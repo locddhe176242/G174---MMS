@@ -1,14 +1,12 @@
-package com.g174.mms.mmssystem.controller;
+package com.g174.mmssystem.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class helloController {
+public class HelloController {
 
-    @GetMapping(
-            "/hello"
-    )
+    @GetMapping("/hello")
     public String hello() {
         return "Hello World";
     }
