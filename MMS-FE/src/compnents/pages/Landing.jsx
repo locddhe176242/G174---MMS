@@ -4,7 +4,6 @@ import logo from '/src/assets/mms_logo.svg';
 export default function Landing() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
       <section className="text-center py-24">
         <img
           src={logo}
@@ -19,7 +18,7 @@ export default function Landing() {
           bán hàng và quản lý kho hiệu quả.
         </p>
         <button
-          className="bg-blue-600 text-white text-lg px-8 py-4 rounded-lg shadow hover:bg-blue-700 transition"
+          className="bg-brand-blue text-white text-lg px-8 py-4 rounded-lg shadow hover:brightness-110 transition"
         >
           Đăng nhập
         </button>
@@ -32,9 +31,9 @@ export default function Landing() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -56,9 +55,9 @@ export default function Landing() {
             </div>
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -80,9 +79,9 @@ export default function Landing() {
             </div>
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -104,9 +103,9 @@ export default function Landing() {
             </div>
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -128,9 +127,9 @@ export default function Landing() {
             </div>
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -152,9 +151,9 @@ export default function Landing() {
             </div>
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-brand-blue"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -178,7 +177,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-20 bg-blue-50">
+      <section className="py-20 bg-brand-blue-50">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
             Sẵn sàng tối ưu hóa quản lý vật tư?
