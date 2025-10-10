@@ -26,10 +26,10 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .filter(u -> u.getDeletedAt() == null)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "User not found with email: " + email));
+                        "Không tìm thấy người dùng với email: " + email));
 
         if (user.getStatus() == User.UserStatus.Inactive) {
-            throw new UsernameNotFoundException("User account is inactive");
+            throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa");
         }
 
         return org.springframework.security.core.userdetails.User.builder()

@@ -97,6 +97,22 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
     }
 
+    // Handle EmailSendingException
+    @ExceptionHandler(EmailSendingException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEmailSendingException(
+            EmailSendingException ex,
+            WebRequest request) {
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                ex.getMessage(),
+                LocalDateTime.now(),
+                request.getDescription(false)
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
       //Handle Validation Errors (@Valid annotation)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(
@@ -111,7 +127,7 @@ public class GlobalExceptionHandler {
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", HttpStatus.BAD_REQUEST.value());
-        response.put("message", "Validation failed");
+        response.put("message", "Dữ liệu không hợp lệ");
         response.put("errors", errors);
         response.put("timestamp", LocalDateTime.now());
 
@@ -127,7 +143,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponseDTO errorResponse = new ErrorResponseDTO(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An error occurred: " + ex.getMessage(),
+                "Đã xảy ra lỗi: " + ex.getMessage(),
                 LocalDateTime.now(),
                 request.getDescription(false)
         );

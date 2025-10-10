@@ -41,7 +41,7 @@ public class JwtService {
 
         claims.put("tokenType", "access");
 
-        log.debug("Generating access token for user: {}", user.getEmail());
+        log.debug("Tạo access token cho người dùng: {}", user.getEmail());
         return generateToken(claims, user.getEmail(), jwtConfig.getAccessTokenExpiration());
     }
 
@@ -50,7 +50,7 @@ public class JwtService {
         claims.put("userId", user.getId());
         claims.put("tokenType", "refresh");
 
-        log.debug("Generating refresh token for user: {}", user.getEmail());
+        log.debug("Tạo refresh token cho người dùng: {}", user.getEmail());
         return generateToken(claims, user.getEmail(), jwtConfig.getRefreshTokenExpiration());
     }
 
@@ -107,16 +107,16 @@ public class JwtService {
             final String tokenEmail = extractEmail(token);
             return (tokenEmail.equals(email) && !isTokenExpired(token));
         } catch (ExpiredJwtException e) {
-            log.error("JWT token is expired: {}", e.getMessage());
+            log.error("JWT token đã hết hạn: {}", e.getMessage());
             return false;
         } catch (MalformedJwtException e) {
-            log.error("Invalid JWT token format: {}", e.getMessage());
+            log.error("Định dạng JWT token không hợp lệ: {}", e.getMessage());
             return false;
         } catch (SignatureException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
+            log.error("Chữ ký JWT không hợp lệ: {}", e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("JWT validation failed: {}", e.getMessage());
+            log.error("Xác thực JWT thất bại: {}", e.getMessage());
             return false;
         }
     }
@@ -126,16 +126,16 @@ public class JwtService {
             extractAllClaims(token);
             return !isTokenExpired(token);
         } catch (ExpiredJwtException e) {
-            log.error("JWT token is expired: {}", e.getMessage());
+            log.error("JWT token đã hết hạn: {}", e.getMessage());
             return false;
         } catch (MalformedJwtException e) {
-            log.error("Invalid JWT token format: {}", e.getMessage());
+            log.error("Định dạng JWT token không hợp lệ: {}", e.getMessage());
             return false;
         } catch (SignatureException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
+            log.error("Chữ ký JWT không hợp lệ: {}", e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("JWT validation failed: {}", e.getMessage());
+            log.error("Xác thực JWT thất bại: {}", e.getMessage());
             return false;
         }
     }

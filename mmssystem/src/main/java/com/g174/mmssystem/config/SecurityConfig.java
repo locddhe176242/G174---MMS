@@ -54,18 +54,27 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .authenticationProvider(authenticationProvider())
                 .authorizeHttpRequests(auth -> auth
+                        // ============ PUBLIC ENDPOINTS ============
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/refresh",
+                                "/api/auth/forgot-password/request",
+                                "/api/auth/forgot-password/verify",
                                 "/error",
                                 "/actuator/health"
                         ).permitAll()
-                        .requestMatchers("/api/auth/register").hasRole("ADMIN")
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")
-                        .requestMatchers("/api/departments/**").hasRole("ADMIN")
-                        .requestMatchers("/api/roles/**").hasRole("ADMIN")
+
+                        // ============ MANAGER ONLY ============
+                        .requestMatchers("/api/auth/register").hasRole("MANAGER")
+                        .requestMatchers("/api/users/**").hasRole("MANAGER")
+                        .requestMatchers("/api/departments/**").hasRole("MANAGER")
+                        .requestMatchers("/api/roles/**").hasRole("MANAGER")
+
+                        // ============ AUTHENTICATED USERS ============
+                        .requestMatchers("/api/auth/change-password").authenticated()
                         .requestMatchers("/api/profile/me").authenticated()
-                        .requestMatchers("/api/profile/change-password").authenticated()
+
+                        // Tất cả requests khác CẦN authentication
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
