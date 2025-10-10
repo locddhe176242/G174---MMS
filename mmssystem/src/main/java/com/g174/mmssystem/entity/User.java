@@ -75,6 +75,12 @@ public class User {
     @Column(name = "otp_used")
     private Boolean otpUsed = false;
 
+    @Column(name = "otp_attempts")
+    private Integer otpAttempts = 0;
+
+    @Column(name = "last_otp_request_time")
+    private Instant lastOtpRequestTime;
+
     @Column(name = "last_login")
     private Instant lastLogin;
 

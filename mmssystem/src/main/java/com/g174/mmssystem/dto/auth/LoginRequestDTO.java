@@ -20,9 +20,6 @@ public class LoginRequestDTO {
     @Email(message = "Email không đúng định dạng")
     private String email;
 
-    @NotBlank(message = "Password không được để trống")
-    @Email(message = "Invalid email format")
-    @Pattern(regexp = "^[A-Za-z0-9._%+-]+@mms\\.com$",
-         message = "Email must end with @mms.com")
+    @NotBlank(message = "Mật khẩu không được để trống")
     private String password;
 }

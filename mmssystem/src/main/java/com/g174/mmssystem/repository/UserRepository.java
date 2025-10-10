@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     boolean existsByEmail(String email);
     boolean existsByEmployeeCode(String employeeCode);
 
+    boolean existsByEmailAndDeletedAtIsNull(String email);
+    boolean existsByEmployeeCodeAndDeletedAtIsNull(String employeeCode);
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE " +
             "LOWER(p.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(p.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

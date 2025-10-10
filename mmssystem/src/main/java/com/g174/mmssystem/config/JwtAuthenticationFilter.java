@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             if (!jwtService.validateToken(token)) {
-                log.warn("Invalid or expired JWT token");
+                log.warn("JWT token không hợp lệ hoặc đã hết hạn");
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -57,7 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String tokenType = jwtService.extractTokenType(token);
 
             if (!"access".equals(tokenType)) {
-                log.warn("Attempting to use refresh token for authentication");
+                log.warn("Cố gắng sử dụng refresh token để xác thực - không được phép");
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -69,10 +69,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            log.debug("User {} authenticated successfully with roles: {}", email, rolesString);
+            log.debug("Người dùng {} đã xác thực thành công với quyền: {}", email, rolesString);
 
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e.getMessage());
+            log.error("Không thể thiết lập xác thực người dùng: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
