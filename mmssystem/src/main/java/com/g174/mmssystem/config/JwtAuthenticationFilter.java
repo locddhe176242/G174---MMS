@@ -1,5 +1,6 @@
 package com.g174.mmssystem.config;
 
+import com.g174.mmssystem.service.IService.ILogoutService;
 import com.g174.mmssystem.until.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,6 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final JwtConfig jwtConfig;
+    private final ILogoutService logoutService;
 
     @Override
     protected void doFilterInternal(
@@ -48,6 +50,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (!jwtService.validateToken(token)) {
                 log.warn("JWT token không hợp lệ hoặc đã hết hạn");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            if (logoutService.isTokenBlacklisted(token)) {
+                log.warn("Token đã bị vô hiệu hóa (đã logout)");
                 filterChain.doFilter(request, response);
                 return;
             }

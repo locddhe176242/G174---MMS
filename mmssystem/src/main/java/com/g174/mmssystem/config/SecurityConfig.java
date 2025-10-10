@@ -72,6 +72,7 @@ public class SecurityConfig {
 
                         // ============ AUTHENTICATED USERS ============
                         .requestMatchers("/api/auth/change-password").authenticated()
+                        .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/profile/me").authenticated()
 
                         // Tất cả requests khác CẦN authentication
