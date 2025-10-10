@@ -1,0 +1,24 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#dbeafe" opacity="0.8"/>
+  
+  <!-- Back box (darkest) -->
+  <rect x="80" y="70" width="35" height="35" rx="4" fill="#1d4ed8"/>
+  
+  <!-- Middle box -->
+  <rect x="65" y="85" width="35" height="35" rx="4" fill="#3b82f6"/>
+  
+  <!-- Front box (lightest) -->
+  <rect x="50" y="100" width="35" height="35" rx="4" fill="#60a5fa"/>
+  
+  <!-- Arrow -->
+  <g transform="translate(120, 100)">
+    <!-- Arrow shaft -->
+    <rect x="0" y="8" width="28" height="8" fill="#f97316" rx="2"/>
+    <!-- Arrow head -->
+    <path d="M 26 4 L 36 12 L 26 20 Z" fill="#f97316"/>
+  </g>
+  
+  <!-- MMS Text -->
+  <text x="100" y="175" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#1e40af" text-anchor="middle">MMS</text>
+</svg>
