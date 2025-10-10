@@ -2,15 +2,13 @@ package com.g174.mmssystem.controller;
 
 import com.g174.mmssystem.dto.auth.*;
 import com.g174.mmssystem.service.IService.IAuthenticationService;
+import com.g174.mmssystem.service.IService.ILogoutService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -19,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final IAuthenticationService authenticationService;
+    private final ILogoutService logoutService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(
@@ -45,5 +44,17 @@ public class AuthController {
         log.info("Yêu cầu đăng ký người dùng mới: {}", registerRequest.getEmail());
         RegisterResponseDTO response = authenticationService.register(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<LogoutResponseDTO> logout(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody LogoutRequestDTO request) {
+
+        String accessToken = authHeader.replace("Bearer ", "");
+        
+        log.info("Yêu cầu đăng xuất");
+        LogoutResponseDTO response = logoutService.logout(accessToken, request);
+        return ResponseEntity.ok(response);
     }
 }
