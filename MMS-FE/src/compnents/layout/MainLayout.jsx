@@ -1,34 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import Header from "./Header";
-import Sidebar from "./SideBar";
-import RoleSwitcher from "../RoleSwitcher";
+import Sidebar from "./Sidebar";
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
-  const { user, roles, getPrimaryRole, logout: authLogout, initializeAuth } = useAuthStore();
-  
-  const [userRole, setUserRole] = useState(() => {
-    const primaryRole = getPrimaryRole();
-    return primaryRole || "MANAGER";
-  });
-  
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
-  
-  useEffect(() => {
-    const primaryRole = getPrimaryRole();
-    if (primaryRole) {
-      setUserRole(primaryRole);
-    }
-  }, [getPrimaryRole]);
+  const { user, logout } = useAuthStore();
 
   const handleLogout = async () => {
-    await authLogout();
+    await logout();
     navigate("/login", { replace: true });
   };
 
@@ -40,20 +22,17 @@ export default function MainLayout() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header
         userName={user?.fullName || user?.email || "User"}
-        role={userRole}
-        notifications={3}
         onLogout={handleLogout}
       />
 
       <div className="flex flex-1 overflow-hidden relative">
-        <Sidebar isCollapsed={isSidebarCollapsed} userRole={userRole} />
+        <Sidebar isCollapsed={isSidebarCollapsed} />
 
         <button
           onClick={toggleSidebar}
-          className={`
-            fixed top-1/2 -translate-y-1/2 w-8 h-16 bg-gradient-to-r from-brand-blue to-blue-600 text-white rounded-r-xl shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center justify-center group z-50
-            ${isSidebarCollapsed ? "left-20" : "left-64"}
-          `}
+          className={`fixed top-1/2 -translate-y-1/2 w-8 h-16 bg-gradient-to-r from-brand-blue to-blue-600 text-white rounded-r-xl shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center justify-center group z-50 ${
+            isSidebarCollapsed ? "left-20" : "left-64"
+          }`}
           aria-label={isSidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
         >
           {isSidebarCollapsed ? (
@@ -71,8 +50,6 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
-
-      <RoleSwitcher currentRole={userRole} onRoleChange={setUserRole} />
     </div>
   );
 }
