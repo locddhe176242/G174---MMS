@@ -39,7 +39,6 @@ public class VendorServiceImpl implements IVendorService {
         log.info("Creating new vendor: {} with code: {}",
                 vendorRequestDTO.getName(), vendorRequestDTO.getVendorCode());
 
-        // Check if vendor code already exists
         if (vendorRepository.existsByVendorCodeAndDeletedAtIsNull(vendorRequestDTO.getVendorCode())) {
             throw new DuplicateResourceException("Vendor code already exists: " + vendorRequestDTO.getVendorCode());
         }
@@ -49,13 +48,11 @@ public class VendorServiceImpl implements IVendorService {
         vendor.setVendorCode(vendorRequestDTO.getVendorCode());
         vendor.setNote(vendorRequestDTO.getNote());
 
-        // Handle address - create new for new vendor
         if (vendorRequestDTO.getAddress() != null) {
             Address address = createAddress(vendorRequestDTO.getAddress());
             vendor.setAddress(address);
         }
 
-        // Handle contact - create new for new vendor
         if (vendorRequestDTO.getContact() != null) {
             Contact contact = createContact(vendorRequestDTO.getContact());
             vendor.setContact(contact);
@@ -122,7 +119,6 @@ public class VendorServiceImpl implements IVendorService {
     public List<VendorResponseDTO> searchVendors(String keyword) {
         log.info("Searching vendors with keyword: {}", keyword);
 
-        // ✅ FIXED: Added null/empty check
         if (keyword == null || keyword.trim().isEmpty()) {
             log.warn("Search keyword is empty, returning all active vendors");
             return getAllVendors();
@@ -139,7 +135,6 @@ public class VendorServiceImpl implements IVendorService {
     public Page<VendorResponseDTO> searchVendors(String keyword, Pageable pageable) {
         log.info("Searching vendors with keyword: {} and pagination", keyword);
 
-        // ✅ FIXED: Added null/empty check
         if (keyword == null || keyword.trim().isEmpty()) {
             log.warn("Search keyword is empty, returning all active vendors");
             return getAllVendors(pageable);
@@ -160,7 +155,6 @@ public class VendorServiceImpl implements IVendorService {
             throw new ResourceNotFoundException("Vendor not found with ID: " + vendorId);
         }
 
-        // Check if vendor code is being changed and if new code already exists
         if (!vendor.getVendorCode().equals(vendorRequestDTO.getVendorCode()) &&
                 vendorRepository.existsByVendorCodeAndDeletedAtIsNull(vendorRequestDTO.getVendorCode())) {
             throw new DuplicateResourceException("Vendor code already exists: " + vendorRequestDTO.getVendorCode());
@@ -170,28 +164,22 @@ public class VendorServiceImpl implements IVendorService {
         vendor.setVendorCode(vendorRequestDTO.getVendorCode());
         vendor.setNote(vendorRequestDTO.getNote());
 
-        // ✅ FIXED: Handle address update - reuse existing or create new
         if (vendorRequestDTO.getAddress() != null) {
             if (vendor.getAddress() != null) {
-                // Update existing address in-place
                 updateAddressFields(vendor.getAddress(), vendorRequestDTO.getAddress());
                 log.debug("Updated existing address ID: {}", vendor.getAddress().getAddressId());
             } else {
-                // Create new address
                 Address address = createAddress(vendorRequestDTO.getAddress());
                 vendor.setAddress(address);
                 log.debug("Created new address ID: {}", address.getAddressId());
             }
         }
 
-        // ✅ FIXED: Handle contact update - reuse existing or create new
         if (vendorRequestDTO.getContact() != null) {
             if (vendor.getContact() != null) {
-                // Update existing contact in-place
                 updateContactFields(vendor.getContact(), vendorRequestDTO.getContact());
                 log.debug("Updated existing contact ID: {}", vendor.getContact().getContactId());
             } else {
-                // Create new contact
                 Contact contact = createContact(vendorRequestDTO.getContact());
                 vendor.setContact(contact);
                 log.debug("Created new contact ID: {}", contact.getContactId());
@@ -243,9 +231,6 @@ public class VendorServiceImpl implements IVendorService {
         return vendorRepository.existsByVendorCodeAndDeletedAtIsNull(vendorCode);
     }
 
-    /**
-     * Creates a new Address entity from DTO
-     */
     private Address createAddress(AddressDTO addressDTO) {
         Address address = new Address();
         address.setStreet(addressDTO.getStreet());
@@ -254,19 +239,12 @@ public class VendorServiceImpl implements IVendorService {
         return addressRepository.save(address);
     }
 
-    /**
-     * Updates existing Address entity fields without creating new entity
-     */
     private void updateAddressFields(Address address, AddressDTO addressDTO) {
         address.setStreet(addressDTO.getStreet());
         address.setCity(addressDTO.getCity());
         address.setCountry(addressDTO.getCountry());
-        // No need to call save() - handled by @Transactional and dirty checking
     }
 
-    /**
-     * Creates a new Contact entity from DTO
-     */
     private Contact createContact(ContactDTO contactDTO) {
         Contact contact = new Contact();
         contact.setPhone(contactDTO.getPhone());
@@ -274,13 +252,9 @@ public class VendorServiceImpl implements IVendorService {
         return contactRepository.save(contact);
     }
 
-    /**
-     * Updates existing Contact entity fields without creating new entity
-     */
     private void updateContactFields(Contact contact, ContactDTO contactDTO) {
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
-        // No need to call save() - handled by @Transactional and dirty checking
     }
 
     private VendorResponseDTO convertToResponseDTO(Vendor vendor) {

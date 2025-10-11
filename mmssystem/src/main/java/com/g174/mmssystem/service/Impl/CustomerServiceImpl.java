@@ -42,13 +42,11 @@ public class CustomerServiceImpl implements ICustomerService {
         customer.setLastName(customerRequestDTO.getLastName());
         customer.setNote(customerRequestDTO.getNote());
 
-        // Handle address - create new for new customer
         if (customerRequestDTO.getAddress() != null) {
             Address address = createAddress(customerRequestDTO.getAddress());
             customer.setAddress(address);
         }
 
-        // Handle contact - create new for new customer
         if (customerRequestDTO.getContact() != null) {
             Contact contact = createContact(customerRequestDTO.getContact());
             customer.setContact(contact);
@@ -140,37 +138,27 @@ public class CustomerServiceImpl implements ICustomerService {
         customer.setLastName(customerRequestDTO.getLastName());
         customer.setNote(customerRequestDTO.getNote());
 
-        // Handle address update - reuse existing or create new
         if (customerRequestDTO.getAddress() != null) {
             if (customer.getAddress() != null) {
-                // Update existing address in-place
                 updateAddressFields(customer.getAddress(), customerRequestDTO.getAddress());
                 log.debug("Updated existing address ID: {}", customer.getAddress().getAddressId());
             } else {
-                // Create new address
                 Address address = createAddress(customerRequestDTO.getAddress());
                 customer.setAddress(address);
                 log.debug("Created new address ID: {}", address.getAddressId());
             }
         }
-        // Note: If DTO address is null, we keep the existing address
-        // To remove it, you'd need: customer.setAddress(null);
 
-        // Handle contact update - reuse existing or create new
         if (customerRequestDTO.getContact() != null) {
             if (customer.getContact() != null) {
-                // Update existing contact in-place
                 updateContactFields(customer.getContact(), customerRequestDTO.getContact());
                 log.debug("Updated existing contact ID: {}", customer.getContact().getContactId());
             } else {
-                // Create new contact
                 Contact contact = createContact(customerRequestDTO.getContact());
                 customer.setContact(contact);
                 log.debug("Created new contact ID: {}", contact.getContactId());
             }
         }
-        // Note: If DTO contact is null, we keep the existing contact
-        // To remove it, you'd need: customer.setContact(null);
 
         Customer updatedCustomer = customerRepository.save(customer);
         log.info("Customer updated successfully with ID: {}", updatedCustomer.getCustomerId());
@@ -211,9 +199,6 @@ public class CustomerServiceImpl implements ICustomerService {
         log.info("Customer restored successfully with ID: {}", customerId);
     }
 
-    /**
-     * Creates a new Address entity from DTO
-     */
     private Address createAddress(AddressDTO addressDTO) {
         Address address = new Address();
         address.setStreet(addressDTO.getStreet());
@@ -222,19 +207,12 @@ public class CustomerServiceImpl implements ICustomerService {
         return addressRepository.save(address);
     }
 
-    /**
-     * Updates existing Address entity fields without creating new entity
-     */
     private void updateAddressFields(Address address, AddressDTO addressDTO) {
         address.setStreet(addressDTO.getStreet());
         address.setCity(addressDTO.getCity());
         address.setCountry(addressDTO.getCountry());
-        // No need to call save() - handled by @Transactional and dirty checking
     }
 
-    /**
-     * Creates a new Contact entity from DTO
-     */
     private Contact createContact(ContactDTO contactDTO) {
         Contact contact = new Contact();
         contact.setPhone(contactDTO.getPhone());
@@ -242,13 +220,9 @@ public class CustomerServiceImpl implements ICustomerService {
         return contactRepository.save(contact);
     }
 
-    /**
-     * Updates existing Contact entity fields without creating new entity
-     */
     private void updateContactFields(Contact contact, ContactDTO contactDTO) {
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
-        // No need to call save() - handled by @Transactional and dirty checking
     }
 
     private CustomerResponseDTO convertToResponseDTO(Customer customer) {
