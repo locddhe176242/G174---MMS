@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import logo from '/src/assets/mms_logo.svg';
 
 export default function Landing() {
@@ -17,11 +18,12 @@ export default function Landing() {
           Hệ thống quản lý vật tư toàn diện, giúp tối ưu hóa quy trình mua sắm,
           bán hàng và quản lý kho hiệu quả.
         </p>
-        <button
-          className="bg-brand-blue text-white text-lg px-8 py-4 rounded-lg shadow hover:brightness-110 transition"
+        <Link 
+          to="/login"
+          className="inline-block bg-brand-blue text-white text-lg px-8 py-4 rounded-lg shadow hover:brightness-110 transition"
         >
           Đăng nhập
-        </button>
+        </Link>
       </section>
 
       <section className="py-20 bg-white">
@@ -32,18 +34,8 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
               <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-6 h-6 text-brand-blue"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"
-                  />
+                <svg className="w-6 h-6 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">
@@ -56,18 +48,8 @@ export default function Landing() {
 
             <div className="p-6 border rounded-2xl shadow-sm text-center hover:shadow-md transition">
               <div className="w-12 h-12 bg-brand-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-6 h-6 text-brand-blue"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                  />
+                <svg className="w-6 h-6 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">

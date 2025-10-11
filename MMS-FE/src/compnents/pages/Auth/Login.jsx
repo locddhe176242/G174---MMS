@@ -1,17 +1,47 @@
-import React, { useState } from "react";
-import logo from "../../assets/mms_logo.svg";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import useAuthStore from "../../../store/authStore";
+import logo from "../../../assets/mms_logo.svg";
 
 export default function Login({ onSubmit: propsOnSubmit }) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isLoading, isAuthenticated, error, clearError } = useAuthStore();
+  
+  const successMessage = location.state?.message;
 
-  function handleSubmit(e) {
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
+
+  async function handleSubmit(e) {
     e.preventDefault();
+    setErrorMessage("");
+    
     const payload = { identifier, password, remember };
-    if (propsOnSubmit) propsOnSubmit(payload);
-    alert(`Đăng nhập với: ${identifier}\nGhi nhớ: ${remember ? "Có" : "Không"}`);
+    
+    const result = await login(payload);
+    
+    if (result.success) {
+      if (propsOnSubmit) propsOnSubmit(payload);
+      
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
+    } else {
+      setErrorMessage(result.error || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
+    }
   }
 
   return (
@@ -29,6 +59,18 @@ export default function Login({ onSubmit: propsOnSubmit }) {
         </div>
 
         <h1 className="text-2xl font-bold text-slate-800 mb-4">Đăng nhập vào cửa hàng của bạn</h1>
+
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -77,18 +119,37 @@ export default function Login({ onSubmit: propsOnSubmit }) {
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
               Ghi nhớ đăng nhập
             </label>
-            <a href="#" className="text-brand-blue hover:underline">Quên mật khẩu</a>
+            <Link to="/forgot-password" className="text-brand-blue hover:underline">
+              Quên mật khẩu
+            </Link>
           </div>
 
           <div>
             <button
               type="submit"
-              className="w-full bg-brand-blue hover:brightness-110 text-white font-semibold py-2 rounded-md shadow-md focus:outline-none"
+              disabled={isLoading}
+              className="w-full bg-brand-blue hover:brightness-110 text-white font-semibold py-2 rounded-md shadow-md focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Đăng nhập
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang đăng nhập...
+                </span>
+              ) : (
+                "Đăng nhập"
+              )}
             </button>
           </div>
         </form>
+
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-sm text-slate-600 hover:text-brand-blue">
+            Quay lại
+          </Link>
+        </div>
       </div>
     </div>
   );

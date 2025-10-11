@@ -104,7 +104,6 @@ public class CustomerController {
 
         customerService.restoreCustomer(customerId);
 
-        // Return the restored customer
         CustomerResponseDTO response = customerService.getCustomerById(customerId);
         return ResponseEntity.ok(response);
     }

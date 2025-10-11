@@ -59,9 +59,8 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/forgot-password/request",
+                                "/api/auth/forgot-password/verify-otp",
                                 "/api/auth/forgot-password/verify",
-                                "/error",
-                                "/actuator/health",
                                 "/api/customers/**",
                                 "/api/vendors/**"
                         ).permitAll()
@@ -71,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("MANAGER")
                         .requestMatchers("/api/departments/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles/**").hasRole("MANAGER")
+                        .requestMatchers("/api/roles").hasRole("MANAGER")
 
                         // ============ AUTHENTICATED USERS ============
                         .requestMatchers("/api/auth/change-password").authenticated()

@@ -1,44 +1,54 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import Landing from "./compnents/pages/Home-Page/Landing";
+import Login from "./compnents/pages/Auth/Login";
+import ForgotPassword from "./compnents/pages/Auth/ForgotPassword";
+import VerifyOtp from "./compnents/pages/Auth/VerifyOtp";
+import ResetPassword from "./compnents/pages/Auth/ResetPassword";
+import MainLayout from "./compnents/layout/MainLayout";
+import Dashboard from "./compnents/pages/Home-Page/Dashboard";
 import CustomerList from "./compnents/pages/CustomerList";
-import Login from "./compnents/pages/Login";
+import UserProfile from "./compnents/pages/UserProfile";
+import ProtectedRoute from "./compnents/ProtectedRoute";
 
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem("accessToken");
-  
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return children;
-};
+// Admin Pages
+import RoleManagement from "./compnents/pages/Admin/RoleManagement";
+import RoleDetail from "./compnents/pages/Admin/RoleDetail";
+import MenuManagement from "./compnents/pages/Admin/MenuManagement";
+import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
+import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
+import UserManagement from "./compnents/pages/Admin/UserManagement";
 
 function App() {
   return (
     <Routes>
-      {/* Public Routes */}
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-      
-      {/* Protected Routes */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/verify-otp" element={<VerifyOtp />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <CustomerList />
+            <MainLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/customers" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<UserProfile />} />
+        <Route path="/customers" element={<CustomerList />} />
         
-        {/* Customer Routes */}
-        <Route path="customers">
-          <Route index element={<CustomerList />} />
-        </Route>
+        {/* Admin Routes */}
+        <Route path="/admin/roles" element={<RoleManagement />} />
+        <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
+        <Route path="/admin/menus" element={<MenuManagement />} />
+        <Route path="/admin/permissions" element={<PermissionManagement />} />
+        <Route path="/admin/user-permissions" element={<UserPermissionManagement />} />
+        <Route path="/admin/users" element={<UserManagement />} />
       </Route>
-      
-      {/* 404 */}
-      <Route path="*" element={<div>404 - Page Not Found</div>} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
