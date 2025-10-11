@@ -18,7 +18,7 @@ import java.util.List;
 @RequestMapping("/api/vendors")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*") // Configure appropriately for production
+@CrossOrigin(origins = "*")
 public class VendorController {
 
     private final IVendorService vendorService;
@@ -112,7 +112,6 @@ public class VendorController {
 
         vendorService.restoreVendor(vendorId);
 
-        // Return the restored vendor
         VendorResponseDTO response = vendorService.getVendorById(vendorId);
         return ResponseEntity.ok(response);
     }
