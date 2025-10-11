@@ -61,7 +61,9 @@ public class SecurityConfig {
                                 "/api/auth/forgot-password/request",
                                 "/api/auth/forgot-password/verify",
                                 "/error",
-                                "/actuator/health"
+                                "/actuator/health",
+                                "/api/customers/**",
+                                "/api/vendors/**"
                         ).permitAll()
 
                         // ============ MANAGER ONLY ============
