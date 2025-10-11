@@ -28,6 +28,7 @@ public class ProductResponseDTO {
     private String categoryName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer quantity;
     private String createdBy;
     private String updatedBy;
 }

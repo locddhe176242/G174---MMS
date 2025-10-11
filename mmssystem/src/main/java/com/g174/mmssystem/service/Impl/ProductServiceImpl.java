@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ProductServiceImpl implements IProductService {
@@ -100,6 +99,7 @@ public class ProductServiceImpl implements IProductService {
                 .category(category)
                 .imageUrl(dto.getImageUrl())
                 .status(status)
+                .quantity(dto.getQuantity())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .createdBy(user)
@@ -124,6 +124,7 @@ public class ProductServiceImpl implements IProductService {
                 .updatedAt(saved.getUpdatedAt())
                 .createdBy(saved.getCreatedBy().getUsername())
                 .updatedBy(saved.getUpdatedBy().getUsername())
+                .quantity(saved.getQuantity())
                 .build();
     }
 
@@ -164,7 +165,7 @@ public class ProductServiceImpl implements IProductService {
         if (dto.getPurchasePrice() != null) product.setPurchasePrice(dto.getPurchasePrice());
         if (dto.getImageUrl() != null) product.setImageUrl(dto.getImageUrl());
         if (dto.getStatus() != null) product.setStatus(dto.getStatus());
-
+        if (dto.getQuantity() != null) product.setQuantity(dto.getQuantity());
         if (dto.getCategoryId() != null) {
             ProductCategory category = productCategoryRepository.findById(dto.getCategoryId())
                     .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_CATEGORY));
@@ -187,6 +188,7 @@ public class ProductServiceImpl implements IProductService {
                 .barcode(saved.getBarcode())
                 .imageUrl(saved.getImageUrl())
                 .status(saved.getStatus())
+                .quantity(saved.getQuantity())
                 .categoryName(saved.getCategory() != null ? saved.getCategory().getName() : null)
                 .categoryName(saved.getCategory() != null ? saved.getCategory().getName() : null)
                 .createdAt(saved.getCreatedAt())
@@ -206,6 +208,7 @@ public class ProductServiceImpl implements IProductService {
                 .purchasePrice(product.getPurchasePrice())
                 .sellingPrice(product.getSellingPrice())
                 .status(product.getStatus())
+                .quantity(product.getQuantity())
                 .barcode(product.getBarcode())
                 .imageUrl(product.getImageUrl())
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)

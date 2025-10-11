@@ -49,6 +49,9 @@ public class Product {
     @Column(name = "image_url", length = 255)
     private String imageUrl;
 
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+
     // ----- Relationships -----
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
