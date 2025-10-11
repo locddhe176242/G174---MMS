@@ -1,6 +1,7 @@
 package com.g174.mmssystem.controller;
 
 import com.g174.mmssystem.dto.requestDTO.CustomerRequestDTO;
+import com.g174.mmssystem.dto.responseDTO.CustomerDetailResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerResponseDTO;
 import com.g174.mmssystem.service.IService.ICustomerService;
 import jakarta.validation.Valid;
@@ -108,4 +109,14 @@ public class CustomerController {
         CustomerResponseDTO response = customerService.getCustomerById(customerId);
         return ResponseEntity.ok(response);
     }
+
+    // Thêm vào CustomerController.java
+    @GetMapping("/{customerId}/detail")
+    public ResponseEntity<CustomerDetailResponseDTO> getCustomerDetailById(@PathVariable Integer customerId) {
+        log.info("REST: Fetching customer detail with ID: {}", customerId);
+
+        CustomerDetailResponseDTO response = customerService.getCustomerDetailById(customerId);
+        return ResponseEntity.ok(response);
+    }
 }
+
