@@ -1,6 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faShield, faBars, faKey, faUsers } from "@fortawesome/free-solid-svg-icons";
+import useAuthStore from "../../../store/authStore";
 
 export default function Dashboard() {
+  const { roles } = useAuthStore();
+  const isManager = roles && roles.includes('MANAGER');
   const stats = [
     {
       label: "Tổng giá trị kho",
@@ -282,6 +288,57 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Admin Quick Links - Only for MANAGER */}
+      {isManager && (
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <FontAwesomeIcon icon={faShield} className="w-6 h-6 text-purple-600" />
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Admin Panel</h2>
+              <p className="text-sm text-slate-600">Quản lý phân quyền và permissions</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              to="/admin/roles"
+              className="bg-white border-2 border-purple-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition-all group"
+            >
+              <FontAwesomeIcon icon={faShield} className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-slate-800 mb-1">Roles</h3>
+              <p className="text-xs text-slate-600">Quản lý roles & assign menus/permissions</p>
+            </Link>
+
+            <Link
+              to="/admin/menus"
+              className="bg-white border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all group"
+            >
+              <FontAwesomeIcon icon={faBars} className="w-8 h-8 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-slate-800 mb-1">Menus</h3>
+              <p className="text-xs text-slate-600">Tạo, sửa, xóa menu items</p>
+            </Link>
+
+            <Link
+              to="/admin/permissions"
+              className="bg-white border-2 border-green-200 rounded-lg p-4 hover:border-green-400 hover:shadow-md transition-all group"
+            >
+              <FontAwesomeIcon icon={faKey} className="w-8 h-8 text-green-600 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-slate-800 mb-1">Permissions</h3>
+              <p className="text-xs text-slate-600">Quản lý permissions trong hệ thống</p>
+            </Link>
+
+            <Link
+              to="/admin/user-permissions"
+              className="bg-white border-2 border-orange-200 rounded-lg p-4 hover:border-orange-400 hover:shadow-md transition-all group"
+            >
+              <FontAwesomeIcon icon={faUsers} className="w-8 h-8 text-orange-600 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold text-slate-800 mb-1">User Permissions</h3>
+              <p className="text-xs text-slate-600">Cấp/thu hồi quyền cho users</p>
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
