@@ -65,10 +65,10 @@ export default function Sidebar() {
 
             {openProduct && (
               <div className="mt-2 ml-8 space-y-1">
-                <Item icon={<span />} onClick={() => {}}>
+                <Item icon={<span />} onClick={() => { }}>
                   Danh sách sản phẩm
                 </Item>
-                <Item icon={<span />} onClick={() => {}}>
+                <Item icon={<span />} onClick={() => { }}>
                   Nhóm / Loại
                 </Item>
               </div>
@@ -81,7 +81,7 @@ export default function Sidebar() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18M3 12h18M3 17h18" />
               </svg>
             }
-            onClick={() => {}}
+            onClick={() => { }}
           >
             Kho
           </Item>
@@ -105,13 +105,14 @@ export default function Sidebar() {
           >
             Xuất hàng
           </Item>
-
+          
           <Item
             icon={
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8a4 4 0 10-8 0h8z" />
               </svg>
             }
+            onClick={() => window.location.href = "/customers"}
           >
             Khách hàng/Nhà cung cấp
           </Item>

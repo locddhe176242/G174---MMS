@@ -13,32 +13,33 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:5173}")
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174}")
     private String[] allowedOrigins;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // Allow specific origins
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
 
+        // Allow all methods
         configuration.setAllowedMethods(Arrays.asList(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
         ));
 
-        configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "X-Requested-With"
-        ));
+        // Allow all headers
+        configuration.setAllowedHeaders(Arrays.asList("*"));
 
+        // Expose headers
         configuration.setExposedHeaders(Arrays.asList(
-                "Authorization"
+                "Authorization", "Content-Type", "X-Total-Count"
         ));
 
+        // Allow credentials
         configuration.setAllowCredentials(true);
 
+        // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
