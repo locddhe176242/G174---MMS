@@ -70,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("MANAGER")
                         .requestMatchers("/api/departments/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles/**").hasRole("MANAGER")
+                        .requestMatchers("/api/roles").hasRole("MANAGER")
 
                         // ============ AUTHENTICATED USERS ============
                         .requestMatchers("/api/auth/change-password").authenticated()
