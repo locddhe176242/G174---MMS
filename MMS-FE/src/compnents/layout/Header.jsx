@@ -2,8 +2,7 @@ import React from "react";
 import logo from '../../assets/mms_logo.svg';
 
 export default function Header({
-  title = "Material Management System",
-  userName = "Nguyen Van A",
+  userName = "Nguyễn Văn A",
   role = "Nhân viên kho",
   notifications = 3,
   onLogout = () => {},
@@ -16,12 +15,13 @@ export default function Header({
     .toUpperCase();
 
   return (
-    <div className="bg-white shadow-sm">
-      <header className="container mx-auto flex items-center justify-between px-4 py-3">
+    <div className="bg-white border-b border-slate-200">
+      <header className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-3">
-          <img src={logo} alt="MMS logo" className="w-10 h-10 object-contain" />
+          <img src={logo} alt="MMS" className="w-10 h-10 object-contain" />
           <div>
-            <div className="text-sm font-semibold text-gray-800">{title}</div>
+            <div className="text-base font-bold text-brand-blue">MMS</div>
+            <div className="text-xs text-slate-600">Management System</div>
           </div>
         </div>
 
