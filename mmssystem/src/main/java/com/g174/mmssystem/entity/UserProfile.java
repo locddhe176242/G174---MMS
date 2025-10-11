@@ -45,6 +45,9 @@ public class UserProfile {
     @Column(name = "address")
     private String address;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     public enum Gender {
         Male, Female, Other
     }
