@@ -1,167 +1,180 @@
 import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { getMenuByRole, getPermissionBadge, PERMISSIONS } from "../../config/menuConfig";
 
-export default function Sidebar() {
-  const [openProduct, setOpenProduct] = useState(false);
-  const Item = ({ children, icon, onClick, active }) => (
-    <button
-      onClick={onClick}
-      className={
-        "w-full flex items-center gap-3 text-left px-3 py-2 rounded-md transition " +
-        (active ? "bg-brand-blue-50 font-medium" : "hover:bg-brand-blue-50")
-      }
-      style={{ color: "var(--text-default, inherit)" }}
-    >
-      <span className="w-5 h-5 flex items-center justify-center text-brand-blue" aria-hidden>
-        {icon}
-      </span>
-      <span className="truncate">{children}</span>
-    </button>
-  );
+export default function Sidebar({ isCollapsed = false, userRole = "MANAGER" }) {
+  const location = useLocation();
+  const [openDropdowns, setOpenDropdowns] = useState({});
+  
+  const menuConfig = getMenuByRole(userRole);
 
-  return (
-    <aside
-      className="w-64 border-r bg-white p-4"
-      style={{ fontFamily: "var(--font-primary), system-ui, sans-serif" }}
-      aria-label="Sidebar"
-    >
-      <div className="mb-6">
-        <div className="text-xs font-semibold text-slate-500 uppercase mb-3">Menu chính</div>
+  const toggleDropdown = (id) => {
+    setOpenDropdowns(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
-        <nav className="space-y-1">
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10.5L12 4l9 6.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V10.5z" />
-              </svg>
-            }
-            active
+  const MenuItem = ({ item, level = 0 }) => {
+    const isActive = item.path && location.pathname === item.path;
+    const hasChildren = item.children && item.children.length > 0;
+    const isOpen = openDropdowns[item.id];
+
+    if (hasChildren && !isCollapsed) {
+      return (
+        <div>
+          <button
+            onClick={() => toggleDropdown(item.id)}
+            className="relative group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue transition-all duration-200"
           >
-            Trang chủ
-          </Item>
-
-          <div>
-            <button
-              onClick={() => setOpenProduct((s) => !s)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-brand-blue-50 transition"
+            <span className="w-5 h-5 flex-shrink-0 text-brand-blue">
+              {item.icon}
+            </span>
+            <span className="flex-1 font-medium text-sm text-left whitespace-nowrap">
+              {item.label}
+            </span>
+            {item.badge && (
+              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                {item.badge}
+              </span>
+            )}
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 20 20" 
+              fill="currentColor" 
+              className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
             >
-              <span className="w-5 h-5 flex items-center justify-center text-brand-blue" aria-hidden>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V7a1 1 0 00-1-1h-6m-6 8v6a1 1 0 001 1h6" />
-                </svg>
-              </span>
-              <span className="flex-1 text-sm">Sản phẩm</span>
-              <span className="text-slate-400">
-                {openProduct ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
-              </span>
-            </button>
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </button>
 
-            {openProduct && (
-              <div className="mt-2 ml-8 space-y-1">
-                <Item icon={<span />} onClick={() => {}}>
-                  Danh sách sản phẩm
-                </Item>
-                <Item icon={<span />} onClick={() => {}}>
-                  Nhóm / Loại
-                </Item>
+          {isOpen && (
+            <div className="mt-1 ml-8 space-y-1">
+              {item.children.map(child => (
+                <Link
+                  key={child.id}
+                  to={child.path}
+                  className={`
+                    flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition
+                    ${location.pathname === child.path
+                      ? "bg-brand-blue-50 text-brand-blue font-medium"
+                      : "text-slate-600 hover:text-brand-blue hover:bg-brand-blue-50"
+                    }
+                  `}
+                >
+                  <span>{child.label}</span>
+                  {child.badge && (
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                      {child.badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (hasChildren && isCollapsed) {
+      return (
+        <button
+          onClick={() => {}}
+          className="relative group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue transition-all duration-200"
+          title={item.label}
+        >
+          <span className="w-5 h-5 flex-shrink-0 text-brand-blue">
+            {item.icon}
+          </span>
+          
+          <div className="absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
+            {item.label}
+            {item.children && (
+              <div className="mt-1 text-xs text-slate-300">
+                {item.children.map(c => c.label).join(', ')}
               </div>
             )}
           </div>
+        </button>
+      );
+    }
 
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18M3 12h18M3 17h18" />
-              </svg>
-            }
-            onClick={() => {}}
-          >
-            Kho
-          </Item>
+    return (
+      <Link
+        to={item.path}
+        className={`
+          relative group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+          ${isActive 
+            ? "bg-brand-blue text-white shadow-sm" 
+            : "text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue"
+          }
+        `}
+        title={isCollapsed ? item.label : ""}
+      >
+        <span className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-white" : "text-brand-blue"}`}>
+          {item.icon}
+        </span>
+        {!isCollapsed && (
+          <span className="flex-1 font-medium text-sm whitespace-nowrap">
+            {item.label}
+          </span>
+        )}
+        {!isCollapsed && item.badge && (
+          <span className={`text-xs px-2 py-0.5 rounded ${
+            isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {item.badge}
+          </span>
+        )}
+        
+        {isCollapsed && (
+          <div className="absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
+            {item.label}
+            {item.badge && <span className="ml-2 text-xs text-slate-300">({item.badge})</span>}
+          </div>
+        )}
+      </Link>
+    );
+  };
 
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18v6H3zM3 6h18" />
-              </svg>
-            }
-          >
-            Nhập hàng
-          </Item>
+  return (
+    <aside
+      className={`
+        relative border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out
+        ${isCollapsed ? "w-20" : "w-64"}
+      `}
+      style={{ fontFamily: "Roboto, sans-serif" }}
+    >
+      <div className="p-4">
+        {menuConfig.mainMenu && menuConfig.mainMenu.length > 0 && (
+          <div className="mb-6">
+            {!isCollapsed && (
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 px-3">
+                Menu chính
+              </div>
+            )}
+            <nav className="space-y-1">
+              {menuConfig.mainMenu.map(item => (
+                <MenuItem key={item.id} item={item} />
+              ))}
+            </nav>
+          </div>
+        )}
 
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18l-1 10a2 2 0 01-2 2H6a2 2 0 01-2-2L3 7z" />
-              </svg>
-            }
-          >
-            Xuất hàng
-          </Item>
-
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8a4 4 0 10-8 0h8z" />
-              </svg>
-            }
-          >
-            Khách hàng/Nhà cung cấp
-          </Item>
-
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
-              </svg>
-            }
-          >
-            Kế toán
-          </Item>
-        </nav>
-      </div>
-
-      <div className="pt-4">
-        <div className="text-xs font-semibold text-slate-500 uppercase mb-3">Quản lý</div>
-
-        <nav className="space-y-1">
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4" />
-              </svg>
-            }
-          >
-            Phê duyệt
-          </Item>
-
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
-              </svg>
-            }
-          >
-            Báo cáo
-          </Item>
-
-          <Item
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857" />
-              </svg>
-            }
-          >
-            Nhân sự
-          </Item>
-        </nav>
+        {menuConfig.managementMenu && menuConfig.managementMenu.length > 0 && (
+          <div className="pt-4 border-t border-slate-200">
+            {!isCollapsed && (
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 px-3">
+                Quản lý
+              </div>
+            )}
+            <nav className="space-y-1">
+              {menuConfig.managementMenu.map(item => (
+                <MenuItem key={item.id} item={item} />
+              ))}
+            </nav>
+          </div>
+        )}
       </div>
     </aside>
   );

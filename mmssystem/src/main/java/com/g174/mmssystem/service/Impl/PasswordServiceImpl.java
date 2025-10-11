@@ -106,6 +106,60 @@ public class PasswordServiceImpl implements IPasswordService {
 
     @Override
     @Transactional(noRollbackFor = InvalidCredentialsException.class)
+    public VerifyOtpOnlyResponseDTO verifyOtpOnly(VerifyOtpOnlyRequestDTO request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .filter(u -> u.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + request.getEmail()));
+
+        if (user.getOtpCode() == null) {
+            log.warn("Không tìm thấy mã OTP cho email: {}", request.getEmail());
+            throw new InvalidCredentialsException("Không tìm thấy mã OTP. Vui lòng yêu cầu mã mới.");
+        }
+
+        if (Boolean.TRUE.equals(user.getOtpUsed())) {
+            log.warn("Mã OTP đã được sử dụng cho email: {}", request.getEmail());
+            throw new InvalidCredentialsException("Mã OTP đã được sử dụng");
+        }
+
+        if (user.getOtpExpiry() == null || Instant.now().isAfter(user.getOtpExpiry())) {
+            log.warn("Mã OTP đã hết hạn cho email: {}", request.getEmail());
+            throw new InvalidCredentialsException("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.");
+        }
+
+        int attempts = user.getOtpAttempts() != null ? user.getOtpAttempts() : 0;
+        
+        if (attempts >= 5) {
+            user.setOtpCode(null);
+            user.setOtpExpiry(null);
+            user.setOtpUsed(true);
+            user.setOtpAttempts(0);
+            userRepository.save(user);
+            
+            log.warn("Vượt quá số lần thử OTP cho email: {}", request.getEmail());
+            throw new InvalidCredentialsException("Bạn đã nhập sai quá 5 lần. Vui lòng yêu cầu mã OTP mới.");
+        }
+
+        if (!user.getOtpCode().equals(request.getOtp())) {
+            user.setOtpAttempts(attempts + 1);
+            userRepository.save(user);
+            
+            int remainingAttempts = 5 - (attempts + 1);
+            log.warn("Mã OTP không đúng cho email: {} - Còn {} lần thử", request.getEmail(), remainingAttempts);
+            throw new InvalidCredentialsException(
+                "Mã OTP không chính xác. Còn " + remainingAttempts + " lần thử."
+            );
+        }
+
+        log.info("Xác thực OTP thành công cho email: {}", request.getEmail());
+
+        return VerifyOtpOnlyResponseDTO.builder()
+                .message("Mã OTP chính xác. Vui lòng nhập mật khẩu mới.")
+                .remainingAttempts(5 - attempts)
+                .build();
+    }
+
+    @Override
+    @Transactional(noRollbackFor = InvalidCredentialsException.class)
     public VerifyOtpResponseDTO verifyOtpAndResetPassword(VerifyOtpRequestDTO request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .filter(u -> u.getDeletedAt() == null)
