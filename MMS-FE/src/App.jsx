@@ -13,6 +13,7 @@ import ProtectedRoute from "./compnents/ProtectedRoute";
 import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 
+
 // Admin Pages
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -42,6 +43,7 @@ function App() {
         <Route path="/customers" element={<CustomerList />} />
         <Route path="/customers/new" element={<CustomerForm />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
+        <Route path="/customers/:id/edit" element={<CustomerForm />} />
         
         {/* Admin Routes */}
         <Route path="/admin/roles" element={<RoleManagement />} />
