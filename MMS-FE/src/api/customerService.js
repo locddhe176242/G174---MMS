@@ -70,10 +70,7 @@ export const getCustomerDetail = async (customerId) => {
   return res.data;
 };
 
-export const createCustomer = async (payload) => {
-  const res = await apiClient.post("/api/customers", payload);
-  return res.data;
-};
+
 
 
 
