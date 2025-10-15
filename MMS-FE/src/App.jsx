@@ -10,6 +10,9 @@ import Dashboard from "./compnents/pages/Home-Page/Dashboard";
 import CustomerList from "./compnents/pages/CustomerList";
 import UserProfile from "./compnents/pages/UserProfile";
 import ProtectedRoute from "./compnents/ProtectedRoute";
+import VendorList from "./compnents/pages/VendorList";
+import VendorForm from "./compnents/pages/VendorForm";
+import VendorDetail from "./compnents/pages/VendorDetail"
 import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 
@@ -41,10 +44,15 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/customers" element={<CustomerList />} />
+        <Route path="/vendors" element={<VendorList />} />
+        <Route path="/vendors/new" element={<VendorForm />} />
+        <Route path="/vendors/:id/edit" element={<VendorForm />} />
+        <Route path="/vendors/:id" element={<VendorDetail />} />
+
         <Route path="/customers/new" element={<CustomerForm />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/customers/:id/edit" element={<CustomerForm />} />
-        
+         main
         {/* Admin Routes */}
         <Route path="/admin/roles" element={<RoleManagement />} />
         <Route path="/admin/roles/:roleId" element={<RoleDetail />} />

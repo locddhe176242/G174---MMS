@@ -18,7 +18,6 @@ import java.util.List;
 @RequestMapping("/api/vendors")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*")
 public class VendorController {
 
     private final IVendorService vendorService;
