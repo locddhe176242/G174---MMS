@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { customerService } from "../../api/customerService";
+import { useNavigate } from "react-router-dom";
+
 
 export default function CustomerList() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,32 +23,31 @@ export default function CustomerList() {
   };
 
   // Sửa phần fetchCustomers trong CustomerList.jsx
-const fetchCustomers = async (page = 0, keyword = "") => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    let response;
-    if (keyword.trim()) {
-      response = await customerService.searchCustomersWithPagination(keyword, page, pageSize);
-    } else {
-      response = await customerService.getCustomersWithPagination(page, pageSize);
+  const fetchCustomers = async (page = 0, keyword = "") => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let response;
+      if (keyword.trim()) {
+        response = await customerService.searchCustomersWithPagination(keyword, page, pageSize);
+      } else {
+        response = await customerService.getCustomersWithPagination(page, pageSize);
+      }
+
+      console.log("API Response:", response); // Debug log
+
+      setCustomers(response.content || []);
+      setTotalPages(response.totalPages || 0);
+      setTotalElements(response.totalElements || 0);
+      setCurrentPage(page);
+    } catch (err) {
+      setError("Không thể tải danh sách khách hàng");
+      console.error("Error fetching customers:", err);
+    } finally {
+      setLoading(false);
     }
-    
-    console.log("API Response:", response); // Debug log
-    
-    // Response đã là data rồi, không cần .data
-    setCustomers(response.content || []);
-    setTotalPages(response.totalPages || 0);
-    setTotalElements(response.totalElements || 0);
-    setCurrentPage(page);
-  } catch (err) {
-    setError("Không thể tải danh sách khách hàng");
-    console.error("Error fetching customers:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Initial load
   useEffect(() => {
@@ -97,11 +99,11 @@ const fetchCustomers = async (page = 0, keyword = "") => {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Quản lý khách hàng</h1>
-            <button className="bg-black text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              Thêm khách hàng
+            <button
+              onClick={() => navigate("/customers/new")}
+              className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+            >
+              + Thêm khách hàng
             </button>
           </div>
         </div>
@@ -138,7 +140,7 @@ const fetchCustomers = async (page = 0, keyword = "") => {
                   Tìm kiếm
                 </button>
               </form>
-              
+
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
@@ -205,18 +207,26 @@ const fetchCustomers = async (page = 0, keyword = "") => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
-                          <button className="text-blue-600 hover:text-blue-900">
+                          <button
+                            onClick={() => navigate(`/customers/${customer.customerId}`)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Xem chi tiết"
+                          >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          <button className="text-green-600 hover:text-green-900">
+                          <button
+                            onClick={() => navigate(`/customers/${customer.customerId}/edit`)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Chỉnh sửa"
+                          >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDelete(customer.customerId)}
                             className="text-red-600 hover:text-red-900"
                           >
@@ -240,7 +250,7 @@ const fetchCustomers = async (page = 0, keyword = "") => {
                 <div className="text-sm text-gray-700">
                   Hiển thị {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, totalElements)} trong tổng số {totalElements} khách hàng
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
@@ -251,7 +261,7 @@ const fetchCustomers = async (page = 0, keyword = "") => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  
+
                   {Array.from({ length: totalPages }, (_, i) => (
                     <button
                       key={i}
@@ -261,7 +271,7 @@ const fetchCustomers = async (page = 0, keyword = "") => {
                       {i + 1}
                     </button>
                   ))}
-                  
+
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages - 1}
