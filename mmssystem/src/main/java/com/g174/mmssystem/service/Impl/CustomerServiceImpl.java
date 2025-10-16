@@ -299,7 +299,6 @@ public class CustomerServiceImpl implements ICustomerService {
             CustomerDetailResponseDTO.AddressInfo addressInfo = new CustomerDetailResponseDTO.AddressInfo();
             addressInfo.setAddressId(customer.getAddress().getAddressId());
             addressInfo.setStreet(customer.getAddress().getStreet());
-            addressInfo.setCity(customer.getAddress().getCity());
             addressInfo.setCountry(customer.getAddress().getCountry());
             responseDTO.setAddress(addressInfo);
         }
@@ -472,7 +471,6 @@ public class CustomerServiceImpl implements ICustomerService {
 
     private boolean isAddressEmpty(AddressDTO addressDTO) {
         return (addressDTO.getStreet() == null || addressDTO.getStreet().trim().isEmpty()) &&
-                (addressDTO.getCity() == null || addressDTO.getCity().trim().isEmpty()) &&
                 (addressDTO.getCountry() == null || addressDTO.getCountry().trim().isEmpty());
     }
 
