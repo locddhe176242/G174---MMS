@@ -60,6 +60,17 @@ export const vendorService = {
     const response = await apiClient.post(`/vendors/${id}/restore`);
     return response.data;
   },
+  
+  // Check if vendor code exists
+  checkVendorCodeExists: async (vendorCode) => {
+    const response = await apiClient.get(`/vendors/exists/${vendorCode}`);
+    return response.data;
+  },
+
+  generateVendorCode: async () => {
+    const response = await apiClient.get("/vendors/generate-code");
+    return response.data;
+  }
 };
 
 // Get detail with transactions
@@ -67,5 +78,7 @@ export const getVendorDetail = async (vendorId) => {
   const res = await apiClient.get(`/vendors/${vendorId}/detail`);
   return res.data;
 };
+
+
 
 export default vendorService;
