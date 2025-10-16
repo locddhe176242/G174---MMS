@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { vendorService } from "../../api/vendorService";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 export default function VendorList() {
   const navigate = useNavigate();
+  
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,6 +14,13 @@ export default function VendorList() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [pageSize] = useState(10);
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
+  
+  // State cho popup xác nhận xóa
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [vendorToDelete, setVendorToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function để tránh nested ternary
   const getPaginationButtonClass = (isActive) => {
@@ -21,20 +30,56 @@ export default function VendorList() {
     return "px-3 py-1 border rounded-md border-gray-300 hover:bg-gray-50";
   };
 
+  // Handle sort
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to asc
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get sort icon
+  const getSortIcon = (field) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+    
+    if (sortDirection === "asc") {
+      return (
+        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+        </svg>
+      );
+    } else {
+      return (
+        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+        </svg>
+      );
+    }
+  };
+
   // Fetch vendors
-  const fetchVendors = async (page = 0, keyword = "") => {
+  const fetchVendors = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc") => {
     try {
       setLoading(true);
       setError(null);
 
+      const sort = `${sortField},${sortDirection}`;
       let response;
       if (keyword.trim()) {
-        response = await vendorService.searchVendorsWithPagination(keyword, page, pageSize);
+        response = await vendorService.searchVendorsWithPagination(keyword, page, pageSize, sort);
       } else {
-        response = await vendorService.getVendorsWithPagination(page, pageSize);
+        response = await vendorService.getVendorsWithPagination(page, pageSize, sort);
       }
-
-      console.log("API Response:", response);
 
       setVendors(response.content || []);
       setTotalPages(response.totalPages || 0);
@@ -53,29 +98,51 @@ export default function VendorList() {
     fetchVendors();
   }, []);
 
+  // Fetch when sort changes
+  useEffect(() => {
+    fetchVendors(currentPage, searchKeyword, sortField, sortDirection);
+  }, [sortField, sortDirection]);
+
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchVendors(0, searchKeyword);
+    fetchVendors(0, searchKeyword, sortField, sortDirection);
   };
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    fetchVendors(newPage, searchKeyword);
+    fetchVendors(newPage, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle delete
-  const handleDelete = async (vendorId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa nhà cung cấp này?")) {
-      try {
-        await vendorService.deleteVendor(vendorId);
-        fetchVendors(currentPage, searchKeyword);
-        alert("Xóa nhà cung cấp thành công!");
-      } catch (err) {
-        alert("Không thể xóa nhà cung cấp");
-        console.error("Error deleting vendor:", err);
-      }
+  // Handle delete button click - mở popup xác nhận
+  const handleDeleteClick = (vendor) => {
+    setVendorToDelete(vendor);
+    setShowDeleteModal(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!vendorToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await vendorService.deleteVendor(vendorToDelete.vendorId);
+      toast.success("Xóa nhà cung cấp thành công!");
+      setShowDeleteModal(false);
+      setVendorToDelete(null);
+      fetchVendors(currentPage, searchKeyword, sortField, sortDirection);
+    } catch (err) {
+      toast.error("Không thể xóa nhà cung cấp");
+      console.error("Error deleting vendor:", err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  // Handle delete cancel
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setVendorToDelete(null);
   };
 
   // Format date
@@ -85,10 +152,15 @@ export default function VendorList() {
     return date.toLocaleDateString("vi-VN");
   };
 
-  // Format address
-  const formatAddress = (address) => {
-    if (!address) return "";
-    return `${address.street || ""}, ${address.city || ""}, ${address.country || ""}`.replace(/^,\s*|,\s*$/g, "");
+  // Format address - chỉ hiển thị tỉnh/thành phố
+  const formatMainAddress = (address) => {
+    if (!address) return "Chưa có địa chỉ";
+    
+    const parts = [];
+    if (address.provinceName) parts.push(address.provinceName);
+    if (address.country) parts.push(address.country);
+    
+    return parts.join(", ") || "Chưa có địa chỉ";
   };
 
   return (
@@ -167,14 +239,54 @@ export default function VendorList() {
                     <th className="px-6 py-3 text-left">
                       <input type="checkbox" className="rounded border-gray-300" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TÊN</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MÃ NCC</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ĐỊA CHỈ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LIÊN HỆ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NGÀY TẠO</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GHI CHÚ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("vendorId")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        ID
+                        {getSortIcon("vendorId")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("name")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        TÊN
+                        {getSortIcon("name")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("vendorCode")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        MÃ NCC
+                        {getSortIcon("vendorCode")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("provinceName")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        ĐỊA CHỈ
+                        {getSortIcon("provinceName")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("createdAt")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        NGÀY TẠO
+                        {getSortIcon("createdAt")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      HÀNH ĐỘNG
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -186,23 +298,19 @@ export default function VendorList() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {vendor.vendorId?.toString().padStart(3, '0')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {vendor.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {vendor.vendorCode}
+                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                          {vendor.vendorCode}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {formatAddress(vendor.address)}
+                        {formatMainAddress(vendor.address)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {vendor.contact?.phone || ""}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(vendor.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {vendor.note || ""}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
@@ -226,7 +334,7 @@ export default function VendorList() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(vendor.vendorId)}
+                            onClick={() => handleDeleteClick(vendor)}
                             className="text-red-600 hover:text-red-900"
                             title="Xóa"
                           >
@@ -287,6 +395,58 @@ export default function VendorList() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 w-10 h-10 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Xác nhận xóa nhà cung cấp
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Bạn có chắc chắn muốn xóa nhà cung cấp <strong>"{vendorToDelete?.name}"</strong> không? 
+                Hành động này không thể hoàn tác.
+              </p>
+              
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={handleDeleteCancel}
+                  disabled={isDeleting}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

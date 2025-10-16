@@ -12,7 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vendors")
@@ -121,5 +123,14 @@ public class VendorController {
 
         boolean exists = vendorService.existsByVendorCode(vendorCode);
         return ResponseEntity.ok(exists);
+    }
+
+    @GetMapping("/generate-code")
+    public ResponseEntity<Map<String, String>> generateVendorCode() {
+        log.info("Generating new vendor code");
+        String vendorCode = vendorService.generateNextVendorCode();
+        Map<String, String> response = new HashMap<>();
+        response.put("vendorCode", vendorCode);
+        return ResponseEntity.ok(response);
     }
 }

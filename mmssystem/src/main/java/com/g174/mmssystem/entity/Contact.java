@@ -1,46 +1,53 @@
 package com.g174.mmssystem.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
-import java.time.Instant;
-
-@Getter
-@Setter
 @Entity
 @Table(name = "contacts")
 public class Contact {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "contact_id")
     private Integer contactId;
 
-    @Size(max = 50)
-    @Column(name = "phone")
+    @Column(name = "phone", length = 50)
     private String phone;
 
-    @Size(max = 100)
-    @Email
-    @Column(name = "email")
+    @Column(name = "email", length = 100)
     private String email;
 
-    @Column(name = "created_at")
-    private Instant createdAt;
+    @Column(name = "website", length = 255)
+    private String website;
 
-    @Column(name = "updated_at")
-    private Instant updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+    // Getters and Setters
+    public Integer getContactId() {
+        return contactId;
     }
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
+    public void setContactId(Integer contactId) {
+        this.contactId = contactId;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getWebsite() {
+        return website;
+    }
+
+    public void setWebsite(String website) {
+        this.website = website;
     }
 }

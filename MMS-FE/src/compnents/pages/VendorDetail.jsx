@@ -47,6 +47,20 @@ export default function VendorDetail() {
   const totalOrders = transactionSummary?.totalOrders ?? 0;
   const avgSpend = totalOrders ? (Number(totalSpend) / Number(totalOrders)) : 0;
 
+  // Format address
+  const formatAddress = (address) => {
+    if (!address) return "Chưa có địa chỉ";
+    
+    const parts = [];
+    if (address.street) parts.push(address.street);
+    if (address.wardName) parts.push(address.wardName);
+    if (address.districtName) parts.push(address.districtName);
+    if (address.provinceName) parts.push(address.provinceName);
+    if (address.country) parts.push(address.country);
+    
+    return parts.join(", ");
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
@@ -162,18 +176,9 @@ export default function VendorDetail() {
 
           {/* Address */}
           <div className="border rounded">
-            <div className="px-4 py-3 border-b font-medium">Sổ địa chỉ</div>
+            <div className="px-4 py-3 border-b font-medium">Địa chỉ</div>
             <div className="p-4 text-sm space-y-1">
-              {address ? (
-                <>
-                  {address.street && <div>{address.street}</div>}
-                  {(address.city || address.country) && (
-                    <div>{[address.city, address.country].filter(Boolean).join(", ")}</div>
-                  )}
-                </>
-              ) : (
-                <div className="text-gray-500">Chưa có địa chỉ</div>
-              )}
+              <div>{formatAddress(address)}</div>
             </div>
           </div>
 

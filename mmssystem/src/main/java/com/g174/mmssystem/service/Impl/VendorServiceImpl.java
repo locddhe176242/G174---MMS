@@ -35,13 +35,54 @@ public class VendorServiceImpl implements IVendorService {
     private final ContactRepository contactRepository;
 
     @Override
+    @Transactional
+    public String generateNextVendorCode() {
+        log.info("Generating next vendor code");
+
+        // Lấy max number từ tất cả vendors (kể cả đã xóa)
+        Integer maxNumber = vendorRepository.getMaxVendorCodeNumber();
+        int nextNumber = (maxNumber == null ? 0 : maxNumber) + 1;
+
+        String vendorCode = String.format("NCC%03d", nextNumber);
+
+        // Kiểm tra xem code có tồn tại trong active vendors không
+        while (vendorRepository.existsByVendorCodeAndDeletedAtIsNull(vendorCode)) {
+            nextNumber++;
+            vendorCode = String.format("NCC%03d", nextNumber);
+        }
+
+        log.info("Generated vendor code: {}", vendorCode);
+        return vendorCode;
+    }
+
+    @Override
     public VendorResponseDTO createVendor(VendorRequestDTO vendorRequestDTO) {
         log.info("Creating new vendor: {} with code: {}",
                 vendorRequestDTO.getName(), vendorRequestDTO.getVendorCode());
 
-        if (vendorRepository.existsByVendorCodeAndDeletedAtIsNull(vendorRequestDTO.getVendorCode())) {
-            throw new DuplicateResourceException("Vendor code already exists: " + vendorRequestDTO.getVendorCode());
+        // Auto generate code nếu chưa có
+        if (vendorRequestDTO.getVendorCode() == null || vendorRequestDTO.getVendorCode().isEmpty()) {
+            String generatedCode = generateNextVendorCode();
+            vendorRequestDTO.setVendorCode(generatedCode);
+            log.info("Auto-generated vendor code: {}", generatedCode);
         }
+
+        // Kiểm tra duplicate với retry logic
+        String vendorCode = vendorRequestDTO.getVendorCode();
+        int retryCount = 0;
+        int maxRetries = 10;
+
+        while (vendorRepository.existsByVendorCode(vendorCode) && retryCount < maxRetries) {
+            retryCount++;
+            vendorCode = generateNextVendorCode();
+            log.warn("Vendor code {} already exists, retrying with: {}", vendorRequestDTO.getVendorCode(), vendorCode);
+        }
+
+        if (retryCount >= maxRetries) {
+            throw new DuplicateResourceException("Unable to generate unique vendor code after " + maxRetries + " attempts");
+        }
+
+        vendorRequestDTO.setVendorCode(vendorCode);
 
         Vendor vendor = new Vendor();
         vendor.setName(vendorRequestDTO.getName());
@@ -232,16 +273,53 @@ public class VendorServiceImpl implements IVendorService {
     }
 
     private Address createAddress(AddressDTO addressDTO) {
+        log.info("=== CREATING ADDRESS ===");
+        log.info("AddressDTO received: {}", addressDTO);
+
         Address address = new Address();
         address.setStreet(addressDTO.getStreet());
-        address.setCity(addressDTO.getCity());
+        address.setProvinceCode(addressDTO.getProvinceCode());
+        address.setProvinceName(addressDTO.getProvinceName());
+        address.setDistrictCode(addressDTO.getDistrictCode());
+        address.setDistrictName(addressDTO.getDistrictName());
+        address.setWardCode(addressDTO.getWardCode());
+        address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
-        return addressRepository.save(address);
+
+        log.info("Address before save:");
+        log.info("  street: {}", address.getStreet());
+        log.info("  provinceCode: {}", address.getProvinceCode());
+        log.info("  provinceName: {}", address.getProvinceName());
+        log.info("  districtCode: {}", address.getDistrictCode());
+        log.info("  districtName: {}", address.getDistrictName());
+        log.info("  wardCode: {}", address.getWardCode());
+        log.info("  wardName: {}", address.getWardName());
+        log.info("  country: {}", address.getCountry());
+
+        Address savedAddress = addressRepository.save(address);
+
+        log.info("Address after save:");
+        log.info("  addressId: {}", savedAddress.getAddressId());
+        log.info("  street: {}", savedAddress.getStreet());
+        log.info("  provinceCode: {}", savedAddress.getProvinceCode());
+        log.info("  provinceName: {}", savedAddress.getProvinceName());
+        log.info("  districtCode: {}", savedAddress.getDistrictCode());
+        log.info("  districtName: {}", savedAddress.getDistrictName());
+        log.info("  wardCode: {}", savedAddress.getWardCode());
+        log.info("  wardName: {}", savedAddress.getWardName());
+        log.info("  country: {}", savedAddress.getCountry());
+
+        return savedAddress;
     }
 
     private void updateAddressFields(Address address, AddressDTO addressDTO) {
         address.setStreet(addressDTO.getStreet());
-        address.setCity(addressDTO.getCity());
+        address.setProvinceCode(addressDTO.getProvinceCode());
+        address.setProvinceName(addressDTO.getProvinceName());
+        address.setDistrictCode(addressDTO.getDistrictCode());
+        address.setDistrictName(addressDTO.getDistrictName());
+        address.setWardCode(addressDTO.getWardCode());
+        address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
     }
 
@@ -249,12 +327,14 @@ public class VendorServiceImpl implements IVendorService {
         Contact contact = new Contact();
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
+        contact.setWebsite(contactDTO.getWebsite());
         return contactRepository.save(contact);
     }
 
     private void updateContactFields(Contact contact, ContactDTO contactDTO) {
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
+        contact.setWebsite(contactDTO.getWebsite());
     }
 
     private VendorResponseDTO convertToResponseDTO(Vendor vendor) {
@@ -270,7 +350,12 @@ public class VendorServiceImpl implements IVendorService {
             VendorResponseDTO.AddressInfo addressInfo = new VendorResponseDTO.AddressInfo();
             addressInfo.setAddressId(vendor.getAddress().getAddressId());
             addressInfo.setStreet(vendor.getAddress().getStreet());
-            addressInfo.setCity(vendor.getAddress().getCity());
+            addressInfo.setProvinceCode(vendor.getAddress().getProvinceCode());
+            addressInfo.setProvinceName(vendor.getAddress().getProvinceName());
+            addressInfo.setDistrictCode(vendor.getAddress().getDistrictCode());
+            addressInfo.setDistrictName(vendor.getAddress().getDistrictName());
+            addressInfo.setWardCode(vendor.getAddress().getWardCode());
+            addressInfo.setWardName(vendor.getAddress().getWardName());
             addressInfo.setCountry(vendor.getAddress().getCountry());
             responseDTO.setAddress(addressInfo);
         }
@@ -280,6 +365,7 @@ public class VendorServiceImpl implements IVendorService {
             contactInfo.setContactId(vendor.getContact().getContactId());
             contactInfo.setPhone(vendor.getContact().getPhone());
             contactInfo.setEmail(vendor.getContact().getEmail());
+            contactInfo.setWebsite(vendor.getContact().getWebsite());
             responseDTO.setContact(contactInfo);
         }
 
