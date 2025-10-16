@@ -16,7 +16,6 @@ public interface VendorRepository extends JpaRepository<Vendor, Integer> {
 
     Optional<Vendor> findByVendorCode(String vendorCode);
 
-    boolean existsByVendorCode(String vendorCode);
 
     boolean existsByVendorCodeAndDeletedAtIsNull(String vendorCode);
 
@@ -26,14 +25,12 @@ public interface VendorRepository extends JpaRepository<Vendor, Integer> {
     @Query("SELECT v FROM Vendor v WHERE v.deletedAt IS NULL")
     Page<Vendor> findAllActiveVendors(Pageable pageable);
 
-    // ✅ FIXED: Added parentheses around OR condition
     @Query("SELECT v FROM Vendor v WHERE " +
             "(LOWER(v.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(v.vendorCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "v.deletedAt IS NULL")
     List<Vendor> searchVendors(@Param("keyword") String keyword);
 
-    // ✅ FIXED: Added parentheses around OR condition
     @Query("SELECT v FROM Vendor v WHERE " +
             "(LOWER(v.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(v.vendorCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
@@ -45,4 +42,15 @@ public interface VendorRepository extends JpaRepository<Vendor, Integer> {
 
     @Query("SELECT v FROM Vendor v WHERE v.contact.contactId = :contactId AND v.deletedAt IS NULL")
     List<Vendor> findByContactId(@Param("contactId") Integer contactId);
+
+    @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(vendor_code, 4) AS UNSIGNED)), 0) " +
+            "FROM vendors " +
+            "WHERE vendor_code REGEXP '^NCC[0-9]+$' " +
+            "FOR UPDATE",
+            nativeQuery = true)
+    Integer getMaxVendorCodeNumber();
+
+    // Thêm method kiểm tra duplicate với retry
+    @Query("SELECT COUNT(v) > 0 FROM Vendor v WHERE v.vendorCode = :vendorCode")
+    boolean existsByVendorCode(@Param("vendorCode") String vendorCode);
 }

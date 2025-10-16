@@ -16,4 +16,5 @@ public interface IVendorService {
     void deleteVendor(Integer vendorId);
     void restoreVendor(Integer vendorId);
     boolean existsByVendorCode(String vendorCode);
+    String generateNextVendorCode();
 }
