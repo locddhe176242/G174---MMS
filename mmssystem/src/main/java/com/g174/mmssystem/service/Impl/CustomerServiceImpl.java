@@ -202,14 +202,24 @@ public class CustomerServiceImpl implements ICustomerService {
     private Address createAddress(AddressDTO addressDTO) {
         Address address = new Address();
         address.setStreet(addressDTO.getStreet());
-        address.setCity(addressDTO.getCity());
+        address.setProvinceCode(addressDTO.getProvinceCode());
+        address.setProvinceName(addressDTO.getProvinceName());
+        address.setDistrictCode(addressDTO.getDistrictCode());
+        address.setDistrictName(addressDTO.getDistrictName());
+        address.setWardCode(addressDTO.getWardCode());
+        address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
         return addressRepository.save(address);
     }
 
     private void updateAddressFields(Address address, AddressDTO addressDTO) {
         address.setStreet(addressDTO.getStreet());
-        address.setCity(addressDTO.getCity());
+        address.setProvinceCode(addressDTO.getProvinceCode());
+        address.setProvinceName(addressDTO.getProvinceName());
+        address.setDistrictCode(addressDTO.getDistrictCode());
+        address.setDistrictName(addressDTO.getDistrictName());
+        address.setWardCode(addressDTO.getWardCode());
+        address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
     }
 
@@ -217,12 +227,14 @@ public class CustomerServiceImpl implements ICustomerService {
         Contact contact = new Contact();
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
+        contact.setWebsite(contactDTO.getWebsite());
         return contactRepository.save(contact);
     }
 
     private void updateContactFields(Contact contact, ContactDTO contactDTO) {
         contact.setPhone(contactDTO.getPhone());
         contact.setEmail(contactDTO.getEmail());
+        contact.setWebsite(contactDTO.getWebsite());
     }
 
     private CustomerResponseDTO convertToResponseDTO(Customer customer) {
@@ -238,7 +250,12 @@ public class CustomerServiceImpl implements ICustomerService {
             CustomerResponseDTO.AddressInfo addressInfo = new CustomerResponseDTO.AddressInfo();
             addressInfo.setAddressId(customer.getAddress().getAddressId());
             addressInfo.setStreet(customer.getAddress().getStreet());
-            addressInfo.setCity(customer.getAddress().getCity());
+            addressInfo.setProvinceCode(customer.getAddress().getProvinceCode());
+            addressInfo.setProvinceName(customer.getAddress().getProvinceName());
+            addressInfo.setDistrictCode(customer.getAddress().getDistrictCode());
+            addressInfo.setDistrictName(customer.getAddress().getDistrictName());
+            addressInfo.setWardCode(customer.getAddress().getWardCode());
+            addressInfo.setWardName(customer.getAddress().getWardName());
             addressInfo.setCountry(customer.getAddress().getCountry());
             responseDTO.setAddress(addressInfo);
         }
@@ -248,6 +265,7 @@ public class CustomerServiceImpl implements ICustomerService {
             contactInfo.setContactId(customer.getContact().getContactId());
             contactInfo.setPhone(customer.getContact().getPhone());
             contactInfo.setEmail(customer.getContact().getEmail());
+            contactInfo.setWebsite(customer.getContact().getWebsite());
             responseDTO.setContact(contactInfo);
         }
 
