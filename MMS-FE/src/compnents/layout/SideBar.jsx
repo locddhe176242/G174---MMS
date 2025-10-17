@@ -110,13 +110,19 @@ export default function Sidebar({ isCollapsed = false }) {
         
         // Transform menu data: thêm icon JSX vào menu items
         const transformMenu = (menuItems) => {
-          return menuItems.map((item) => ({
-            ...item,
-            id: item.menuKey, // Use menuKey as id
-            path: item.menuPath, // Use menuPath as path
-            label: item.menuLabel, // Use menuLabel as label
-            icon: getIcon(item.iconName), // Convert icon name to JSX
-          }));
+          return menuItems.map((item) => {
+
+            const absolutePath = item.menuPath?.startsWith("/")
+                ? item.menuPath
+                : `/${item.menuPath}`;
+            return {
+              ...item,
+              id: item.menuKey,
+              path: absolutePath,
+              label: item.menuLabel,
+              icon: getIcon(item.iconName),
+            };
+          });
         };
         
         setMenuConfig({

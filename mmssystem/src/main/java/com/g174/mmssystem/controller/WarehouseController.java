@@ -3,6 +3,7 @@ package com.g174.mmssystem.controller;
 import com.g174.mmssystem.dto.requestDTO.WarehouseRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.WarehouseResponseDTO;
 import com.g174.mmssystem.service.IService.IWarehouseService;
+import com.g174.mmssystem.service.Impl.WarehouseServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import java.util.List;
 public class WarehouseController {
 
     private final IWarehouseService service;
+    private final WarehouseServiceImpl warehouseServiceImpl;
 
     @PostMapping
     public ResponseEntity<WarehouseResponseDTO> createWarehouse(
@@ -78,6 +80,13 @@ public class WarehouseController {
             Pageable pageable) {
         return ResponseEntity.ok(service.searchWarehouses(keyword, pageable));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<WarehouseResponseDTO> deleteWarehouse(@PathVariable Integer id) {
+        WarehouseResponseDTO deleted = warehouseServiceImpl.deleteWarehouse(id);
+        return ResponseEntity.ok(deleted);
+    }
+
 
     @GetMapping("/exists/{code}")
     public ResponseEntity<Boolean> checkWarehouseCodeExists(@PathVariable String code) {

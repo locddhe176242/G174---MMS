@@ -29,5 +29,8 @@ public interface IWarehouseService {
 
     WarehouseResponseDTO restoreWarehouse(Integer warehouseId);
 
+    WarehouseResponseDTO deleteWarehouse(Integer warehouseId);
+
+
     boolean existsByCode(String code);
 }
