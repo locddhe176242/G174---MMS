@@ -57,3 +57,37 @@
   outline: 2px solid var(--brand-blue-600);
   outline-offset: 2px;
 }
+
+/* React Select Styling */
+.react-select-container .react-select__control {
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  min-height: 42px;
+  box-shadow: none;
+}
+
+.react-select-container .react-select__control:hover {
+  border-color: #d1d5db;
+}
+
+.react-select-container .react-select__control--is-focused {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.react-select-container .react-select__placeholder {
+  color: #9ca3af;
+}
+
+.react-select-container .react-select__single-value {
+  color: #374151;
+}
+
+.react-select-container .react-select__option--is-focused {
+  background-color: #f3f4f6;
+}
+
+.react-select-container .react-select__option--is-selected {
+  background-color: #3b82f6;
+  color: white;
+}
