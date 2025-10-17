@@ -56,10 +56,10 @@ public class WarehouseServiceImpl implements IWarehouseService {
     @Transactional(readOnly = true)
     public WarehouseResponseDTO getWarehouseById(Integer id) {
         Warehouse warehouse = warehouseRepository.findById(id)
-                .filter(w -> w.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + id));
         return convertToResponseDTO(warehouse);
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -113,14 +113,16 @@ public class WarehouseServiceImpl implements IWarehouseService {
     @Override
     public WarehouseResponseDTO updateWarehouse(Integer id, WarehouseRequestDTO dto, Integer updatedById) {
         Warehouse warehouse = warehouseRepository.findById(id)
-                .filter(w -> w.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + id));
+
+        if (warehouse.getStatus() == Warehouse.Status.Inactive) {
+            throw new IllegalStateException("Không thể cập nhật kho đã bị khóa (Inactive).");
+        }
 
         if (!warehouse.getCode().equals(dto.getCode()) &&
                 warehouseRepository.existsByCodeAndDeletedAtIsNull(dto.getCode())) {
             throw new DuplicateResourceException("Warehouse code already exists: " + dto.getCode());
         }
-
         warehouse.setCode(dto.getCode());
         warehouse.setName(dto.getName());
         warehouse.setLocation(dto.getLocation());
@@ -133,6 +135,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
         log.info("Warehouse updated successfully with ID: {}", updated.getWarehouseId());
         return convertToResponseDTO(updated);
     }
+
 
     @Override
     public WarehouseResponseDTO deactivateWarehouse(Integer id) {
@@ -220,4 +223,15 @@ public class WarehouseServiceImpl implements IWarehouseService {
             return null;
         }
     }
+
+    @Override
+    public WarehouseResponseDTO deleteWarehouse(Integer warehouseId) {
+        Warehouse warehouse = warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + warehouseId));
+
+        warehouseRepository.delete(warehouse);
+        log.info("Warehouse deleted permanently with ID: {}", warehouseId);
+        return convertToResponseDTO(warehouse);
+    }
+
 }
