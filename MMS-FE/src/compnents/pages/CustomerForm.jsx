@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Select from 'react-select';
 import { customerService } from "../../api/customerService";
+import { toast } from "react-toastify";
 
 export default function CustomerForm() {
   const { id } = useParams();
@@ -13,8 +15,11 @@ export default function CustomerForm() {
     note: "",
     address: {
       street: "",
-      city: "",
-      country: ""
+      provinceCode: "",
+      provinceName: "",
+      wardCode: "",
+      wardName: "",
+      country: "Việt Nam"
     },
     contact: {
       phone: "",
@@ -25,6 +30,18 @@ export default function CustomerForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+
+  // States cho provinces và wards
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+
+  // Load provinces on mount
+  useEffect(() => {
+    loadProvinces();
+  }, []);
 
   // Load customer data for editing
   useEffect(() => {
@@ -32,6 +49,63 @@ export default function CustomerForm() {
       loadCustomerData();
     }
   }, [id]);
+
+  // Load wards khi chọn province HOẶC khi provinces load xong
+  useEffect(() => {
+    if (formData.address.provinceCode && provinces.length > 0) {
+      loadWards(formData.address.provinceCode);
+    } else {
+      setWards([]);
+    }
+  }, [formData.address.provinceCode, provinces]);
+
+  const loadProvinces = async () => {
+    try {
+      setLoadingProvinces(true);
+      const response = await fetch('https://provinces.open-api.vn/api/v2/p/');
+      const data = await response.json();
+      const formattedProvinces = data.map(province => ({
+        value: province.code,
+        label: province.name
+      }));
+      setProvinces(formattedProvinces);
+    } catch (err) {
+      console.error('Error loading provinces:', err);
+      toast.error('Không thể tải danh sách tỉnh/thành phố');
+    } finally {
+      setLoadingProvinces(false);
+    }
+  };
+
+  const loadWards = async (provinceCode) => {
+    try {
+      setLoadingWards(true);
+      const response = await fetch(`https://provinces.open-api.vn/api/v2/p/${provinceCode}?depth=2`);
+      const provinceData = await response.json();
+
+      const allWards = [];
+      if (provinceData.wards && Array.isArray(provinceData.wards)) {
+        provinceData.wards.forEach(ward => {
+          allWards.push({
+            value: ward.code,
+            label: ward.name
+          });
+        });
+      }
+
+      setWards(allWards);
+
+      if (allWards.length === 0) {
+        toast.info('Không tìm thấy phường/xã cho tỉnh này');
+      }
+    } catch (err) {
+      console.error('Error loading wards:', err);
+      toast.error('Không thể tải danh sách phường/xã');
+      setWards([]);
+    } finally {
+      setLoadingWards(false);
+    }
+  };
 
   const loadCustomerData = async () => {
     try {
@@ -43,8 +117,11 @@ export default function CustomerForm() {
         note: customer.note || "",
         address: {
           street: customer.address?.street || "",
-          city: customer.address?.city || "",
-          country: customer.address?.country || ""
+          provinceCode: customer.address?.provinceCode || "",
+          provinceName: customer.address?.provinceName || "",
+          wardCode: customer.address?.wardCode || "",
+          wardName: customer.address?.wardName || "",
+          country: customer.address?.country || "Việt Nam"
         },
         contact: {
           phone: customer.contact?.phone || "",
@@ -77,22 +154,122 @@ export default function CustomerForm() {
     }
   };
 
+  const handleProvinceChange = (selectedOption) => {
+    const provinceCode = selectedOption ? selectedOption.value : "";
+    const provinceName = selectedOption ? selectedOption.label : "";
+
+    // Reset wards
+    setWards([]);
+
+    setFormData(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        provinceCode,
+        provinceName,
+        wardCode: "", // Reset ward khi đổi province
+        wardName: ""
+      }
+    }));
+  };
+
+  const handleWardChange = (selectedOption) => {
+    const wardCode = selectedOption ? selectedOption.value : "";
+    const wardName = selectedOption ? selectedOption.label : "";
+
+    setFormData(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        wardCode,
+        wardName
+      }
+    }));
+  };
+
+  // Validation functions
+  const validateEmail = (email) => {
+    if (!email) return true; // Email không bắt buộc
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone) => {
+    if (!phone) return true; // Phone không bắt buộc
+    const phoneRegex = /^0[3|5|7|8|9][0-9]{7,8}$/;
+    return phoneRegex.test(phone);
+  };
+
+  // Validate tất cả fields cùng lúc
+  const validateAllFields = () => {
+    const errors = {};
+
+    // Validate firstName (bắt buộc)
+    if (!formData.firstName || formData.firstName.trim().length < 2) {
+      errors.firstName = "Tên phải có ít nhất 2 ký tự";
+    }
+
+    // Validate lastName (bắt buộc)
+    if (!formData.lastName || formData.lastName.trim().length < 2) {
+      errors.lastName = "Họ phải có ít nhất 2 ký tự";
+    }
+
+    // Validate province (bắt buộc)
+    if (!formData.address.provinceCode) {
+      errors.province = "Vui lòng chọn tỉnh/thành phố";
+    }
+
+    // Validate ward (bắt buộc)
+    if (!formData.address.wardCode) {
+      errors.ward = "Vui lòng chọn phường/xã";
+    }
+
+    // Validate email (không bắt buộc nhưng phải đúng format)
+    if (formData.contact.email && !validateEmail(formData.contact.email)) {
+      errors.email = "Email không đúng định dạng (vd: example@gmail.com)";
+    }
+
+    // Validate phone (không bắt buộc nhưng phải đúng format)
+    if (formData.contact.phone && !validatePhone(formData.contact.phone)) {
+      errors.phone = "Số điện thoại không đúng định dạng";
+    }
+
+    return errors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setValidationErrors({});
+
+    // Validate tất cả fields
+    const errors = validateAllFields();
+    
+    if (Object.keys(errors).length > 0) {
+      // Có lỗi validation
+      setValidationErrors(errors);
+      setIsSubmitting(false);
+      
+      // Auto scroll lên đầu form
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     try {
       if (isEdit) {
         await customerService.updateCustomer(id, formData);
-        alert("Cập nhật khách hàng thành công!");
+        toast.success("Cập nhật khách hàng thành công!");
+        navigate("/customers");
       } else {
         await customerService.createCustomer(formData);
-        alert("Tạo khách hàng thành công!");
+        toast.success("Tạo khách hàng thành công!");
+        navigate("/customers");
       }
-      navigate("/customers");
     } catch (err) {
-      setError(isEdit ? "Không thể cập nhật khách hàng" : "Không thể tạo khách hàng");
+      const errorMessage = err.response?.data?.message ||
+        (isEdit ? "Không thể cập nhật khách hàng" : "Không thể tạo khách hàng");
+      setError(errorMessage);
       console.error("Error saving customer:", err);
     } finally {
       setIsSubmitting(false);
@@ -156,81 +333,141 @@ export default function CustomerForm() {
               )}
 
               {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Họ <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange("lastName", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Nhập họ"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tên <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange("firstName", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Nhập tên"
-                    required
-                  />
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Thông tin cơ bản</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Họ <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange("lastName", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        validationErrors.lastName ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Nhập họ"
+                    />
+                    {validationErrors.lastName && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.lastName}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tên <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange("firstName", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        validationErrors.firstName ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Nhập tên"
+                    />
+                    {validationErrors.firstName && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.firstName}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Address Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">Thông tin địa chỉ</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <h3 className="text-lg font-semibold text-gray-900">Thông tin địa chỉ</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Địa chỉ chi tiết
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address.street}
+                    onChange={(e) => handleInputChange("address.street", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Số nhà, tên đường, tổ, khu phố..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Đường/Phố
+                      Tỉnh/Thành phố <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={formData.address.street}
-                      onChange={(e) => handleInputChange("address.street", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Nhập đường/phố"
+                    <Select
+                      value={provinces.find(p => p.value === formData.address.provinceCode)}
+                      onChange={handleProvinceChange}
+                      options={provinces}
+                      placeholder="Chọn tỉnh/thành phố"
+                      isLoading={loadingProvinces}
+                      isSearchable
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          borderColor: validationErrors.province ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
+                          '&:hover': {
+                            borderColor: validationErrors.province ? '#ef4444' : '#3b82f6'
+                          }
+                        })
+                      }}
                     />
+                    {validationErrors.province && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.province}</p>
+                    )}
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Thành phố
+                      Phường/Xã <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={formData.address.city}
-                      onChange={(e) => handleInputChange("address.city", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Nhập thành phố"
+                    <Select
+                      value={wards.find(w => w.value === formData.address.wardCode)}
+                      onChange={handleWardChange}
+                      options={wards}
+                      placeholder={loadingWards ? "Đang tải..." : "Chọn phường/xã"}
+                      isLoading={loadingWards}
+                      isDisabled={!formData.address.provinceCode || loadingWards}
+                      isSearchable
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          borderColor: validationErrors.ward ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
+                          '&:hover': {
+                            borderColor: validationErrors.ward ? '#ef4444' : '#3b82f6'
+                          }
+                        })
+                      }}
                     />
+                    {validationErrors.ward && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.ward}</p>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Quốc gia
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.address.country}
-                      onChange={(e) => handleInputChange("address.country", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Nhập quốc gia"
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quốc gia
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address.country}
+                    onChange={(e) => handleInputChange("address.country", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Quốc gia"
+                  />
                 </div>
               </div>
 
               {/* Contact Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">Thông tin liên hệ</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Thông tin liên hệ</h3>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,9 +477,13 @@ export default function CustomerForm() {
                       type="tel"
                       value={formData.contact.phone}
                       onChange={(e) => handleInputChange("contact.phone", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Nhập số điện thoại"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        validationErrors.phone ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {validationErrors.phone && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -252,9 +493,13 @@ export default function CustomerForm() {
                       type="email"
                       value={formData.contact.email}
                       onChange={(e) => handleInputChange("contact.email", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Nhập email"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    {validationErrors.email && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { customerService } from "../../api/customerService";
 import { useNavigate } from "react-router-dom";
-
+import { toast } from "react-toastify";
 
 export default function CustomerList() {
   const navigate = useNavigate();
@@ -13,6 +13,13 @@ export default function CustomerList() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [pageSize] = useState(10);
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
+  
+  // State cho popup xác nhận xóa
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function để tránh nested ternary
   const getPaginationButtonClass = (isActive) => {
@@ -22,17 +29,55 @@ export default function CustomerList() {
     return "px-3 py-1 border rounded-md border-gray-300 hover:bg-gray-50";
   };
 
-  // Sửa phần fetchCustomers trong CustomerList.jsx
-  const fetchCustomers = async (page = 0, keyword = "") => {
+  // Handle sort
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to asc
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get sort icon
+  const getSortIcon = (field) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+    
+    if (sortDirection === "asc") {
+      return (
+        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+        </svg>
+      );
+    } else {
+      return (
+        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+        </svg>
+      );
+    }
+  };
+
+  // Fetch customers
+  const fetchCustomers = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc") => {
     try {
       setLoading(true);
       setError(null);
 
+      const sort = `${sortField},${sortDirection}`;
       let response;
       if (keyword.trim()) {
-        response = await customerService.searchCustomersWithPagination(keyword, page, pageSize);
+        response = await customerService.searchCustomersWithPagination(keyword, page, pageSize, sort);
       } else {
-        response = await customerService.getCustomersWithPagination(page, pageSize);
+        response = await customerService.getCustomersWithPagination(page, pageSize, sort);
       }
 
       console.log("API Response:", response); // Debug log
@@ -54,29 +99,51 @@ export default function CustomerList() {
     fetchCustomers();
   }, []);
 
+  // Fetch when sort changes
+  useEffect(() => {
+    fetchCustomers(currentPage, searchKeyword, sortField, sortDirection);
+  }, [sortField, sortDirection]);
+
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchCustomers(0, searchKeyword);
+    fetchCustomers(0, searchKeyword, sortField, sortDirection);
   };
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    fetchCustomers(newPage, searchKeyword);
+    fetchCustomers(newPage, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle delete
-  const handleDelete = async (customerId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
-      try {
-        await customerService.deleteCustomer(customerId);
-        fetchCustomers(currentPage, searchKeyword);
-        alert("Xóa khách hàng thành công!");
-      } catch (err) {
-        alert("Không thể xóa khách hàng");
-        console.error("Error deleting customer:", err);
-      }
+  // Handle delete button click - mở popup xác nhận
+  const handleDeleteClick = (customer) => {
+    setCustomerToDelete(customer);
+    setShowDeleteModal(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!customerToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await customerService.deleteCustomer(customerToDelete.customerId);
+      toast.success("Xóa khách hàng thành công!");
+      setShowDeleteModal(false);
+      setCustomerToDelete(null);
+      fetchCustomers(currentPage, searchKeyword, sortField, sortDirection);
+    } catch (err) {
+      toast.error("Không thể xóa khách hàng");
+      console.error("Error deleting customer:", err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  // Handle delete cancel
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setCustomerToDelete(null);
   };
 
   // Format date
@@ -86,10 +153,15 @@ export default function CustomerList() {
     return date.toLocaleDateString("vi-VN");
   };
 
-  // Format address
-  const formatAddress = (address) => {
-    if (!address) return "";
-    return `${address.street || ""}, ${address.city || ""}, ${address.country || ""}`.replace(/^,\s*|,\s*$/g, "");
+  // Format address - chỉ hiển thị tỉnh/thành phố
+  const formatMainAddress = (address) => {
+    if (!address) return "Chưa có địa chỉ";
+    
+    const parts = [];
+    if (address.provinceName) parts.push(address.provinceName);
+    if (address.country) parts.push(address.country);
+    
+    return parts.join(", ") || "Chưa có địa chỉ";
   };
 
   return (
@@ -168,12 +240,43 @@ export default function CustomerList() {
                     <th className="px-6 py-3 text-left">
                       <input type="checkbox" className="rounded border-gray-300" />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HỌ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TÊN</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ĐỊA CHỈ</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("customerId")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        ID
+                        {getSortIcon("customerId")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("firstName")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        TÊN KHÁCH HÀNG
+                        {getSortIcon("firstName")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("provinceName")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        ĐỊA CHỈ
+                        {getSortIcon("provinceName")}
+                      </button>
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LIÊN HỆ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NGÀY TẠO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={() => handleSort("createdAt")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        NGÀY TẠO
+                        {getSortIcon("createdAt")}
+                      </button>
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GHI CHÚ</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
                   </tr>
@@ -187,14 +290,11 @@ export default function CustomerList() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {customer.customerId?.toString().padStart(3, '0')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {customer.lastName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {customer.firstName}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        {customer.lastName} {customer.firstName}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {formatAddress(customer.address)}
+                        {formatMainAddress(customer.address)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {customer.contact?.phone || ""}
@@ -227,8 +327,9 @@ export default function CustomerList() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(customer.customerId)}
+                            onClick={() => handleDeleteClick(customer)}
                             className="text-red-600 hover:text-red-900"
+                            title="Xóa"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -287,6 +388,58 @@ export default function CustomerList() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 w-10 h-10 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Xác nhận xóa khách hàng
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Bạn có chắc chắn muốn xóa khách hàng <strong>"{customerToDelete?.lastName} {customerToDelete?.firstName}"</strong> không? 
+                Hành động này không thể hoàn tác.
+              </p>
+              
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={handleDeleteCancel}
+                  disabled={isDeleting}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
