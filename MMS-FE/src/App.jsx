@@ -47,40 +47,26 @@ function App() {
             >
                 <Route path="/dashboard" element={<Dashboard/>}/>
                 <Route path="/profile" element={<UserProfile/>}/>
+                
+                {/* Customer Routes */}
                 <Route path="/customers" element={<CustomerList/>}/>
+                <Route path="/customers/new" element={<CustomerForm />} />
+                <Route path="/customers/:id" element={<CustomerDetail />} />
+                <Route path="/customers/:id/edit" element={<CustomerForm />} />
+                
+                {/* Vendor Routes */}
+                <Route path="/vendors" element={<VendorList />} />
+                <Route path="/vendors/new" element={<VendorForm />} />
+                <Route path="/vendors/:id/edit" element={<VendorForm />} />
+                <Route path="/vendors/:id" element={<VendorDetail />} />
+                
+                {/* Warehouse Routes */}
                 <Route path="/warehouse" element={<WarehouseList/>}/>
                 <Route path="/warehouse/new" element={<AddWarehouse/>}/>
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse/>}/>
                 <Route path="/warehouse/:id" element={<WarehouseDetail/>} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<UserProfile />} />
-        <Route path="/customers" element={<CustomerList />} />
-        <Route path="/vendors" element={<VendorList />} />
-        <Route path="/vendors/new" element={<VendorForm />} />
-        <Route path="/vendors/:id/edit" element={<VendorForm />} />
-        <Route path="/vendors/:id" element={<VendorDetail />} />
 
-        <Route path="/customers/new" element={<CustomerForm />} />
-        <Route path="/customers/:id" element={<CustomerDetail />} />
-        <Route path="/customers/:id/edit" element={<CustomerForm />} />
-         main
-        {/* Admin Routes */}
-        <Route path="/admin/roles" element={<RoleManagement />} />
-        <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
-        <Route path="/admin/menus" element={<MenuManagement />} />
-        <Route path="/admin/permissions" element={<PermissionManagement />} />
-        <Route path="/admin/user-permissions" element={<UserPermissionManagement />} />
-        <Route path="/admin/users" element={<UserManagement />} />
-      </Route>
-
-                    {/* Admin Routes */}
+                {/* Admin Routes */}
                 <Route path="/admin/roles" element={<RoleManagement/>}/>
                 <Route path="/admin/roles/:roleId" element={<RoleDetail/>}/>
                 <Route path="/admin/menus" element={<MenuManagement/>}/>

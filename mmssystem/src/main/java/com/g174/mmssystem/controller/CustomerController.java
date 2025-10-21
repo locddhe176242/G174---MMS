@@ -14,12 +14,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class CustomerController {
 
     private final ICustomerService customerService;
@@ -28,8 +29,8 @@ public class CustomerController {
     public ResponseEntity<CustomerResponseDTO> createCustomer(
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
 
-        log.info("REST: Creating new customer: {} {}",
-                customerRequestDTO.getFirstName(), customerRequestDTO.getLastName());
+        log.info("REST: Creating new customer: {} {} with code: {}",
+                customerRequestDTO.getFirstName(), customerRequestDTO.getLastName(), customerRequestDTO.getCustomerCode());
 
         CustomerResponseDTO response = customerService.createCustomer(customerRequestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -40,6 +41,14 @@ public class CustomerController {
         log.info("REST: Fetching customer with ID: {}", customerId);
 
         CustomerResponseDTO response = customerService.getCustomerById(customerId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/code/{customerCode}")
+    public ResponseEntity<CustomerResponseDTO> getCustomerByCode(@PathVariable String customerCode) {
+        log.info("REST: Fetching customer with code: {}", customerCode);
+
+        CustomerResponseDTO response = customerService.getCustomerByCode(customerCode);
         return ResponseEntity.ok(response);
     }
 
@@ -114,6 +123,25 @@ public class CustomerController {
         log.info("REST: Fetching customer detail with ID: {}", customerId);
 
         CustomerDetailResponseDTO response = customerService.getCustomerDetailById(customerId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/exists/{customerCode}")
+    public ResponseEntity<Map<String, Boolean>> checkCustomerCodeExists(@PathVariable String customerCode) {
+        log.info("REST: Checking if customer code exists: {}", customerCode);
+
+        boolean exists = customerService.existsByCustomerCode(customerCode);
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("exists", exists);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/generate-code")
+    public ResponseEntity<Map<String, String>> generateCustomerCode() {
+        log.info("REST: Generating new customer code");
+        String customerCode = customerService.generateNextCustomerCode();
+        Map<String, String> response = new HashMap<>();
+        response.put("customerCode", customerCode);
         return ResponseEntity.ok(response);
     }
 }

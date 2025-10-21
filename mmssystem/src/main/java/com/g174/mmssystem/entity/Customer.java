@@ -15,7 +15,8 @@ import java.time.Instant;
         indexes = {
                 @Index(name = "idx_customer_name", columnList = "first_name, last_name"),
                 @Index(name = "idx_customer_address", columnList = "address_id"),
-                @Index(name = "idx_customer_contact", columnList = "contact_id")
+                @Index(name = "idx_customer_contact", columnList = "contact_id"),
+                @Index(name = "idx_customer_code", columnList = "customer_code")
         })
 public class Customer {
     @Id
@@ -32,6 +33,11 @@ public class Customer {
     @Size(max = 255)
     @Column(name = "last_name", nullable = false)
     private String lastName;
+
+    @NotBlank
+    @Size(max = 255)
+    @Column(name = "customer_code", nullable = false, unique = true)
+    private String customerCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "address_id")

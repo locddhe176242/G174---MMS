@@ -10,6 +10,7 @@ import com.g174.mmssystem.dto.requestDTO.CustomerFormRequestDTO;
 import java.util.List;
 
 public interface ICustomerService {
+    String generateNextCustomerCode();
     CustomerResponseDTO createCustomer(CustomerRequestDTO customerRequestDTO);
     CustomerResponseDTO getCustomerById(Integer customerId);
     List<CustomerResponseDTO> getAllCustomers();
@@ -21,4 +22,6 @@ public interface ICustomerService {
     void restoreCustomer(Integer customerId);
     CustomerDetailResponseDTO getCustomerDetailById(Integer customerId);
     CustomerResponseDTO updateCustomerForm(Integer customerId, CustomerFormRequestDTO customerFormRequestDTO);
+    boolean existsByCustomerCode(String customerCode);
+    CustomerResponseDTO getCustomerByCode(String customerCode);
 }
