@@ -12,6 +12,7 @@ export default function CustomerForm() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    customerCode: "",
     note: "",
     address: {
       street: "",
@@ -23,7 +24,8 @@ export default function CustomerForm() {
     },
     contact: {
       phone: "",
-      email: ""
+      email: "",
+      website: ""
     }
   });
   
@@ -47,8 +49,11 @@ export default function CustomerForm() {
   useEffect(() => {
     if (isEdit) {
       loadCustomerData();
+    } else {
+      // Auto generate customer code for new customer
+      generateCustomerCode();
     }
-  }, [id]);
+  }, [isEdit]);
 
   // Load wards khi chọn province HOẶC khi provinces load xong
   useEffect(() => {
@@ -107,6 +112,19 @@ export default function CustomerForm() {
     }
   };
 
+  const generateCustomerCode = async () => {
+    try {
+      const response = await customerService.generateCustomerCode();
+      setFormData(prev => ({
+        ...prev,
+        customerCode: response.customerCode
+      }));
+    } catch (error) {
+      console.error('Error generating customer code:', error);
+      toast.error('Không thể tạo mã khách hàng');
+    }
+  };
+
   const loadCustomerData = async () => {
     try {
       setLoading(true);
@@ -114,6 +132,7 @@ export default function CustomerForm() {
       setFormData({
         firstName: customer.firstName || "",
         lastName: customer.lastName || "",
+        customerCode: customer.customerCode || "",
         note: customer.note || "",
         address: {
           street: customer.address?.street || "",
@@ -125,7 +144,8 @@ export default function CustomerForm() {
         },
         contact: {
           phone: customer.contact?.phone || "",
-          email: customer.contact?.email || ""
+          email: customer.contact?.email || "",
+          website: customer.contact?.website || ""
         }
       });
     } catch (err) {
@@ -212,6 +232,11 @@ export default function CustomerForm() {
     // Validate lastName (bắt buộc)
     if (!formData.lastName || formData.lastName.trim().length < 2) {
       errors.lastName = "Họ phải có ít nhất 2 ký tự";
+    }
+
+    // Validate customerCode (bắt buộc)
+    if (!formData.customerCode || formData.customerCode.trim().length === 0) {
+      errors.customerCode = "Mã khách hàng là bắt buộc";
     }
 
     // Validate province (bắt buộc)
@@ -311,11 +336,7 @@ export default function CustomerForm() {
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Thông tin khách hàng
-              </h2>
-            </div>
+            
 
             <form onSubmit={handleSubmit} className="p-6 space-y-8">
               {/* Error Message */}
@@ -371,6 +392,25 @@ export default function CustomerForm() {
                       <p className="mt-1 text-sm text-red-600">{validationErrors.firstName}</p>
                     )}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mã khách hàng <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.customerCode}
+                    onChange={(e) => handleInputChange("customerCode", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      validationErrors.customerCode ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Mã khách hàng"
+                    readOnly
+                  />
+                  {validationErrors.customerCode && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.customerCode}</p>
+                  )}
                 </div>
               </div>
 
@@ -480,6 +520,7 @@ export default function CustomerForm() {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         validationErrors.phone ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      placeholder="Nhập số điện thoại"
                     />
                     {validationErrors.phone && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
@@ -496,11 +537,25 @@ export default function CustomerForm() {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         validationErrors.email ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      placeholder="Nhập email"
                     />
                     {validationErrors.email && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
                     )}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.contact.website}
+                    onChange={(e) => handleInputChange("contact.website", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Nhập website"
+                  />
                 </div>
               </div>
 

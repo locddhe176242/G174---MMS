@@ -251,6 +251,15 @@ export default function CustomerList() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <button
+                        onClick={() => handleSort("customerCode")}
+                        className="flex items-center gap-1 hover:text-gray-700"
+                      >
+                        MÃ KH
+                        {getSortIcon("customerCode")}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
                         onClick={() => handleSort("firstName")}
                         className="flex items-center gap-1 hover:text-gray-700"
                       >
@@ -289,6 +298,11 @@ export default function CustomerList() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {customer.customerId?.toString().padStart(3, '0')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                          {customer.customerCode}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {customer.lastName} {customer.firstName}
