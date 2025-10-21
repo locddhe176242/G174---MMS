@@ -63,7 +63,8 @@ public class SecurityConfig {
                                 "/api/auth/forgot-password/verify",
                                 "/api/customers/**",
                                 "/api/vendors/**",
-                                "/api/vendors/generate-code"
+                                "/api/vendors/generate-code",
+                                "/api/customers/generate-code"
                         ).permitAll()
 
                         // ============ MANAGER ONLY ============
