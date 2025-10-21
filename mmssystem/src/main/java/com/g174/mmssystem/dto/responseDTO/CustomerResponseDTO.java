@@ -8,6 +8,7 @@ public class CustomerResponseDTO {
     private Integer customerId;
     private String firstName;
     private String lastName;
+    private String customerCode;
     private String note;
     private Instant createdAt;
     private Instant updatedAt;

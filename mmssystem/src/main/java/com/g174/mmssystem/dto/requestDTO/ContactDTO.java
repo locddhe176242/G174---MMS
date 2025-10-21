@@ -10,7 +10,7 @@ public class ContactDTO {
     private String phone;
 
     @Size(max = 100)
-    
+
     private String email;
 
     @Size(max = 255)
