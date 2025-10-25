@@ -24,38 +24,54 @@ const PurchaseRequisitionForm = () => {
   // Additional states
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
-  const [requesters, setRequesters] = useState([]);
-  const [approvers, setApprovers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Auto-generate requisition number
   const generateRequisitionNumber = async () => {
     try {
       const response = await fetch('/api/purchase-requisitions/generate-number');
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      return data.requisition_no;
+
+      if (data.success) {
+        return data.requisition_no;
+      } else {
+        throw new Error(data.message || 'Failed to generate requisition number');
+      }
     } catch (error) {
       console.error('Error generating requisition number:', error);
-      return `PR${Date.now()}`;
+      // Fallback to proper format - không dùng timestamp
+      const currentYear = new Date().getFullYear();
+      return `PR-${currentYear}-999`; // Fallback number
     }
+  };
+
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('token');
+    console.log('Token:', token); // Debug token
+
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        console.log('JWT Payload:', payload); // Debug payload
+        return payload.userId;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+        return null;
+      }
+    }
+    return null;
   };
 
   // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Load users (requesters and approvers)
-        const usersResponse = await fetch('/api/users');
-        const usersData = await usersResponse.json();
-        setRequesters(usersData.map(user => ({
-          value: user.user_id,
-          label: `${user.employee_code} - ${user.username}`
-        })));
-        setApprovers(usersData.map(user => ({
-          value: user.user_id,
-          label: `${user.employee_code} - ${user.username}`
-        })));
-
         // Load products
         const productsResponse = await fetch('/api/products');
         const productsData = await productsResponse.json();
@@ -65,13 +81,23 @@ const PurchaseRequisitionForm = () => {
           product: product
         })));
 
+        // Get current user info from JWT token
+        const userId = getCurrentUserId();
+        if (userId) {
+          setCurrentUser({ userId });
+          // Set requester_id ngay lập tức
+          setFormData(prev => ({
+            ...prev,
+            requester_id: userId
+          }));
+        }
+
         // Generate requisition number for new requisition
         if (!isEdit) {
           const requisitionNo = await generateRequisitionNumber();
           setFormData(prev => ({
             ...prev,
-            requisition_no: requisitionNo,
-            requester_id: usersData[0]?.user_id || null
+            requisition_no: requisitionNo
           }));
         }
       } catch (error) {
@@ -91,7 +117,7 @@ const PurchaseRequisitionForm = () => {
           setLoading(true);
           const response = await fetch(`/api/purchase-requisitions/${id}`);
           const data = await response.json();
-          
+
           setFormData({
             requisition_no: data.requisition_no,
             requester_id: data.requester_id,
@@ -119,7 +145,7 @@ const PurchaseRequisitionForm = () => {
       ...prev,
       [field]: value
     }));
-    
+
     // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
@@ -186,10 +212,6 @@ const PurchaseRequisitionForm = () => {
       errors.requisition_no = 'Mã phiếu yêu cầu là bắt buộc';
     }
 
-    if (!formData.requester_id) {
-      errors.requester_id = 'Người yêu cầu là bắt buộc';
-    }
-
     if (!formData.purpose) {
       errors.purpose = 'Mục đích sử dụng là bắt buộc';
     }
@@ -217,7 +239,7 @@ const PurchaseRequisitionForm = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const errors = validateAllFields();
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -288,7 +310,7 @@ const PurchaseRequisitionForm = () => {
         {/* Purchase Requisition Information */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Thông tin phiếu yêu cầu</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Requisition Number */}
             <div>
@@ -299,9 +321,8 @@ const PurchaseRequisitionForm = () => {
                 type="text"
                 value={formData.requisition_no}
                 onChange={(e) => handleInputChange('requisition_no', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.requisition_no ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.requisition_no ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 placeholder="Mã phiếu yêu cầu"
                 readOnly={!isEdit}
               />
@@ -310,21 +331,18 @@ const PurchaseRequisitionForm = () => {
               )}
             </div>
 
-            {/* Requester */}
+            {/* Requester ID - Chỉ hiển thị */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Người yêu cầu <span className="text-red-500">*</span>
+                Người yêu cầu
               </label>
-              <Select
-                value={requesters.find(option => option.value === formData.requester_id)}
-                onChange={(selectedOption) => handleInputChange('requester_id', selectedOption?.value)}
-                options={requesters}
-                placeholder="Chọn người yêu cầu"
-                className={validationErrors.requester_id ? 'border-red-500' : ''}
+              <input
+                type="text"
+                value={currentUser ? `User ID: ${currentUser.userId}` : 'Đang tải...'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                readOnly
               />
-              {validationErrors.requester_id && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.requester_id}</p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
             </div>
 
             {/* Status */}
@@ -344,7 +362,6 @@ const PurchaseRequisitionForm = () => {
                 placeholder="Chọn trạng thái"
               />
             </div>
-
           </div>
 
           {/* Purpose */}
@@ -356,9 +373,8 @@ const PurchaseRequisitionForm = () => {
               value={formData.purpose}
               onChange={(e) => handleInputChange('purpose', e.target.value)}
               rows={3}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.purpose ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.purpose ? 'border-red-500' : 'border-gray-300'
+                }`}
               placeholder="Mô tả mục đích sử dụng"
             />
             {validationErrors.purpose && (
