@@ -33,6 +33,9 @@ public class Product {
     @Column(name = "uom", length = 50)
     private String uom;
 
+    @Column(name = "size")
+    private Float size;
+
     @Column(name = "purchase_price", precision = 18, scale = 2)
     private BigDecimal purchasePrice;
 

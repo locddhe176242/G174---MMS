@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -19,6 +20,7 @@ public class ProductController {
     private final IProductService productService;
 
     @GetMapping
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity getProducts(
             @RequestParam(defaultValue = Constant.PAGE) int page,
             @RequestParam(defaultValue = Constant.SIZE) int size,
@@ -31,6 +33,7 @@ public class ProductController {
     }
 
     @GetMapping(value = Constant.ID_PATH)
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity getProductDetail(
             @PathVariable(value = Constant.ID) Integer id
     ) {
@@ -39,6 +42,7 @@ public class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity createProduct(
             @Valid @RequestBody ProductRequestDTO ProductRequest
     ) {
@@ -47,6 +51,7 @@ public class ProductController {
     }
 
     @PutMapping(value = Constant.ID_PATH)
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity updateProduct(
             @PathVariable(value = Constant.ID) Integer id,
             @Valid @RequestBody ProductRequestDTO ProductRequest

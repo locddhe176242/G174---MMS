@@ -94,6 +94,7 @@ public class ProductServiceImpl implements IProductService {
                 .barcode(dto.getBarcode())
                 .description(dto.getDescription())
                 .uom(dto.getUom())
+                .size(dto.getSize())
                 .sellingPrice(dto.getSellingPrice())
                 .purchasePrice(dto.getPurchasePrice())
                 .category(category)
@@ -114,11 +115,13 @@ public class ProductServiceImpl implements IProductService {
                 .name(saved.getName())
                 .description(saved.getDescription())
                 .uom(saved.getUom())
+                .size(saved.getSize())
                 .sellingPrice(saved.getSellingPrice())
                 .purchasePrice(saved.getPurchasePrice())
                 .barcode(saved.getBarcode())
                 .imageUrl(saved.getImageUrl())
                 .status(saved.getStatus())
+                .categoryId(saved.getCategory().getCategoryId())
                 .categoryName(saved.getCategory().getName())
                 .createdAt(saved.getCreatedAt())
                 .updatedAt(saved.getUpdatedAt())
@@ -171,7 +174,9 @@ public class ProductServiceImpl implements IProductService {
                     .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_CATEGORY));
             product.setCategory(category);
         }
-
+        if (dto.getSize() != null) product.setSize(dto.getSize());
+        if (dto.getDeletedAt() != null) product.setDeletedAt(dto.getDeletedAt());
+        if (dto.getBarcode() != null) product.setBarcode(dto.getBarcode());
         product.setUpdatedAt(LocalDateTime.now());
         product.setUpdatedBy(user);
 
@@ -183,16 +188,18 @@ public class ProductServiceImpl implements IProductService {
                 .name(saved.getName())
                 .description(saved.getDescription())
                 .uom(saved.getUom())
+                .size(saved.getSize())
                 .sellingPrice(saved.getSellingPrice())
                 .purchasePrice(saved.getPurchasePrice())
                 .barcode(saved.getBarcode())
                 .imageUrl(saved.getImageUrl())
                 .status(saved.getStatus())
                 .quantity(saved.getQuantity())
-                .categoryName(saved.getCategory() != null ? saved.getCategory().getName() : null)
+                .categoryId(product.getCategory().getCategoryId())
                 .categoryName(saved.getCategory() != null ? saved.getCategory().getName() : null)
                 .createdAt(saved.getCreatedAt())
                 .updatedAt(saved.getUpdatedAt())
+                .deletedAt(saved.getDeletedAt())
                 .createdBy(saved.getCreatedBy() != null ? saved.getCreatedBy().getUsername() : null)
                 .updatedBy(saved.getUpdatedBy() != null ? saved.getUpdatedBy().getUsername() : null)
                 .build();
@@ -205,12 +212,14 @@ public class ProductServiceImpl implements IProductService {
                 .name(product.getName())
                 .description(product.getDescription())
                 .uom(product.getUom())
+                .size(product.getSize())
                 .purchasePrice(product.getPurchasePrice())
                 .sellingPrice(product.getSellingPrice())
                 .status(product.getStatus())
                 .quantity(product.getQuantity())
                 .barcode(product.getBarcode())
                 .imageUrl(product.getImageUrl())
+                .categoryId(product.getCategory().getCategoryId())
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())

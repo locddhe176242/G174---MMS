@@ -20,15 +20,18 @@ public class ProductResponseDTO {
     private String name;
     private String description;
     private String uom;
+    private Float size;
     private BigDecimal purchasePrice;
     private BigDecimal sellingPrice;
     private ProductStatus status;
     private String barcode;
     private String imageUrl;
+    private Integer categoryId;
     private String categoryName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer quantity;
     private String createdBy;
     private String updatedBy;
+    private LocalDateTime deletedAt;
 }

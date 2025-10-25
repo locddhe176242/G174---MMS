@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -29,6 +30,10 @@ public class ProductRequestDTO {
     @NotBlank(message = "Đơn vị tính (UOM) không được để trống ")
     private String uom;
 
+    @NotNull(message = "Kích cỡ không được để trống")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Kích cỡ phải lớn hơn 0")
+    private Float size;
+
     @NotNull(message = "Giá bán không được để trống")
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán phải lớn hơn 0")
     private BigDecimal sellingPrice;
@@ -47,4 +52,6 @@ public class ProductRequestDTO {
     @NotNull(message = "Số lượng không được để trống")
     @Min(value = 0, message = "Số lượng không được nhỏ hơn 0")
     private Integer quantity;
+
+    private LocalDateTime deletedAt;
 }
