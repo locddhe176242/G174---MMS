@@ -69,6 +69,8 @@ public class SecurityConfig {
                         // ============ MANAGER ONLY ============
                         .requestMatchers("/api/auth/register").hasRole("MANAGER")
                         .requestMatchers("/api/users/**").hasRole("MANAGER")
+                        .requestMatchers("/api/product/**").hasRole("MANAGER")
+                        .requestMatchers("/api/category/**").hasRole("MANAGER")
                         .requestMatchers("/api/departments/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles").hasRole("MANAGER")
