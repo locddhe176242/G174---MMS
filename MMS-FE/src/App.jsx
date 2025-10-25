@@ -19,6 +19,7 @@ import VendorForm from "./compnents/pages/VendorForm";
 import VendorDetail from "./compnents/pages/VendorDetail"
 import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
+import PurchaseRequisitionForm from './compnents/pages/PurchaseRequisitionForm';
 
 
 // Admin Pages
@@ -70,6 +71,8 @@ function App() {
         <Route path="/customers/new" element={<CustomerForm />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/customers/:id/edit" element={<CustomerForm />} />
+
+        <Route path="/purchase-requisitions/create" element={<PurchaseRequisitionForm />} />
          main
         {/* Admin Routes */}
         <Route path="/admin/roles" element={<RoleManagement />} />
