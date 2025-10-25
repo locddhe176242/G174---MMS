@@ -51,6 +51,17 @@ public class PasswordController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/forgot-password/verify-otp")
+    public ResponseEntity<VerifyOtpOnlyResponseDTO> verifyOtpOnly(
+            @Valid @RequestBody VerifyOtpOnlyRequestDTO request) {
+
+        log.info("Yêu cầu xác thực OTP (không reset password) cho email: {}", request.getEmail());
+
+        VerifyOtpOnlyResponseDTO response = passwordService.verifyOtpOnly(request);
+
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/forgot-password/verify")
     public ResponseEntity<VerifyOtpResponseDTO> verifyOtpAndResetPassword(
             @Valid @RequestBody VerifyOtpRequestDTO request) {

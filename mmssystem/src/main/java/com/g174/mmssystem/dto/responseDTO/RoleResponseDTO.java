@@ -1,16 +1,12 @@
 package com.g174.mmssystem.dto.responseDTO;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 
 @Getter
 @Setter
-@ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class RoleResponseDTO {
     private Integer roleId;
     private String roleName;
