@@ -21,7 +21,7 @@ public class UserController {
     private final IUserService userService;
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('MANAGER')")
+//    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<Map<String, Object>> searchUsers(
             @RequestParam(required = false, defaultValue = "") String keyword
     ) {

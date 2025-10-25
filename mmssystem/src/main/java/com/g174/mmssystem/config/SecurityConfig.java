@@ -63,12 +63,15 @@ public class SecurityConfig {
                                 "/api/auth/forgot-password/verify",
                                 "/api/customers/**",
                                 "/api/vendors/**",
-                                "/api/vendors/generate-code"
+                                "/api/products/**",
+                                "/api/vendors/generate-code",
+                                "/api/purchase-requisitions/generate-number",
+                                "/api/users"
                         ).permitAll()
 
                         // ============ MANAGER ONLY ============
                         .requestMatchers("/api/auth/register").hasRole("MANAGER")
-                        .requestMatchers("/api/users/**").hasRole("MANAGER")
+//                        .requestMatchers("/api/users/**").hasRole("MANAGER")
                         .requestMatchers("/api/departments/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles").hasRole("MANAGER")
@@ -77,6 +80,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/change-password").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/profile/me").authenticated()
+                        .requestMatchers("/api/purchase-requisitions/**").authenticated()
 
                         // Tất cả requests khác CẦN authentication
                         .anyRequest().authenticated()

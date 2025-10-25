@@ -19,7 +19,6 @@ import java.util.List;
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class CustomerController {
 
     private final ICustomerService customerService;
