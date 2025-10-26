@@ -21,7 +21,6 @@ public class WarehouseResponseDTO {
     @Data
     public static class UserInfo {
         private Integer userId;
-        private String username;
         private String email;
     }
 }
