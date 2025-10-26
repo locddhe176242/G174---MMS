@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.auth.*;
 import com.g174.mmssystem.service.IService.IAuthenticationService;
 import com.g174.mmssystem.service.IService.ILogoutService;
@@ -20,6 +21,12 @@ public class AuthController {
     private final ILogoutService logoutService;
 
     @PostMapping("/login")
+    @LogActivity(
+            action = "LOGIN",
+            activityType = "LOGIN",
+            description = "User_dang_nhap_vao_he_thong",
+            includeClientInfo = true
+    )
     public ResponseEntity<LoginResponseDTO> login(
             @Valid @RequestBody LoginRequestDTO loginRequest) {
 
@@ -47,12 +54,18 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @LogActivity(
+            action = "LOGOUT",
+            activityType = "LOGOUT",
+            description = "User_dang_xuat_khoi_he_thong",
+            includeClientInfo = true
+    )
     public ResponseEntity<LogoutResponseDTO> logout(
             @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody LogoutRequestDTO request) {
 
         String accessToken = authHeader.replace("Bearer ", "");
-        
+
         log.info("Yêu cầu đăng xuất");
         LogoutResponseDTO response = logoutService.logout(accessToken, request);
         return ResponseEntity.ok(response);
