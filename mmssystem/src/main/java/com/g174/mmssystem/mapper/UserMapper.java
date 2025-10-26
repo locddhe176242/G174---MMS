@@ -30,6 +30,7 @@ public class UserMapper {
             : null;
 
         String fullName = null;
+        String phoneNumber = null;
         if (user.getProfile() != null) {
             String firstName = user.getProfile().getFirstName();
             String lastName = user.getProfile().getLastName();
@@ -41,12 +42,15 @@ public class UserMapper {
             } else if (lastName != null) {
                 fullName = lastName;
             }
+            
+            phoneNumber = user.getProfile().getPhoneNumber();
         }
 
         return UserListResponseDTO.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .fullName(fullName)
+                .phoneNumber(phoneNumber)
                 .employeeCode(user.getEmployeeCode())
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
                 .departmentId(departmentId)

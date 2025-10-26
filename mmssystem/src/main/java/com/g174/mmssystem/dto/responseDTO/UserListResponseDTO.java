@@ -14,6 +14,7 @@ public class UserListResponseDTO {
     private Integer userId;
     private String email;
     private String fullName;
+    private String phoneNumber;
     private String employeeCode;
     private String status;
     private Integer departmentId;

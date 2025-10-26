@@ -16,7 +16,6 @@ import java.util.List;
 public class UserProfileResponseDTO {
     
     private Long userId;
-    private String username;
     private String email;
     private String employeeCode;
     private String status;
@@ -29,6 +28,7 @@ public class UserProfileResponseDTO {
     private LocalDate dob;
     private String phoneNumber;
     private String address;
+    private String avatarUrl;
     
     private Long departmentId;
     private String departmentName;
