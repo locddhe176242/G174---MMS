@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getCurrentUserProfile, updateUserProfile, changePassword } from "../../api/userProfileService";
+import { getCurrentUserProfile, updateUserProfile, changePassword, uploadAvatar } from "../../api/userProfileService";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCamera, faUser, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import useAuthStore from "../../store/authStore";
 
 export default function UserProfile() {
   const [searchParams] = useSearchParams();
@@ -9,6 +12,7 @@ export default function UserProfile() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [isEditing, setIsEditing] = useState(false);
+  const { updateUser } = useAuthStore();
 
   const [profileForm, setProfileForm] = useState({
     firstName: "",
@@ -27,15 +31,22 @@ export default function UserProfile() {
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    console.log('Profile state changed:', profile);
+  }, [profile]);
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
       const data = await getCurrentUserProfile();
+      console.log('Profile data:', data);
       setProfile(data);
       setProfileForm({
         firstName: data.firstName || "",
@@ -75,7 +86,7 @@ export default function UserProfile() {
 
       await updateUserProfile(profileForm);
       await fetchProfile();
-      setSuccessMessage("Profile updated successfully!");
+      setSuccessMessage("Cập nhật thông tin thành công!");
       setIsEditing(false);
 
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -94,7 +105,7 @@ export default function UserProfile() {
       setError(null);
 
       await changePassword(passwordForm);
-      setSuccessMessage("Password changed successfully!");
+      setSuccessMessage("Đổi mật khẩu thành công!");
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
@@ -109,11 +120,65 @@ export default function UserProfile() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+      setError(null);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await uploadAvatar(formData);
+      console.log('Upload response:', response);
+      
+      const avatarUrl = response.avatarUrl || response.data?.avatarUrl;
+      console.log('Extracted avatarUrl:', avatarUrl);
+      
+      if (avatarUrl) {
+        const avatarUrlWithCache = `${avatarUrl}?t=${Date.now()}`;
+        setProfile(prev => {
+          const newProfile = { ...prev, avatarUrl: avatarUrlWithCache };
+          console.log('Updated profile:', newProfile);
+          return newProfile;
+        });
+        
+        updateUser({ avatarUrl: avatarUrlWithCache });
+        
+        setSuccessMessage('Cập nhật ảnh đại diện thành công!');
+      } else {
+        setError('Không nhận được URL ảnh từ server');
+      }
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err.message || 'Tải lên ảnh thất bại');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Loading profile...</span>
+        <span className="ml-2 text-gray-600">Đang tải thông tin...</span>
       </div>
     );
   }
@@ -124,11 +189,57 @@ export default function UserProfile() {
         {/* Header */}
         <div className="bg-white shadow rounded-lg mb-6 p-6">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {profile?.firstName?.charAt(0) || profile?.username?.charAt(0) || "U"}
+            <div className="relative">
+              {profile?.avatarUrl && profile.avatarUrl.trim() !== '' ? (
+                <img
+                  src={`http://localhost:8080${profile.avatarUrl}`}
+                  alt="Ảnh đại diện"
+                  className="w-20 h-20 rounded-full object-cover border-4 border-blue-100"
+                  onError={(e) => {
+                    console.log('Image load error:', e.target.src);
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                  onLoad={() => {
+                    console.log('Image loaded successfully:', profile.avatarUrl);
+                  }}
+                  key={profile.avatarUrl}
+                />
+              ) : null}
+              
+              <div 
+                className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+                style={{ display: profile?.avatarUrl && profile.avatarUrl.trim() !== '' ? 'none' : 'flex' }}
+              >
+                {profile?.firstName?.charAt(0) || profile?.email?.charAt(0) || "U"}
+              </div>
+              
+              {/* Upload Button */}
+              <button
+                onClick={triggerFileInput}
+                disabled={uploadingAvatar}
+                className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors duration-200 disabled:opacity-50"
+                title="Tải lên ảnh đại diện"
+              >
+                {uploadingAvatar ? (
+                  <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FontAwesomeIcon icon={faCamera} className="w-4 h-4" />
+                )}
+              </button>
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
             </div>
+            
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{profile?.fullName || profile?.username}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{profile?.fullName || profile?.email}</h1>
               <p className="text-gray-600">{profile?.email}</p>
               <p className="text-sm text-gray-500">
                 {profile?.departmentName} • {profile?.employeeCode}
@@ -149,7 +260,7 @@ export default function UserProfile() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
-                Profile Information
+                Thông tin cá nhân
               </button>
               <button
                 onClick={() => setActiveTab("password")}
@@ -159,7 +270,7 @@ export default function UserProfile() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
-                Change Password
+                Đổi mật khẩu
               </button>
             </nav>
           </div>
@@ -183,7 +294,7 @@ export default function UserProfile() {
               <form onSubmit={handleUpdateProfile}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tên</label>
                     <input
                       type="text"
                       name="firstName"
@@ -196,7 +307,7 @@ export default function UserProfile() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Họ</label>
                     <input
                       type="text"
                       name="lastName"
@@ -209,7 +320,7 @@ export default function UserProfile() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Giới tính</label>
                     <select
                       name="gender"
                       value={profileForm.gender}
@@ -217,15 +328,15 @@ export default function UserProfile() {
                       disabled={!isEditing}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                     >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="">Chọn giới tính</option>
+                      <option value="Male">Nam</option>
+                      <option value="Female">Nữ</option>
+                      <option value="Other">Khác</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ngày sinh</label>
                     <input
                       type="date"
                       name="dob"
@@ -237,7 +348,7 @@ export default function UserProfile() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
                     <input
                       type="tel"
                       name="phoneNumber"
@@ -250,7 +361,7 @@ export default function UserProfile() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ</label>
                     <textarea
                       name="address"
                       value={profileForm.address}
@@ -266,10 +377,14 @@ export default function UserProfile() {
                   {!isEditing ? (
                     <button
                       type="button"
-                      onClick={() => setIsEditing(true)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsEditing(true);
+                      }}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
-                      Edit Profile
+                      Chỉnh sửa thông tin
                     </button>
                   ) : (
                     <>
@@ -278,7 +393,7 @@ export default function UserProfile() {
                         disabled={submitLoading}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                       >
-                        {submitLoading ? "Saving..." : "Save Changes"}
+                        {submitLoading ? "Đang lưu..." : "Lưu thay đổi"}
                       </button>
                       <button
                         type="button"
@@ -288,7 +403,7 @@ export default function UserProfile() {
                         }}
                         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
                       >
-                        Cancel
+                        Hủy
                       </button>
                     </>
                   )}
@@ -300,7 +415,7 @@ export default function UserProfile() {
               <form onSubmit={handleChangePassword} className="max-w-md">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu hiện tại</label>
                     <input
                       type="password"
                       name="currentPassword"
@@ -312,7 +427,7 @@ export default function UserProfile() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu mới</label>
                     <input
                       type="password"
                       name="newPassword"
@@ -322,12 +437,12 @@ export default function UserProfile() {
                       required
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      Must contain uppercase, lowercase, and number. Min 6 characters.
+                      Phải chứa chữ hoa, chữ thường và số. Tối thiểu 6 ký tự.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Xác nhận mật khẩu mới</label>
                     <input
                       type="password"
                       name="confirmPassword"
@@ -344,7 +459,7 @@ export default function UserProfile() {
                   disabled={submitLoading}
                   className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {submitLoading ? "Changing..." : "Change Password"}
+                        {submitLoading ? "Đang đổi..." : "Đổi mật khẩu"}
                 </button>
               </form>
             )}
