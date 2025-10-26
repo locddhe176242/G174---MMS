@@ -74,14 +74,14 @@ export default function Login({ onSubmit: propsOnSubmit }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="sr-only">Email hoặc SĐT</label>
+            <label className="sr-only">Email</label>
             <input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Email/Số điện thoại của bạn"
+              placeholder="Email của bạn"
               className="w-full border border-slate-300 rounded px-3 py-2 focus:ring-2 focus:ring-brand-blue-100 focus:outline-none"
-              type="text"
-              autoComplete="username"
+              type="email"
+              autoComplete="email"
             />
           </div>
 

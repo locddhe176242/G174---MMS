@@ -15,11 +15,11 @@ import java.util.Set;
 @Builder
 public class AuthUserDTO {
     private Integer userId;
-    private String username;
     private String email;
     private String employeeCode;
     private UserStatus status;
     private Integer departmentId;
     private String departmentName;
+    private String avatarUrl;
     private Set<String> roles;
 }

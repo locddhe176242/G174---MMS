@@ -138,7 +138,6 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         }
 
         User user = new User();
-        user.setUsername(registerRequest.getEmail());
         user.setEmail(registerRequest.getEmail());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setEmployeeCode(registerRequest.getEmployeeCode());
@@ -197,12 +196,12 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         return AuthUserDTO.builder()
                 .userId(user.getId())
-                .username(user.getUsername())
                 .email(user.getEmail())
                 .employeeCode(user.getEmployeeCode())
                 .status(user.getStatus())
                 .departmentId(departmentId)
                 .departmentName(departmentName)
+                .avatarUrl(user.getProfile() != null ? user.getProfile().getAvatarUrl() : null)
                 .roles(roles)
                 .build();
     }
