@@ -192,7 +192,6 @@ public class WarehouseServiceImpl implements IWarehouseService {
         if (w.getCreatedBy() != null) {
             WarehouseResponseDTO.UserInfo created = new WarehouseResponseDTO.UserInfo();
             created.setUserId(w.getCreatedBy().getId());
-            created.setUsername(w.getCreatedBy().getUsername());
             created.setEmail(w.getCreatedBy().getEmail());
             dto.setCreatedBy(created);
         }
@@ -200,7 +199,6 @@ public class WarehouseServiceImpl implements IWarehouseService {
         if (w.getUpdatedBy() != null) {
             WarehouseResponseDTO.UserInfo updated = new WarehouseResponseDTO.UserInfo();
             updated.setUserId(w.getUpdatedBy().getId());
-            updated.setUsername(w.getUpdatedBy().getUsername());
             updated.setEmail(w.getUpdatedBy().getEmail());
             dto.setUpdatedBy(updated);
         }
@@ -214,7 +212,6 @@ public class WarehouseServiceImpl implements IWarehouseService {
                 return userRepository.findById(userId)
                         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
             } else {
-                // fallback user mặc định (admin id = 1)
                 return userRepository.findById(1)
                         .orElseThrow(() -> new ResourceNotFoundException("Default admin user not found (ID=1)"));
             }

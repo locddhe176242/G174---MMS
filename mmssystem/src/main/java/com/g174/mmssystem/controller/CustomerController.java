@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.CustomerRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerDetailResponseDTO;
@@ -25,6 +26,12 @@ public class CustomerController {
     private final ICustomerService customerService;
 
     @PostMapping
+    @LogActivity(
+            action = "CREATE_CUSTOMER",
+            activityType = "CUSTOMER_MANAGEMENT",
+            description = "Tạo khách hàng mới: #{#customerRequestDTO.firstName} #{#customerRequestDTO.lastName}",
+            entityId = "#{#result.id}"
+    )
     public ResponseEntity<CustomerResponseDTO> createCustomer(
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
 

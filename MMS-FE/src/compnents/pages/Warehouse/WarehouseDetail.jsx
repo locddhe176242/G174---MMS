@@ -109,13 +109,13 @@ export default function WarehouseDetail() {
                             {warehouse.createdAt ? formatDate(warehouse.createdAt) : "—"}
                         </Descriptions.Item>
                         <Descriptions.Item label="Người tạo">
-                            {warehouse.createdBy?.username || warehouse.createdBy?.email || "—"}
+                            {warehouse.createdBy?.email || "—"}
                         </Descriptions.Item>
                         <Descriptions.Item label="Ngày cập nhật">
                             {warehouse.updatedAt ? formatDate(warehouse.updatedAt) : "—"}
                         </Descriptions.Item>
                         <Descriptions.Item label="Người cập nhật">
-                            {warehouse.updatedBy?.username || warehouse.updatedBy?.email || "—"}
+                            {warehouse.updatedBy?.email || "—"}
                         </Descriptions.Item>
                     </Descriptions>
                 </Card>

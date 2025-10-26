@@ -14,14 +14,13 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class UserProfileResponseDTO {
-    
+
     private Long userId;
-    private String username;
     private String email;
     private String employeeCode;
     private String status;
     private LocalDateTime lastLogin;
-    
+
     private String firstName;
     private String lastName;
     private String fullName;
@@ -29,13 +28,14 @@ public class UserProfileResponseDTO {
     private LocalDate dob;
     private String phoneNumber;
     private String address;
-    
+    private String avatarUrl;
+
     private Long departmentId;
     private String departmentName;
     private String departmentCode;
-    
+
     private List<String> roles;
-    
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

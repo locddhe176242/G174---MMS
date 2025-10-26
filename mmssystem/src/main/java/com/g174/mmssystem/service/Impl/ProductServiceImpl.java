@@ -78,10 +78,10 @@ public class ProductServiceImpl implements IProductService {
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
+        String email = authentication.getName();
 
-        User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND + username));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND + email));
 
         ProductCategory category = productCategoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_CATEGORY));
@@ -125,8 +125,8 @@ public class ProductServiceImpl implements IProductService {
                 .categoryName(saved.getCategory().getName())
                 .createdAt(saved.getCreatedAt())
                 .updatedAt(saved.getUpdatedAt())
-                .createdBy(saved.getCreatedBy().getUsername())
-                .updatedBy(saved.getUpdatedBy().getUsername())
+                .createdBy(saved.getCreatedBy().getEmail())
+                .updatedBy(saved.getUpdatedBy().getEmail())
                 .quantity(saved.getQuantity())
                 .build();
     }
@@ -156,10 +156,10 @@ public class ProductServiceImpl implements IProductService {
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
+        String email = authentication.getName();
 
-        User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND + email));
 
         if (dto.getName() != null) product.setName(dto.getName());
         if (dto.getDescription() != null) product.setDescription(dto.getDescription());
@@ -200,8 +200,8 @@ public class ProductServiceImpl implements IProductService {
                 .createdAt(saved.getCreatedAt())
                 .updatedAt(saved.getUpdatedAt())
                 .deletedAt(saved.getDeletedAt())
-                .createdBy(saved.getCreatedBy() != null ? saved.getCreatedBy().getUsername() : null)
-                .updatedBy(saved.getUpdatedBy() != null ? saved.getUpdatedBy().getUsername() : null)
+                .createdBy(saved.getCreatedBy() != null ? saved.getCreatedBy().getEmail() : null)
+                .updatedBy(saved.getUpdatedBy() != null ? saved.getUpdatedBy().getEmail() : null)
                 .build();
     }
 
@@ -223,8 +223,8 @@ public class ProductServiceImpl implements IProductService {
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
-                .createdBy(product.getCreatedBy() != null ? product.getCreatedBy().getUsername() : null)
-                .updatedBy(product.getUpdatedBy() != null ? product.getUpdatedBy().getUsername() : null)
+                .createdBy(product.getCreatedBy() != null ? product.getCreatedBy().getEmail() : null)
+                .updatedBy(product.getUpdatedBy() != null ? product.getUpdatedBy().getEmail() : null)
                 .build();
     }
 }

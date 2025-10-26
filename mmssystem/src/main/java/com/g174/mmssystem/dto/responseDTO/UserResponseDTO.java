@@ -15,7 +15,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class UserResponseDTO {
     private Integer userId;
-    private String username;
     private String email;
     private String employeeCode;
     private User.UserStatus status;
@@ -30,7 +29,6 @@ public class UserResponseDTO {
     public String toString() {
         return "UserResponseDTO{" +
                 "userId=" + userId +
-                ", username='" + username + '\'' +
                 ", email='" + email + '\'' +
                 ", employeeCode='" + employeeCode + '\'' +
                 ", status=" + status +
