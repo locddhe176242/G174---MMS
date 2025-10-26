@@ -15,6 +15,9 @@ public class CustomerRequestDTO {
     @Size(max = 255, message = "Last name must not exceed 255 characters")
     private String lastName;
 
+    @Size(max = 255, message = "Customer code must not exceed 255 characters")
+    private String customerCode;
+
     @Valid
     private AddressDTO address;
 
