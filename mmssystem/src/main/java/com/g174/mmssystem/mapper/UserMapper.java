@@ -15,25 +15,26 @@ public class UserMapper {
             return null;
         }
 
-        List<String> roles = user.getUserRoles() != null 
-            ? user.getUserRoles().stream()
+        List<String> roles = user.getUserRoles() != null
+                ? user.getUserRoles().stream()
                 .map(ur -> ur.getRole().getRoleName())
                 .collect(Collectors.toList())
-            : List.of();
+                : List.of();
 
-        String departmentName = user.getDepartment() != null 
-            ? user.getDepartment().getDepartmentName() 
-            : null;
+        String departmentName = user.getDepartment() != null
+                ? user.getDepartment().getDepartmentName()
+                : null;
 
-        Integer departmentId = user.getDepartment() != null 
-            ? user.getDepartment().getId() 
-            : null;
+        Integer departmentId = user.getDepartment() != null
+                ? user.getDepartment().getId()
+                : null;
 
         String fullName = null;
+        String phoneNumber = null;
         if (user.getProfile() != null) {
             String firstName = user.getProfile().getFirstName();
             String lastName = user.getProfile().getLastName();
-            
+
             if (firstName != null && lastName != null) {
                 fullName = firstName + " " + lastName;
             } else if (firstName != null) {
@@ -41,12 +42,15 @@ public class UserMapper {
             } else if (lastName != null) {
                 fullName = lastName;
             }
+
+            phoneNumber = user.getProfile().getPhoneNumber();
         }
 
         return UserListResponseDTO.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .fullName(fullName)
+                .phoneNumber(phoneNumber)
                 .employeeCode(user.getEmployeeCode())
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
                 .departmentId(departmentId)
@@ -67,4 +71,3 @@ public class UserMapper {
                 .collect(Collectors.toList());
     }
 }
-
