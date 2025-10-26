@@ -8,6 +8,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user, logout } = useAuthStore();
+  console.log('MainLayout user:', user);
 
   const handleLogout = async () => {
     await logout();
@@ -21,7 +22,8 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header
-        userName={user?.fullName || user?.email || "User"}
+        userEmail={user?.email || "Người dùng"}
+        avatarUrl={user?.avatarUrl || null}
         onLogout={handleLogout}
       />
 

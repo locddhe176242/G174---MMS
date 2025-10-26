@@ -3,18 +3,18 @@ import { useNavigate } from "react-router-dom";
 import logo from '../../assets/mms_logo.svg';
 
 export default function Header({
-  userName = "User",
+  userEmail = "User",
+  avatarUrl = null,
   onLogout = () => {},
 }) {
+  console.log('Header avatarUrl:', avatarUrl);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
-  const initials = userName
-    .split(" ")
-    .map((s) => s[0])
+  const initials = userEmail
+    .split("@")[0]
     .slice(0, 2)
-    .join("")
     .toUpperCase();
 
   useEffect(() => {
@@ -66,11 +66,26 @@ export default function Header({
               className="flex items-center gap-3 hover:bg-gray-50 rounded-lg px-3 py-2 transition-colors"
             >
               <div className="text-right">
-                <div className="text-sm font-semibold text-gray-800">{userName}</div>
+                <div className="text-sm font-semibold text-gray-800">{userEmail}</div>
                 <div className="text-xs text-gray-500">Xem hồ sơ</div>
               </div>
 
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-md">
+              {avatarUrl && avatarUrl.trim() !== '' ? (
+                <img
+                  src={`http://localhost:8080${avatarUrl}`}
+                  alt="Ảnh đại diện"
+                  className="w-10 h-10 rounded-full object-cover shadow-md"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              
+              <div 
+                className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-md"
+                style={{ display: avatarUrl && avatarUrl.trim() !== '' ? 'none' : 'flex' }}
+              >
                 {initials}
               </div>
 
@@ -87,7 +102,7 @@ export default function Header({
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <div className="font-semibold text-gray-800">{userName}</div>
+                  <div className="font-semibold text-gray-800">{userEmail}</div>
                   <div className="text-xs text-gray-500 mt-1">Quản lý tài khoản của bạn</div>
                 </div>
 
