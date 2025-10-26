@@ -15,24 +15,20 @@ import java.util.Set;
 @Entity
 @Table(name = "users",
         indexes = {
-                @Index(name = "idx_users_username", columnList = "username", unique = true),
-                @Index(name = "idx_users_email", columnList = "email", unique = true),
-                @Index(name = "idx_users_employee_code", columnList = "employee_code", unique = true),
                 @Index(name = "idx_users_department_id", columnList = "department_id"),
                 @Index(name = "idx_users_status_deleted", columnList = "status, deleted_at"),
-                @Index(name = "idx_users_last_login", columnList = "last_login DESC"),
-                @Index(name = "idx_users_created_at", columnList = "created_at DESC")
+                @Index(name = "idx_users_department_status_deleted", columnList = "department_id, status, deleted_at"),
+                @Index(name = "idx_users_deleted_at", columnList = "deleted_at"),
+                @Index(name = "idx_users_last_login", columnList = "last_login"),
+                @Index(name = "idx_users_created_at", columnList = "created_at"),
+                @Index(name = "uq_users_email_active", columnList = "email, deleted_at", unique = true),
+                @Index(name = "uq_users_employee_code_active", columnList = "employee_code, deleted_at", unique = true)
         })
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id", nullable = false)
     private Integer id;
-
-    @Size(max = 255)
-    @NotNull
-    @Column(name = "username", nullable = false)
-    private String username;
 
     @Size(max = 255)
     @NotNull
@@ -106,5 +102,10 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    // Helper method để check soft delete
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

@@ -16,25 +16,56 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
-    Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByEmployeeCode(String employeeCode);
 
-    boolean existsByUsername(String username);
     boolean existsByEmail(String email);
     boolean existsByEmployeeCode(String employeeCode);
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
     boolean existsByEmployeeCodeAndDeletedAtIsNull(String employeeCode);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE " +
-            "LOWER(p.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+    // Soft delete methods
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL")
+    List<User> findAllActive();
+    
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL")
+    Page<User> findAllActive(Pageable pageable);
+    
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NOT NULL")
+    List<User> findAllDeleted();
+    
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NOT NULL")
+    Page<User> findAllDeleted(Pageable pageable);
+    
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE u.deletedAt IS NULL AND " +
+           "(LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<User> searchActiveUsers(@Param("keyword") String keyword);
+    
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE u.deletedAt IS NULL AND " +
+           "(LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<User> searchActiveUsers(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE u.deletedAt IS NULL AND " +
+            "(LOWER(p.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(p.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<User> searchUsers(@Param("keyword") String keyword);
 
-    Page<User> findByDepartmentId(Integer departmentId, Pageable pageable);
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.profile p WHERE u.deletedAt IS NOT NULL AND " +
+            "(LOWER(p.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<User> searchDeletedUsers(@Param("keyword") String keyword);
+
+    @Query("SELECT u FROM User u WHERE u.department.id = :departmentId AND u.deletedAt IS NULL")
+    Page<User> findByDepartmentId(@Param("departmentId") Integer departmentId, Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.status = :status AND u.deletedAt IS NULL")
     List<User> findByStatusAndNotDeleted(@Param("status") UserStatus status);
