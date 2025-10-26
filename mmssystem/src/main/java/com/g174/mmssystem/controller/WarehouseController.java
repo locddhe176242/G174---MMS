@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.WarehouseRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.WarehouseResponseDTO;
 import com.g174.mmssystem.service.IService.IWarehouseService;
@@ -22,6 +23,12 @@ public class WarehouseController {
     private final WarehouseServiceImpl warehouseServiceImpl;
 
     @PostMapping
+    @LogActivity(
+        action = "CREATE_WAREHOUSE",
+        activityType = "WAREHOUSE_MANAGEMENT",
+        description = "Tạo kho mới: #{#warehouseDTO.warehouseName}",
+        entityId = "#{#result.id}"
+    )
     public ResponseEntity<WarehouseResponseDTO> createWarehouse(
             @Valid @RequestBody WarehouseRequestDTO warehouseDTO,
             @RequestParam(required = false) Integer createdById) {
@@ -47,6 +54,12 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
+    @LogActivity(
+        action = "UPDATE_WAREHOUSE",
+        activityType = "WAREHOUSE_MANAGEMENT",
+        description = "Cập nhật kho: #{#warehouseDTO.warehouseName}",
+        entityId = "#{#id}"
+    )
     public ResponseEntity<WarehouseResponseDTO> updateWarehouse(
             @PathVariable Integer id,
             @Valid @RequestBody WarehouseRequestDTO warehouseDTO,
@@ -56,12 +69,24 @@ public class WarehouseController {
     }
 
     @PatchMapping("/{id}/deactivate")
+    @LogActivity(
+        action = "DEACTIVATE_WAREHOUSE",
+        activityType = "WAREHOUSE_MANAGEMENT",
+        description = "Vô hiệu hóa kho ID: #{#id}",
+        entityId = "#{#id}"
+    )
     public ResponseEntity<WarehouseResponseDTO> deactivateWarehouse(@PathVariable Integer id) {
         WarehouseResponseDTO response = service.deactivateWarehouse(id);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/restore")
+    @LogActivity(
+        action = "RESTORE_WAREHOUSE",
+        activityType = "WAREHOUSE_MANAGEMENT",
+        description = "Khôi phục kho ID: #{#id}",
+        entityId = "#{#id}"
+    )
     public ResponseEntity<WarehouseResponseDTO> restoreWarehouse(@PathVariable Integer id) {
         WarehouseResponseDTO response = service.restoreWarehouse(id);
         return ResponseEntity.ok(response);
