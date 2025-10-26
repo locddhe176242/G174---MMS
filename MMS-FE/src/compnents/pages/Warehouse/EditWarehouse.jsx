@@ -35,7 +35,7 @@ export default function EditWarehouse() {
 					status: data.status || "Active",
 				});
 				setMeta({
-					createdBy: data.createdBy?.username || data.createdBy?.email || "",
+					createdBy: data.createdBy?.email || "",
 					createdAt: data.createdAt || "",
 				});
 			} catch (e) {
