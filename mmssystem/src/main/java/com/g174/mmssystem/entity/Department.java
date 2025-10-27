@@ -13,10 +13,10 @@ import java.time.Instant;
 @Setter
 @Entity
 @Table(name = "departments",
-       indexes = {
-           @Index(name = "idx_departments_name", columnList = "department_name"),
-           @Index(name = "idx_departments_code", columnList = "department_code", unique = true)
-       })
+        indexes = {
+                @Index(name = "idx_departments_name", columnList = "department_name"),
+                @Index(name = "idx_departments_code", columnList = "department_code", unique = true)
+        })
 public class Department {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,6 +36,11 @@ public class Department {
     @Lob
     @Column(name = "description")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @ColumnDefault("'ACTIVE'")
+    private DepartmentStatus status = DepartmentStatus.ACTIVE;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")
@@ -57,6 +62,10 @@ public class Department {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    public enum DepartmentStatus {
+        ACTIVE, INACTIVE
     }
 
 }

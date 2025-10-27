@@ -3,12 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { getMenuForCurrentUser } from "../../api/menuService";
 
-/**
- * Sidebar Component - Dynamic Menu Loading
- * Load menu configuration từ API theo role của user
- */
-
-// Icon mapping - Map icon names from backend to actual SVG icons
 const iconMap = {
   home: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -71,7 +65,6 @@ const iconMap = {
       <path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" />
     </svg>
   ),
-  // Thêm icon mặc định cho các menu items không có icon
   default: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
       <path fillRule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clipRule="evenodd" />
@@ -79,11 +72,6 @@ const iconMap = {
   ),
 };
 
-/**
- * Get icon JSX từ icon name (string từ backend)
- * @param {string} iconName - Tên icon (home, products, customers, ...)
- * @returns {JSX.Element}
- */
 const getIcon = (iconName) => {
   return iconMap[iconName] || iconMap.default;
 };
@@ -98,8 +86,8 @@ export default function Sidebar({ isCollapsed = false }) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
 
-  // Load menu từ API
   useEffect(() => {
     const loadMenu = async () => {
       try {
@@ -108,7 +96,6 @@ export default function Sidebar({ isCollapsed = false }) {
         
         const data = await getMenuForCurrentUser();
         
-        // Transform menu data: thêm icon JSX vào menu items
         const transformMenu = (menuItems) => {
           return menuItems.map((item) => {
 
@@ -252,7 +239,6 @@ export default function Sidebar({ isCollapsed = false }) {
     );
   };
 
-  // Loading state
   if (loading) {
     return (
       <aside
@@ -268,7 +254,6 @@ export default function Sidebar({ isCollapsed = false }) {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <aside
@@ -295,7 +280,6 @@ export default function Sidebar({ isCollapsed = false }) {
       style={{ fontFamily: "Roboto, sans-serif" }}
     >
       <div className="p-4">
-        {/* Menu Chính */}
         {menuConfig.mainMenu && menuConfig.mainMenu.length > 0 && (
           <div className="mb-4">
             {!isCollapsed && (
@@ -309,7 +293,6 @@ export default function Sidebar({ isCollapsed = false }) {
           </div>
         )}
 
-        {/* Operation Menu (không có header) */}
         {menuConfig.operationMenu && menuConfig.operationMenu.length > 0 && (
           <div className="mb-4">
             <nav className="space-y-1">
@@ -320,7 +303,6 @@ export default function Sidebar({ isCollapsed = false }) {
           </div>
         )}
 
-        {/* Quản lý */}
         {menuConfig.managementMenu && menuConfig.managementMenu.length > 0 && (
           <div className="pt-4 border-t border-slate-200">
             {!isCollapsed && (

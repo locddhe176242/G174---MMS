@@ -1,7 +1,9 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.CustomerRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerResponseDTO;
+import com.g174.mmssystem.dto.responseDTO.CustomerDetailResponseDTO;
 import com.g174.mmssystem.service.IService.ICustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,12 @@ public class CustomerController {
     private final ICustomerService customerService;
 
     @PostMapping
+    @LogActivity(
+            action = "CREATE_CUSTOMER",
+            activityType = "CUSTOMER_MANAGEMENT",
+            description = "Tạo khách hàng mới: #{#customerRequestDTO.firstName} #{#customerRequestDTO.lastName}",
+            entityId = "#{#result.id}"
+    )
     public ResponseEntity<CustomerResponseDTO> createCustomer(
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
 
@@ -105,6 +113,14 @@ public class CustomerController {
         customerService.restoreCustomer(customerId);
 
         CustomerResponseDTO response = customerService.getCustomerById(customerId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{customerId}/detail")
+    public ResponseEntity<CustomerDetailResponseDTO> getCustomerDetailById(@PathVariable Integer customerId) {
+        log.info("REST: Fetching customer detail with ID: {}", customerId);
+
+        CustomerDetailResponseDTO response = customerService.getCustomerDetailById(customerId);
         return ResponseEntity.ok(response);
     }
 }

@@ -30,7 +30,6 @@ public class JwtService {
     public String generateAccessToken(User user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
-        claims.put("username", user.getUsername());
         claims.put("email", user.getEmail());
         claims.put("employeeCode", user.getEmployeeCode());
 
@@ -75,10 +74,6 @@ public class JwtService {
 
     public Integer extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", Integer.class));
-    }
-
-    public String extractUsername(String token) {
-        return extractClaim(token, claims -> claims.get("username", String.class));
     }
 
     public String extractRoles(String token) {

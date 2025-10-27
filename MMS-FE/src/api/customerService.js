@@ -36,6 +36,8 @@ export const customerService = {
     const response = await apiClient.get(`/customers/${id}`);
     return response.data;
   },
+
+  
   
   // Create customer
   createCustomer: async (customerData) => {
@@ -61,5 +63,15 @@ export const customerService = {
     return response.data;
   },
 };
+
+// Get detail with transactions
+export const getCustomerDetail = async (customerId) => {
+  const res = await apiClient.get(`/customers/${customerId}/detail`);
+  return res.data;
+};
+
+
+
+
 
 export default customerService;

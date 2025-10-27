@@ -16,7 +16,6 @@ import java.time.Instant;
 @AllArgsConstructor
 public class UserSimpleResponseDTO {
     private Integer userId;
-    private String username;
     private String email;
     private String employeeCode;
     private UserStatus status;

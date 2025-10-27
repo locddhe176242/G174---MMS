@@ -131,7 +131,7 @@ export default function AddWarehouse() {
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-gray-700">Người tạo</label>
-								<input disabled value={user?.username || user?.email || ""} className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50 text-gray-700" />
+								<input disabled value={user?.email || ""} className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50 text-gray-700" />
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-gray-700">Ngày tạo</label>
@@ -180,5 +180,4 @@ export default function AddWarehouse() {
 		</div>
 	);
 }
-
 

@@ -38,3 +38,20 @@ export const changePassword = async (passwordData) => {
     };
   }
 };
+
+export const uploadAvatar = async (formData) => {
+  try {
+    const response = await apiClient.post("/users/profile/avatar", formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi upload avatar:", error);
+    throw {
+      message: error.response?.data?.message || "Không thể upload avatar",
+      status: error.response?.status,
+    };
+  }
+};

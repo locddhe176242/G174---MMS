@@ -16,6 +16,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class UserRoleResponseDTO {
     private Integer userId;
-    private String username;
+    private String email;
     private Set<RoleResponseDTO> roles = new HashSet<>();
 }
