@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,6 +26,7 @@ public class VendorController {
     private final IVendorService vendorService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<VendorResponseDTO> createVendor(
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
 
@@ -36,6 +38,7 @@ public class VendorController {
     }
 
     @GetMapping("/{vendorId}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<VendorResponseDTO> getVendorById(@PathVariable Integer vendorId) {
         log.info("REST: Fetching vendor with ID: {}", vendorId);
 
@@ -44,6 +47,7 @@ public class VendorController {
     }
 
     @GetMapping("/code/{vendorCode}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<VendorResponseDTO> getVendorByCode(@PathVariable String vendorCode) {
         log.info("REST: Fetching vendor with code: {}", vendorCode);
 
@@ -52,6 +56,7 @@ public class VendorController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<List<VendorResponseDTO>> getAllVendors() {
         log.info("REST: Fetching all vendors");
 
@@ -60,6 +65,7 @@ public class VendorController {
     }
 
     @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Page<VendorResponseDTO>> getAllVendorsWithPagination(Pageable pageable) {
         log.info("REST: Fetching vendors with pagination - page: {}, size: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
@@ -69,6 +75,7 @@ public class VendorController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<List<VendorResponseDTO>> searchVendors(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("REST: Searching vendors with keyword: '{}'", keyword);
@@ -78,6 +85,7 @@ public class VendorController {
     }
 
     @GetMapping("/search/page")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Page<VendorResponseDTO>> searchVendorsWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -89,6 +97,7 @@ public class VendorController {
     }
 
     @PutMapping("/{vendorId}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<VendorResponseDTO> updateVendor(
             @PathVariable Integer vendorId,
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
@@ -100,6 +109,7 @@ public class VendorController {
     }
 
     @DeleteMapping("/{vendorId}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Void> deleteVendor(@PathVariable Integer vendorId) {
         log.info("REST: Soft deleting vendor with ID: {}", vendorId);
 
@@ -108,6 +118,7 @@ public class VendorController {
     }
 
     @PostMapping("/{vendorId}/restore")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<VendorResponseDTO> restoreVendor(@PathVariable Integer vendorId) {
         log.info("REST: Restoring vendor with ID: {}", vendorId);
 
@@ -118,6 +129,7 @@ public class VendorController {
     }
 
     @GetMapping("/exists/{vendorCode}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Boolean> checkVendorCodeExists(@PathVariable String vendorCode) {
         log.info("REST: Checking if vendor code exists: {}", vendorCode);
 
@@ -126,6 +138,7 @@ public class VendorController {
     }
 
     @GetMapping("/generate-code")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Map<String, String>> generateVendorCode() {
         log.info("Generating new vendor code");
         String vendorCode = vendorService.generateNextVendorCode();

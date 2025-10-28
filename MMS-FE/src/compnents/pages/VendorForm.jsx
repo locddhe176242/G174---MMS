@@ -12,8 +12,9 @@ export default function VendorForm() {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [emailError, setEmailError] = useState("");
-  const [phoneError, setPhoneError] = useState("");
+
+  // Validation errors - chỉ hiển thị sau khi submit
+  const [validationErrors, setValidationErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -23,8 +24,6 @@ export default function VendorForm() {
       street: "",
       provinceCode: "",
       provinceName: "",
-      districtCode: "",
-      districtName: "",
       wardCode: "",
       wardName: "",
       country: "Việt Nam"
@@ -37,10 +36,8 @@ export default function VendorForm() {
   });
 
   const [provinces, setProvinces] = useState([]);
-  const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
 
   // Load provinces on mount
@@ -58,48 +55,20 @@ export default function VendorForm() {
     }
   }, [isEdit, id]);
 
-  // Load districts when province changes
+  // Load wards khi chọn province HOẶC khi provinces load xong
   useEffect(() => {
-    if (formData.address.provinceCode) {
-      loadDistricts(formData.address.provinceCode);
-    } else {
-      setDistricts([]);
-      setWards([]);
-      setFormData(prev => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          districtCode: "",
-          districtName: "",
-          wardCode: "",
-          wardName: ""
-        }
-      }));
-    }
-  }, [formData.address.provinceCode]);
-
-  // Load wards when district changes
-  useEffect(() => {
-    if (formData.address.districtCode) {
-      loadWards(formData.address.districtCode);
+    if (formData.address.provinceCode && provinces.length > 0) {
+      loadWards(formData.address.provinceCode);
     } else {
       setWards([]);
-      setFormData(prev => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          wardCode: "",
-          wardName: ""
-        }
-      }));
     }
-  }, [formData.address.districtCode]);
+  }, [formData.address.provinceCode, provinces]);
 
   const loadVendorData = async () => {
     try {
       setLoading(true);
       const vendor = await vendorService.getVendorById(id);
-      
+
       setFormData({
         name: vendor.name || "",
         vendorCode: vendor.vendorCode || "",
@@ -108,8 +77,6 @@ export default function VendorForm() {
           street: vendor.address?.street || "",
           provinceCode: vendor.address?.provinceCode || "",
           provinceName: vendor.address?.provinceName || "",
-          districtCode: vendor.address?.districtCode || "",
-          districtName: vendor.address?.districtName || "",
           wardCode: vendor.address?.wardCode || "",
           wardName: vendor.address?.wardName || "",
           country: vendor.address?.country || "Việt Nam"
@@ -149,7 +116,7 @@ export default function VendorForm() {
   const loadProvinces = async () => {
     try {
       setLoadingProvinces(true);
-      const response = await fetch('https://provinces.open-api.vn/api/p/');
+      const response = await fetch('https://provinces.open-api.vn/api/v2/p/');
       const data = await response.json();
       const formattedProvinces = data.map(province => ({
         value: province.code,
@@ -158,40 +125,37 @@ export default function VendorForm() {
       setProvinces(formattedProvinces);
     } catch (err) {
       console.error('Error loading provinces:', err);
+      toast.error('Không thể tải danh sách tỉnh/thành phố');
     } finally {
       setLoadingProvinces(false);
     }
   };
 
-  const loadDistricts = async (provinceCode) => {
-    try {
-      setLoadingDistricts(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      const data = await response.json();
-      const formattedDistricts = data.districts.map(district => ({
-        value: district.code,
-        label: district.name
-      }));
-      setDistricts(formattedDistricts);
-    } catch (err) {
-      console.error('Error loading districts:', err);
-    } finally {
-      setLoadingDistricts(false);
-    }
-  };
-
-  const loadWards = async (districtCode) => {
+  const loadWards = async (provinceCode) => {
     try {
       setLoadingWards(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
-      const data = await response.json();
-      const formattedWards = data.wards.map(ward => ({
-        value: ward.code,
-        label: ward.name
-      }));
-      setWards(formattedWards);
+      const response = await fetch(`https://provinces.open-api.vn/api/v2/p/${provinceCode}?depth=2`);
+      const provinceData = await response.json();
+
+      const allWards = [];
+      if (provinceData.wards && Array.isArray(provinceData.wards)) {
+        provinceData.wards.forEach(ward => {
+          allWards.push({
+            value: ward.code,
+            label: ward.name
+          });
+        });
+      }
+
+      setWards(allWards);
+
+      if (allWards.length === 0) {
+        toast.info('Không tìm thấy phường/xã cho tỉnh này');
+      }
     } catch (err) {
       console.error('Error loading wards:', err);
+      toast.error('Không thể tải danh sách phường/xã');
+      setWards([]);
     } finally {
       setLoadingWards(false);
     }
@@ -218,32 +182,17 @@ export default function VendorForm() {
   const handleProvinceChange = (selectedOption) => {
     const provinceCode = selectedOption ? selectedOption.value : "";
     const provinceName = selectedOption ? selectedOption.label : "";
-    
+
+    // Reset wards
+    setWards([]);
+
     setFormData(prev => ({
       ...prev,
       address: {
         ...prev.address,
         provinceCode,
         provinceName,
-        districtCode: "",
-        districtName: "",
-        wardCode: "",
-        wardName: ""
-      }
-    }));
-  };
-
-  const handleDistrictChange = (selectedOption) => {
-    const districtCode = selectedOption ? selectedOption.value : "";
-    const districtName = selectedOption ? selectedOption.label : "";
-    
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        districtCode,
-        districtName,
-        wardCode: "",
+        wardCode: "", // Reset ward khi đổi province
         wardName: ""
       }
     }));
@@ -252,7 +201,7 @@ export default function VendorForm() {
   const handleWardChange = (selectedOption) => {
     const wardCode = selectedOption ? selectedOption.value : "";
     const wardName = selectedOption ? selectedOption.label : "";
-    
+
     setFormData(prev => ({
       ...prev,
       address: {
@@ -263,6 +212,7 @@ export default function VendorForm() {
     }));
   };
 
+  // Validation functions
   const validateEmail = (email) => {
     if (!email) return true; // Email không bắt buộc
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -271,28 +221,76 @@ export default function VendorForm() {
 
   const validatePhone = (phone) => {
     if (!phone) return true; // Phone không bắt buộc
-    const phoneRegex = /^(0\d{9,10})$/;
+    const phoneRegex = /^0[3|5|7|8|9][0-9]{7,8}$/;
     return phoneRegex.test(phone);
+  };
+
+  const validateWebsite = (website) => {
+    if (!website) return true; // Website không bắt buộc
+    const websiteRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,63}(\/[^\s]*)?$/;
+    return websiteRegex.test(website);
+  };
+
+  // Validate tất cả fields cùng lúc
+  const validateAllFields = () => {
+    const errors = {};
+
+    // Validate name (bắt buộc)
+    if (!formData.name || formData.name.trim().length < 2) {
+      errors.name = "Tên nhà cung cấp phải có ít nhất 2 ký tự";
+    }
+
+    // Validate vendorCode (bắt buộc)
+    if (!formData.vendorCode || formData.vendorCode.trim().length === 0) {
+      errors.vendorCode = "Mã nhà cung cấp không được để trống";
+    }
+
+    // Validate province (bắt buộc)
+    if (!formData.address.provinceCode) {
+      errors.province = "Vui lòng chọn tỉnh/thành phố";
+    }
+
+    // Validate ward (bắt buộc)
+    if (!formData.address.wardCode) {
+      errors.ward = "Vui lòng chọn phường/xã";
+    }
+
+    // Validate email (không bắt buộc nhưng phải đúng format)
+    if (formData.contact.email && !validateEmail(formData.contact.email)) {
+      errors.email = "Email không đúng định dạng (vd: example@gmail.com)";
+    }
+
+    // Validate phone (không bắt buộc nhưng phải đúng format)
+    if (formData.contact.phone && !validatePhone(formData.contact.phone)) {
+      errors.phone = "Số điện thoại không đúng định dạng";
+    }
+
+    // Validate website (không bắt buộc nhưng phải đúng format)
+    if (formData.contact.website && !validateWebsite(formData.contact.website)) {
+      errors.website = "Website không đúng định dạng (vd: https://example.com)";
+    }
+
+    return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
-    setEmailError("");
-    setPhoneError("");
 
-    // Validate email trước khi submit
-    if (formData.contact.email && !validateEmail(formData.contact.email)) {
-      setEmailError("Email không đúng định dạng (vd: example@gmail.com)");
-      setIsSubmitting(false);
-      return;
-    }
+    // Clear previous validation errors
+    setValidationErrors({});
 
-    // Validate phone trước khi submit
-    if (formData.contact.phone && !validatePhone(formData.contact.phone)) {
-      setPhoneError("Số điện thoại không đúng định dạng (vd: 0123456789)");
+    // Validate tất cả fields
+    const errors = validateAllFields();
+
+    if (Object.keys(errors).length > 0) {
+      // Có lỗi validation
+      setValidationErrors(errors);
       setIsSubmitting(false);
+
+      // Auto scroll lên đầu form
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -307,7 +305,6 @@ export default function VendorForm() {
         navigate("/vendors");
       }
     } catch (err) {
-      // Hiển thị lỗi từ backend
       const errorMessage = err.response?.data?.message ||
         (isEdit ? "Không thể cập nhật nhà cung cấp" : "Không thể tạo nhà cung cấp");
       setError(errorMessage);
@@ -370,7 +367,7 @@ export default function VendorForm() {
             {/* Basic Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Thông tin cơ bản</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -380,10 +377,13 @@ export default function VendorForm() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Nhập tên nhà cung cấp"
-                    required
                   />
+                  {validationErrors.name && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -394,10 +394,14 @@ export default function VendorForm() {
                     type="text"
                     value={formData.vendorCode}
                     onChange={(e) => handleInputChange("vendorCode", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 ${validationErrors.vendorCode ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Mã sẽ được tự động tạo"
                     readOnly
                   />
+                  {validationErrors.vendorCode && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.vendorCode}</p>
+                  )}
                 </div>
               </div>
 
@@ -418,7 +422,7 @@ export default function VendorForm() {
             {/* Address Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Thông tin địa chỉ</h3>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Địa chỉ chi tiết
@@ -432,7 +436,7 @@ export default function VendorForm() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tỉnh/Thành phố <span className="text-red-500">*</span>
@@ -446,24 +450,19 @@ export default function VendorForm() {
                     isSearchable
                     className="react-select-container"
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        borderColor: validationErrors.province ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
+                        '&:hover': {
+                          borderColor: validationErrors.province ? '#ef4444' : '#3b82f6'
+                        }
+                      })
+                    }}
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quận/Huyện <span className="text-red-500">*</span>
-                  </label>
-                  <Select
-                    value={districts.find(d => d.value === formData.address.districtCode)}
-                    onChange={handleDistrictChange}
-                    options={districts}
-                    placeholder="Chọn quận/huyện"
-                    isLoading={loadingDistricts}
-                    isDisabled={!formData.address.provinceCode}
-                    isSearchable
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                  />
+                  {validationErrors.province && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.province}</p>
+                  )}
                 </div>
 
                 <div>
@@ -474,13 +473,25 @@ export default function VendorForm() {
                     value={wards.find(w => w.value === formData.address.wardCode)}
                     onChange={handleWardChange}
                     options={wards}
-                    placeholder="Chọn phường/xã"
+                    placeholder={loadingWards ? "Đang tải..." : "Chọn phường/xã"}
                     isLoading={loadingWards}
-                    isDisabled={!formData.address.districtCode}
+                    isDisabled={!formData.address.provinceCode || loadingWards}
                     isSearchable
                     className="react-select-container"
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        borderColor: validationErrors.ward ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
+                        '&:hover': {
+                          borderColor: validationErrors.ward ? '#ef4444' : '#3b82f6'
+                        }
+                      })
+                    }}
                   />
+                  {validationErrors.ward && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.ward}</p>
+                  )}
                 </div>
               </div>
 
@@ -501,7 +512,7 @@ export default function VendorForm() {
             {/* Contact Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Thông tin liên hệ</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -510,22 +521,12 @@ export default function VendorForm() {
                   <input
                     type="tel"
                     value={formData.contact.phone}
-                    onChange={(e) => {
-                      handleInputChange("contact.phone", e.target.value);
-                      // Validate real-time
-                      if (e.target.value && !validatePhone(e.target.value)) {
-                        setPhoneError("Số điện thoại không đúng định dạng");
-                      } else {
-                        setPhoneError("");
-                      }
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      phoneError ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="0123456789"
+                    onChange={(e) => handleInputChange("contact.phone", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.phone ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   />
-                  {phoneError && (
-                    <p className="mt-1 text-sm text-red-600">{phoneError}</p>
+                  {validationErrors.phone && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
                   )}
                 </div>
 
@@ -536,22 +537,12 @@ export default function VendorForm() {
                   <input
                     type="email"
                     value={formData.contact.email}
-                    onChange={(e) => {
-                      handleInputChange("contact.email", e.target.value);
-                      // Validate real-time
-                      if (e.target.value && !validateEmail(e.target.value)) {
-                        setEmailError("Email không đúng định dạng");
-                      } else {
-                        setEmailError("");
-                      }
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      emailError ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="example@gmail.com"
+                    onChange={(e) => handleInputChange("contact.email", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   />
-                  {emailError && (
-                    <p className="mt-1 text-sm text-red-600">{emailError}</p>
+                  {validationErrors.email && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
                   )}
                 </div>
               </div>
@@ -564,9 +555,12 @@ export default function VendorForm() {
                   type="url"
                   value={formData.contact.website}
                   onChange={(e) => handleInputChange("contact.website", e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://example.com"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.website ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 />
+                {validationErrors.website && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.website}</p>
+                )}
               </div>
             </div>
 

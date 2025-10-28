@@ -18,12 +18,6 @@ public class Address {
     @Column(name = "province_name")
     private String provinceName;
 
-    @Column(name = "district_code")
-    private String districtCode;
-
-    @Column(name = "district_name")
-    private String districtName;
-
     @Column(name = "ward_code")
     private String wardCode;
 
@@ -64,22 +58,6 @@ public class Address {
 
     public void setProvinceName(String provinceName) {
         this.provinceName = provinceName;
-    }
-
-    public String getDistrictCode() {
-        return districtCode;
-    }
-
-    public void setDistrictCode(String districtCode) {
-        this.districtCode = districtCode;
-    }
-
-    public String getDistrictName() {
-        return districtName;
-    }
-
-    public void setDistrictName(String districtName) {
-        this.districtName = districtName;
     }
 
     public String getWardCode() {

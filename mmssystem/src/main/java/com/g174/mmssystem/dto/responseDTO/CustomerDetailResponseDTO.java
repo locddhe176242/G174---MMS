@@ -1,5 +1,7 @@
 package com.g174.mmssystem.dto.responseDTO;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -11,6 +13,7 @@ public class CustomerDetailResponseDTO {
     private Integer customerId;
     private String firstName;
     private String lastName;
+    private String customerCode;
     private AddressInfo address;
     private ContactInfo contact;
     private String note;
@@ -29,7 +32,12 @@ public class CustomerDetailResponseDTO {
     public static class AddressInfo {
         private Integer addressId;
         private String street;
-        private String city;
+        private String provinceCode;
+        private String provinceName;
+        private String districtCode;
+        private String districtName;
+        private String wardCode;
+        private String wardName;
         private String country;
     }
 
@@ -38,6 +46,7 @@ public class CustomerDetailResponseDTO {
         private Integer contactId;
         private String phone;
         private String email;
+        private String website;
     }
 
     @Data
