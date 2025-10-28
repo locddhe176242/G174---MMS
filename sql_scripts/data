@@ -1,0 +1,208 @@
+use mms;
+
+-- ==================== 1. DEPARTMENTS ====================
+INSERT INTO Departments (department_id, department_name, department_code, description, created_at, updated_at) VALUES
+(1, 'Phòng quản lý cấp cao', 'QLCC', 'Phòng ban quản lý', NOW(), NOW()),
+(2, 'Phòng sale', 'BH', 'Phòng ban quản bán hàng', NOW(), NOW());
+
+-- ==================== 2. ROLES ====================
+INSERT INTO Roles (role_id, role_name) VALUES
+(1, 'MANAGER'),
+(2, 'SALE'),
+(3, 'PURCHASE'),
+(4, 'ACCOUNTING'),
+(5, 'WAREHOUSE');
+
+-- ==================== 3. USERS ====================
+-- Password đã được mã hóa bằng BCrypt (password gốc: "Password123")
+INSERT INTO Users (user_id, email, password, employee_code, department_id, status, created_at, updated_at) VALUES
+(1, 'doloc2882003@gmail.com', '$2a$10$ybaihHMZbzB1Pbgq.cqYBO7HqAvwA1YV8ccLpuRAkgKGui.i5LBkS', 'QLCC001', 1, 'Active', NOW(), NOW()),
+(2,  'sale@mms.com', '$2a$10$ybaihHMZbzB1Pbgq.cqYBO7HqAvwA1YV8ccLpuRAkgKGui.i5LBkS', 'EMP002', 1, 'Active', NOW(), NOW());
+
+-- ==================== 4. USER_ROLES ====================
+INSERT INTO User_Roles (user_id, role_id) VALUES
+(1, 1), -- User 1 (manager@mms.com) có role MANAGER
+(2, 2); -- User 2 (sale@mms.com) có role SALE
+
+-- ==================== 5. USER_PROFILE ====================
+INSERT INTO User_Profile (profile_id, user_id, first_name, last_name, gender, dob, phone_number, address, avatar_url) VALUES
+(1, 1, 'Do', 'Loc', 'Male', '1990-05-15', '0901234567', '123 Đường Nguyễn Huệ, Quận 1, TP.HCM', NULL),
+(2, 2, 'Thị B', 'Trần', 'Female', '1995-08-20', '0912345678', '456 Đường Lê Lợi, Quận 3, TP.HCM', NULL);
+
+-- ==================== 6. TOKEN_BLACKLIST ====================
+INSERT INTO token_blacklist (id, token, user_id, blacklisted_at, expires_at) VALUES
+(1, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired_token_1', 1, NOW(), DATE_ADD(NOW(), INTERVAL 1 HOUR)),
+(2, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired_token_2', 2, NOW(), DATE_ADD(NOW(), INTERVAL 1 HOUR));
+
+-- ==================== 7. MENU_ITEMS ====================
+INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
+(1, 'dashboard', 'Trang chủ', '/dashboard', 'home', 1),
+(2, 'customers', 'Khách hàng', '/customers', 'customers', 10),
+(3, 'vendors', 'Nhà cung cấp', '/vendors', 'vendors', 11),
+(4, 'products', 'Sản phẩm', '/products', 'products', 12),
+(5, 'warehouse', 'Kho', '/warehouse', 'warehouse', 13),
+(6, 'purchase', 'Nhập hàng', '/purchase', 'import', 14),
+(7, 'sales', 'Xuất hàng', '/sales', 'export', 15),
+(8, 'accounting', 'Kế toán', '/accounting', 'accounting', 16),
+(9, 'approval', 'Phê duyệt', '/approval', 'approval', 100),
+(10, 'reports', 'Báo cáo', '/reports', 'reports', 101),
+(11, 'staff', 'Nhân sự', '/admin/user', 'staff', 102);
+
+-- ==================== 8. ROLE_MENUS ====================
+-- MANAGER: Có tất cả menus
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11);
+
+-- SALE: Dashboard, Sản phẩm, Xuất hàng, Khách hàng, Báo cáo
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(2, 1), (2, 2), (2, 4), (2, 7), (2, 10);
+
+-- PURCHASE: Dashboard, Sản phẩm, Nhập hàng, Nhà cung cấp, Báo cáo
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(3, 1), (3, 3), (3, 4), (3, 6), (3, 10);
+
+-- ACCOUNTING: Dashboard, Kế toán, Khách hàng, Nhà cung cấp, Phê duyệt, Báo cáo
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(4, 1), (4, 2), (4, 3), (4, 8), (4, 9), (4, 10);
+
+-- WAREHOUSE: Dashboard, Sản phẩm, Kho, Nhập hàng, Xuất hàng, Báo cáo
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(5, 1), (5, 4), (5, 5), (5, 6), (5, 7), (5, 10);
+
+-- ==================== 9. PERMISSIONS ====================
+-- Customer permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(1, 'customer.view', 'Xem khách hàng', 'customer', 'view'),
+(2, 'customer.create', 'Tạo khách hàng', 'customer', 'create'),
+(3, 'customer.edit', 'Sửa khách hàng', 'customer', 'edit'),
+(4, 'customer.delete', 'Xóa khách hàng', 'customer', 'delete'),
+(5, 'customer.export', 'Xuất danh sách khách hàng', 'customer', 'export');
+
+-- Vendor permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(6, 'vendor.view', 'Xem nhà cung cấp', 'vendor', 'view'),
+(7, 'vendor.create', 'Tạo nhà cung cấp', 'vendor', 'create'),
+(8, 'vendor.edit', 'Sửa nhà cung cấp', 'vendor', 'edit'),
+(9, 'vendor.delete', 'Xóa nhà cung cấp', 'vendor', 'delete'),
+(10, 'vendor.export', 'Xuất danh sách nhà cung cấp', 'vendor', 'export');
+
+-- Product permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(11, 'product.view', 'Xem sản phẩm', 'product', 'view'),
+(12, 'product.create', 'Tạo sản phẩm', 'product', 'create'),
+(13, 'product.edit', 'Sửa sản phẩm', 'product', 'edit'),
+(14, 'product.delete', 'Xóa sản phẩm', 'product', 'delete'),
+(15, 'product.export', 'Xuất danh sách sản phẩm', 'product', 'export');
+
+-- Sales permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(16, 'sales.view', 'Xem đơn bán hàng', 'sales', 'view'),
+(17, 'sales.create', 'Tạo đơn bán hàng', 'sales', 'create'),
+(18, 'sales.edit', 'Sửa đơn bán hàng', 'sales', 'edit'),
+(19, 'sales.delete', 'Xóa đơn bán hàng', 'sales', 'delete'),
+(20, 'sales.approve', 'Phê duyệt đơn bán hàng', 'sales', 'approve');
+
+-- Purchase permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(21, 'purchase.view', 'Xem đơn mua hàng', 'purchase', 'view'),
+(22, 'purchase.create', 'Tạo đơn mua hàng', 'purchase', 'create'),
+(23, 'purchase.edit', 'Sửa đơn mua hàng', 'purchase', 'edit'),
+(24, 'purchase.delete', 'Xóa đơn mua hàng', 'purchase', 'delete'),
+(25, 'purchase.approve', 'Phê duyệt đơn mua hàng', 'purchase', 'approve');
+
+-- Warehouse permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(26, 'warehouse.view', 'Xem kho', 'warehouse', 'view'),
+(27, 'warehouse.import', 'Nhập kho', 'warehouse', 'import'),
+(28, 'warehouse.export', 'Xuất kho', 'warehouse', 'export'),
+(29, 'warehouse.adjust', 'Điều chỉnh tồn kho', 'warehouse', 'adjust'),
+(30, 'warehouse.transfer', 'Chuyển kho', 'warehouse', 'transfer');
+
+-- ==================== 10. ROLE_PERMISSIONS ====================
+-- MANAGER: Tất cả permissions
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5),
+(1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
+(1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
+(1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
+(1, 21), (1, 22), (1, 23), (1, 24), (1, 25),
+(1, 26), (1, 27), (1, 28), (1, 29), (1, 30);
+
+-- SALE: Customer (view, create, edit, export), Product (view), Sales (view, create, edit)
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(2, 1), (2, 2), (2, 3), (2, 5),      -- Customer
+(2, 11),                              -- Product view
+(2, 16), (2, 17), (2, 18);            -- Sales
+
+-- PURCHASE: Vendor (view, create, edit, export), Product (view), Purchase (view, create, edit)
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(3, 6), (3, 7), (3, 8), (3, 10),      -- Vendor
+(3, 11),                              -- Product view
+(3, 21), (3, 22), (3, 23);            -- Purchase
+
+-- ACCOUNTING: Customer (view), Vendor (view), Sales (view, approve), Purchase (view, approve)
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(4, 1), (4, 6),                       -- Customer & Vendor view
+(4, 16), (4, 20),                     -- Sales view & approve
+(4, 21), (4, 25);                     -- Purchase view & approve
+
+-- WAREHOUSE: Product (view, edit), Warehouse (all), Sales (view), Purchase (view)
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+(5, 11), (5, 13),                     -- Product view & edit
+(5, 26), (5, 27), (5, 28), (5, 29), (5, 30),  -- Warehouse all
+(5, 16), (5, 21);                     -- Sales & Purchase view
+
+-- ==================== 11. USER_PERMISSIONS ====================
+-- User 1 (Manager) không cần override vì đã có full permissions
+-- User 2 (Sale) được cấp thêm quyền xóa khách hàng tạm thời (3 ngày)
+INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
+(2, 4, DATE_ADD(NOW(), INTERVAL 3 DAY)); -- customer.delete, expires in 3 days
+
+-- User 2 (Sale) được cấp quyền phê duyệt đơn bán hàng vĩnh viễn
+INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
+(2, 20, NULL); -- sales.approve, permanent
+
+INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
+VALUES
+('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
+
+-- Bước 1: Kiểm tra role MANAGER có tồn tại không
+SELECT 'Kiểm tra role MANAGER:' as status;
+SELECT role_id, role_name FROM roles WHERE role_name = 'MANAGER';
+
+-- Bước 2: Thêm menu item cho Department Management
+INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
+VALUES
+('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
+
+-- Bước 3: Lấy menu_id vừa tạo
+SET @menu_id = LAST_INSERT_ID();
+SELECT CONCAT('Menu ID vừa tạo: ', @menu_id) as status;
+
+-- Bước 4: Kiểm tra menu đã được tạo
+SELECT 'Menu item đã được thêm:' as status;
+SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
+
+-- Bước 5: Gán cho role MANAGER (chỉ nếu cả hai đều tồn tại)
+INSERT INTO role_menus (role_id, menu_id)
+SELECT r.role_id, @menu_id
+FROM roles r
+WHERE r.role_name = 'MANAGER'
+AND @menu_id IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1 FROM role_menus rm
+    WHERE rm.role_id = r.role_id AND rm.menu_id = @menu_id
+);
+
+-- Kiểm tra kết quả
+SELECT 'Menu item đã được thêm:' as status;
+SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
+
+SELECT 'Role-Menu mapping:' as status;
+SELECT rm.role_id, r.role_name, rm.menu_id, mi.menu_label
+FROM role_menus rm
+JOIN roles r ON rm.role_id = r.role_id
+JOIN menu_items mi ON rm.menu_id = mi.menu_id
+WHERE mi.menu_key = 'admin.departments';
+
+
