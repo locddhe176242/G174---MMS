@@ -5,38 +5,43 @@ import {warehouseService} from "../../../api/warehouseService.js";
 import Pagination from "../../common/Pagination.jsx";
 
 export default function WarehouseList() {
-    const [warehouses, setWarehouses] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [warehouses, setWarehouses] = useState([]); // Lưu trữ danh sách kho hàng
+    const [loading, setLoading] = useState(true);  // Quản lý trạng thái loading khi fetch data
+    const [error, setError] = useState(null); // Lưu trữ thông báo lỗi nếu có
 
-    const [searchKeyword, setSearchKeyword] = useState("");
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [totalElements, setTotalElements] = useState(0);
-    const [pageSize, setPageSize] = useState(10);
+    const [searchKeyword, setSearchKeyword] = useState("");// Từ khóa tìm kiếm
+    const [currentPage, setCurrentPage] = useState(0); // Trang hiện tại (bắt đầu từ 0)
+    const [totalPages, setTotalPages] = useState(0);// Tổng số trang
+    const [totalElements, setTotalElements] = useState(0);// Tổng số phần tử
+    const [pageSize, setPageSize] = useState(10);// Số phần tử trên mỗi trang
 
-    // New filter states
-    const [filterNameOrCode, setFilterNameOrCode] = useState("");
-    const [filterStatus, setFilterStatus] = useState("All");
+    //  States cho bộ lọc
+    const [filterNameOrCode, setFilterNameOrCode] = useState(""); // Lọc theo tên hoặc mã
+    const [filterStatus, setFilterStatus] = useState("All"); // Lọc theo trạng thái (All/Active/Inactive)
 
     // Confirm modal state
     const [confirmState, setConfirmState] = useState({
-        open: false,
-        action: null,
-        warehouseId: null,
-        message: "",
+        open: false, // Trạng thái hiển thị modal
+        action: null, // Hành động (deactivate/restore)
+        warehouseId: null,  // ID của kho cần thực hiện hành động
+        message: "", // Thông báo xác nhận
     });
 
     // Toast state
-    const [toast, setToast] = useState({open: false, message: "", type: "success"});
+    const [toast, setToast] = useState({
+        open: false, // Trạng thái hiển thị toast
+        message: "",  // Nội dung thông báo
+        type: "success" // Loại thông báo (success/error)
+    }); 
 
+    //Hàm fetch dữ liệu kho
     const fetchWarehouses = async (
-        page = 0,
-        keyword = "",
-        statusFilter = "All",
-        nameOrCodeFilter = "",
-        useClientFilter = false,
-        customPageSize = pageSize
+        page = 0, // Trang cần lấy
+        keyword = "", // Từ khóa tìm kiếm
+        statusFilter = "All", // Bộ lọc trạng thái
+        nameOrCodeFilter = "", // Bộ lọc tên/mã
+        useClientFilter = false, // Có sử dụng filter ở client không
+        customPageSize = pageSize // Số phần tử trên trang
     ) => {
         try {
             setLoading(true);
@@ -94,7 +99,7 @@ export default function WarehouseList() {
         fetchWarehouses(0, searchKeyword, filterStatus, filterNameOrCode);
     }, [pageSize]);
 
-
+    // Xử lý tìm kiếm
     const handleSearch = (e) => {
         e.preventDefault();
 
@@ -103,11 +108,13 @@ export default function WarehouseList() {
         setFilterStatus("All");
     };
 
+     // Xử lý đổi trang
     const handlePageChange = (newPage) => {
         const useClientFilter = Boolean(filterNameOrCode.trim() || (filterStatus && filterStatus !== "All"));
         fetchWarehouses(newPage, searchKeyword, filterStatus, filterNameOrCode, useClientFilter);
     };
 
+    // Xử lý thay đổi số phần tử/trang
     const handlePageSizeChange = (newSize) => {
         setPageSize(newSize);
         setCurrentPage(0);
