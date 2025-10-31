@@ -23,13 +23,48 @@ export const getCategories = async () => {
   return response.data;
 };
 
+// Lấy danh sách categories đã xóa
+export const getDeletedCategories = async () => {
+  const response = await api.get("/deleted");
+  return response.data;
+};
+
 // Lấy 1 category theo id
 export const getCategory = async (id) => {
   const response = await api.get(`/${id}`);
   return response.data;
 };
 
+// Tạo category mới
+export const createCategory = async (categoryData) => {
+  const response = await api.post("", categoryData);
+  return response.data;
+};
+
+// Cập nhật category
+export const updateCategory = async (id, categoryData) => {
+  const response = await api.put(`/${id}`, categoryData);
+  return response.data;
+};
+
+// Xóa category (soft delete)
+export const deleteCategory = async (id) => {
+  const response = await api.delete(`/${id}`);
+  return response.data;
+};
+
+// Khôi phục category đã xóa
+export const restoreCategory = async (id) => {
+  const response = await api.put(`/${id}/restore`);
+  return response.data;
+};
+
 export default {
   getCategories,
-  getCategory
+  getDeletedCategories,
+  getCategory,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  restoreCategory
 };
