@@ -99,6 +99,55 @@ export const validation = {
       
       return { isValid: true, message: "" };
     }
+  },
+
+  // Category name validation
+  categoryName: {
+    validate: (name) => {
+      if (!name || name.trim() === '') {
+        return {
+          isValid: false,
+          message: "Tên danh mục là bắt buộc"
+        };
+      }
+      
+      if (name.length > 100) {
+        return {
+          isValid: false,
+          message: "Tên danh mục không được quá 100 ký tự"
+        };
+      }
+      
+      // Pattern: chữ cái, số, khoảng trắng, dấu gạch ngang
+      const nameRegex = /^[a-zA-Z0-9\s\-_À-ỹ]+$/;
+      
+      if (!nameRegex.test(name)) {
+        return {
+          isValid: false,
+          message: "Tên danh mục chỉ được chứa chữ cái, số, khoảng trắng, dấu gạch ngang"
+        };
+      }
+      
+      return { isValid: true, message: "" };
+    }
+  },
+
+  // Category description validation
+  categoryDescription: {
+    validate: (description) => {
+      if (!description) {
+        return { isValid: true, message: "" }; // Optional field
+      }
+      
+      if (description.length > 500) {
+        return {
+          isValid: false,
+          message: "Mô tả không được quá 500 ký tự"
+        };
+      }
+      
+      return { isValid: true, message: "" };
+    }
   }
 };
 
