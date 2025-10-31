@@ -20,6 +20,7 @@ import VendorDetail from "./compnents/pages/VendorDetail";
 import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
+import CategoryList from "./compnents/pages/Category/CategoryList";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -52,6 +53,7 @@ function App() {
                 <Route path="/customers/:id" element={<CustomerDetail/>}/>
                 <Route path="/customers/:id/edit" element={<CustomerForm/>}/>
                 <Route path="/products" element={<ProductList/>}/>
+                <Route path="/categories" element={<CategoryList/>}/>
                 <Route path="/vendors" element={<VendorList/>}/>
                 <Route path="/vendors/new" element={<VendorForm/>}/>
                 <Route path="/vendors/:id/edit" element={<VendorForm/>}/>
