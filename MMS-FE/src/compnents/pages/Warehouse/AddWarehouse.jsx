@@ -94,7 +94,7 @@ export default function AddWarehouse() {
 				<div className="container mx-auto px-4 py-6">
 					<div className="flex items-center justify-between">
 						<h1 className="text-2xl font-bold text-gray-900">Thêm kho mới</h1>
-						<Link to="/warehouse" className="px-4 py-2 border rounded-lg hover:bg-gray-50">Trở về danh sách</Link>
+						<Link to="/warehouse" className="px-4 py-2 border rounded-lg hover:bg-blue-500">Trở về danh sách</Link>
 					</div>
 				</div>
 			</div>
@@ -140,7 +140,7 @@ export default function AddWarehouse() {
 						</div>
 
 						<div className="pt-4 flex items-center gap-3">
-							<button type="submit" disabled={submitting} className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50">{submitting ? "Đang lưu..." : "Lưu"}</button>
+							<button type="submit" disabled={submitting} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-500 disabled:opacity-50">{submitting ? "Đang lưu..." : "Lưu"}</button>
 							<Link to="/warehouse" className="px-4 py-2 border rounded-lg hover:bg-gray-50">Huỷ</Link>
 						</div>
 					</form>
