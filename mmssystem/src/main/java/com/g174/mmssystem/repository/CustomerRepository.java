@@ -15,6 +15,10 @@ import java.util.Optional;
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
+    Optional<Customer> findByCustomerCode(String customerCode);
+
+    boolean existsByCustomerCodeAndDeletedAtIsNull(String customerCode);
+
     @Query("SELECT c FROM Customer c WHERE c.deletedAt IS NULL")
     List<Customer> findAllActiveCustomers();
 
@@ -22,14 +26,16 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
     Page<Customer> findAllActiveCustomers(Pageable pageable);
 
     @Query("SELECT c FROM Customer c WHERE " +
-            "LOWER(c.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) AND " +
+            "(LOWER(c.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "c.deletedAt IS NULL")
     List<Customer> searchCustomers(@Param("keyword") String keyword);
 
     @Query("SELECT c FROM Customer c WHERE " +
-            "LOWER(c.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) AND " +
+            "(LOWER(c.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "c.deletedAt IS NULL")
     Page<Customer> searchCustomers(@Param("keyword") String keyword, Pageable pageable);
 
@@ -44,6 +50,17 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
             "LEFT JOIN FETCH c.contact " +
             "WHERE c.customerId = :customerId AND c.deletedAt IS NULL")
     Optional<Customer> findByIdWithDetails(@Param("customerId") Integer customerId);
+
+    @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code, 4) AS UNSIGNED)), 0) " +
+            "FROM customers " +
+            "WHERE customer_code REGEXP '^KH[0-9]+$' " +
+            "FOR UPDATE",
+            nativeQuery = true)
+    Integer getMaxCustomerCodeNumber();
+
+    // Thêm method kiểm tra duplicate với retry
+    @Query("SELECT COUNT(c) > 0 FROM Customer c WHERE c.customerCode = :customerCode")
+    boolean existsByCustomerCode(@Param("customerCode") String customerCode);
 
     // Native query for transaction summary - single query instead of multiple
     @Query(value = """

@@ -280,8 +280,6 @@ public class VendorServiceImpl implements IVendorService {
         address.setStreet(addressDTO.getStreet());
         address.setProvinceCode(addressDTO.getProvinceCode());
         address.setProvinceName(addressDTO.getProvinceName());
-        address.setDistrictCode(addressDTO.getDistrictCode());
-        address.setDistrictName(addressDTO.getDistrictName());
         address.setWardCode(addressDTO.getWardCode());
         address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
@@ -290,8 +288,6 @@ public class VendorServiceImpl implements IVendorService {
         log.info("  street: {}", address.getStreet());
         log.info("  provinceCode: {}", address.getProvinceCode());
         log.info("  provinceName: {}", address.getProvinceName());
-        log.info("  districtCode: {}", address.getDistrictCode());
-        log.info("  districtName: {}", address.getDistrictName());
         log.info("  wardCode: {}", address.getWardCode());
         log.info("  wardName: {}", address.getWardName());
         log.info("  country: {}", address.getCountry());
@@ -303,8 +299,6 @@ public class VendorServiceImpl implements IVendorService {
         log.info("  street: {}", savedAddress.getStreet());
         log.info("  provinceCode: {}", savedAddress.getProvinceCode());
         log.info("  provinceName: {}", savedAddress.getProvinceName());
-        log.info("  districtCode: {}", savedAddress.getDistrictCode());
-        log.info("  districtName: {}", savedAddress.getDistrictName());
         log.info("  wardCode: {}", savedAddress.getWardCode());
         log.info("  wardName: {}", savedAddress.getWardName());
         log.info("  country: {}", savedAddress.getCountry());
@@ -316,8 +310,6 @@ public class VendorServiceImpl implements IVendorService {
         address.setStreet(addressDTO.getStreet());
         address.setProvinceCode(addressDTO.getProvinceCode());
         address.setProvinceName(addressDTO.getProvinceName());
-        address.setDistrictCode(addressDTO.getDistrictCode());
-        address.setDistrictName(addressDTO.getDistrictName());
         address.setWardCode(addressDTO.getWardCode());
         address.setWardName(addressDTO.getWardName());
         address.setCountry(addressDTO.getCountry());
@@ -352,8 +344,6 @@ public class VendorServiceImpl implements IVendorService {
             addressInfo.setStreet(vendor.getAddress().getStreet());
             addressInfo.setProvinceCode(vendor.getAddress().getProvinceCode());
             addressInfo.setProvinceName(vendor.getAddress().getProvinceName());
-            addressInfo.setDistrictCode(vendor.getAddress().getDistrictCode());
-            addressInfo.setDistrictName(vendor.getAddress().getDistrictName());
             addressInfo.setWardCode(vendor.getAddress().getWardCode());
             addressInfo.setWardName(vendor.getAddress().getWardName());
             addressInfo.setCountry(vendor.getAddress().getCountry());

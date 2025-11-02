@@ -131,15 +131,12 @@ CREATE TABLE user_permissions (
 CREATE TABLE Addresses (
     address_id INT AUTO_INCREMENT PRIMARY KEY,
     street VARCHAR(255),
+    country VARCHAR(100),
     province_code VARCHAR(20),
     province_name VARCHAR(100),
-    district_code VARCHAR(20),
-    district_name VARCHAR(100),
     ward_code VARCHAR(20),
     ward_name VARCHAR(100),
-    country VARCHAR(100),
     INDEX idx_province (province_code),
-    INDEX idx_district (district_code),
     INDEX idx_ward (ward_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -155,6 +152,7 @@ CREATE TABLE Customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(255) NOT NULL,
     last_name VARCHAR(255) NOT NULL,
+    customer_code VARCHAR(255) NOT NULL UNIQUE,
     address_id INT,
     contact_id INT,
     note TEXT,
@@ -164,6 +162,7 @@ CREATE TABLE Customers (
     FOREIGN KEY (address_id) REFERENCES Addresses(address_id) ON DELETE SET NULL,
     FOREIGN KEY (contact_id) REFERENCES Contacts(contact_id) ON DELETE SET NULL,
     INDEX idx_customer_name (first_name, last_name),
+    INDEX idx_customer_code (customer_code),
     INDEX idx_customer_deleted (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -190,10 +189,14 @@ CREATE TABLE Vendors (
 
 CREATE TABLE Product_Categories (
     category_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(500) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
     INDEX idx_category_name (name),
-    INDEX idx_category_deleted (deleted_at)
+    INDEX idx_category_deleted (deleted_at),
+    INDEX idx_category_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Products (

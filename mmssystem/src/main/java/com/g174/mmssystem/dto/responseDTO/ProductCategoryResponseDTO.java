@@ -14,5 +14,8 @@ import java.time.LocalDateTime;
 public class ProductCategoryResponseDTO {
     private Integer categoryId;
     private String name;
+    private String description;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
 }
