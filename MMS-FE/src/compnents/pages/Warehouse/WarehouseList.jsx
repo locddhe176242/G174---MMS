@@ -394,8 +394,7 @@ export default function WarehouseList() {
                             <div className="flex items-center justify-between">
                                 <div className="text-sm text-gray-700">
 
-                                </div>
-
+                                </div>f
                                 <div>
                                     <Pagination
                                         currentPage={currentPage}
