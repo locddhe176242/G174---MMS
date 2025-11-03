@@ -21,6 +21,9 @@ import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
+import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
+import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
+import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -62,6 +65,9 @@ function App() {
                 <Route path="/warehouse/new" element={<AddWarehouse/>}/>
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse/>}/>
                 <Route path="/warehouse/:id" element={<WarehouseDetail/>}/>
+                <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm/>}/>
+                <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail/>}/>
+                <Route path="/purchase-requisitions" element={<PurchaseRequisitionList/>}/>
                 
                 <Route path="/admin/roles" element={<RoleManagement/>}/>
                 <Route path="/admin/roles/:roleId" element={<RoleDetail/>}/>
