@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/G174---MMS.iml" filepath="$PROJECT_DIR$/.idea/G174---MMS.iml" />
-      <module fileurl="file://$PROJECT_DIR$/mmssystem/mmssystem.iml" filepath="$PROJECT_DIR$/mmssystem/mmssystem.iml" />
     </modules>
   </component>
 </project>
