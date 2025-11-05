@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 
 export default function PurchaseRequisitionList() {
   const navigate = useNavigate();
@@ -72,29 +73,26 @@ export default function PurchaseRequisitionList() {
       setError(null);
 
       const sort = `${sortField},${sortDirection}`;
-      let url = `/api/purchase-requisitions?page=${page}&size=${pageSize}&sort=${sort}`;
       
+      let response;
       if (keyword.trim()) {
-        url += `&search=${encodeURIComponent(keyword)}`;
+        response = await purchaseRequisitionService.searchRequisitionsWithPagination(keyword, page, pageSize, sort);
+      } else {
+        response = await purchaseRequisitionService.getRequisitionsWithPagination(page, pageSize, sort);
       }
 
-      const response = await fetch(url);
+      // Handle BE response format: { success, message, data, totalElements, totalPages, ... }
+      const data = response.data || response;
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Handle both paginated and non-paginated responses
-      if (data.content) {
+      if (Array.isArray(data)) {
+        setRequisitions(data);
+        setTotalPages(Math.ceil(data.length / pageSize));
+        setTotalElements(data.length);
+      } else if (data.content) {
+        // Handle paginated response
         setRequisitions(data.content || []);
         setTotalPages(data.totalPages || 0);
         setTotalElements(data.totalElements || 0);
-      } else if (Array.isArray(data)) {
-        setRequisitions(data);
-        setTotalPages(1);
-        setTotalElements(data.length);
       } else {
         setRequisitions([]);
         setTotalPages(0);
@@ -105,6 +103,7 @@ export default function PurchaseRequisitionList() {
     } catch (err) {
       setError("Không thể tải danh sách phiếu yêu cầu");
       console.error("Error fetching requisitions:", err);
+      toast.error("Lỗi khi tải danh sách phiếu yêu cầu");
     } finally {
       setLoading(false);
     }
@@ -143,20 +142,19 @@ export default function PurchaseRequisitionList() {
 
     try {
       setIsDeleting(true);
-      const response = await fetch(`/api/purchase-requisitions/${requisitionToDelete.requisition_id}`, {
-        method: 'DELETE'
-      });
+      const id = requisitionToDelete.requisitionId || requisitionToDelete.requisition_id || requisitionToDelete.id;
+      const response = await purchaseRequisitionService.deleteRequisition(id);
 
-      if (!response.ok) {
-        throw new Error('Failed to delete requisition');
+      if (response.success !== false) {
+        toast.success(response.message || "Xóa phiếu yêu cầu thành công!");
+        setShowDeleteModal(false);
+        setRequisitionToDelete(null);
+        fetchRequisitions(currentPage, searchKeyword, sortField, sortDirection);
+      } else {
+        throw new Error(response.message || 'Failed to delete requisition');
       }
-
-      toast.success("Xóa phiếu yêu cầu thành công!");
-      setShowDeleteModal(false);
-      setRequisitionToDelete(null);
-      fetchRequisitions(currentPage, searchKeyword, sortField, sortDirection);
     } catch (err) {
-      toast.error("Không thể xóa phiếu yêu cầu");
+      toast.error(err.message || "Không thể xóa phiếu yêu cầu");
       console.error("Error deleting requisition:", err);
     } finally {
       setIsDeleting(false);
@@ -324,65 +322,68 @@ export default function PurchaseRequisitionList() {
                       </td>
                     </tr>
                   ) : (
-                    requisitions.map((requisition) => (
-                      <tr key={requisition.requisition_id || requisition.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <input type="checkbox" className="rounded border-gray-300" />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                          <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                            {requisition.requisition_no}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {getStatusBadge(requisition.status)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                          {requisition.purpose || "-"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getTotalItems(requisition.items)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(requisition.created_at || requisition.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {requisition.requester_id || "-"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => navigate(`/purchase-requisitions/${requisition.requisition_id || requisition.id}`)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Xem chi tiết"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => navigate(`/purchase-requisitions/${requisition.requisition_id || requisition.id}/edit`)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Chỉnh sửa"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClick(requisition)}
-                              className="text-red-600 hover:text-red-900"
-                              title="Xóa"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    requisitions.map((requisition) => {
+                      const reqId = requisition.requisitionId || requisition.requisition_id || requisition.id;
+                      return (
+                        <tr key={reqId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <input type="checkbox" className="rounded border-gray-300" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                            <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                              {requisition.requisitionNo || requisition.requisition_no}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {getStatusBadge(requisition.status || requisition.approvalStatus)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                            {requisition.purpose || "-"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {getTotalItems(requisition.items)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(requisition.createdAt || requisition.created_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {requisition.requesterName || requisition.requester_id || "-"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => navigate(`/purchase-requisitions/${reqId}`)}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="Xem chi tiết"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => navigate(`/purchase-requisitions/${reqId}/edit`)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Chỉnh sửa"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(requisition)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Xóa"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -451,7 +452,7 @@ export default function PurchaseRequisitionList() {
                 Xác nhận xóa phiếu yêu cầu
               </h3>
               <p className="text-sm text-gray-500 mb-6">
-                Bạn có chắc chắn muốn xóa phiếu yêu cầu <strong>"{requisitionToDelete?.requisition_no}"</strong> không? 
+                Bạn có chắc chắn muốn xóa phiếu yêu cầu <strong>"{requisitionToDelete?.requisitionNo || requisitionToDelete?.requisition_no}"</strong> không? 
                 Hành động này không thể hoàn tác.
               </p>
               

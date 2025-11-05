@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
+import apiClient from "../../../api/apiClient";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">
@@ -45,10 +47,9 @@ export default function PurchaseRequisitionDetail() {
   };
 
   const lineValue = (item) => {
-    const price = Number(item?.valuation_price || 0);
-    const qty = Number(item?.requested_qty || 0);
-    const unit = Number(item?.price_unit || 1);
-    return price * qty * unit;
+    const price = Number(item?.targetUnitPrice || item?.valuation_price || 0);
+    const qty = Number(item?.requestedQty || item?.requested_qty || 0);
+    return price * qty;
   };
 
   const totalValue = useMemo(() => {
@@ -85,14 +86,12 @@ export default function PurchaseRequisitionDetail() {
         setErr(null);
 
         // Fetch detail
-        const resDetail = await fetch(`/api/purchase-requisitions/${id}`);
-        if (!resDetail.ok) throw new Error(`HTTP ${resDetail.status}`);
-        const detailData = await resDetail.json();
+        const detailResponse = await purchaseRequisitionService.getRequisitionById(id);
+        const detailData = detailResponse.data || detailResponse;
 
         // Fetch products
-        const resProducts = await fetch("/api/products");
-        if (!resProducts.ok) throw new Error(`HTTP ${resProducts.status}`);
-        const prodData = await resProducts.json();
+        const productsResponse = await apiClient.get("/products");
+        const prodData = productsResponse.data?.content || productsResponse.data || [];
 
         if (mounted) {
           setData(detailData);
@@ -135,7 +134,7 @@ export default function PurchaseRequisitionDetail() {
           ←
         </button>
         <h1 className="text-2xl font-semibold">
-          Phiếu yêu cầu: {data.requisition_no || `#${id}`}
+          Phiếu yêu cầu: {data.requisitionNo || data.requisition_no || `#${id}`}
         </h1>
       </div>
 
@@ -197,26 +196,28 @@ export default function PurchaseRequisitionDetail() {
                           <tr key={item.pri_id || index} className="border-t">
                             <td className="py-2 pr-4">{index + 1}</td>
                             <td className="py-2 pr-4">
-                              {getProductName(item.product_id)}
+                              {item.productName || getProductName(item.productId || item.product_id)}
                             </td>
                             <td className="py-2 pr-4">
                               {Number(
-                                item.requested_qty || 0
-                              ).toLocaleString()}
+                                item.requestedQty || item.requested_qty || 0
+                              ).toLocaleString()} {item.uom || ''}
                             </td>
                             <td className="py-2 pr-4">
-                              {item.delivery_date
+                              {item.neededBy
+                                ? formatDate(item.neededBy)
+                                : item.delivery_date
                                 ? formatDate(item.delivery_date)
                                 : "-"}
                             </td>
                             <td className="py-2 pr-4">
                               {Number(
-                                item.valuation_price || 0
+                                item.targetUnitPrice || item.valuation_price || 0
                               ).toLocaleString()}{" "}
                               đ
                             </td>
                             <td className="py-2 pr-4">
-                              {Number(item.price_unit || 1).toLocaleString()}
+                              -
                             </td>
                             <td className="py-2 pr-0 text-right">
                               {Number(itemTotal).toLocaleString()} đ
@@ -272,36 +273,50 @@ export default function PurchaseRequisitionDetail() {
               <div>
                 <span className="text-gray-500">Mã phiếu: </span>
                 <span className="font-medium">
-                  {data.requisition_no || "-"}
+                  {data.requisitionNo || data.requisition_no || "-"}
                 </span>
               </div>
               <div>
                 <span className="text-gray-500">Người yêu cầu: </span>
                 <span className="font-medium">
-                  {data.requester_name ||
+                  {data.requesterName ||
+                    data.requester_name ||
+                    data.requesterId ||
                     data.requester_id ||
                     "Chưa gán người yêu cầu"}
                 </span>
               </div>
-              {data.approver_id && (
+              {data.department && (
+                <div>
+                  <span className="text-gray-500">Phòng ban: </span>
+                  <span className="font-medium">{data.department}</span>
+                </div>
+              )}
+              {data.destinationWarehouseName && (
+                <div>
+                  <span className="text-gray-500">Kho đích đến: </span>
+                  <span className="font-medium">{data.destinationWarehouseName}</span>
+                </div>
+              )}
+              {(data.approverId || data.approver_id) && (
                 <div>
                   <span className="text-gray-500">Người duyệt: </span>
                   <span className="font-medium">
-                    {data.approver_name || data.approver_id}
+                    {data.approverName || data.approver_name || data.approverId || data.approver_id}
                   </span>
                 </div>
               )}
               <div>
                 <span className="text-gray-500">Ngày tạo: </span>
                 <span className="font-medium">
-                  {formatDateTime(data.created_at || data.createdAt)}
+                  {formatDateTime(data.createdAt || data.created_at)}
                 </span>
               </div>
-              {data.approved_at && (
+              {data.approvedAt && (
                 <div>
                   <span className="text-gray-500">Ngày duyệt: </span>
                   <span className="font-medium">
-                    {formatDateTime(data.approved_at)}
+                    {formatDateTime(data.approvedAt || data.approved_at)}
                   </span>
                 </div>
               )}

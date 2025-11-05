@@ -32,20 +32,23 @@ public class PurchaseRequisitionRequestDTO {
     private LocalDate neededBy;
 
     @NotNull(message = "Kho đích đến không được để trống")
-    private Long destinationWarehouseId;
+    private Integer destinationWarehouseId;
 
     @NotBlank(message = "Mục đích không được để trống")
     private String purpose;
 
+    @Builder.Default
     private ApprovalStatus approvalStatus = ApprovalStatus.Pending;
 
-    private Long approverId;
+    private Integer approverId;
 
     @DecimalMin(value = "0.0", inclusive = true)
+    @Builder.Default
     private BigDecimal totalEstimated = BigDecimal.ZERO;
 
+    @Builder.Default
     private RequisitionStatus status = RequisitionStatus.Open;
 
     @NotEmpty(message = "Danh sách sản phẩm không được để trống")
-    private List<PurchaseRequisitionItemRequest> items;
+    private List<PurchaseRequisitionItemRequestDTO> items;
 }

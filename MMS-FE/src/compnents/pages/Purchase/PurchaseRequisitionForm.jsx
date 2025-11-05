@@ -4,20 +4,27 @@ import { toast } from 'react-toastify';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
+import apiClient from '../../../api/apiClient';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEdit = Boolean(id);
 
-    // Form data state
+    // Form data state - matching BE RequestDTO format
     const [formData, setFormData] = useState({
-        requisition_no: '',
-        requester_id: null,
+        planId: null,
+        requesterId: null,
+        department: '',
+        costCenter: '',
+        neededBy: null,
+        destinationWarehouseId: null,
         purpose: '',
-        status: 'Draft',
-        approver_id: null,
-        approved_at: null,
+        approvalStatus: 'Pending',
+        approverId: null,
+        totalEstimated: 0,
+        status: 'Open',
         items: []
     });
 
@@ -25,45 +32,36 @@ const PurchaseRequisitionForm = () => {
     const [loading, setLoading] = useState(false);
     const [validationErrors, setValidationErrors] = useState({});
     const [products, setProducts] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [requisitionNo, setRequisitionNo] = useState('');
 
     // Auto-generate requisition number
     const generateRequisitionNumber = async () => {
         try {
-            const response = await fetch('/api/purchase-requisitions/generate-number');
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                return data.requisition_no;
+            const response = await purchaseRequisitionService.generateRequisitionNo();
+            if (response.success && response.requisition_no) {
+                return response.requisition_no;
             } else {
-                throw new Error(data.message || 'Failed to generate requisition number');
+                throw new Error(response.message || 'Failed to generate requisition number');
             }
         } catch (error) {
             console.error('Error generating requisition number:', error);
-            // Fallback to proper format - không dùng timestamp
+            toast.error('Không thể tạo mã phiếu yêu cầu');
             const currentYear = new Date().getFullYear();
-            return `PR-${currentYear}-999`; // Fallback number
+            return `PR-${currentYear}-001`; // Fallback number
         }
     };
 
-    const getCurrentUserId = () => {
-        const token = localStorage.getItem('token');
-        console.log('Token:', token); // Debug token
-
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                console.log('JWT Payload:', payload); // Debug payload
-                return payload.userId;
-            } catch (error) {
-                console.error('Error parsing token:', error);
-                return null;
+    const getCurrentUserId = async () => {
+        try {
+            // Get user profile to get userId
+            const response = await apiClient.get('/users/profile');
+            if (response.data && response.data.userId) {
+                return response.data.userId;
             }
+        } catch (error) {
+            console.error('Error getting current user:', error);
         }
         return null;
     };
@@ -73,32 +71,37 @@ const PurchaseRequisitionForm = () => {
         const loadInitialData = async () => {
             try {
                 // Load products
-                const productsResponse = await fetch('/api/products');
-                const productsData = await productsResponse.json();
+                const productsResponse = await apiClient.get('/products');
+                const productsData = productsResponse.data?.content || productsResponse.data || [];
                 setProducts(productsData.map(product => ({
-                    value: product.product_id,
+                    value: product.id || product.productId,
                     label: `${product.sku} - ${product.name}`,
                     product: product
                 })));
 
-                // Get current user info from JWT token
-                const userId = getCurrentUserId();
+                // Load warehouses
+                const warehousesResponse = await apiClient.get('/warehouses');
+                const warehousesData = warehousesResponse.data?.data || warehousesResponse.data || [];
+                setWarehouses(warehousesData.map(wh => ({
+                    value: wh.warehouseId,
+                    label: `${wh.code} - ${wh.name}`,
+                    warehouse: wh
+                })));
+
+                // Get current user info
+                const userId = await getCurrentUserId();
                 if (userId) {
                     setCurrentUser({ userId });
-                    // Set requester_id ngay lập tức
                     setFormData(prev => ({
                         ...prev,
-                        requester_id: userId
+                        requesterId: userId
                     }));
                 }
 
                 // Generate requisition number for new requisition
                 if (!isEdit) {
-                    const requisitionNo = await generateRequisitionNumber();
-                    setFormData(prev => ({
-                        ...prev,
-                        requisition_no: requisitionNo
-                    }));
+                    const reqNo = await generateRequisitionNumber();
+                    setRequisitionNo(reqNo);
                 }
             } catch (error) {
                 console.error('Error loading initial data:', error);
@@ -115,17 +118,34 @@ const PurchaseRequisitionForm = () => {
             const loadRequisitionData = async () => {
                 try {
                     setLoading(true);
-                    const response = await fetch(`/api/purchase-requisitions/${id}`);
-                    const data = await response.json();
+                    const response = await purchaseRequisitionService.getRequisitionById(id);
+                    const data = response.data || response;
 
+                    setRequisitionNo(data.requisitionNo || '');
                     setFormData({
-                        requisition_no: data.requisition_no,
-                        requester_id: data.requester_id,
-                        purpose: data.purpose,
-                        status: data.status,
-                        approver_id: data.approver_id,
-                        approved_at: data.approved_at ? new Date(data.approved_at) : null,
-                        items: data.items || []
+                        planId: data.planId || null,
+                        requesterId: data.requesterId || null,
+                        department: data.department || '',
+                        costCenter: data.costCenter || '',
+                        neededBy: data.neededBy ? new Date(data.neededBy) : null,
+                        destinationWarehouseId: data.destinationWarehouseId || null,
+                        purpose: data.purpose || '',
+                        approvalStatus: data.approvalStatus || 'Pending',
+                        approverId: data.approverId || null,
+                        totalEstimated: data.totalEstimated || 0,
+                        status: data.status || 'Open',
+                        items: (data.items || []).map(item => ({
+                            planItemId: item.planItemId || null,
+                            productId: item.productId || null,
+                            productCode: item.productCode || '',
+                            productName: item.productName || '',
+                            spec: item.spec || '',
+                            uom: item.uom || '',
+                            requestedQty: item.requestedQty || 0,
+                            targetUnitPrice: item.targetUnitPrice || 0,
+                            suggestedVendorId: item.suggestedVendorId || null,
+                            note: item.note || ''
+                        }))
                     });
                 } catch (error) {
                     console.error('Error loading requisition data:', error);
@@ -169,14 +189,18 @@ const PurchaseRequisitionForm = () => {
         }));
     };
 
-    // Add new item
+    // Add new item - matching BE ItemRequestDTO format
     const addItem = () => {
         const newItem = {
-            product_id: null,
-            requested_qty: 0,
-            delivery_date: new Date(),
-            valuation_price: 0,
-            price_unit: 1,
+            planItemId: null,
+            productId: null,
+            productCode: '',
+            productName: '',
+            spec: '',
+            uom: '',
+            requestedQty: 0,
+            targetUnitPrice: 0,
+            suggestedVendorId: null,
             note: ''
         };
 
@@ -199,20 +223,27 @@ const PurchaseRequisitionForm = () => {
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption) {
             const product = selectedOption.product;
-            handleItemChange(index, 'product_id', product.product_id);
-            handleItemChange(index, 'valuation_price', product.purchase_price || 0);
+            handleItemChange(index, 'productId', product.id || product.productId);
+            handleItemChange(index, 'productCode', product.sku || '');
+            handleItemChange(index, 'productName', product.name || '');
+            handleItemChange(index, 'uom', product.uom || '');
+            handleItemChange(index, 'targetUnitPrice', product.purchasePrice || 0);
         }
     };
 
-    // Validation
+    // Validation - matching BE validation
     const validateAllFields = () => {
         const errors = {};
 
-        if (!formData.requisition_no) {
-            errors.requisition_no = 'Mã phiếu yêu cầu là bắt buộc';
+        if (!formData.department || formData.department.trim() === '') {
+            errors.department = 'Phòng ban là bắt buộc';
         }
 
-        if (!formData.purpose) {
+        if (!formData.destinationWarehouseId) {
+            errors.destinationWarehouseId = 'Kho đích đến là bắt buộc';
+        }
+
+        if (!formData.purpose || formData.purpose.trim() === '') {
             errors.purpose = 'Mục đích sử dụng là bắt buộc';
         }
 
@@ -220,16 +251,19 @@ const PurchaseRequisitionForm = () => {
             errors.items = 'Phải có ít nhất một sản phẩm';
         }
 
-        // Validate items
+        // Validate items - matching BE ItemRequestDTO validation
         formData.items.forEach((item, index) => {
-            if (!item.product_id) {
-                errors[`item_${index}_product`] = 'Sản phẩm là bắt buộc';
+            if (!item.productCode || item.productCode.trim() === '') {
+                errors[`item_${index}_productCode`] = 'Mã sản phẩm là bắt buộc';
             }
-            if (!item.requested_qty || item.requested_qty <= 0) {
+            if (!item.productName || item.productName.trim() === '') {
+                errors[`item_${index}_productName`] = 'Tên sản phẩm là bắt buộc';
+            }
+            if (!item.uom || item.uom.trim() === '') {
+                errors[`item_${index}_uom`] = 'Đơn vị tính là bắt buộc';
+            }
+            if (!item.requestedQty || item.requestedQty <= 0) {
                 errors[`item_${index}_qty`] = 'Số lượng phải lớn hơn 0';
-            }
-            if (!item.delivery_date) {
-                errors[`item_${index}_delivery_date`] = 'Ngày giao hàng là bắt buộc';
             }
         });
 
@@ -250,27 +284,51 @@ const PurchaseRequisitionForm = () => {
 
         try {
             setLoading(true);
-            const url = isEdit ? `/api/purchase-requisitions/${id}` : '/api/purchase-requisitions';
-            const method = isEdit ? 'PUT' : 'POST';
+            
+            // Prepare data matching BE RequestDTO format
+            const submitData = {
+                planId: formData.planId,
+                requesterId: formData.requesterId,
+                department: formData.department,
+                costCenter: formData.costCenter || null,
+                neededBy: formData.neededBy ? formData.neededBy.toISOString().split('T')[0] : null,
+                destinationWarehouseId: formData.destinationWarehouseId,
+                purpose: formData.purpose,
+                approvalStatus: formData.approvalStatus,
+                approverId: formData.approverId || null,
+                totalEstimated: formData.totalEstimated,
+                status: formData.status,
+                items: formData.items.map(item => ({
+                    planItemId: item.planItemId || null,
+                    productId: item.productId || null,
+                    productCode: item.productCode,
+                    productName: item.productName,
+                    spec: item.spec || null,
+                    uom: item.uom,
+                    requestedQty: parseFloat(item.requestedQty) || 0,
+                    targetUnitPrice: parseFloat(item.targetUnitPrice) || 0,
+                    suggestedVendorId: item.suggestedVendorId || null,
+                    note: item.note || null
+                }))
+            };
 
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
+            let response;
+            if (isEdit) {
+                response = await purchaseRequisitionService.updateRequisition(id, submitData);
+            } else {
+                response = await purchaseRequisitionService.createRequisition(submitData);
+            }
 
-            if (response.ok) {
-                toast.success(isEdit ? 'Cập nhật phiếu yêu cầu thành công!' : 'Tạo phiếu yêu cầu thành công!');
+            if (response.success) {
+                toast.success(response.message || (isEdit ? 'Cập nhật phiếu yêu cầu thành công!' : 'Tạo phiếu yêu cầu thành công!'));
                 navigate('/purchase-requisitions');
             } else {
-                const errorData = await response.json();
-                toast.error(errorData.message || 'Có lỗi xảy ra');
+                toast.error(response.message || 'Có lỗi xảy ra');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            toast.error('Có lỗi xảy ra khi gửi dữ liệu');
+            const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra khi gửi dữ liệu';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -315,34 +373,79 @@ const PurchaseRequisitionForm = () => {
                         {/* Requisition Number */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Mã phiếu <span className="text-red-500">*</span>
+                                Mã phiếu
                             </label>
                             <input
                                 type="text"
-                                value={formData.requisition_no}
-                                onChange={(e) => handleInputChange('requisition_no', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.requisition_no ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                                placeholder="Mã phiếu yêu cầu"
-                                readOnly={!isEdit}
-                            />
-                            {validationErrors.requisition_no && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.requisition_no}</p>
-                            )}
-                        </div>
-
-                        {/* Requester ID - Chỉ hiển thị */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Người yêu cầu
-                            </label>
-                            <input
-                                type="text"
-                                value={currentUser ? `User ID: ${currentUser.userId}` : 'Đang tải...'}
+                                value={requisitionNo}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
+                            <p className="text-xs text-gray-500 mt-1">Tự động tạo</p>
+                        </div>
+
+                        {/* Department */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Phòng ban <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.department}
+                                onChange={(e) => handleInputChange('department', e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.department ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                placeholder="Nhập phòng ban"
+                            />
+                            {validationErrors.department && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.department}</p>
+                            )}
+                        </div>
+
+                        {/* Cost Center */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Trung tâm chi phí
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.costCenter}
+                                onChange={(e) => handleInputChange('costCenter', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Nhập trung tâm chi phí"
+                            />
+                        </div>
+
+                        {/* Destination Warehouse */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Kho đích đến <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={warehouses.find(wh => wh.value === formData.destinationWarehouseId)}
+                                onChange={(selected) => handleInputChange('destinationWarehouseId', selected?.value || null)}
+                                options={warehouses}
+                                placeholder="Chọn kho"
+                                className={`${validationErrors.destinationWarehouseId ? 'border-red-500' : ''}`}
+                            />
+                            {validationErrors.destinationWarehouseId && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.destinationWarehouseId}</p>
+                            )}
+                        </div>
+
+                        {/* Needed By */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Ngày cần
+                            </label>
+                            <DatePicker
+                                selected={formData.neededBy}
+                                onChange={(date) => handleInputChange('neededBy', date)}
+                                dateFormat="dd/MM/yyyy"
+                                minDate={new Date()}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholderText="Chọn ngày"
+                            />
                         </div>
 
                         {/* Status */}
@@ -357,7 +460,7 @@ const PurchaseRequisitionForm = () => {
                                 readOnly
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                {isEdit ? 'Trạng thái không thể thay đổi trực tiếp' : 'Mặc định là Draft khi tạo mới'}
+                                {isEdit ? 'Trạng thái không thể thay đổi trực tiếp' : 'Mặc định là Open khi tạo mới'}
                             </p>
                         </div>
                     </div>
@@ -411,19 +514,22 @@ const PurchaseRequisitionForm = () => {
                                             #
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Sản phẩm
+                                            Sản phẩm <span className="text-red-500">*</span>
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Số lượng
+                                            Mã sản phẩm <span className="text-red-500">*</span>
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Ngày giao hàng
+                                            Tên sản phẩm <span className="text-red-500">*</span>
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Giá định giá
+                                            Đơn vị tính <span className="text-red-500">*</span>
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn vị giá
+                                            Số lượng <span className="text-red-500">*</span>
+                                        </th>
+                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                            Đơn giá
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
                                             Ghi chú
@@ -441,23 +547,56 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <Select
-                                                    value={products.find(option => option.value === item.product_id)}
+                                                    value={products.find(option => option.value === item.productId)}
                                                     onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
                                                     options={products}
                                                     placeholder="Chọn sản phẩm"
                                                     className="min-w-48"
                                                 />
-                                                {validationErrors[`item_${index}_product`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_product`]}</p>
+                                            </td>
+                                            <td className="border border-gray-200 px-4 py-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.productCode}
+                                                    onChange={(e) => handleItemChange(index, 'productCode', e.target.value)}
+                                                    className={`w-32 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_productCode`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholder="Mã sản phẩm"
+                                                />
+                                                {validationErrors[`item_${index}_productCode`] && (
+                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_productCode`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="border border-gray-200 px-4 py-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.productName}
+                                                    onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
+                                                    className={`w-48 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_productName`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholder="Tên sản phẩm"
+                                                />
+                                                {validationErrors[`item_${index}_productName`] && (
+                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_productName`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="border border-gray-200 px-4 py-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.uom}
+                                                    onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                                                    className={`w-20 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_uom`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholder="UOM"
+                                                />
+                                                {validationErrors[`item_${index}_uom`] && (
+                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_uom`]}</p>
                                                 )}
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <input
                                                     type="number"
-                                                    value={item.requested_qty}
-                                                    onChange={(e) => handleItemChange(index, 'requested_qty', parseFloat(e.target.value) || 0)}
-                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    min="0"
+                                                    value={item.requestedQty}
+                                                    onChange={(e) => handleItemChange(index, 'requestedQty', parseFloat(e.target.value) || 0)}
+                                                    className={`w-20 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    min="0.01"
                                                     step="0.01"
                                                 />
                                                 {validationErrors[`item_${index}_qty`] && (
@@ -465,22 +604,10 @@ const PurchaseRequisitionForm = () => {
                                                 )}
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
-                                                <DatePicker
-                                                    selected={item.delivery_date}
-                                                    onChange={(date) => handleItemChange(index, 'delivery_date', date)}
-                                                    dateFormat="dd/MM/yyyy"
-                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    placeholderText="Chọn ngày"
-                                                />
-                                                {validationErrors[`item_${index}_delivery_date`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_delivery_date`]}</p>
-                                                )}
-                                            </td>
-                                            <td className="border border-gray-200 px-4 py-2">
                                                 <input
                                                     type="number"
-                                                    value={item.valuation_price}
-                                                    onChange={(e) => handleItemChange(index, 'valuation_price', parseFloat(e.target.value) || 0)}
+                                                    value={item.targetUnitPrice}
+                                                    onChange={(e) => handleItemChange(index, 'targetUnitPrice', parseFloat(e.target.value) || 0)}
                                                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     min="0"
                                                     step="0.01"
@@ -488,18 +615,8 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <input
-                                                    type="number"
-                                                    value={item.price_unit}
-                                                    onChange={(e) => handleItemChange(index, 'price_unit', parseFloat(e.target.value) || 1)}
-                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    min="0"
-                                                    step="0.01"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-200 px-4 py-2">
-                                                <input
                                                     type="text"
-                                                    value={item.note}
+                                                    value={item.note || ''}
                                                     onChange={(e) => handleItemChange(index, 'note', e.target.value)}
                                                     className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     placeholder="Ghi chú"
