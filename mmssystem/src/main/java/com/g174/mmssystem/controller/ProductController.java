@@ -20,7 +20,7 @@ public class ProductController {
     private final IProductService productService;
 
     @GetMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("permitAll()")
     public ResponseEntity getProducts(
             @RequestParam(defaultValue = Constant.PAGE) int page,
             @RequestParam(defaultValue = Constant.SIZE) int size,
@@ -33,7 +33,7 @@ public class ProductController {
     }
 
     @GetMapping(value = Constant.ID_PATH)
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("permitAll()")
     public ResponseEntity getProductDetail(
             @PathVariable(value = Constant.ID) Integer id
     ) {

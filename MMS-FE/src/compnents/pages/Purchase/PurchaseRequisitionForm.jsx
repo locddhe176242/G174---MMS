@@ -73,12 +73,13 @@ const PurchaseRequisitionForm = () => {
         const loadInitialData = async () => {
             try {
                 // Load products
-                const productsResponse = await fetch('/api/products');
-                const productsData = await productsResponse.json();
-                setProducts(productsData.map(product => ({
-                    value: product.product_id,
-                    label: `${product.sku} - ${product.name}`,
-                    product: product
+                const productsResponse = await fetch('/api/product?page=0&size=100');
+                const resJson = await productsResponse.json();
+                const productsData = Array.isArray(resJson) ? resJson : (resJson.content || []);
+                setProducts(productsData.map(p => ({
+                    value: p.id ?? p.product_id,
+                    label: `${p.sku || p.productCode} - ${p.name}`,
+                    product: p
                 })));
 
                 // Get current user info from JWT token
@@ -195,12 +196,15 @@ const PurchaseRequisitionForm = () => {
         }));
     };
 
-    // Handle product selection
+
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption) {
             const product = selectedOption.product;
-            handleItemChange(index, 'product_id', product.product_id);
-            handleItemChange(index, 'valuation_price', product.purchase_price || 0);
+            handleItemChange(index, 'product_id', product.product_id || product.id);
+            // Nếu muốn tự động điền giá định giá
+            if (product.purchase_price) {
+                handleItemChange(index, 'valuation_price', product.purchase_price);
+            }
         }
     };
 
@@ -423,9 +427,6 @@ const PurchaseRequisitionForm = () => {
                                             Giá định giá
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn vị giá
-                                        </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
                                             Ghi chú
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
@@ -441,11 +442,18 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <Select
-                                                    value={products.find(option => option.value === item.product_id)}
+                                                    value={products.find(option => String(option.value) === String(item.product_id)) || null}
                                                     onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
                                                     options={products}
                                                     placeholder="Chọn sản phẩm"
                                                     className="min-w-48"
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                    menuShouldScrollIntoView={false}
+                                                    styles={{
+                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                    }}
                                                 />
                                                 {validationErrors[`item_${index}_product`] && (
                                                     <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_product`]}</p>
@@ -482,16 +490,6 @@ const PurchaseRequisitionForm = () => {
                                                     value={item.valuation_price}
                                                     onChange={(e) => handleItemChange(index, 'valuation_price', parseFloat(e.target.value) || 0)}
                                                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    min="0"
-                                                    step="0.01"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-200 px-4 py-2">
-                                                <input
-                                                    type="number"
-                                                    value={item.price_unit}
-                                                    onChange={(e) => handleItemChange(index, 'price_unit', parseFloat(e.target.value) || 1)}
-                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     min="0"
                                                     step="0.01"
                                                 />

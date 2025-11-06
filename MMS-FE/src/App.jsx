@@ -1,5 +1,5 @@
 import React from "react";
-import {Routes, Route, Navigate} from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Landing from "./compnents/pages/Home-Page/Landing";
 import Login from "./compnents/pages/Auth/Login";
 import ForgotPassword from "./compnents/pages/Auth/ForgotPassword";
@@ -24,6 +24,9 @@ import CategoryList from "./compnents/pages/Category/CategoryList";
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
+import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
+// import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
+import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -36,49 +39,53 @@ import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.j
 function App() {
     return (
         <Routes>
-            <Route path="/" element={<Landing/>}/>
-            <Route path="/login" element={<Login/>}/>
-            <Route path="/forgot-password" element={<ForgotPassword/>}/>
-            <Route path="/verify-otp" element={<VerifyOtp/>}/>
-            <Route path="/reset-password" element={<ResetPassword/>}/>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route
                 element={
                     <ProtectedRoute>
-                        <MainLayout/>
+                        <MainLayout />
                     </ProtectedRoute>
                 }
             >
-                <Route path="/dashboard" element={<Dashboard/>}/>
-                <Route path="/profile" element={<UserProfile/>}/>
-                <Route path="/customers" element={<CustomerList/>}/>
-                <Route path="/customers/new" element={<CustomerForm/>}/>
-                <Route path="/customers/:id" element={<CustomerDetail/>}/>
-                <Route path="/customers/:id/edit" element={<CustomerForm/>}/>
-                <Route path="/products" element={<ProductList/>}/>
-                <Route path="/categories" element={<CategoryList/>}/>
-                <Route path="/vendors" element={<VendorList/>}/>
-                <Route path="/vendors/new" element={<VendorForm/>}/>
-                <Route path="/vendors/:id/edit" element={<VendorForm/>}/>
-                <Route path="/vendors/:id" element={<VendorDetail/>}/>
-                <Route path="/warehouse" element={<WarehouseList/>}/>
-                <Route path="/warehouse/new" element={<AddWarehouse/>}/>
-                <Route path="/warehouse/:id/edit" element={<EditWarehouse/>}/>
-                <Route path="/warehouse/:id" element={<WarehouseDetail/>}/>
-                <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm/>}/>
-                <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail/>}/>
-                <Route path="/purchase-requisitions" element={<PurchaseRequisitionList/>}/>
-                
-                <Route path="/admin/roles" element={<RoleManagement/>}/>
-                <Route path="/admin/roles/:roleId" element={<RoleDetail/>}/>
-                <Route path="/admin/menus" element={<MenuManagement/>}/>
-                <Route path="/admin/permissions" element={<PermissionManagement/>}/>
-                <Route path="/admin/user-permissions" element={<UserPermissionManagement/>}/>
-                <Route path="/admin/users" element={<UserManagement/>}/>
-                <Route path="/admin/departments" element={<DepartmentManagement/>}/>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<UserProfile />} />
+                <Route path="/customers" element={<CustomerList />} />
+                <Route path="/customers/new" element={<CustomerForm />} />
+                <Route path="/customers/:id" element={<CustomerDetail />} />
+                <Route path="/customers/:id/edit" element={<CustomerForm />} />
+                <Route path="/products" element={<ProductList />} />
+                <Route path="/categories" element={<CategoryList />} />
+                <Route path="/vendors" element={<VendorList />} />
+                <Route path="/vendors/new" element={<VendorForm />} />
+                <Route path="/vendors/:id/edit" element={<VendorForm />} />
+                <Route path="/vendors/:id" element={<VendorDetail />} />
+                <Route path="/warehouse" element={<WarehouseList />} />
+                <Route path="/warehouse/new" element={<AddWarehouse />} />
+                <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
+                <Route path="/warehouse/:id" element={<WarehouseDetail />} />
+                <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
+                <Route path="/purchase-requisitions" element={<PurchaseRequisitionList />} />
+                <Route path="/purchase/rfqs" element={<RFQList />} />
+                <Route path="/purchase/rfqs/new" element={<RFQForm />} />
+                {/* <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
+                <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} /> */}
+
+                <Route path="/admin/roles" element={<RoleManagement />} />
+                <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
+                <Route path="/admin/menus" element={<MenuManagement />} />
+                <Route path="/admin/permissions" element={<PermissionManagement />} />
+                <Route path="/admin/user-permissions" element={<UserPermissionManagement />} />
+                <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/departments" element={<DepartmentManagement />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace/>}/>
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }
