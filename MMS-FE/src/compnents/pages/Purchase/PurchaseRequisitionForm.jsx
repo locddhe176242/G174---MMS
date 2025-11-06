@@ -427,9 +427,6 @@ const PurchaseRequisitionForm = () => {
                                             Giá định giá
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn vị giá
-                                        </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
                                             Ghi chú
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
@@ -493,16 +490,6 @@ const PurchaseRequisitionForm = () => {
                                                     value={item.valuation_price}
                                                     onChange={(e) => handleItemChange(index, 'valuation_price', parseFloat(e.target.value) || 0)}
                                                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    min="0"
-                                                    step="0.01"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-200 px-4 py-2">
-                                                <input
-                                                    type="number"
-                                                    value={item.price_unit}
-                                                    onChange={(e) => handleItemChange(index, 'price_unit', parseFloat(e.target.value) || 1)}
-                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                                     min="0"
                                                     step="0.01"
                                                 />
