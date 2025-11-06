@@ -26,7 +26,7 @@ import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequis
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 // import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
-// import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
+import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -72,8 +72,8 @@ function App() {
                 <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
                 <Route path="/purchase-requisitions" element={<PurchaseRequisitionList />} />
                 <Route path="/purchase/rfqs" element={<RFQList />} />
-                {/* <Route path="/purchase/rfqs/new" element={<RFQForm />} />
-                <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
+                <Route path="/purchase/rfqs/new" element={<RFQForm />} />
+                {/* <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} /> */}
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
