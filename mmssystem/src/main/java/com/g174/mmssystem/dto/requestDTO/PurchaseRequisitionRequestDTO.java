@@ -18,7 +18,7 @@ public class PurchaseRequisitionRequestDTO {
 
     private Long planId;
 
-    @NotNull(message = "Requester ID không được để trống")
+//    @NotNull(message = "Requester ID không được để trống")
     private Long requesterId;
 
     @NotBlank(message = "Phòng ban không được để trống")
