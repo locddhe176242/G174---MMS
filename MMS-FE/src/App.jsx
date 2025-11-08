@@ -27,6 +27,7 @@ import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisit
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 // import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
+import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -75,6 +76,8 @@ function App() {
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 {/* <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} /> */}
+                <Route path="/purchase/vendor-quotations/new" element={<VendorQuotationForm />} />
+                <Route path="/purchase/vendor-quotations/:id/edit" element={<VendorQuotationForm />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
                 <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
