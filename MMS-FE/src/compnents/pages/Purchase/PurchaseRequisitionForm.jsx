@@ -416,7 +416,6 @@ const PurchaseRequisitionForm = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
                         </div>
 
                         {/* Status */}
@@ -430,9 +429,6 @@ const PurchaseRequisitionForm = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                {isEdit ? 'Trạng thái không thể thay đổi trực tiếp' : 'Mặc định là Draft khi tạo mới'}
-                            </p>
                         </div>
                     </div>
 
