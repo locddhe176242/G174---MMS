@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
 import apiClient from "../../../api/apiClient";
+import { getCurrentUser } from "../../../api/authService";
 
 export default function RFQForm() {
     const { id } = useParams();
@@ -25,7 +26,7 @@ export default function RFQForm() {
                 productCode: "",
                 productName: "",
                 uom: "",
-                quantity: 0,
+                quantity: 1,
                 deliveryDate: null,
                 targetPrice: 0,
                 priceUnit: 1,
@@ -37,6 +38,7 @@ export default function RFQForm() {
     const [vendors, setVendors] = useState([]);
     const [loadingVendors, setLoadingVendors] = useState(false);
     const [products, setProducts] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,10 +50,66 @@ export default function RFQForm() {
     const [prList, setPrList] = useState([]);           // [{ value,label, pr }]
     const [selectedPr, setSelectedPr] = useState(null); // option được chọn
 
+    // Calculate total value
+    const totalValue = useMemo(() => {
+        if (!Array.isArray(formData.items)) return 0;
+        return formData.items.reduce((sum, it) => {
+            const qty = Number(it.quantity || 0);
+            const price = Number(it.targetPrice || 0);
+            return sum + qty * price;
+        }, 0);
+    }, [formData.items]);
+
+    const formatCurrency = (n) =>
+        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
+
+    const getUserDisplayName = (user) => {
+        if (!user) return 'Đang tải...';
+        if (user.fullName) return user.fullName;
+        if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
+        if (user.firstName) return user.firstName;
+        if (user.email) return user.email;
+        if (user.employeeCode) return user.employeeCode;
+        return `User ID: ${user.userId || user.user_id}`;
+    };
+
     useEffect(() => {
         loadVendors();
         loadProducts();
+        loadCurrentUser();
     }, []);
+
+    const loadCurrentUser = async () => {
+        try {
+            const user = getCurrentUser();
+            if (user) {
+                // Load user profile to get name
+                try {
+                    const profileResponse = await fetch('/api/users/profile', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                        }
+                    });
+                    if (profileResponse.ok) {
+                        const profile = await profileResponse.json();
+                        setCurrentUser({
+                            ...user,
+                            fullName: profile.fullName,
+                            firstName: profile.firstName,
+                            lastName: profile.lastName
+                        });
+                    } else {
+                        setCurrentUser(user);
+                    }
+                } catch (error) {
+                    console.error('Error loading user profile:', error);
+                    setCurrentUser(user);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading current user:', error);
+        }
+    };
 
     useEffect(() => {
         if (isEdit) {
@@ -175,7 +233,7 @@ export default function RFQForm() {
             ...prev,
             items: [
                 ...prev.items,
-                { productId: null, productCode: "", productName: "", uom: "", quantity: 0, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" },
+                { productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" },
             ],
         }));
     };
@@ -184,7 +242,7 @@ export default function RFQForm() {
         setFormData((prev) => {
             const next = [...prev.items];
             next.splice(index, 1);
-            return { ...prev, items: next.length ? next : [{ productId: null, productCode: "", productName: "", uom: "", quantity: 0, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" }] };
+            return { ...prev, items: next.length ? next : [{ productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" }] };
         });
     };
 
@@ -248,20 +306,37 @@ export default function RFQForm() {
     const openImportModal = async () => {
         setShowImportModal(true);
         try {
-            const res = await apiClient.get("/purchase-requisitions", {
-                params: { page: 0, size: 50, sort: "createdAt,desc" },
-            });
-            const list = Array.isArray(res.data) ? res.data : (res.data?.content || []);
+            // Sử dụng apiClient để đảm bảo có interceptors và error handling
+            const url = `/api/purchase-requisitions?page=0&size=50&sort=createdAt,desc`;
+            const response = await apiClient.get(url);
+            
+            const data = response.data || {};
+            const list = Array.isArray(data) ? data : (data?.content || []);
+            
+            if (list.length === 0) {
+                toast.info("Không có phiếu yêu cầu nào");
+                setPrList([]);
+                return;
+            }
+            
             setPrList(
                 list.map((pr) => ({
-                    value: pr.id ?? pr.requisition_id,
-                    label: `${pr.prNo || pr.requisitionNo || "PR"}${pr.title ? ` - ${pr.title}` : ""}`,
+                    value: pr.id ?? pr.requisition_id ?? pr.requisitionId,
+                    label: `${pr.requisition_no || pr.requisitionNo || pr.prNo || "PR"}${pr.purpose ? ` - ${pr.purpose}` : ""}`,
                     pr,
                 }))
             );
         } catch (err) {
             console.error("Load PR list error:", err);
-            toast.error("Không thể tải danh sách phiếu yêu cầu");
+            const errorMessage = err?.response?.data?.message || err?.message || 'Lỗi không xác định';
+            
+            // Kiểm tra nếu là lỗi 404 hoặc 500 do endpoint không tồn tại
+            if (err?.response?.status === 404 || err?.response?.status === 500) {
+                toast.error("Backend chưa có endpoint cho danh sách phiếu yêu cầu. Vui lòng liên hệ admin.");
+            } else {
+                toast.error(`Không thể tải danh sách phiếu yêu cầu: ${errorMessage}`);
+            }
+            setPrList([]);
         }
     };
 
@@ -430,6 +505,21 @@ export default function RFQForm() {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Người làm đơn
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={getUserDisplayName(currentUser)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                                            readOnly
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Nhà cung cấp
                                         </label>
                                         <Select
@@ -443,9 +533,7 @@ export default function RFQForm() {
                                             classNamePrefix="react-select"
                                         />
                                     </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Trạng thái
@@ -457,7 +545,9 @@ export default function RFQForm() {
                                             className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
                                         />
                                     </div>
+                                </div>
 
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày phát hành <span className="text-red-500">*</span>
@@ -529,6 +619,7 @@ export default function RFQForm() {
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Ngày cần</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Giá mục tiêu</th>
+                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                                 </tr>
                                             </thead>
@@ -560,10 +651,10 @@ export default function RFQForm() {
                                                                 <input
                                                                     type="number"
                                                                     value={item.quantity}
-                                                                    onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 0)}
+                                                                    onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
                                                                     className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                    min="0"
-                                                                    step="0.01"
+                                                                    min="1"
+                                                                    step="1"
                                                                 />
                                                                 {itemErr.quantity && (
                                                                     <p className="text-red-500 text-xs mt-1">{itemErr.quantity}</p>
@@ -591,6 +682,9 @@ export default function RFQForm() {
                                                                     step="0.01"
                                                                 />
                                                             </td>
+                                                            <td className="border border-gray-200 px-4 py-2 text-sm">
+                                                                {formatCurrency((Number(item.quantity || 0) * Number(item.targetPrice || 0)))}
+                                                            </td>
                                                             <td className="border border-gray-200 px-4 py-2">
                                                                 <button
                                                                     type="button"
@@ -605,6 +699,12 @@ export default function RFQForm() {
                                                 })}
                                             </tbody>
                                         </table>
+                                        <div className="flex justify-end mt-3">
+                                            <div className="text-right">
+                                                <div className="text-sm text-gray-600">Tổng giá trị</div>
+                                                <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
