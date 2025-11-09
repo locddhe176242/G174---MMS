@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { getCurrentUser } from '../../../api/authService';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();
@@ -26,6 +27,29 @@ const PurchaseRequisitionForm = () => {
     const [validationErrors, setValidationErrors] = useState({});
     const [products, setProducts] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+
+    // Calculate total value
+    const totalValue = useMemo(() => {
+        if (!Array.isArray(formData.items)) return 0;
+        return formData.items.reduce((sum, it) => {
+            const qty = Number(it.requested_qty || 0);
+            const price = Number(it.valuation_price || 0);
+            return sum + qty * price;
+        }, 0);
+    }, [formData.items]);
+
+    const formatCurrency = (n) =>
+        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
+
+    const getUserDisplayName = (user) => {
+        if (!user) return 'Đang tải...';
+        if (user.fullName) return user.fullName;
+        if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
+        if (user.firstName) return user.firstName;
+        if (user.email) return user.email;
+        if (user.employeeCode) return user.employeeCode;
+        return `User ID: ${user.userId || user.user_id}`;
+    };
 
     // Auto-generate requisition number
     const generateRequisitionNumber = async () => {
@@ -82,15 +106,50 @@ const PurchaseRequisitionForm = () => {
                     product: p
                 })));
 
-                // Get current user info from JWT token
-                const userId = getCurrentUserId();
-                if (userId) {
-                    setCurrentUser({ userId });
+                // Get current user info from localStorage
+                const user = getCurrentUser();
+                if (user) {
                     // Set requester_id ngay lập tức
+                    const userId = user.userId || user.user_id;
                     setFormData(prev => ({
                         ...prev,
                         requester_id: userId
                     }));
+                    
+                    // Load user profile to get name
+                    try {
+                        const profileResponse = await fetch('/api/users/profile', {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        });
+                        if (profileResponse.ok) {
+                            const profile = await profileResponse.json();
+                            setCurrentUser({
+                                ...user,
+                                fullName: profile.fullName,
+                                firstName: profile.firstName,
+                                lastName: profile.lastName
+                            });
+                        } else {
+                            // Fallback to user from localStorage if profile API fails
+                            setCurrentUser(user);
+                        }
+                    } catch (error) {
+                        console.error('Error loading user profile:', error);
+                        // Fallback to user from localStorage if profile API fails
+                        setCurrentUser(user);
+                    }
+                } else {
+                    // Fallback: Get userId from JWT token if user not in localStorage
+                    const userId = getCurrentUserId();
+                    if (userId) {
+                        setCurrentUser({ userId });
+                        setFormData(prev => ({
+                            ...prev,
+                            requester_id: userId
+                        }));
+                    }
                 }
 
                 // Generate requisition number for new requisition
@@ -174,7 +233,7 @@ const PurchaseRequisitionForm = () => {
     const addItem = () => {
         const newItem = {
             product_id: null,
-            requested_qty: 0,
+            requested_qty: 1,
             delivery_date: new Date(),
             valuation_price: 0,
             price_unit: 1,
@@ -200,11 +259,22 @@ const PurchaseRequisitionForm = () => {
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption) {
             const product = selectedOption.product;
-            handleItemChange(index, 'product_id', product.product_id || product.id);
-            // Nếu muốn tự động điền giá định giá
-            if (product.purchase_price) {
-                handleItemChange(index, 'valuation_price', product.purchase_price);
-            }
+            // Tự động điền giá định giá từ product (ưu tiên purchasePrice, sau đó purchase_price)
+            const purchasePrice = product.purchasePrice ?? product.purchase_price ?? 0;
+            
+            // Update cả product_id và valuation_price trong một lần để tránh state không đồng bộ
+            setFormData(prev => {
+                const newItems = [...prev.items];
+                newItems[index] = {
+                    ...newItems[index],
+                    product_id: selectedOption.value,
+                    valuation_price: purchasePrice
+                };
+                return {
+                    ...prev,
+                    items: newItems
+                };
+            });
         }
     };
 
@@ -342,11 +412,10 @@ const PurchaseRequisitionForm = () => {
                             </label>
                             <input
                                 type="text"
-                                value={currentUser ? `User ID: ${currentUser.userId}` : 'Đang tải...'}
+                                value={getUserDisplayName(currentUser)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
                         </div>
 
                         {/* Status */}
@@ -360,9 +429,6 @@ const PurchaseRequisitionForm = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                {isEdit ? 'Trạng thái không thể thay đổi trực tiếp' : 'Mặc định là Draft khi tạo mới'}
-                            </p>
                         </div>
                     </div>
 
@@ -427,6 +493,9 @@ const PurchaseRequisitionForm = () => {
                                             Giá định giá
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                            Thành tiền
+                                        </th>
+                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
                                             Ghi chú
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
@@ -442,7 +511,11 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <Select
-                                                    value={products.find(option => String(option.value) === String(item.product_id)) || null}
+                                                    value={products.find(option => {
+                                                        const optionValue = Number(option.value);
+                                                        const itemValue = Number(item.product_id);
+                                                        return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
+                                                    }) || null}
                                                     onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
                                                     options={products}
                                                     placeholder="Chọn sản phẩm"
@@ -463,10 +536,10 @@ const PurchaseRequisitionForm = () => {
                                                 <input
                                                     type="number"
                                                     value={item.requested_qty}
-                                                    onChange={(e) => handleItemChange(index, 'requested_qty', parseFloat(e.target.value) || 0)}
+                                                    onChange={(e) => handleItemChange(index, 'requested_qty', parseFloat(e.target.value) || 1)}
                                                     className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    min="0"
-                                                    step="0.01"
+                                                    min="1"
+                                                    step="1"
                                                 />
                                                 {validationErrors[`item_${index}_qty`] && (
                                                     <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_qty`]}</p>
@@ -494,6 +567,9 @@ const PurchaseRequisitionForm = () => {
                                                     step="0.01"
                                                 />
                                             </td>
+                                            <td className="border border-gray-200 px-4 py-2 text-sm">
+                                                {formatCurrency((Number(item.requested_qty || 0) * Number(item.valuation_price || 0)))}
+                                            </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <input
                                                     type="text"
@@ -516,6 +592,12 @@ const PurchaseRequisitionForm = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="flex justify-end mt-3">
+                                <div className="text-right">
+                                    <div className="text-sm text-gray-600">Tổng giá trị</div>
+                                    <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
