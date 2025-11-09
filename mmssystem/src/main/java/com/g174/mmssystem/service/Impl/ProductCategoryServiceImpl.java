@@ -6,7 +6,6 @@ import com.g174.mmssystem.entity.ProductCategory;
 import com.g174.mmssystem.mapper.ProductCategoryMapper;
 import com.g174.mmssystem.repository.ProductCategoryRepository;
 import com.g174.mmssystem.service.IService.IProductCategoryService;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@Slf4j
 public class ProductCategoryServiceImpl implements IProductCategoryService {
     private final ProductCategoryRepository productCategoryRepository;
     private final ProductCategoryMapper productCategoryMapper;
@@ -58,8 +56,6 @@ public class ProductCategoryServiceImpl implements IProductCategoryService {
 
         ProductCategory category = productCategoryMapper.toEntity(request);
         ProductCategory savedCategory = productCategoryRepository.save(category);
-        log.info("Tạo danh mục mới: {}", savedCategory.getName());
-        
         return productCategoryMapper.toResponseDTO(savedCategory);
     }
 
@@ -80,8 +76,6 @@ public class ProductCategoryServiceImpl implements IProductCategoryService {
 
         productCategoryMapper.updateEntityFromDTO(category, request);
         ProductCategory updatedCategory = productCategoryRepository.save(category);
-        log.info("Cập nhật danh mục: {}", updatedCategory.getName());
-        
         return productCategoryMapper.toResponseDTO(updatedCategory);
     }
 
@@ -97,7 +91,6 @@ public class ProductCategoryServiceImpl implements IProductCategoryService {
 
         category.setDeletedAt(LocalDateTime.now());
         productCategoryRepository.save(category);
-        log.info("Xóa danh mục: {}", category.getName());
     }
 
     @Override
@@ -112,6 +105,5 @@ public class ProductCategoryServiceImpl implements IProductCategoryService {
 
         category.setDeletedAt(null);
         productCategoryRepository.save(category);
-        log.info("Khôi phục danh mục: {}", category.getName());
     }
 }

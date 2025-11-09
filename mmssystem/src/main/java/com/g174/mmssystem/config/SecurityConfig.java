@@ -65,7 +65,7 @@ public class SecurityConfig {
                                 "/api/vendors/**",
                                 "/api/vendors/generate-code",
                                 "/api/customers/generate-code",
-                                "/api/product/**"
+                                "/uploads/**"
                         ).permitAll()
 
                         // ============ MANAGER ONLY ============

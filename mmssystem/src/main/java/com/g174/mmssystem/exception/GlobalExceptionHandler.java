@@ -1,5 +1,6 @@
 package com.g174.mmssystem.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,6 +13,8 @@ import org.springframework.web.context.request.WebRequest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -134,6 +137,55 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    // Handle DataIntegrityViolationException (SQL constraint violations)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(
+            DataIntegrityViolationException ex) {
+
+        String errorMessage = parseConstraintViolationMessage(ex.getMessage());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        response.put("error", errorMessage);
+        response.put("timestamp", LocalDateTime.now());
+
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    private String parseConstraintViolationMessage(String message) {
+        if (message == null) {
+            return "Dữ liệu không hợp lệ";
+        }
+
+        // Pattern cho duplicate entry: "Duplicate entry 'value' for key 'table.column'"
+        Pattern duplicatePattern = Pattern.compile(
+            "Duplicate entry '([^']+)' for key '([^.]+)\\.([^']+)'",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher duplicateMatcher = duplicatePattern.matcher(message);
+        
+        if (duplicateMatcher.find()) {
+            String column = duplicateMatcher.group(3);
+            
+            // Map tên cột sang tiếng Việt
+            Map<String, String> columnNames = new HashMap<>();
+            columnNames.put("sku", "SKU");
+            columnNames.put("barcode", "Mã vạch");
+            columnNames.put("name", "Tên sản phẩm");
+            columnNames.put("product_id", "ID sản phẩm");
+            
+            String fieldName = columnNames.getOrDefault(column.toLowerCase(), column);
+            return String.format("%s trùng", fieldName);
+        }
+
+        // Pattern cho ràng buộc khóa ngoại
+        if (message.contains("foreign key constraint") || message.contains("Cannot add or update")) {
+            return "Không thể thực hiện thao tác này do ràng buộc dữ liệu";
+        }
+
+        // Message mặc định
+        return "Dữ liệu không hợp lệ";
+    }
 
      //Handle all other exceptions
     @ExceptionHandler(Exception.class)
