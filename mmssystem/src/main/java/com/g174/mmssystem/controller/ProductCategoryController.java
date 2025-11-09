@@ -1,6 +1,5 @@
 package com.g174.mmssystem.controller;
 
-import com.g174.mmssystem.constant.Constant;
 import com.g174.mmssystem.dto.requestDTO.ProductCategoryRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.ProductCategoryResponseDTO;
 import com.g174.mmssystem.service.IService.IProductCategoryService;
@@ -15,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping(Constant.API_CATEGORY)
+@RequestMapping("/api/category")
 @RequiredArgsConstructor
 @Slf4j
 public class ProductCategoryController {

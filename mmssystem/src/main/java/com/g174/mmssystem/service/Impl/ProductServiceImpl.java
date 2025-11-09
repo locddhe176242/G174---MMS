@@ -1,230 +1,214 @@
 package com.g174.mmssystem.service.Impl;
 
-import com.g174.mmssystem.constant.Constant;
 import com.g174.mmssystem.dto.requestDTO.ProductRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.ProductResponseDTO;
 import com.g174.mmssystem.entity.Product;
 import com.g174.mmssystem.entity.ProductCategory;
 import com.g174.mmssystem.entity.User;
-import com.g174.mmssystem.enums.ProductStatus;
+import com.g174.mmssystem.mapper.ProductMapper;
 import com.g174.mmssystem.repository.ProductCategoryRepository;
 import com.g174.mmssystem.repository.ProductRepository;
 import com.g174.mmssystem.repository.UserRepository;
 import com.g174.mmssystem.service.IService.IProductService;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
-import org.springframework.data.domain.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
+@Slf4j
 public class ProductServiceImpl implements IProductService {
     private final ProductRepository productRepository;
     private final ProductCategoryRepository productCategoryRepository;
     private final UserRepository userRepository;
+    private final ProductMapper productMapper;
 
-    public ProductServiceImpl(ProductRepository productRepository, ProductCategoryRepository productCategoryRepository, UserRepository userRepository) {
+    public ProductServiceImpl(ProductRepository productRepository,
+                              ProductCategoryRepository productCategoryRepository,
+                              UserRepository userRepository,
+                              ProductMapper productMapper) {
         this.productRepository = productRepository;
         this.productCategoryRepository = productCategoryRepository;
         this.userRepository = userRepository;
+        this.productMapper = productMapper;
     }
 
     @Override
-    public Object getProducts(String fieldSearch, String sortOrder, String sortBy, int size, int page) {
-        Sort sort = Sort.by(sortBy == null || sortBy.isEmpty() ? "createdAt" : sortBy);
-        sort = Constant.DESC.equalsIgnoreCase(sortOrder) ? sort.descending() : sort.ascending();
-        Pageable pageable = PageRequest.of(page, size, sort);
+    public List<ProductResponseDTO> getProducts() {
+        List<Product> products = productRepository.findAllActiveOrderByCreatedAt();
+        return productMapper.toResponseDTOList(products);
+    }
 
-        Page<Product> products = productRepository.findAll(pageable);
+    @Override
+    public List<ProductResponseDTO> searchProducts(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getProducts();
+        }
+        List<Product> products = productRepository.searchActiveProducts(keyword.trim());
+        return productMapper.toResponseDTOList(products);
+    }
 
-        List<Product> filteredList = products.getContent()
-                .stream()
-                .filter(p -> p.getDeletedAt() == null)
-                .toList();
-
-        Page<Product> filteredPage = new PageImpl<>(
-                filteredList,
-                pageable,
-                products.getTotalElements()
-        );
-
-        Page<ProductResponseDTO> dtoPage = filteredPage.map(this::convertToDTO);
-
-        return dtoPage;
+    @Override
+    public List<ProductResponseDTO> getDeletedProducts() {
+        List<Product> products = productRepository.findAllDeletedOrderByCreatedAt();
+        return productMapper.toResponseDTOList(products);
     }
 
     @Override
     public ProductResponseDTO getProduct(Integer id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_PRODUCT + id));
-
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+        
         if (product.getDeletedAt() != null) {
-            throw new EntityNotFoundException(Constant.NOT_FOUND_PRODUCT + id);
+            throw new RuntimeException("Sản phẩm đã bị xóa");
         }
-
-        return convertToDTO(product);
+        
+        return productMapper.toResponseDTO(product);
     }
 
     @Override
     @Transactional
-    public ProductResponseDTO createProduct(ProductRequestDTO dto) {
-
-        if (productRepository.existsBySku(dto.getSku())) {
-            throw new IllegalArgumentException(Constant.SKU_EXISTED);
+    public ProductResponseDTO createProduct(ProductRequestDTO request) {
+        if (productRepository.existsBySkuAndDeletedAtIsNull(request.getSku())) {
+            throw new RuntimeException("SKU đã tồn tại: " + request.getSku());
         }
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
+        ProductCategory category = productCategoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với ID: " + request.getCategoryId()));
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND + email));
+        User user = getCurrentUser();
 
-        ProductCategory category = productCategoryRepository.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_CATEGORY));
-
-        ProductStatus status = dto.getStatus() != null ? dto.getStatus() : ProductStatus.IN_STOCK;
-
-        Product product = Product.builder()
-                .sku(dto.getSku())
-                .name(dto.getName())
-                .barcode(dto.getBarcode())
-                .description(dto.getDescription())
-                .uom(dto.getUom())
-                .size(dto.getSize())
-                .sellingPrice(dto.getSellingPrice())
-                .purchasePrice(dto.getPurchasePrice())
-                .category(category)
-                .imageUrl(dto.getImageUrl())
-                .status(status)
-                .quantity(dto.getQuantity())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .createdBy(user)
-                .updatedBy(user)
-                .build();
-
-        Product saved = productRepository.save(product);
-
-        return ProductResponseDTO.builder()
-                .id(saved.getProductId())
-                .sku(saved.getSku())
-                .name(saved.getName())
-                .description(saved.getDescription())
-                .uom(saved.getUom())
-                .size(saved.getSize())
-                .sellingPrice(saved.getSellingPrice())
-                .purchasePrice(saved.getPurchasePrice())
-                .barcode(saved.getBarcode())
-                .imageUrl(saved.getImageUrl())
-                .status(saved.getStatus())
-                .categoryId(saved.getCategory().getCategoryId())
-                .categoryName(saved.getCategory().getName())
-                .createdAt(saved.getCreatedAt())
-                .updatedAt(saved.getUpdatedAt())
-                .createdBy(saved.getCreatedBy().getEmail())
-                .updatedBy(saved.getUpdatedBy().getEmail())
-                .quantity(saved.getQuantity())
-                .build();
+        Product product = productMapper.toEntity(request, category, user);
+        Product savedProduct = productRepository.save(product);
+        log.info("Tạo sản phẩm mới: {}", savedProduct.getName());
+        
+        return productMapper.toResponseDTO(savedProduct);
     }
 
     @Override
     @Transactional
-    public ProductResponseDTO updateProduct(Integer id, ProductRequestDTO dto) {
+    public ProductResponseDTO updateProduct(Integer id, ProductRequestDTO request) {
+        if (id == null) {
+            throw new RuntimeException("ID sản phẩm không được để trống");
+        }
 
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_PRODUCT + id));
-
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+        
         if (product.getDeletedAt() != null) {
-            throw new EntityNotFoundException(Constant.NOT_FOUND_PRODUCT + id);
+            throw new RuntimeException("Không thể cập nhật sản phẩm đã bị xóa");
         }
 
-        if (dto.getSku() != null) {
-            String newSku = dto.getSku().trim();
-            String currentSku = product.getSku().trim();
-
-            if (!newSku.equalsIgnoreCase(currentSku)) {
-                boolean exists = productRepository.existsBySku(newSku);
-                if (exists) {
-                    throw new IllegalArgumentException(Constant.SKU_EXISTED);
-                }
-                product.setSku(newSku);
-            }
+        // Only validate SKU uniqueness if SKU is being changed
+        if (request.getSku() != null && !product.getSku().equals(request.getSku()) && 
+            productRepository.existsBySkuAndDeletedAtIsNull(request.getSku())) {
+            throw new RuntimeException("SKU đã tồn tại: " + request.getSku());
         }
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException(Constant.USER_NOT_FOUND + email));
-
-        if (dto.getName() != null) product.setName(dto.getName());
-        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
-        if (dto.getUom() != null) product.setUom(dto.getUom());
-        if (dto.getSellingPrice() != null) product.setSellingPrice(dto.getSellingPrice());
-        if (dto.getPurchasePrice() != null) product.setPurchasePrice(dto.getPurchasePrice());
-        if (dto.getImageUrl() != null) product.setImageUrl(dto.getImageUrl());
-        if (dto.getStatus() != null) product.setStatus(dto.getStatus());
-        if (dto.getQuantity() != null) product.setQuantity(dto.getQuantity());
-        if (dto.getCategoryId() != null) {
-            ProductCategory category = productCategoryRepository.findById(dto.getCategoryId())
-                    .orElseThrow(() -> new EntityNotFoundException(Constant.NOT_FOUND_CATEGORY));
-            product.setCategory(category);
+        ProductCategory category = null;
+        if (request.getCategoryId() != null) {
+            category = productCategoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với ID: " + request.getCategoryId()));
         }
-        if (dto.getSize() != null) product.setSize(dto.getSize());
-        if (dto.getDeletedAt() != null) product.setDeletedAt(dto.getDeletedAt());
-        if (dto.getBarcode() != null) product.setBarcode(dto.getBarcode());
-        product.setUpdatedAt(LocalDateTime.now());
-        product.setUpdatedBy(user);
 
-        Product saved = productRepository.save(product);
-
-        return ProductResponseDTO.builder()
-                .id(saved.getProductId())
-                .sku(saved.getSku())
-                .name(saved.getName())
-                .description(saved.getDescription())
-                .uom(saved.getUom())
-                .size(saved.getSize())
-                .sellingPrice(saved.getSellingPrice())
-                .purchasePrice(saved.getPurchasePrice())
-                .barcode(saved.getBarcode())
-                .imageUrl(saved.getImageUrl())
-                .status(saved.getStatus())
-                .quantity(saved.getQuantity())
-                .categoryId(product.getCategory().getCategoryId())
-                .categoryName(saved.getCategory() != null ? saved.getCategory().getName() : null)
-                .createdAt(saved.getCreatedAt())
-                .updatedAt(saved.getUpdatedAt())
-                .deletedAt(saved.getDeletedAt())
-                .createdBy(saved.getCreatedBy() != null ? saved.getCreatedBy().getEmail() : null)
-                .updatedBy(saved.getUpdatedBy() != null ? saved.getUpdatedBy().getEmail() : null)
-                .build();
+        User user = getCurrentUser();
+        productMapper.updateEntityFromDTO(product, request, category, user);
+        Product updatedProduct = productRepository.save(product);
+        log.info("Cập nhật sản phẩm: {}", updatedProduct.getName());
+        
+        return productMapper.toResponseDTO(updatedProduct);
     }
 
-    private ProductResponseDTO convertToDTO(Product product) {
-        return ProductResponseDTO.builder()
-                .id(product.getProductId())
-                .sku(product.getSku())
-                .name(product.getName())
-                .description(product.getDescription())
-                .uom(product.getUom())
-                .size(product.getSize())
-                .purchasePrice(product.getPurchasePrice())
-                .sellingPrice(product.getSellingPrice())
-                .status(product.getStatus())
-                .quantity(product.getQuantity())
-                .barcode(product.getBarcode())
-                .imageUrl(product.getImageUrl())
-                .categoryId(product.getCategory().getCategoryId())
-                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .createdBy(product.getCreatedBy() != null ? product.getCreatedBy().getEmail() : null)
-                .updatedBy(product.getUpdatedBy() != null ? product.getUpdatedBy().getEmail() : null)
-                .build();
+    @Override
+    @Transactional
+    public void deleteProduct(Integer id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+        
+        if (product.getDeletedAt() != null) {
+            throw new RuntimeException("Sản phẩm đã bị xóa");
+        }
+
+        product.setDeletedAt(LocalDateTime.now());
+        productRepository.save(product);
+        log.info("Xóa sản phẩm: {}", product.getName());
+    }
+
+    @Override
+    @Transactional
+    public void restoreProduct(Integer id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+        
+        if (product.getDeletedAt() == null) {
+            throw new RuntimeException("Sản phẩm chưa bị xóa");
+        }
+
+        product.setDeletedAt(null);
+        productRepository.save(product);
+        log.info("Khôi phục sản phẩm: {}", product.getName());
+    }
+
+    @Override
+    @Transactional
+    public String uploadImage(MultipartFile file) {
+        // Validate file
+        if (file.isEmpty()) {
+            throw new RuntimeException("File trống");
+        }
+
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new RuntimeException("File phải là hình ảnh");
+        }
+
+        // Validate file size (max 5MB)
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new RuntimeException("Kích thước file phải nhỏ hơn 5MB");
+        }
+
+        try {
+            // Create uploads directory if not exists
+            Path uploadsDir = Paths.get("uploads/products");
+            Files.createDirectories(uploadsDir);
+
+            // Generate unique filename
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
+            String filename = UUID.randomUUID().toString() + extension;
+
+            // Save file
+            Path filePath = uploadsDir.resolve(filename);
+            Files.copy(file.getInputStream(), filePath);
+
+            // Return relative path for database
+            String imageUrl = "/uploads/products/" + filename;
+            log.info("Upload ảnh sản phẩm thành công: {}", imageUrl);
+            return imageUrl;
+
+        } catch (IOException e) {
+            log.error("Lỗi khi upload ảnh sản phẩm: {}", e.getMessage());
+            throw new RuntimeException("Tải lên ảnh sản phẩm thất bại: " + e.getMessage(), e);
+        }
+    }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
     }
 }
