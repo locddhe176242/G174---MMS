@@ -1,8 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Image as ImageIcon, Plus, Sparkles } from 'lucide-react';
-import { getCategories } from '../../../api/categoryService'; 
-import { createProduct } from '../../../api/productService';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faXmark, faUpload, faImage, faPlus, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
+import { getCategories } from '../../../api/categoryService';
+import { createProduct, uploadProductImage } from '../../../api/productService';
 import { toast } from 'react-toastify';
+
+/**
+ * Helper function để xử lý image URL (giống UserProfile)
+ * Xử lý base64, relative path, và full URL
+ * @param {string} imageUrl - URL ảnh (base64, relative path, hoặc full URL)
+ * @returns {string|null} - URL ảnh đầy đủ hoặc null
+ */
+const getImageUrl = (imageUrl) => {
+    if (!imageUrl) return null;
+    // Nếu là base64 (data:image/...), dùng trực tiếp
+    if (imageUrl.startsWith('data:image/')) {
+        return imageUrl;
+    }
+    // Nếu là relative path (/uploads/...), thêm base URL
+    if (imageUrl.startsWith('/uploads/')) {
+        return `http://localhost:8080${imageUrl}`;
+    }
+    // Nếu đã có http/https, dùng trực tiếp
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+        return imageUrl;
+    }
+    // Mặc định thêm base URL
+    return `http://localhost:8080${imageUrl}`;
+};
 
 const ProductAdd = ({ onClose, onSave }) => {
     const [formData, setFormData] = useState({
@@ -17,11 +42,14 @@ const ProductAdd = ({ onClose, onSave }) => {
         status: 'IN_STOCK',
         quantity: '',
         image_url: null,
+        imageFile: null, // Lưu file object để upload
         sku: ''
     });
+    // ============ State ============
     const [categories, setCategories] = useState([]);
 
-     useEffect(() => {
+    // ============ Effects ============
+    useEffect(() => {
         document.body.style.overflow = 'hidden';
         const fetchCategories = async () => {
             try {
@@ -34,6 +62,10 @@ const ProductAdd = ({ onClose, onSave }) => {
         fetchCategories();
     }, []);
 
+    // ============ Event Handlers ============
+    /**
+     * Xử lý thay đổi giá trị input
+     */
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -42,342 +74,396 @@ const ProductAdd = ({ onClose, onSave }) => {
         }));
     };
 
-    const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.name.trim()) {
-      toast.warning('⚠️ Vui lòng nhập tên sản phẩm!');
-      return;
-    }
-    if (!formData.categoryId) {
-      toast.warning('⚠️ Vui lòng chọn danh mục sản phẩm!');
-      return;
-    }
-
-    const newProduct = {
-      sku: formData.sku || formData.barcode || `PRD${Date.now()}`,
-      created_at: new Date().toISOString(),
-      ...formData
-    };
-
-    try {
-      const response = await createProduct(newProduct);
-      toast.success('🎉 Thêm sản phẩm thành công!');
-      onSave(response);
-      onClose();
-    } catch (error) {
-      console.error('❌ Lỗi khi tạo sản phẩm:', error);
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        'Tạo sản phẩm thất bại, vui lòng thử lại!';
-      toast.error(`❌ ${apiMessage}`);
-    }
-  };
-
+    /**
+     * Xử lý upload ảnh sản phẩm
+     * Validate file type và size, đọc file thành base64 để preview
+     */
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert('Kích thước ảnh không được vượt quá 2MB');
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                toast.warning('File phải là hình ảnh!');
                 return;
             }
+            
+            if (file.size > 2 * 1024 * 1024) {
+                toast.warning('Kích thước ảnh không được vượt quá 2MB');
+                return;
+            }
+            
+            // Lưu file object để upload sau
             const reader = new FileReader();
+            reader.onerror = () => {
+                console.error('Lỗi khi đọc file:', reader.error);
+                toast.error('Lỗi khi đọc file ảnh!');
+            };
             reader.onloadend = () => {
-                setFormData(prev => ({
-                    ...prev,
-                    image_url: reader.result
-                }));
+                if (reader.result) {
+                    console.log('Đọc file thành công, kích thước base64:', reader.result.length);
+                    setFormData(prev => ({
+                        ...prev,
+                        imageUrl: reader.result,
+                        image_url: reader.result, // Giữ để hiển thị
+                        imageFile: file // Lưu file object để upload
+                    }));
+                } else {
+                    console.error('Không đọc được file');
+                    toast.error('Không đọc được file ảnh!');
+                }
             };
             reader.readAsDataURL(file);
         }
     };
 
+    /**
+     * Xử lý submit form thêm sản phẩm mới
+     * Validate dữ liệu, upload ảnh nếu có, sau đó gọi API tạo sản phẩm
+     */
+    const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast.warning('Vui lòng nhập tên sản phẩm!');
+      return;
+    }
+    if (!formData.categoryId) {
+      toast.warning('Vui lòng chọn danh mục sản phẩm!');
+      return;
+    }
+
+    /**
+     * Helper để parse số thực an toàn
+     * Loại bỏ ký tự đặc biệt, chỉ giữ số và dấu chấm
+     * @param {string|number} value - Giá trị cần parse
+     * @returns {number|null} - Số thực đã parse hoặc null nếu không hợp lệ
+     */
+    const parseFloatSafe = (value) => {
+      if (!value || value === '') return null;
+      const cleaned = String(value).replace(/[^\d.]/g, '');
+      const parsed = parseFloat(cleaned);
+      return !isNaN(parsed) && isFinite(parsed) ? parsed : null;
+    };
+    
+    /**
+     * Helper để parse số nguyên an toàn
+     * Loại bỏ ký tự đặc biệt, chỉ giữ số
+     * @param {string|number} value - Giá trị cần parse
+     * @returns {number|null} - Số nguyên đã parse hoặc null nếu không hợp lệ
+     */
+    const parseIntSafe = (value) => {
+      if (!value || value === '') return null;
+      const cleaned = String(value).replace(/[^\d]/g, '');
+      const parsed = parseInt(cleaned, 10);
+      return !isNaN(parsed) && isFinite(parsed) ? parsed : null;
+    };
+    
+    // Chuẩn hóa dữ liệu trước khi gửi - đảm bảo các field bắt buộc có giá trị hợp lệ
+    const newProduct = {
+      // Field bắt buộc (@NotBlank/@NotNull)
+      sku: (formData.sku || formData.barcode || `PRD${Date.now()}`).trim(),
+      name: formData.name.trim(),
+      uom: (formData.uom || '').trim(),
+      size: parseFloatSafe(formData.size),
+      purchasePrice: parseFloatSafe(formData.purchasePrice),
+      sellingPrice: parseFloatSafe(formData.sellingPrice),
+      categoryId: parseIntSafe(formData.categoryId),
+      quantity: parseIntSafe(formData.quantity) ?? 0,
+      
+      // Field không bắt buộc
+      description: formData.description?.trim() || null,
+      barcode: formData.barcode?.trim() || null,
+      // Chỉ gửi imageUrl nếu không phải base64 (data:image/...)
+      // Base64 quá dài (>255 ký tự) sẽ vi phạm validation
+      imageUrl: (formData.imageUrl || formData.image_url) && 
+                !(formData.imageUrl || formData.image_url).startsWith('data:image/') 
+                ? (formData.imageUrl || formData.image_url) 
+                : null,
+      status: formData.status || 'IN_STOCK',
+    };
+    
+    // Validate các field bắt buộc trước khi gửi
+    if (!newProduct.uom || newProduct.uom === '') {
+      toast.warning('Vui lòng nhập đơn vị tính (UOM)!');
+      return;
+    }
+    if (!newProduct.size || newProduct.size <= 0) {
+      toast.warning('Vui lòng nhập kích cỡ hợp lệ (phải lớn hơn 0)!');
+      return;
+    }
+    if (!newProduct.purchasePrice || newProduct.purchasePrice <= 0) {
+      toast.warning('Vui lòng nhập giá vốn hợp lệ (phải lớn hơn 0)!');
+      return;
+    }
+    if (!newProduct.sellingPrice || newProduct.sellingPrice <= 0) {
+      toast.warning('Vui lòng nhập giá bán hợp lệ (phải lớn hơn 0)!');
+      return;
+    }
+    if (!newProduct.categoryId) {
+      toast.warning('Vui lòng chọn danh mục sản phẩm!');
+      return;
+    }
+
+    console.log('Creating product:', newProduct);
+    try {
+      // Nếu có file ảnh (base64), upload trước để lấy URL ngắn
+      let finalImageUrl = newProduct.imageUrl;
+      let hasImageUploaded = false;
+      if (formData.imageFile && (formData.imageUrl || formData.image_url)?.startsWith('data:image/')) {
+        try {
+          toast.info('Đang upload ảnh...');
+          const uploadResponse = await uploadProductImage(formData.imageFile);
+          finalImageUrl = uploadResponse.imageUrl;
+          newProduct.imageUrl = finalImageUrl;
+          hasImageUploaded = true;
+        } catch (uploadError) {
+          console.error('Lỗi khi upload ảnh:', uploadError);
+          toast.warning('Upload ảnh thất bại, tạo sản phẩm không có ảnh...');
+          newProduct.imageUrl = null; // Tạo sản phẩm không có ảnh
+        }
+      }
+      
+      const response = await createProduct(newProduct);
+      const successMessage = hasImageUploaded 
+        ? 'Thêm sản phẩm và upload ảnh thành công!'
+        : 'Thêm sản phẩm thành công!';
+      toast.success(successMessage);
+      onSave(response);
+      onClose();
+    } catch (error) {
+      console.error('Lỗi khi tạo sản phẩm:', error);
+      console.error('Error response:', error?.response?.data);
+      
+      // Hiển thị lỗi chi tiết từ backend
+      let apiMessage = 'Tạo sản phẩm thất bại, vui lòng thử lại!';
+      
+      if (error?.response?.data) {
+        // Nếu có validation errors từ backend (MethodArgumentNotValidException)
+        if (error.response.data.errors) {
+          const errorMessages = Object.entries(error.response.data.errors)
+            .map(([field, message]) => `${field}: ${message}`)
+            .join(', ');
+          apiMessage = `Dữ liệu không hợp lệ: ${errorMessages}`;
+        } else if (error.response.data.message) {
+          apiMessage = error.response.data.message;
+        } else if (error.response.data.error) {
+          apiMessage = error.response.data.error;
+        }
+      } else if (error?.message) {
+        apiMessage = error.message;
+      }
+      
+      toast.error(apiMessage);
+    }
+  };
+
+    // ============ Render ============
     return (
-        <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden bg-white rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {/* Premium Header with Gradient */}
-            <div className="relative px-8 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5" />
-                <div className="relative flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/30">
-                            <Plus className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-                                Thêm sản phẩm
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-0.5">Tạo sản phẩm mới trong hệ thống</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/80 rounded-xl transition-all duration-200 group"
-                    >
-                        <X className="w-5 h-5 text-gray-500 group-hover:text-gray-700 group-hover:rotate-90 transition-all duration-200" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div className="bg-white rounded-lg p-6 w-full max-w-5xl my-8 mx-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-slate-800">Thêm sản phẩm mới</h2>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                        <FontAwesomeIcon icon={faXmark} className="w-6 h-6" />
                     </button>
                 </div>
-            </div>
 
-            {/* Form Content with Custom Scrollbar */}
-            <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                <div className="flex-1 overflow-y-auto px-8 py-6" style={{ 
-                    maxHeight: 'calc(90vh - 180px)',
-                    WebkitOverflowScrolling: 'touch',
-                    transform: 'translateZ(0)',
-                    scrollBehavior: 'smooth',
-                 }}>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Left Column - Main Info */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Basic Info Section */}
-                            <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <div className="flex items-center gap-2 mb-5">
-                                    <Sparkles className="w-5 h-5 text-blue-600" />
-                                    <h3 className="text-base font-semibold text-gray-800">Thông tin sản phẩm</h3>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Tên sản phẩm <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 text-sm transition-all duration-200"
-                                            placeholder="Nhập tên sản phẩm (tối đa 300 ký tự)"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Mã vạch/Barcode</label>
-                                        <input
-                                            type="text"
-                                            name="barcode"
-                                            value={formData.barcode}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 text-sm transition-all duration-200"
-                                            placeholder="Nhập mã vạch"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Description Section */}
-                            <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả</label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleChange}
-                                    rows="5"
-                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 text-sm resize-none transition-all duration-200"
-                                    placeholder="Nhập mô tả sản phẩm"
-                                />
-                            </div>
-
-                            <div className="bg-gradient-to-br from-gray-50 to-green-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <h3 className="text-base font-semibold text-gray-800 mb-5">Thông tin</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Đơn vị đo</label>
-                                        <input
-                                            type="text"
-                                            name="uom"
-                                            value={formData.uom}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 text-sm transition-all duration-200"
-                                            placeholder="VD:  cái, thùng, mét, kg, gói, v.v."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Size</label>
-                                        <input
-                                            type="text"
-                                            name="size"
-                                            value={formData.size}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 text-sm transition-all duration-200"
-                                            placeholder="Theo đơn vị đo lường"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
-                                        <input
-                                            type="text"
-                                            name="sku"
-                                            value={formData.sku}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 text-sm transition-all duration-200"
-                                            placeholder="Phải Unique"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-                                        <input
-                                            type="text"
-                                            name="quantity"
-                                            value={formData.quantity}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 text-sm transition-all duration-200"
-                                            placeholder="Nhập số lượng"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
-                                        <select
-                                            name="status"
-                                            value={formData.status}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 text-sm transition-all duration-200 cursor-pointer"
-                                        >
-                                            <option value="IN_STOCK">In Stock</option>
-                                            <option value="OUT_OF_STOCK">Out of Stock</option>
-                                            <option value="DISCONTINUED">Discontinued</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Pricing Section */}
-                            <div className="bg-gradient-to-br from-gray-50 to-green-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <h3 className="text-base font-semibold text-gray-800 mb-5">Giá</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Giá bán</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                name="sellingPrice"
-                                                value={formData.sellingPrice}
-                                                onChange={handleChange}
-                                                className="w-full pl-4 pr-8 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 text-sm text-right transition-all duration-200"
-                                                placeholder="0"
-                                                min="0"
-                                            />
-                                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm font-medium text-gray-500">đ</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Giá vốn</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                name="purchasePrice"
-                                                value={formData.purchasePrice}
-                                                onChange={handleChange}
-                                                className="w-full pl-4 pr-8 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 text-sm text-right transition-all duration-200"
-                                                placeholder="0"
-                                                min="0"
-                                            />
-                                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm font-medium text-gray-500">đ</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
+            <form onSubmit={handleSubmit}>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                Tên sản phẩm <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                placeholder="Nhập tên sản phẩm"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                                required
+                            />
                         </div>
-
-                        {/* Right Column - Image & Category */}
-                        <div className="lg:col-span-1 space-y-6">
-                            {/* Image Upload */}
-                            <div className="bg-gradient-to-br from-gray-50 to-indigo-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <h3 className="text-base font-semibold text-gray-800 mb-4">Ảnh sản phẩm</h3>
-                                <div className="relative border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-white hover:border-blue-400 transition-all duration-300 group cursor-pointer aspect-square">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Mã vạch/Barcode</label>
+                            <input
+                                type="text"
+                                name="barcode"
+                                value={formData.barcode}
+                                onChange={handleChange}
+                                placeholder="Nhập mã vạch"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                            <input
+                                type="text"
+                                name="sku"
+                                value={formData.sku}
+                                onChange={handleChange}
+                                placeholder="Phải Unique"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                Danh mục <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                name="categoryId"
+                                value={formData.categoryId}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                                required
+                            >
+                                <option value="">Chọn danh mục</option>
+                                {categories.map(category => (
+                                    <option key={category.categoryId} value={category.categoryId}>
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Đơn vị đo</label>
+                            <input
+                                type="text"
+                                name="uom"
+                                value={formData.uom}
+                                onChange={handleChange}
+                                placeholder="VD: cái, thùng, mét, kg, gói"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Size</label>
+                            <input
+                                type="text"
+                                name="size"
+                                value={formData.size}
+                                onChange={handleChange}
+                                placeholder="Theo đơn vị đo lường"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
+                            <input
+                                type="number"
+                                name="quantity"
+                                value={formData.quantity}
+                                onChange={handleChange}
+                                placeholder="Nhập số lượng"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
+                            <select
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            >
+                                <option value="IN_STOCK">In Stock</option>
+                                <option value="OUT_OF_STOCK">Out of Stock</option>
+                                <option value="DISCONTINUED">Discontinued</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Giá bán</label>
+                            <input
+                                type="number"
+                                name="sellingPrice"
+                                value={formData.sellingPrice}
+                                onChange={handleChange}
+                                placeholder="0"
+                                min="0"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Giá vốn</label>
+                            <input
+                                type="number"
+                                name="purchasePrice"
+                                value={formData.purchasePrice}
+                                onChange={handleChange}
+                                placeholder="0"
+                                min="0"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            placeholder="Nhập mô tả sản phẩm"
+                            rows={3}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Ảnh sản phẩm</label>
+                        <div className="relative border-2 border-dashed border-slate-300 rounded-lg overflow-hidden bg-white hover:border-brand-blue transition-all cursor-pointer">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            {formData.imageUrl || formData.image_url ? (
+                                <div className="relative w-full h-48">
+                                    <img
+                                        src={getImageUrl(formData.imageUrl || formData.image_url)}
+                                        alt="Preview"
+                                        className="w-full h-full object-contain p-4"
+                                        onError={(e) => {
+                                            console.error('Lỗi khi load ảnh:', e.target.src?.substring(0, 100));
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                imageUrl: null,
+                                                image_url: null,
+                                                imageFile: null
+                                            }));
+                                            toast.warning('Ảnh không hợp lệ, vui lòng chọn lại!');
+                                        }}
                                     />
-                                    {formData.imageUrl ? (
-                                        <div className="relative w-full h-full">
-                                            <img
-                                                src={formData.imageUrl}
-                                                alt="Preview"
-                                                className="w-full h-full object-contain p-4"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center pb-4">
-                                                <div className="text-white text-sm font-medium flex items-center gap-2">
-                                                    <Upload className="w-4 h-4" />
-                                                    Thay đổi ảnh
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-                                            <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                                                <ImageIcon className="w-8 h-8 text-blue-600" />
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-700 mb-1">Tải ảnh sản phẩm lên</p>
-                                            <p className="text-xs text-gray-500">(Tối đa 2MB)</p>
-                                        </div>
-                                    )}
                                 </div>
-                            </div>
-
-                            {/* Category */}
-                            <div className="bg-gradient-to-br from-gray-50 to-pink-50/30 rounded-xl p-6 border border-gray-200/50">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
-                                <select
-                                    name="categoryId"
-                                    value={formData.categoryId}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-400 text-sm transition-all duration-200 cursor-pointer appearance-none"
-                                >
-                                    <option value="">Chọn danh mục</option>
-                                    {categories.map(category => (
-                                        <option key={category.categoryId} value={category.categoryId}>
-                                            {category.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-48 text-slate-500 p-6">
+                                    <FontAwesomeIcon icon={faImage} className="w-12 h-12 mb-2" />
+                                    <p className="text-sm">Tải ảnh sản phẩm lên (Tối đa 2MB)</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Premium Footer */}
-                <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50/30">
+                <div className="flex items-center gap-3 mt-6 pt-4 border-t">
+                    <button
+                        type="submit"
+                        className="group flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
+                    >
+                        <FontAwesomeIcon icon={faFloppyDisk} className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                        <span className="group-hover:font-medium transition-all duration-200">Tạo sản phẩm</span>
+                    </button>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                        className="group px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all duration-200 hover:scale-105 hover:shadow-sm"
                     >
-                        Hủy
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200 flex items-center gap-2 hover:scale-[1.02]"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Thêm sản phẩm
+                        <span className="group-hover:font-medium transition-all duration-200">Hủy</span>
                     </button>
                 </div>
             </form>
-
-            <style jsx>{`
-                /* Custom Scrollbar */
-                .overflow-y-auto::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-track {
-                    background: #f1f5f9;
-                    border-radius: 10px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb {
-                    background: linear-gradient(to bottom, #3b82f6, #6366f1);
-                    border-radius: 10px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-                    background: linear-gradient(to bottom, #2563eb, #4f46e5);
-                }
-            `}</style>
         </div>
+    </div>
     );
 };
 
