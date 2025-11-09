@@ -8,7 +8,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken") || "eyJhbGciOiJIUzUxMiJ9.eyJyb2xlcyI6IiIsInRva2VuVHlwZSI6ImFjY2VzcyIsInVzZXJJZCI6NSwiZW1haWwiOiJqb2huLmRvZUBtbXMuY29tIiwidXNlcm5hbWUiOiJqb2huX2RvZSIsImVtcGxveWVlQ29kZSI6IkVNUDAwMSIsInN1YiI6ImpvaG4uZG9lQG1tcy5jb20iLCJpc3MiOiJNTVMgU3lzdGVtIiwiaWF0IjoxNzYwMjExOTEzLCJleHAiOjE3NjAyOTgzMTN9.FeOCbpiVxY4xlT4mSzmMVZaApUu992A689D75AdUnVUpEDZzT3UU9ZncQ65O_SLx4V3ZkHmh2X3hLwlkMRZuBQ";
+    const token = localStorage.getItem("accessToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,23 +22,9 @@ export const getProductById = async (id) => {
   return response.data;
 };
 
-export const getProducts = async ({
-  page = 0,
-  size = 5,
-  sortBy = "createdAt",
-  sortOrder = "desc",
-  fieldSearch = "",
-  workspaceId = "",
-}) => {
+export const getProducts = async (keyword = "") => {
   const response = await api.get("", {
-    params: {
-      page,
-      size,
-      sortBy,
-      sortOrder,
-      fieldSearch,
-      workspaceId,
-    },
+    params: keyword ? { keyword } : {},
   });
   return response.data;
 };
@@ -53,9 +39,27 @@ export const updateProduct = async (id, productData) => {
   return response.data;
 };
 
+export const deleteProduct = async (id) => {
+  const response = await api.delete(`/${id}`);
+  return response.data;
+};
+
+export const uploadProductImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post('/upload-image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export default {
   getProductById,
   getProducts,
   createProduct,
   updateProduct,
+  deleteProduct,
+  uploadProductImage,
 };
