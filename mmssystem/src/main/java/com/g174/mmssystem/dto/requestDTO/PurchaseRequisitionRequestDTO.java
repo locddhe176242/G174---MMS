@@ -16,7 +16,6 @@ import java.util.List;
 @Builder
 public class PurchaseRequisitionRequestDTO {
 
-    private Long planId;
 
 //    @NotNull(message = "Requester ID không được để trống")
     private Long requesterId;

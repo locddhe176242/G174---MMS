@@ -25,8 +25,6 @@ public class PurchaseRequisitionMapper {
         PurchaseRequisitionResponseDTO dto = PurchaseRequisitionResponseDTO.builder()
                 .requisitionId(requisition.getRequisitionId())
                 .requisitionNo(requisition.getRequisitionNo())
-                .planId(requisition.getPlantId())
-                .requesterId(requisition.getRequester() != null ? requisition.getRequester().getId() : null)
                 .requesterName(requisition.getRequester() != null && requisition.getRequester().getProfile() != null
                         ? (requisition.getRequester().getProfile().getFirstName() + " " + 
                            requisition.getRequester().getProfile().getLastName()).trim()
@@ -69,9 +67,6 @@ public class PurchaseRequisitionMapper {
             return;
         }
 
-        if (dto.getPlanId() != null) {
-            requisition.setPlantId(dto.getPlanId());
-        }
         if (requester != null) {
             requisition.setRequester(requester);
         }
@@ -147,7 +142,6 @@ public class PurchaseRequisitionMapper {
 
         return PurchaseRequisitionItem.builder()
                 .purchaseRequisition(requisition)
-                .planItemId(dto.getPlanItemId())
                 .productId(dto.getProductId())
                 .productCode(dto.getProductCode())
                 .productName(dto.getProductName())

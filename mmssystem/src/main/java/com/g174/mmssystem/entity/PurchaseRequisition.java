@@ -27,8 +27,6 @@ public class PurchaseRequisition {
     @Column(name = "requisition_no", length = 30, unique = true, nullable = false)
     private String requisitionNo;
 
-    @Column(name = "plan_id")
-    private Long plantId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requester_id")

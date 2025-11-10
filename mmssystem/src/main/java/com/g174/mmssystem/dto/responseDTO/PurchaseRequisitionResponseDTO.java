@@ -16,8 +16,6 @@ import java.util.List;
 public class PurchaseRequisitionResponseDTO {
     private Long requisitionId;
     private String requisitionNo;
-    private Long planId;
-    private Integer requesterId;
     private String requesterName;
     private String department;
     private String costCenter;

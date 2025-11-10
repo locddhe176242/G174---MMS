@@ -55,16 +55,21 @@ function App() {
                 <Route path="/customers/new" element={<CustomerForm/>}/>
                 <Route path="/customers/:id" element={<CustomerDetail/>}/>
                 <Route path="/customers/:id/edit" element={<CustomerForm/>}/>
+
                 <Route path="/products" element={<ProductList/>}/>
+
                 <Route path="/categories" element={<CategoryList/>}/>
+
                 <Route path="/vendors" element={<VendorList/>}/>
                 <Route path="/vendors/new" element={<VendorForm/>}/>
                 <Route path="/vendors/:id/edit" element={<VendorForm/>}/>
                 <Route path="/vendors/:id" element={<VendorDetail/>}/>
+
                 <Route path="/warehouse" element={<WarehouseList/>}/>
                 <Route path="/warehouse/new" element={<AddWarehouse/>}/>
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse/>}/>
                 <Route path="/warehouse/:id" element={<WarehouseDetail/>}/>
+                
                 <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm/>}/>
                 <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail/>}/>
                 <Route path="/purchase-requisitions" element={<PurchaseRequisitionList/>}/>

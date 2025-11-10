@@ -23,8 +23,6 @@ public class PurchaseRequisitionItem {
     @JoinColumn(name = "requisition_id", nullable = false)
     private PurchaseRequisition purchaseRequisition;
 
-    @Column(name = "plan_item_id")
-    private Long planItemId;
 
     @Column(name = "product_id")
     private Long productId;

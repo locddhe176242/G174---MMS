@@ -12,8 +12,6 @@ import java.math.BigDecimal;
 @Builder
 public class PurchaseRequisitionItemRequestDTO {
 
-    private Long planItemId;
-
     private Long productId;
 
     @NotBlank(message = "Mã sản phẩm không được để trống")

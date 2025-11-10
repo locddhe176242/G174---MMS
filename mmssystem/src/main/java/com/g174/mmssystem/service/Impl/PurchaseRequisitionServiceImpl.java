@@ -59,7 +59,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         // Create requisition entity
         PurchaseRequisition requisition = PurchaseRequisition.builder()
                 .requisitionNo(requisitionNo)
-                .plantId(dto.getPlanId())
                 .requester(requester)
                 .department(dto.getDepartment())
                 .costCenter(dto.getCostCenter())
@@ -87,7 +86,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                     .map(itemDto -> {
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
-                                .planItemId(itemDto.getPlanItemId())
                                 .productId(itemDto.getProductId())
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
@@ -107,16 +105,19 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         // Save requisition (cascade will save items)
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Tạo purchase requisition thành công với ID: {} và số: {}", saved.getRequisitionId(), saved.getRequisitionNo());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
     public PurchaseRequisitionResponseDTO getRequisitionById(Long requisitionId) {
         log.info("Lấy purchase requisition ID: {}", requisitionId);
 
-        PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
-                .filter(r -> r.getDeletedAt() == null)
+        PurchaseRequisition requisition = requisitionRepository.findByIdWithRelations(requisitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
         return requisitionMapper.toResponseDTO(requisition);
@@ -126,7 +127,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     public List<PurchaseRequisitionResponseDTO> getAllRequisitions() {
         log.info("Lấy tất cả purchase requisitions");
 
-        List<PurchaseRequisition> requisitions = requisitionRepository.findAllActive();
+        List<PurchaseRequisition> requisitions = requisitionRepository.findAllActiveWithRelations();
         return requisitionMapper.toResponseDTOList(requisitions);
     }
 
@@ -134,7 +135,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     public Page<PurchaseRequisitionResponseDTO> getAllRequisitions(Pageable pageable) {
         log.info("Lấy danh sách purchase requisitions với phân trang");
 
-        Page<PurchaseRequisition> requisitions = requisitionRepository.findAllActive(pageable);
+        Page<PurchaseRequisition> requisitions = requisitionRepository.findAllActiveWithRelations(pageable);
         List<PurchaseRequisitionResponseDTO> dtoList = requisitionMapper.toResponseDTOList(requisitions.getContent());
 
         return new PageImpl<>(dtoList, pageable, requisitions.getTotalElements());
@@ -148,7 +149,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             return getAllRequisitions();
         }
 
-        List<PurchaseRequisition> requisitions = requisitionRepository.searchRequisitions(keyword.trim());
+        List<PurchaseRequisition> requisitions = requisitionRepository.searchRequisitionsWithRelations(keyword.trim());
         return requisitionMapper.toResponseDTOList(requisitions);
     }
 
@@ -193,9 +194,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         }
 
         // Update basic fields
-        if (dto.getPlanId() != null) {
-            requisition.setPlantId(dto.getPlanId());
-        }
         if (dto.getDepartment() != null) {
             requisition.setDepartment(dto.getDepartment());
         }
@@ -228,7 +226,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                     .map(itemDto -> {
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
-                                .planItemId(itemDto.getPlanItemId())
                                 .productId(itemDto.getProductId())
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
@@ -255,8 +252,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         requisition.setUpdatedAt(LocalDateTime.now());
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Cập nhật purchase requisition thành công ID: {}", saved.getRequisitionId());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
@@ -282,8 +283,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Approve purchase requisition thành công ID: {}", saved.getRequisitionId());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
@@ -314,8 +319,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Reject purchase requisition thành công ID: {}", saved.getRequisitionId());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
@@ -336,8 +345,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Đóng purchase requisition thành công ID: {}", saved.getRequisitionId());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
@@ -357,8 +370,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
+        // Fetch lại với relations để có đầy đủ dữ liệu
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
         log.info("Khôi phục purchase requisition thành công ID: {}", saved.getRequisitionId());
-        return requisitionMapper.toResponseDTO(saved);
+        return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
     @Override
@@ -370,11 +387,15 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        // Soft delete
-        requisition.setDeletedAt(LocalDateTime.now());
-        requisition.setUpdatedAt(LocalDateTime.now());
+        // Fetch với relations trước khi soft delete để có đầy đủ dữ liệu
+        PurchaseRequisition requisitionWithRelations = requisitionRepository.findByIdWithRelations(requisitionId)
+                .orElse(requisition);
 
-        PurchaseRequisition saved = requisitionRepository.save(requisition);
+        // Soft delete
+        requisitionWithRelations.setDeletedAt(LocalDateTime.now());
+        requisitionWithRelations.setUpdatedAt(LocalDateTime.now());
+
+        PurchaseRequisition saved = requisitionRepository.save(requisitionWithRelations);
 
         log.info("Xóa purchase requisition thành công ID: {}", saved.getRequisitionId());
         return requisitionMapper.toResponseDTO(saved);
