@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
+import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import apiClient from '../../../api/apiClient';
 
 const PurchaseRequisitionForm = () => {

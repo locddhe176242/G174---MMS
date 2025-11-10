@@ -2,99 +2,101 @@ import apiClient from "./apiClient";
 
 const BASE_PATH = "/purchase-requisitions";
 
+const handleResponse = (response) => {
+    // Tự động unwrap ApiResponse trong backend
+    if (response.data && response.data.success) {
+        return response.data.data;
+    }
+    console.warn("API Warning:", response.data?.message);
+    return response.data?.data ?? null;
+};
+
 export const purchaseRequisitionService = {
-	// Generate requisition number
-	generateRequisitionNo: async () => {
-		const response = await apiClient.get(`${BASE_PATH}/generate-number`);
-		return response.data;
-	},
+    // ------------------- CREATE -------------------
+    createRequisition: async (data) => {
+        const response = await apiClient.post(`${BASE_PATH}`, data);
+        return handleResponse(response);
+    },
 
-	// Check if requisition number exists
-	existsByRequisitionNo: async (requisitionNo) => {
-		const response = await apiClient.get(`${BASE_PATH}/exists/${encodeURIComponent(requisitionNo)}`);
-		return response.data;
-	},
+    // ------------------- UPDATE -------------------
+    updateRequisition: async (id, data) => {
+        const response = await apiClient.put(`${BASE_PATH}/${id}`, data);
+        return handleResponse(response);
+    },
 
-	// Get all requisitions
-	getAllRequisitions: async () => {
-		const response = await apiClient.get(`${BASE_PATH}`);
-		return response.data;
-	},
+    // ------------------- GET BY ID -------------------
+    getRequisitionById: async (id) => {
+        const response = await apiClient.get(`${BASE_PATH}/${id}`);
+        return handleResponse(response);
+    },
 
-	// Get requisitions with pagination
-	getRequisitionsWithPagination: async (page = 0, size = 10, sort = "createdAt,desc") => {
-		const response = await apiClient.get(`${BASE_PATH}/page`, {
-			params: { page, size, sort }
-		});
-		return response.data;
-	},
+    // ------------------- GET ALL -------------------
+    getAllRequisitions: async () => {
+        const response = await apiClient.get(`${BASE_PATH}`);
+        return handleResponse(response);
+    },
 
-	// Search requisitions
-	searchRequisitions: async (keyword = "") => {
-		const response = await apiClient.get(`${BASE_PATH}/search`, {
-			params: { keyword }
-		});
-		return response.data;
-	},
+    // ------------------- PAGINATION -------------------
+    getRequisitionsWithPagination: async (page = 0, size = 10, sort = "createdAt,desc") => {
+        const response = await apiClient.get(`${BASE_PATH}/page`, {
+            params: { page, size, sort },
+        });
+        return handleResponse(response);
+    },
 
-	// Search requisitions with pagination
-	searchRequisitionsWithPagination: async (keyword = "", page = 0, size = 10, sort = "createdAt,desc") => {
-		const response = await apiClient.get(`${BASE_PATH}/search/page`, {
-			params: { keyword, page, size, sort }
-		});
-		return response.data;
-	},
+    // ------------------- SEARCH -------------------
+    searchRequisitions: async (keyword = "") => {
+        const response = await apiClient.get(`${BASE_PATH}/search`, { params: { keyword } });
+        return handleResponse(response);
+    },
 
-	// Get requisition by ID
-	getRequisitionById: async (id) => {
-		const response = await apiClient.get(`${BASE_PATH}/${id}`);
-		return response.data;
-	},
+    // ------------------- SEARCH + PAGINATION -------------------
+    searchRequisitionsWithPagination: async (keyword = "", page = 0, size = 10, sort = "createdAt,desc") => {
+        const response = await apiClient.get(`${BASE_PATH}/search/page`, {
+            params: { keyword, page, size, sort },
+        });
+        return handleResponse(response);
+    },
 
-	// Create requisition
-	createRequisition: async (data) => {
-		const response = await apiClient.post(`${BASE_PATH}`, data);
-		return response.data;
-	},
+    // ------------------- APPROVE / REJECT / CLOSE / RESTORE -------------------
+    approveRequisition: async (id) => {
+        const response = await apiClient.post(`${BASE_PATH}/${id}/approve`);
+        return handleResponse(response);
+    },
 
-	// Update requisition
-	updateRequisition: async (id, data) => {
-		const response = await apiClient.put(`${BASE_PATH}/${id}`, data);
-		return response.data;
-	},
+    rejectRequisition: async (id, reason = "") => {
+        const response = await apiClient.post(`${BASE_PATH}/${id}/reject`, null, {
+            params: { reason },
+        });
+        return handleResponse(response);
+    },
 
-	// Approve requisition
-	approveRequisition: async (id) => {
-		const response = await apiClient.post(`${BASE_PATH}/${id}/approve`);
-		return response.data;
-	},
+    closeRequisition: async (id) => {
+        const response = await apiClient.post(`${BASE_PATH}/${id}/close`);
+        return handleResponse(response);
+    },
 
-	// Reject requisition
-	rejectRequisition: async (id, reason = "") => {
-		const response = await apiClient.post(`${BASE_PATH}/${id}/reject`, null, {
-			params: { reason }
-		});
-		return response.data;
-	},
+    restoreRequisition: async (id) => {
+        const response = await apiClient.post(`${BASE_PATH}/${id}/restore`);
+        return handleResponse(response);
+    },
 
-	// Close requisition
-	closeRequisition: async (id) => {
-		const response = await apiClient.post(`${BASE_PATH}/${id}/close`);
-		return response.data;
-	},
+    // ------------------- DELETE -------------------
+    deleteRequisition: async (id) => {
+        const response = await apiClient.delete(`${BASE_PATH}/${id}`);
+        return handleResponse(response);
+    },
 
-	// Restore requisition
-	restoreRequisition: async (id) => {
-		const response = await apiClient.post(`${BASE_PATH}/${id}/restore`);
-		return response.data;
-	},
+    // ------------------- UTILITIES -------------------
+    generateRequisitionNumber: async () => {
+        const response = await apiClient.get(`${BASE_PATH}/generate-number`);
+        return handleResponse(response);
+    },
 
-	// Delete requisition (soft delete)
-	deleteRequisition: async (id) => {
-		const response = await apiClient.delete(`${BASE_PATH}/${id}`);
-		return response.data;
-	},
+    existsByRequisitionNo: async (requisitionNo) => {
+        const response = await apiClient.get(`${BASE_PATH}/exists/${encodeURIComponent(requisitionNo)}`);
+        return handleResponse(response);
+    },
 };
 
 export default purchaseRequisitionService;
-
