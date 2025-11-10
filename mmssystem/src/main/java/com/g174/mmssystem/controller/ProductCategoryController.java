@@ -1,6 +1,6 @@
 package com.g174.mmssystem.controller;
 
-import com.g174.mmssystem.constant.Constant;
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.ProductCategoryRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.ProductCategoryResponseDTO;
 import com.g174.mmssystem.service.IService.IProductCategoryService;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping(Constant.API_CATEGORY)
+@RequestMapping("/api/category")
 @RequiredArgsConstructor
 @Slf4j
 public class ProductCategoryController {
@@ -48,10 +48,15 @@ public class ProductCategoryController {
 
     @PostMapping
     @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @LogActivity(
+            action = "CREATE_PRODUCT_CATEGORY",
+            activityType = "PRODUCT_CATEGORY_MANAGEMENT",
+            description = "Tạo danh mục mới: #{#request.name}",
+            entityId = "#{#result.categoryId}"
+    )
     public ResponseEntity<ProductCategoryResponseDTO> createProductCategory(@Valid @RequestBody ProductCategoryRequestDTO request) {
         try {
             ProductCategoryResponseDTO createdCategory = productCategoryService.createProductCategory(request);
-            log.info("Tạo danh mục mới thành công: {}", createdCategory.getName());
             return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
         } catch (RuntimeException e) {
             log.error("Lỗi khi tạo danh mục: {}", e.getMessage());
@@ -64,12 +69,17 @@ public class ProductCategoryController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @LogActivity(
+            action = "UPDATE_PRODUCT_CATEGORY",
+            activityType = "PRODUCT_CATEGORY_MANAGEMENT",
+            description = "Cập nhật danh mục: #{#request.name}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<ProductCategoryResponseDTO> updateProductCategory(
-            @PathVariable Integer id, 
+            @PathVariable Integer id,
             @Valid @RequestBody ProductCategoryRequestDTO request) {
         try {
             ProductCategoryResponseDTO updatedCategory = productCategoryService.updateProductCategory(id, request);
-            log.info("Cập nhật danh mục ID {} thành công: {}", id, updatedCategory.getName());
             return ResponseEntity.ok(updatedCategory);
         } catch (RuntimeException e) {
             log.error("Lỗi khi cập nhật danh mục ID {}: {}", id, e.getMessage());
@@ -82,10 +92,15 @@ public class ProductCategoryController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @LogActivity(
+            action = "DELETE_PRODUCT_CATEGORY",
+            activityType = "PRODUCT_CATEGORY_MANAGEMENT",
+            description = "Xóa danh mục ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<Void> deleteProductCategory(@PathVariable Integer id) {
         try {
             productCategoryService.deleteProductCategory(id);
-            log.info("Xóa danh mục ID {} thành công", id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             log.error("Lỗi khi xóa danh mục ID {}: {}", id, e.getMessage());
@@ -98,10 +113,15 @@ public class ProductCategoryController {
 
     @PutMapping("/{id}/restore")
     @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @LogActivity(
+            action = "RESTORE_PRODUCT_CATEGORY",
+            activityType = "PRODUCT_CATEGORY_MANAGEMENT",
+            description = "Khôi phục danh mục ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<Void> restoreProductCategory(@PathVariable Integer id) {
         try {
             productCategoryService.restoreProductCategory(id);
-            log.info("Khôi phục danh mục ID {} thành công", id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             log.error("Lỗi khi khôi phục danh mục ID {}: {}", id, e.getMessage());

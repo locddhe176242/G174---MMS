@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
@@ -6,6 +6,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import apiClient from '../../../api/apiClient';
+import { getCurrentUser } from '../../../api/authService';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();
@@ -35,6 +36,29 @@ const PurchaseRequisitionForm = () => {
     const [warehouses, setWarehouses] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [requisitionNo, setRequisitionNo] = useState('');
+
+    // Calculate total value
+    const totalValue = useMemo(() => {
+        if (!Array.isArray(formData.items)) return 0;
+        return formData.items.reduce((sum, it) => {
+            const qty = Number(it.requested_qty || 0);
+            const price = Number(it.valuation_price || 0);
+            return sum + qty * price;
+        }, 0);
+    }, [formData.items]);
+
+    const formatCurrency = (n) =>
+        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
+
+    const getUserDisplayName = (user) => {
+        if (!user) return 'Đang tải...';
+        if (user.fullName) return user.fullName;
+        if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
+        if (user.firstName) return user.firstName;
+        if (user.email) return user.email;
+        if (user.employeeCode) return user.employeeCode;
+        return `User ID: ${user.userId || user.user_id}`;
+    };
 
     // Auto-generate requisition number
     const generateRequisitionNumber = async () => {
@@ -71,31 +95,59 @@ const PurchaseRequisitionForm = () => {
         const loadInitialData = async () => {
             try {
                 // Load products
-                const productsResponse = await apiClient.get('/products');
-                const productsData = productsResponse.data?.content || productsResponse.data || [];
-                setProducts(productsData.map(product => ({
-                    value: product.id || product.productId,
-                    label: `${product.sku} - ${product.name}`,
-                    product: product
+                const productsResponse = await fetch('/api/product?page=0&size=100');
+                const resJson = await productsResponse.json();
+                const productsData = Array.isArray(resJson) ? resJson : (resJson.content || []);
+                setProducts(productsData.map(p => ({
+                    value: p.id ?? p.product_id,
+                    label: `${p.sku || p.productCode} - ${p.name}`,
+                    product: p
                 })));
 
-                // Load warehouses
-                const warehousesResponse = await apiClient.get('/warehouses');
-                const warehousesData = warehousesResponse.data?.data || warehousesResponse.data || [];
-                setWarehouses(warehousesData.map(wh => ({
-                    value: wh.warehouseId,
-                    label: `${wh.code} - ${wh.name}`,
-                    warehouse: wh
-                })));
-
-                // Get current user info
-                const userId = await getCurrentUserId();
-                if (userId) {
-                    setCurrentUser({ userId });
+                // Get current user info from localStorage
+                const user = getCurrentUser();
+                if (user) {
+                    // Set requester_id ngay lập tức
+                    const userId = user.userId || user.user_id;
                     setFormData(prev => ({
                         ...prev,
                         requesterId: userId
                     }));
+                    
+                    // Load user profile to get name
+                    try {
+                        const profileResponse = await fetch('/api/users/profile', {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        });
+                        if (profileResponse.ok) {
+                            const profile = await profileResponse.json();
+                            setCurrentUser({
+                                ...user,
+                                fullName: profile.fullName,
+                                firstName: profile.firstName,
+                                lastName: profile.lastName
+                            });
+                        } else {
+                            // Fallback to user from localStorage if profile API fails
+                            setCurrentUser(user);
+                        }
+                    } catch (error) {
+                        console.error('Error loading user profile:', error);
+                        // Fallback to user from localStorage if profile API fails
+                        setCurrentUser(user);
+                    }
+                } else {
+                    // Fallback: Get userId from JWT token if user not in localStorage
+                    const userId = getCurrentUserId();
+                    if (userId) {
+                        setCurrentUser({ userId });
+                        setFormData(prev => ({
+                            ...prev,
+                            requester_id: userId
+                        }));
+                    }
                 }
 
                 // Generate requisition number for new requisition
@@ -192,15 +244,11 @@ const PurchaseRequisitionForm = () => {
     // Add new item - matching BE ItemRequestDTO format
     const addItem = () => {
         const newItem = {
-            planItemId: null,
-            productId: null,
-            productCode: '',
-            productName: '',
-            spec: '',
-            uom: '',
-            requestedQty: 0,
-            targetUnitPrice: 0,
-            suggestedVendorId: null,
+            product_id: null,
+            requested_qty: 1,
+            delivery_date: new Date(),
+            valuation_price: 0,
+            price_unit: 1,
             note: ''
         };
 
@@ -219,15 +267,26 @@ const PurchaseRequisitionForm = () => {
         }));
     };
 
-    // Handle product selection
+
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption) {
             const product = selectedOption.product;
-            handleItemChange(index, 'productId', product.id || product.productId);
-            handleItemChange(index, 'productCode', product.sku || '');
-            handleItemChange(index, 'productName', product.name || '');
-            handleItemChange(index, 'uom', product.uom || '');
-            handleItemChange(index, 'targetUnitPrice', product.purchasePrice || 0);
+            // Tự động điền giá định giá từ product (ưu tiên purchasePrice, sau đó purchase_price)
+            const purchasePrice = product.purchasePrice ?? product.purchase_price ?? 0;
+            
+            // Update cả product_id và valuation_price trong một lần để tránh state không đồng bộ
+            setFormData(prev => {
+                const newItems = [...prev.items];
+                newItems[index] = {
+                    ...newItems[index],
+                    product_id: selectedOption.value,
+                    valuation_price: purchasePrice
+                };
+                return {
+                    ...prev,
+                    items: newItems
+                };
+            });
         }
     };
 
@@ -377,74 +436,28 @@ const PurchaseRequisitionForm = () => {
                             </label>
                             <input
                                 type="text"
-                                value={requisitionNo}
+                                value={formData.requisition_no}
+                                onChange={(e) => handleInputChange('requisition_no', e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.requisition_no ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                placeholder="Mã phiếu yêu cầu"
+                                readOnly={!isEdit}
+                            />
+                            {validationErrors.requisition_no && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.requisition_no}</p>
+                            )}
+                        </div>
+
+                        {/* Requester ID - Chỉ hiển thị */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Người yêu cầu
+                            </label>
+                            <input
+                                type="text"
+                                value={getUserDisplayName(currentUser)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Tự động tạo</p>
-                        </div>
-
-                        {/* Department */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Phòng ban <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.department}
-                                onChange={(e) => handleInputChange('department', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.department ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                                placeholder="Nhập phòng ban"
-                            />
-                            {validationErrors.department && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.department}</p>
-                            )}
-                        </div>
-
-                        {/* Cost Center */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Trung tâm chi phí
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.costCenter}
-                                onChange={(e) => handleInputChange('costCenter', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập trung tâm chi phí"
-                            />
-                        </div>
-
-                        {/* Destination Warehouse */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Kho đích đến <span className="text-red-500">*</span>
-                            </label>
-                            <Select
-                                value={warehouses.find(wh => wh.value === formData.destinationWarehouseId)}
-                                onChange={(selected) => handleInputChange('destinationWarehouseId', selected?.value || null)}
-                                options={warehouses}
-                                placeholder="Chọn kho"
-                                className={`${validationErrors.destinationWarehouseId ? 'border-red-500' : ''}`}
-                            />
-                            {validationErrors.destinationWarehouseId && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.destinationWarehouseId}</p>
-                            )}
-                        </div>
-
-                        {/* Needed By */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Ngày cần
-                            </label>
-                            <DatePicker
-                                selected={formData.neededBy}
-                                onChange={(date) => handleInputChange('neededBy', date)}
-                                dateFormat="dd/MM/yyyy"
-                                minDate={new Date()}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholderText="Chọn ngày"
                             />
                         </div>
 
@@ -459,9 +472,6 @@ const PurchaseRequisitionForm = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                {isEdit ? 'Trạng thái không thể thay đổi trực tiếp' : 'Mặc định là Open khi tạo mới'}
-                            </p>
                         </div>
                     </div>
 
@@ -526,10 +536,7 @@ const PurchaseRequisitionForm = () => {
                                             Đơn vị tính <span className="text-red-500">*</span>
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Số lượng <span className="text-red-500">*</span>
-                                        </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn giá
+                                            Thành tiền
                                         </th>
                                         <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
                                             Ghi chú
@@ -547,11 +554,22 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <Select
-                                                    value={products.find(option => option.value === item.productId)}
+                                                    value={products.find(option => {
+                                                        const optionValue = Number(option.value);
+                                                        const itemValue = Number(item.product_id);
+                                                        return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
+                                                    }) || null}
                                                     onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
                                                     options={products}
                                                     placeholder="Chọn sản phẩm"
                                                     className="min-w-48"
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                    menuShouldScrollIntoView={false}
+                                                    styles={{
+                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                    }}
                                                 />
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
@@ -593,11 +611,11 @@ const PurchaseRequisitionForm = () => {
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <input
                                                     type="number"
-                                                    value={item.requestedQty}
-                                                    onChange={(e) => handleItemChange(index, 'requestedQty', parseFloat(e.target.value) || 0)}
-                                                    className={`w-20 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                    min="0.01"
-                                                    step="0.01"
+                                                    value={item.requested_qty}
+                                                    onChange={(e) => handleItemChange(index, 'requested_qty', parseFloat(e.target.value) || 1)}
+                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    min="1"
+                                                    step="1"
                                                 />
                                                 {validationErrors[`item_${index}_qty`] && (
                                                     <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_qty`]}</p>
@@ -612,6 +630,9 @@ const PurchaseRequisitionForm = () => {
                                                     min="0"
                                                     step="0.01"
                                                 />
+                                            </td>
+                                            <td className="border border-gray-200 px-4 py-2 text-sm">
+                                                {formatCurrency((Number(item.requested_qty || 0) * Number(item.valuation_price || 0)))}
                                             </td>
                                             <td className="border border-gray-200 px-4 py-2">
                                                 <input
@@ -635,6 +656,12 @@ const PurchaseRequisitionForm = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="flex justify-end mt-3">
+                                <div className="text-right">
+                                    <div className="text-sm text-gray-600">Tổng giá trị</div>
+                                    <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
