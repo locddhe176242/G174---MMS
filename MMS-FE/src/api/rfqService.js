@@ -1,63 +1,50 @@
 import apiClient from "./apiClient";
 
+const BASE_PATH = "/purchase/rfqs";
+
 export const rfqService = {
-  // Get all RFQs (no pagination) - nếu cần
-  getAllRFQs: async () => {
-    const response = await apiClient.get("/rfqs");
-    return response.data;
-  },
-
-  // Get RFQs with pagination
+  // Lấy danh sách RFQ có phân trang
   getRFQsWithPagination: async (page = 0, size = 10, sort = "createdAt,desc") => {
-    const response = await apiClient.get("/rfqs/page", {
-      params: { page, size, sort }
+    const response = await apiClient.get(BASE_PATH, {
+      params: { page, size, sort },
     });
     return response.data;
   },
 
-  // Search RFQs (no pagination) - nếu cần
-  searchRFQs: async (keyword) => {
-    const response = await apiClient.get("/rfqs/search", {
-      params: { keyword }
-    });
-    return response.data;
-  },
-
-  // Search RFQs with pagination
+  // Tìm kiếm RFQ có phân trang
   searchRFQsWithPagination: async (keyword, page = 0, size = 10, sort = "createdAt,desc") => {
-    const response = await apiClient.get("/rfqs/search/page", {
-      params: { keyword, page, size, sort }
+    const response = await apiClient.get(`${BASE_PATH}/search`, {
+      params: { keyword, page, size, sort },
     });
     return response.data;
   },
 
-  // Get RFQ by ID
+  // Lấy chi tiết RFQ
   getRFQById: async (id) => {
-    const response = await apiClient.get(`/rfqs/${id}`);
+    const response = await apiClient.get(`${BASE_PATH}/${id}`);
     return response.data;
   },
 
-  // Create RFQ
+  // Tạo RFQ mới
   createRFQ: async (rfqData) => {
-    const response = await apiClient.post("/rfqs", rfqData);
+    const response = await apiClient.post(BASE_PATH, rfqData);
     return response.data;
   },
 
-  // Update RFQ
+  // Cập nhật RFQ
   updateRFQ: async (id, rfqData) => {
-    const response = await apiClient.put(`/rfqs/${id}`, rfqData);
+    const response = await apiClient.put(`${BASE_PATH}/${id}`, rfqData);
     return response.data;
   },
 
-  // Delete RFQ (soft delete nếu backend hỗ trợ)
+  // Xóa (soft delete) RFQ
   deleteRFQ: async (id) => {
-    const response = await apiClient.delete(`/rfqs/${id}`);
-    return response.data;
+    await apiClient.delete(`${BASE_PATH}/${id}`);
   },
 
-  // Optional: Generate RFQ number (nếu backend có)
+  // Sinh số RFQ tự động
   generateRFQNo: async () => {
-    const response = await apiClient.get("/rfqs/generate-number");
+    const response = await apiClient.get(`${BASE_PATH}/generate-number`);
     return response.data;
   },
 };

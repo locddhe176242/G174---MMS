@@ -17,7 +17,7 @@ export default function RFQForm() {
         rfqNo: "",
         issueDate: "",
         dueDate: "",
-        status: "Draft",
+        status: "DRAFT",
         selectedVendorIds: [],
         notes: "",
         items: [
@@ -188,7 +188,7 @@ export default function RFQForm() {
                 rfqNo: rfq.rfqNo || "",
                 issueDate: rfq.issueDate ? rfq.issueDate.slice(0, 10) : "",
                 dueDate: rfq.dueDate ? rfq.dueDate.slice(0, 10) : "",
-                status: rfq.status || "Draft",
+                status: rfq.status || "DRAFT",
                 selectedVendorIds: rfq.selectedVendorIds || (Array.isArray(rfq.selectedVendors) ? rfq.selectedVendors.map((v) => v.vendorId || v.id) : (rfq.selectedVendorId ? [rfq.selectedVendorId] : [])),
                 notes: rfq.notes || rfq.note || "",
                 items: (rfq.items || []).map((it) => ({
@@ -283,15 +283,14 @@ export default function RFQForm() {
         } else {
             const itemErrs = formData.items.map((it) => {
                 const e = {};
-                if (!it.productId && !it.productName?.trim() && !it.productCode?.trim()) {
-                    e.productName = "Chọn sản phẩm hoặc nhập mã/tên";
+                // Chỉ cần có productName hoặc productCode là đủ (không bắt buộc phải chọn từ kho)
+                if (!it.productName?.trim() && !it.productCode?.trim()) {
+                    e.productName = "Nhập mã hoặc tên sản phẩm";
                 }
                 if (!it.quantity || Number(it.quantity) <= 0) {
                     e.quantity = "Số lượng phải > 0";
                 }
-                if (!it.deliveryDate) {
-                    e.deliveryDate = "Chọn ngày";
-                }
+                // Ngày cần không bắt buộc (có thể để trống)
                 return e;
             });
             // Nếu tất cả đều rỗng thì không set
@@ -402,25 +401,66 @@ export default function RFQForm() {
         }
 
         try {
-            const payload = {
-                rfqNo: formData.rfqNo,
-                issueDate: formData.issueDate,
-                dueDate: formData.dueDate,
-                status: formData.status,
-                selectedVendorIds: formData.selectedVendorIds,
-                notes: formData.notes,
-                items: formData.items.map((it) => ({
-                    productId: it.productId,
-                    productCode: it.productCode,
-                    productName: it.productName,
-                    uom: it.uom,
-                    quantity: Number(it.quantity),
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate).toISOString() : null,
-                    targetPrice: Number(it.targetPrice || 0),
-                    priceUnit: Number(it.priceUnit || 1),
-                    note: it.note,
-                })),
+            // Format date thành YYYY-MM-DD (LocalDate format)
+            const formatDateForBackend = (dateInput) => {
+                if (!dateInput) return null;
+                // Nếu là Date object thì dùng trực tiếp, nếu là string thì parse
+                const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+                if (isNaN(date.getTime())) return null; // Invalid date
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
             };
+
+            // Filter và map items - chỉ lấy items hợp lệ (có productName hoặc productCode, và quantity > 0)
+            const validItems = formData.items
+                .filter((it) => {
+                    const hasProduct = (it.productName?.trim() || it.productCode?.trim());
+                    const qty = Number(it.quantity);
+                    const hasQuantity = !isNaN(qty) && qty > 0;
+                    return hasProduct && hasQuantity;
+                })
+                .map((it) => {
+                    const qty = Number(it.quantity);
+                    const targetPrice = it.targetPrice ? Number(it.targetPrice) : null;
+                    const priceUnit = it.priceUnit ? Number(it.priceUnit) : null;
+                    
+                    return {
+                        productId: it.productId || null,
+                        productCode: it.productCode?.trim() || null,
+                        productName: it.productName?.trim() || null,
+                        spec: it.spec?.trim() || null,
+                        uom: it.uom?.trim() || null,
+                        quantity: qty, // Đã validate > 0 ở filter
+                        deliveryDate: it.deliveryDate ? formatDateForBackend(it.deliveryDate) : null,
+                        targetPrice: targetPrice !== null && !isNaN(targetPrice) && targetPrice >= 0 ? targetPrice : null,
+                        priceUnit: priceUnit !== null && !isNaN(priceUnit) && priceUnit >= 0 ? priceUnit : null,
+                        note: it.note?.trim() || null,
+                    };
+                });
+
+            if (validItems.length === 0) {
+                setError("Cần ít nhất 1 dòng sản phẩm hợp lệ");
+                setIsSubmitting(false);
+                return;
+            }
+
+            const payload = {
+                rfqNo: formData.rfqNo?.trim() || null,
+                requisitionId: null, // Có thể thêm sau nếu cần
+                issueDate: formatDateForBackend(formData.issueDate),
+                dueDate: formatDateForBackend(formData.dueDate),
+                status: formData.status || "DRAFT",
+                selectedVendorIds: formData.selectedVendorIds && formData.selectedVendorIds.length > 0 
+                    ? formData.selectedVendorIds 
+                    : null,
+                notes: formData.notes?.trim() || null,
+                items: validItems,
+            };
+
+            // Debug: log payload để kiểm tra
+            console.log("RFQ Payload:", JSON.stringify(payload, null, 2));
 
             if (isEdit) {
                 await rfqService.updateRFQ(id, payload);
@@ -432,8 +472,28 @@ export default function RFQForm() {
             navigate("/purchase/rfqs");
         } catch (err) {
             console.error("Error saving RFQ:", err);
-            const msg = err?.response?.data?.message || (isEdit ? "Không thể cập nhật Yêu cầu báo giá" : "Không thể tạo Yêu cầu báo giá");
-            setError(msg);
+            let errorMsg = isEdit ? "Không thể cập nhật Yêu cầu báo giá" : "Không thể tạo Yêu cầu báo giá";
+            
+            // Xử lý lỗi validation từ backend
+            if (err?.response?.status === 400) {
+                const errorData = err.response.data;
+                if (errorData?.errors) {
+                    // Lỗi validation chi tiết
+                    const errorList = Object.entries(errorData.errors)
+                        .map(([field, msg]) => `${field}: ${msg}`)
+                        .join(", ");
+                    errorMsg = `Dữ liệu không hợp lệ: ${errorList}`;
+                } else if (errorData?.message) {
+                    errorMsg = errorData.message;
+                } else if (errorData?.error) {
+                    errorMsg = errorData.error;
+                }
+            } else if (err?.response?.data?.message) {
+                errorMsg = err.response.data.message;
+            }
+            
+            setError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -538,12 +598,17 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Trạng thái
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={formData.status || "Draft"}
-                                            readOnly
-                                            className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
-                                        />
+                                        <select
+                                            value={formData.status || "DRAFT"}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value="DRAFT">Draft</option>
+                                            <option value="PENDING">Pending</option>
+                                            <option value="SENT">Sent</option>
+                                            <option value="CLOSED">Closed</option>
+                                            <option value="CANCELLED">Cancelled</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -615,7 +680,9 @@ export default function RFQForm() {
                                             <thead>
                                                 <tr className="bg-gray-50">
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">#</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
+                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Mã SP</th>
+                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Tên sản phẩm</th>
+                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn vị</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Ngày cần</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Giá mục tiêu</th>
@@ -630,22 +697,65 @@ export default function RFQForm() {
                                                         <tr key={index} className="hover:bg-gray-50">
                                                             <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">{index + 1}</td>
                                                             <td className="border border-gray-200 px-4 py-2">
-                                                                <Select
-                                                                    value={products.find((o) => o.value === item.productId) || null}
-                                                                    onChange={(opt) => handleProductSelect(index, opt)}
-                                                                    options={products}
-                                                                    placeholder="Chọn sản phẩm"
-                                                                    menuPortalTarget={document.body}
-                                                                    menuPosition="fixed"
-                                                                    menuShouldScrollIntoView={false}
-                                                                    styles={{
-                                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                                <div className="space-y-2">
+                                                                    <Select
+                                                                        value={products.find((o) => o.value === item.productId) || null}
+                                                                        onChange={(opt) => handleProductSelect(index, opt)}
+                                                                        options={products}
+                                                                        placeholder="Chọn từ kho (tùy chọn)"
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        menuShouldScrollIntoView={false}
+                                                                        styles={{
+                                                                            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                                            menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                                        }}
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={item.productCode || ""}
+                                                                        onChange={(e) => {
+                                                                            handleItemChange(index, "productCode", e.target.value);
+                                                                            // Nếu nhập tay thì xóa productId
+                                                                            if (e.target.value && item.productId) {
+                                                                                handleItemChange(index, "productId", null);
+                                                                            }
+                                                                        }}
+                                                                        placeholder="Hoặc nhập mã SP"
+                                                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    />
+                                                                </div>
+                                                                {itemErr.productCode && (
+                                                                    <p className="text-red-500 text-xs mt-1">{itemErr.productCode}</p>
+                                                                )}
+                                                            </td>
+                                                            <td className="border border-gray-200 px-4 py-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.productName || ""}
+                                                                    onChange={(e) => {
+                                                                        handleItemChange(index, "productName", e.target.value);
+                                                                        // Nếu nhập tay thì xóa productId
+                                                                        if (e.target.value && item.productId) {
+                                                                            handleItemChange(index, "productId", null);
+                                                                        }
                                                                     }}
+                                                                    placeholder="Nhập tên sản phẩm"
+                                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                                                 />
                                                                 {itemErr.productName && (
                                                                     <p className="text-red-500 text-xs mt-1">{itemErr.productName}</p>
                                                                 )}
+                                                            </td>
+                                                            <td className="border border-gray-200 px-4 py-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.uom || ""}
+                                                                    onChange={(e) => handleItemChange(index, "uom", e.target.value)}
+                                                                    placeholder="Đơn vị"
+                                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                />
                                                             </td>
                                                             <td className="border border-gray-200 px-4 py-2">
                                                                 <input
