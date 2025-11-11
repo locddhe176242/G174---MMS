@@ -9,6 +9,7 @@ import com.g174.mmssystem.enums.ApprovalStatus;
 import com.g174.mmssystem.enums.RequisitionStatus;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseRequisitionMapper;
+import com.g174.mmssystem.repository.DepartmentRepository;
 import com.g174.mmssystem.repository.PurchaseRequisitionRepository;
 import com.g174.mmssystem.repository.UserRepository;
 import com.g174.mmssystem.service.IService.IPurchaseRequisitionService;
@@ -36,6 +37,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     private final PurchaseRequisitionRepository requisitionRepository;
     private final PurchaseRequisitionMapper requisitionMapper;
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
+    private final com.g174.mmssystem.repository.ProductRepository productRepository;
 
     @Override
     @Transactional
@@ -49,41 +52,78 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         // Generate requisition number
         String requisitionNo = generateRequisitionNo();
 
+        // Load Department if provided
+        com.g174.mmssystem.entity.Department department = null;
+        if (dto.getDepartmentId() != null) {
+            department = departmentRepository.findById(dto.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy department với ID: " + dto.getDepartmentId()));
+        }
+
+        // Calculate total estimated from items
+        BigDecimal totalEstimated = BigDecimal.ZERO;
+        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            totalEstimated = dto.getItems().stream()
+                    .filter(item -> item.getRequestedQty() != null && item.getEstimatedUnitPrice() != null)
+                    .map(item -> item.getRequestedQty().multiply(item.getEstimatedUnitPrice()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
         // Create requisition entity
         PurchaseRequisition requisition = PurchaseRequisition.builder()
                 .requisitionNo(requisitionNo)
+                .requisitionDate(LocalDate.now())
                 .requester(requester)
-                .department(dto.getDepartment())
-                .neededBy(dto.getNeededBy())
+                .department(department)
                 .purpose(dto.getPurpose())
-                .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : ApprovalStatus.Pending)
+                .justification(dto.getJustification())
+                .neededBy(dto.getNeededBy())
+                .priority(dto.getPriority() != null ? dto.getPriority() : com.g174.mmssystem.enums.Priority.Medium)
+                .totalEstimated(totalEstimated)
+                .currencyCode(dto.getCurrencyCode() != null ? dto.getCurrencyCode() : "VND")
+                .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : ApprovalStatus.Draft)
                 .approver(dto.getApproverId() != null ? userRepository.findById(dto.getApproverId()).orElse(null) : null)
-                .totalEstimated(BigDecimal.ZERO)
+                .approvalRemarks(dto.getApprovalRemarks())
                 .status(dto.getStatus() != null ? dto.getStatus() : RequisitionStatus.Open)
+                .convertedToPoId(dto.getConvertedToPoId())
+                .createdBy(requester)
+                .updatedBy(requester)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        // Calculate total estimated from items
+        // Create and save items
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            BigDecimal total = dto.getItems().stream()
-                    .filter(item -> item.getRequestedQty() != null && item.getTargetUnitPrice() != null)
-                    .map(item -> item.getRequestedQty().multiply(item.getTargetUnitPrice()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            requisition.setTotalEstimated(total);
-
-            // Create and save items
             List<PurchaseRequisitionItem> items = dto.getItems().stream()
                     .map(itemDto -> {
+                        // Load Product entity if productId is provided
+                        com.g174.mmssystem.entity.Product product = null;
+                        if (itemDto.getProductId() != null) {
+                            product = productRepository.findById(itemDto.getProductId().intValue())
+                                    .orElse(null); // Allow null product
+                        }
+
+                        // Calculate estimatedTotal
+                        BigDecimal estimatedTotal = null;
+                        if (itemDto.getRequestedQty() != null && itemDto.getEstimatedUnitPrice() != null) {
+                            estimatedTotal = itemDto.getRequestedQty().multiply(itemDto.getEstimatedUnitPrice());
+                        }
+
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
-                                .productId(itemDto.getProductId())
+                                .product(product)
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
+                                .specification(itemDto.getSpecification())
                                 .uom(itemDto.getUom())
                                 .requestedQty(itemDto.getRequestedQty())
-                                .targetUnitPrice(itemDto.getTargetUnitPrice())
+                                .estimatedUnitPrice(itemDto.getEstimatedUnitPrice() != null ? itemDto.getEstimatedUnitPrice() : BigDecimal.ZERO)
+                                .estimatedTotal(estimatedTotal)
+                                .deliveryDate(itemDto.getDeliveryDate())
                                 .note(itemDto.getNote())
+                                .createdBy(requester)
+                                .updatedBy(requester)
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
                                 .build();
                         return item;
                     })
@@ -165,23 +205,40 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        // Check if requisition can be updated (only if status is Open and not approved)
-        if (requisition.getStatus() != RequisitionStatus.Open) {
-            throw new IllegalStateException("Chỉ có thể cập nhật requisition khi status là Open");
+        // Check if requisition can be updated (only if approvalStatus is Draft or Pending, and status is Open)
+        if (requisition.getApprovalStatus() == ApprovalStatus.Approved || 
+            requisition.getApprovalStatus() == ApprovalStatus.Rejected ||
+            requisition.getApprovalStatus() == ApprovalStatus.Cancelled) {
+            throw new IllegalStateException("Không thể cập nhật requisition khi approvalStatus là " + requisition.getApprovalStatus());
         }
-        if (requisition.getApprovalStatus() == ApprovalStatus.Approved) {
-            throw new IllegalStateException("Không thể cập nhật requisition đã được approve");
+        if (requisition.getStatus() != RequisitionStatus.Open) {
+            throw new IllegalStateException("Không thể cập nhật requisition khi status là " + requisition.getStatus());
         }
 
+        // Load updatedBy user
+        User updatedBy = userRepository.findById(updatedById)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user với ID: " + updatedById));
+
         // Update basic fields
-        if (dto.getDepartment() != null) {
-            requisition.setDepartment(dto.getDepartment());
+        if (dto.getDepartmentId() != null) {
+            com.g174.mmssystem.entity.Department department = departmentRepository.findById(dto.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy department với ID: " + dto.getDepartmentId()));
+            requisition.setDepartment(department);
+        }
+        if (dto.getPurpose() != null) {
+            requisition.setPurpose(dto.getPurpose());
+        }
+        if (dto.getJustification() != null) {
+            requisition.setJustification(dto.getJustification());
         }
         if (dto.getNeededBy() != null) {
             requisition.setNeededBy(dto.getNeededBy());
         }
-        if (dto.getPurpose() != null) {
-            requisition.setPurpose(dto.getPurpose());
+        if (dto.getPriority() != null) {
+            requisition.setPriority(dto.getPriority());
+        }
+        if (dto.getCurrencyCode() != null) {
+            requisition.setCurrencyCode(dto.getCurrencyCode());
         }
         if (dto.getApprovalStatus() != null) {
             requisition.setApprovalStatus(dto.getApprovalStatus());
@@ -191,6 +248,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         }
 
         // Update items - remove old items and add new ones
+        BigDecimal totalEstimated = BigDecimal.ZERO;
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             // Remove existing items
             requisition.getItems().clear();
@@ -198,29 +256,49 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             // Add new items
             List<PurchaseRequisitionItem> newItems = dto.getItems().stream()
                     .map(itemDto -> {
+                        // Load Product entity if productId is provided
+                        com.g174.mmssystem.entity.Product product = null;
+                        if (itemDto.getProductId() != null) {
+                            product = productRepository.findById(itemDto.getProductId().intValue())
+                                    .orElse(null); // Allow null product
+                        }
+
+                        // Calculate estimatedTotal
+                        BigDecimal estimatedTotal = null;
+                        if (itemDto.getRequestedQty() != null && itemDto.getEstimatedUnitPrice() != null) {
+                            estimatedTotal = itemDto.getRequestedQty().multiply(itemDto.getEstimatedUnitPrice());
+                        }
+
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
-                                .productId(itemDto.getProductId())
+                                .product(product)
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
+                                .specification(itemDto.getSpecification())
                                 .uom(itemDto.getUom())
                                 .requestedQty(itemDto.getRequestedQty())
-                                .targetUnitPrice(itemDto.getTargetUnitPrice())
+                                .estimatedUnitPrice(itemDto.getEstimatedUnitPrice() != null ? itemDto.getEstimatedUnitPrice() : BigDecimal.ZERO)
+                                .estimatedTotal(estimatedTotal)
+                                .deliveryDate(itemDto.getDeliveryDate())
                                 .note(itemDto.getNote())
+                                .createdBy(requisition.getCreatedBy())
+                                .updatedBy(updatedBy)
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
                                 .build();
                         return item;
                     })
                     .collect(Collectors.toList());
             requisition.setItems(newItems);
-
-            // Recalculate total
-            BigDecimal total = newItems.stream()
-                    .filter(item -> item.getRequestedQty() != null && item.getTargetUnitPrice() != null)
-                    .map(item -> item.getRequestedQty().multiply(item.getTargetUnitPrice()))
+            
+            // Calculate total estimated from items after creating them
+            totalEstimated = newItems.stream()
+                    .filter(item -> item.getEstimatedTotal() != null)
+                    .map(PurchaseRequisitionItem::getEstimatedTotal)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            requisition.setTotalEstimated(total);
         }
-
+        requisition.setTotalEstimated(totalEstimated);
+        requisition.setUpdatedBy(updatedBy);
         requisition.setUpdatedAt(LocalDateTime.now());
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 
@@ -251,6 +329,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         requisition.setApprovalStatus(ApprovalStatus.Approved);
         requisition.setApprover(approver);
         requisition.setApprovedAt(LocalDateTime.now());
+        requisition.setUpdatedBy(approver);
         requisition.setUpdatedAt(LocalDateTime.now());
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
@@ -282,12 +361,9 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         requisition.setApprovalStatus(ApprovalStatus.Rejected);
         requisition.setApprover(approver);
         requisition.setApprovedAt(LocalDateTime.now());
+        requisition.setApprovalRemarks(reason);
+        requisition.setUpdatedBy(approver);
         requisition.setUpdatedAt(LocalDateTime.now());
-        // Add reason to note or purpose if needed
-        if (reason != null && !reason.trim().isEmpty()) {
-            String currentPurpose = requisition.getPurpose() != null ? requisition.getPurpose() : "";
-            requisition.setPurpose(currentPurpose + " [REJECTED: " + reason + "]");
-        }
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
 

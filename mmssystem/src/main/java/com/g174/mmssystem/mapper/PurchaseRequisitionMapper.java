@@ -24,13 +24,19 @@ public class PurchaseRequisitionMapper {
         PurchaseRequisitionResponseDTO dto = PurchaseRequisitionResponseDTO.builder()
                 .requisitionId(requisition.getRequisitionId())
                 .requisitionNo(requisition.getRequisitionNo())
+                .requisitionDate(requisition.getRequisitionDate())
                 .requesterName(requisition.getRequester() != null && requisition.getRequester().getProfile() != null
                         ? (requisition.getRequester().getProfile().getFirstName() + " " + 
                            requisition.getRequester().getProfile().getLastName()).trim()
                         : null)
-                .department(requisition.getDepartment())
-                .neededBy(requisition.getNeededBy())
+                .departmentId(requisition.getDepartment() != null ? requisition.getDepartment().getId() : null)
+                .departmentName(requisition.getDepartment() != null ? requisition.getDepartment().getDepartmentName() : null)
                 .purpose(requisition.getPurpose())
+                .justification(requisition.getJustification())
+                .neededBy(requisition.getNeededBy())
+                .priority(requisition.getPriority())
+                .totalEstimated(requisition.getTotalEstimated())
+                .currencyCode(requisition.getCurrencyCode())
                 .approvalStatus(requisition.getApprovalStatus())
                 .approverId(requisition.getApprover() != null ? requisition.getApprover().getId() : null)
                 .approverName(requisition.getApprover() != null && requisition.getApprover().getProfile() != null
@@ -38,8 +44,17 @@ public class PurchaseRequisitionMapper {
                            requisition.getApprover().getProfile().getLastName()).trim()
                         : null)
                 .approvedAt(requisition.getApprovedAt())
-                .totalEstimated(requisition.getTotalEstimated())
+                .approvalRemarks(requisition.getApprovalRemarks())
                 .status(requisition.getStatus())
+                .convertedToPoId(requisition.getConvertedToPoId())
+                .createdByName(requisition.getCreatedBy() != null && requisition.getCreatedBy().getProfile() != null
+                        ? (requisition.getCreatedBy().getProfile().getFirstName() + " " + 
+                           requisition.getCreatedBy().getProfile().getLastName()).trim()
+                        : null)
+                .updatedByName(requisition.getUpdatedBy() != null && requisition.getUpdatedBy().getProfile() != null
+                        ? (requisition.getUpdatedBy().getProfile().getFirstName() + " " + 
+                           requisition.getUpdatedBy().getProfile().getLastName()).trim()
+                        : null)
                 .createdAt(requisition.getCreatedAt())
                 .updatedAt(requisition.getUpdatedAt())
                 .build();
@@ -64,32 +79,11 @@ public class PurchaseRequisitionMapper {
         if (requester != null) {
             requisition.setRequester(requester);
         }
-        if (dto.getDepartment() != null) {
-            requisition.setDepartment(dto.getDepartment());
-        }
-        if (dto.getNeededBy() != null) {
-            requisition.setNeededBy(dto.getNeededBy());
-        }
         if (dto.getPurpose() != null) {
             requisition.setPurpose(dto.getPurpose());
         }
-        if (dto.getApprovalStatus() != null) {
-            requisition.setApprovalStatus(dto.getApprovalStatus());
-        }
-        if (dto.getTotalEstimated() != null) {
-            requisition.setTotalEstimated(dto.getTotalEstimated());
-        }
         if (dto.getStatus() != null) {
             requisition.setStatus(dto.getStatus());
-        }
-
-        // Recalculate total estimated from items
-        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            BigDecimal total = dto.getItems().stream()
-                    .filter(item -> item.getRequestedQty() != null && item.getTargetUnitPrice() != null)
-                    .map(item -> item.getRequestedQty().multiply(item.getTargetUnitPrice()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            requisition.setTotalEstimated(total);
         }
     }
 
@@ -100,13 +94,29 @@ public class PurchaseRequisitionMapper {
 
         return PurchaseRequisitionItemResponseDTO.builder()
                 .priId(item.getPriId())
-                .productId(item.getProductId())
-                .productCode(item.getProductCode())
-                .productName(item.getProductName())
-                .uom(item.getUom())
+                .productId(item.getProduct() != null ? item.getProduct().getProductId().longValue() : null)
+                .productCode(item.getProductCode() != null ? item.getProductCode() : 
+                            (item.getProduct() != null ? item.getProduct().getSku() : null))
+                .productName(item.getProductName() != null ? item.getProductName() : 
+                            (item.getProduct() != null ? item.getProduct().getName() : null))
+                .specification(item.getSpecification())
+                .uom(item.getUom() != null ? item.getUom() : 
+                     (item.getProduct() != null ? item.getProduct().getUom() : null))
                 .requestedQty(item.getRequestedQty())
-                .targetUnitPrice(item.getTargetUnitPrice())
+                .estimatedUnitPrice(item.getEstimatedUnitPrice())
+                .estimatedTotal(item.getEstimatedTotal())
+                .deliveryDate(item.getDeliveryDate())
                 .note(item.getNote())
+                .createdByName(item.getCreatedBy() != null && item.getCreatedBy().getProfile() != null
+                        ? (item.getCreatedBy().getProfile().getFirstName() + " " + 
+                           item.getCreatedBy().getProfile().getLastName()).trim()
+                        : null)
+                .updatedByName(item.getUpdatedBy() != null && item.getUpdatedBy().getProfile() != null
+                        ? (item.getUpdatedBy().getProfile().getFirstName() + " " + 
+                           item.getUpdatedBy().getProfile().getLastName()).trim()
+                        : null)
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
                 .build();
     }
 
@@ -121,32 +131,43 @@ public class PurchaseRequisitionMapper {
     }
 
     public PurchaseRequisitionItem toItemEntity(PurchaseRequisitionItemRequestDTO dto, 
-                                                  PurchaseRequisition requisition) {
+                                                  PurchaseRequisition requisition,
+                                                  com.g174.mmssystem.entity.Product product,
+                                                  User createdBy) {
         if (dto == null) {
             return null;
         }
 
+        // Calculate estimatedTotal = requestedQty * estimatedUnitPrice
+        BigDecimal estimatedTotal = null;
+        if (dto.getRequestedQty() != null && dto.getEstimatedUnitPrice() != null) {
+            estimatedTotal = dto.getRequestedQty().multiply(dto.getEstimatedUnitPrice());
+        }
+
         return PurchaseRequisitionItem.builder()
                 .purchaseRequisition(requisition)
-                .productId(dto.getProductId())
+                .product(product)
                 .productCode(dto.getProductCode())
                 .productName(dto.getProductName())
+                .specification(dto.getSpecification())
                 .uom(dto.getUom())
                 .requestedQty(dto.getRequestedQty())
-                .targetUnitPrice(dto.getTargetUnitPrice())
+                .estimatedUnitPrice(dto.getEstimatedUnitPrice() != null ? dto.getEstimatedUnitPrice() : BigDecimal.ZERO)
+                .estimatedTotal(estimatedTotal)
+                .deliveryDate(dto.getDeliveryDate())
                 .note(dto.getNote())
+                .createdBy(createdBy)
                 .build();
     }
 
+    // Note: This method is deprecated - use service to create items with Product entity
+    // Keeping for backward compatibility but service should handle Product loading
+    @Deprecated
     public List<PurchaseRequisitionItem> toItemEntityList(List<PurchaseRequisitionItemRequestDTO> dtos,
                                                            PurchaseRequisition requisition) {
-        if (dtos == null) {
-            return null;
-        }
-
-        return dtos.stream()
-                .map(dto -> toItemEntity(dto, requisition))
-                .collect(Collectors.toList());
+        // This method cannot be used anymore as it requires Product entity
+        // Service should handle item creation with Product loading
+        throw new UnsupportedOperationException("Use service method to create items with Product entity");
     }
 
     public List<PurchaseRequisitionResponseDTO> toResponseDTOList(List<PurchaseRequisition> requisitions) {

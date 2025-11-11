@@ -21,9 +21,6 @@ import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
-import CategoryDetail from "./compnents/pages/Category/CategoryDetail";
-import CategoryEdit from "./compnents/pages/Category/CategoryEdit";
-import CategoryAdd from "./compnents/pages/Category/CategoryAdd";
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
@@ -64,9 +61,6 @@ function App() {
                 <Route path="/customers/:id/edit" element={<CustomerForm />} />
                 <Route path="/products" element={<ProductList />} />
                 <Route path="/categories" element={<CategoryList />} />
-                <Route path="/categories/new" element={<CategoryAdd />} />
-                <Route path="/categories/:id" element={<CategoryDetail />} />
-                <Route path="/categories/:id/edit" element={<CategoryEdit />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/vendors/new" element={<VendorForm />} />
                 <Route path="/vendors/:id/edit" element={<VendorForm />} />

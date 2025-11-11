@@ -4,6 +4,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -14,23 +15,26 @@ public class PurchaseRequisitionItemRequestDTO {
 
     private Long productId;
 
-    @NotBlank(message = "Mã sản phẩm không được để trống")
     @Size(max = 50)
     private String productCode;
 
-    @NotBlank(message = "Tên sản phẩm không được để trống")
     @Size(max = 255)
     private String productName;
 
-    @NotBlank(message = "Đơn vị tính không được để trống")
+    private String specification;
+
+    @Size(max = 50)
     private String uom;
 
     @NotNull(message = "Số lượng yêu cầu không được để trống")
     @DecimalMin(value = "0.01", message = "Số lượng yêu cầu phải lớn hơn 0")
     private BigDecimal requestedQty;
 
+    @Builder.Default
     @DecimalMin(value = "0.0", inclusive = true)
-    private BigDecimal targetUnitPrice;
+    private BigDecimal estimatedUnitPrice = BigDecimal.ZERO;
+
+    private LocalDate deliveryDate;
 
     private String note;
 }

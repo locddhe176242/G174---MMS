@@ -1,6 +1,7 @@
 package com.g174.mmssystem.dto.requestDTO;
 
 import com.g174.mmssystem.enums.ApprovalStatus;
+import com.g174.mmssystem.enums.Priority;
 import com.g174.mmssystem.enums.RequisitionStatus;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -16,31 +17,40 @@ import java.util.List;
 @Builder
 public class PurchaseRequisitionRequestDTO {
 
-
-//    @NotNull(message = "Requester ID không được để trống")
     private Long requesterId;
 
-    @NotBlank(message = "Phòng ban không được để trống")
-    @Size(max = 100)
-    private String department;
+    @NotNull(message = "Phòng ban là bắt buộc")
+    private Integer departmentId;
 
-    @FutureOrPresent(message = "Ngày cần phải lớn hơn hoặc bằng ngày hiện tại")
-    private LocalDate neededBy;
-
-    @NotBlank(message = "Mục đích không được để trống")
     private String purpose;
 
+    private String justification;
+
+    @NotNull(message = "Ngày cần hàng là bắt buộc")
+    private LocalDate neededBy;
+
     @Builder.Default
-    private ApprovalStatus approvalStatus = ApprovalStatus.Pending;
+    private Priority priority = Priority.Medium;
 
-    private Integer approverId;
-
+    @Builder.Default
     @DecimalMin(value = "0.0", inclusive = true)
-    @Builder.Default
     private BigDecimal totalEstimated = BigDecimal.ZERO;
 
     @Builder.Default
+    @Size(max = 10)
+    private String currencyCode = "VND";
+
+    @Builder.Default
+    private ApprovalStatus approvalStatus = ApprovalStatus.Draft;
+
+    private Integer approverId;
+
+    private String approvalRemarks;
+
+    @Builder.Default
     private RequisitionStatus status = RequisitionStatus.Open;
+
+    private Long convertedToPoId;
 
     @NotEmpty(message = "Danh sách sản phẩm không được để trống")
     private List<PurchaseRequisitionItemRequestDTO> items;

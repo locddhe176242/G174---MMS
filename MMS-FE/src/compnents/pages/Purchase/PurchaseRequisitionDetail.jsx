@@ -109,15 +109,15 @@ export default function PurchaseRequisitionDetail() {
 
   /**
    * Tính giá trị của một line item
-   * Công thức: requestedQty × targetUnitPrice
+   * Công thức: requestedQty × estimatedUnitPrice
    * 
    * @param {Object} item - Purchase requisition item
    * @returns {number} Line value
    */
   const lineValue = (item) => {
-    const price = Number(item?.targetUnitPrice || 0);
     const qty = Number(item?.requestedQty || 0);
-    return price * qty;
+    const estimatedUnitPrice = Number(item?.estimatedUnitPrice || 0);
+    return qty * estimatedUnitPrice;
   };
 
   /**
@@ -132,13 +132,14 @@ export default function PurchaseRequisitionDetail() {
   /**
    * Tạo badge hiển thị trạng thái phiếu (RequisitionStatus)
    * 
-   * @param {string} status - Open/Closed/Cancelled
+   * @param {string} status - Open/Closed/Converted/Cancelled
    * @returns {JSX.Element} Badge component
    */
   const getStatusBadge = (status) => {
     const map = {
       Open: "bg-blue-100 text-blue-800",
       Closed: "bg-gray-100 text-gray-800",
+      Converted: "bg-green-100 text-green-800",
       Cancelled: "bg-red-100 text-red-800",
     };
 
@@ -153,20 +154,22 @@ export default function PurchaseRequisitionDetail() {
   /**
    * Tạo badge hiển thị trạng thái duyệt (ApprovalStatus)
    * 
-   * @param {string} approvalStatus - Pending/Approved/Rejected
+   * @param {string} approvalStatus - Draft/Pending/Approved/Rejected/Cancelled
    * @returns {JSX.Element} Badge component
    */
   const getApprovalStatusBadge = (approvalStatus) => {
     const map = {
+      Draft: "bg-gray-100 text-gray-800",
       Pending: "bg-yellow-100 text-yellow-800",
       Approved: "bg-green-100 text-green-800",
       Rejected: "bg-red-100 text-red-800",
+      Cancelled: "bg-red-100 text-red-800",
     };
 
     const color = map[approvalStatus] || "bg-gray-100 text-gray-800";
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}>
-        {approvalStatus || "Pending"}
+        {approvalStatus || "Draft"}
       </span>
     );
   };
@@ -282,14 +285,6 @@ export default function PurchaseRequisitionDetail() {
                   {getStatusBadge(data.status)}
                 </div>
               </div>
-              <div className="hidden md:block w-px bg-gray-200 self-stretch" />
-              {/* Trạng thái duyệt */}
-              <div className="flex-1 text-center">
-                <div className="text-sm text-gray-500">Duyệt</div>
-                <div className="text-xl font-semibold flex justify-center">
-                  {getApprovalStatusBadge(data.approvalStatus)}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -326,11 +321,10 @@ export default function PurchaseRequisitionDetail() {
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
                         <th className="py-2 pr-4">#</th>
-                        <th className="py-2 pr-4">Mã sản phẩm</th>
-                        <th className="py-2 pr-4">Tên sản phẩm</th>
-                        <th className="py-2 pr-4">Đơn vị</th>
+                        <th className="py-2 pr-4">Sản phẩm</th>
                         <th className="py-2 pr-4">Số lượng</th>
-                        <th className="py-2 pr-4">Đơn giá</th>
+                        <th className="py-2 pr-4">Ngày giao hàng</th>
+                        <th className="py-2 pr-4">Đơn giá ước tính</th>
                         <th className="py-2 pr-4 text-right">Thành tiền</th>
                         <th className="py-2 pr-4">Ghi chú</th>
                       </tr>
@@ -342,25 +336,23 @@ export default function PurchaseRequisitionDetail() {
                           <tr key={item.priId || index} className="border-t">
                             {/* STT */}
                             <td className="py-2 pr-4">{index + 1}</td>
-                            {/* Mã sản phẩm */}
+                            {/* Sản phẩm (hiển thị từ product entity) */}
                             <td className="py-2 pr-4">
-                              {item.productCode || "-"}
-                            </td>
-                            {/* Tên sản phẩm (ưu tiên productName, fallback lookup từ productId) */}
-                            <td className="py-2 pr-4">
-                              {item.productName || getProductName(item.productId)}
-                            </td>
-                            {/* Đơn vị tính */}
-                            <td className="py-2 pr-4">
-                              {item.uom || "-"}
+                              {item.productCode && item.productName 
+                                ? `${item.productCode} - ${item.productName}`
+                                : item.productCode || item.productName || getProductName(item.productId)}
                             </td>
                             {/* Số lượng yêu cầu */}
                             <td className="py-2 pr-4">
                               {Number(item.requestedQty || 0).toLocaleString()}
                             </td>
-                            {/* Đơn giá mục tiêu */}
+                            {/* Ngày giao hàng */}
                             <td className="py-2 pr-4">
-                              {Number(item.targetUnitPrice || 0).toLocaleString()} đ
+                              {item.deliveryDate ? formatDate(item.deliveryDate) : "-"}
+                            </td>
+                            {/* Đơn giá ước tính */}
+                            <td className="py-2 pr-4">
+                              {Number(item.estimatedUnitPrice || 0).toLocaleString()} đ
                             </td>
                             {/* Thành tiền */}
                             <td className="py-2 pr-4 text-right">
@@ -378,7 +370,7 @@ export default function PurchaseRequisitionDetail() {
                     <tfoot>
                       <tr className="border-t-2 font-semibold">
                         <td
-                          colSpan={6}
+                          colSpan={5}
                           className="py-2 pr-4 text-right whitespace-nowrap"
                         >
                           Tổng cộng:
@@ -404,20 +396,28 @@ export default function PurchaseRequisitionDetail() {
           <div className="border rounded">
             <div className="px-4 py-3 border-b font-medium">Trạng thái</div>
             <div className="p-4 text-sm space-y-2">
-              {/* Trạng thái phiếu: Open/Closed/Cancelled */}
+              {/* Trạng thái phiếu: Open/Closed/Converted/Cancelled */}
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Trạng thái:</span>
                 {getStatusBadge(data.status)}
               </div>
-              {/* Trạng thái duyệt: Pending/Approved/Rejected */}
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Duyệt:</span>
-                {getApprovalStatusBadge(data.approvalStatus)}
-              </div>
+              {/* Trạng thái duyệt: Draft/Pending/Approved/Rejected/Cancelled */}
+              {data.approvalStatus && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Trạng thái duyệt:</span>
+                  {getApprovalStatusBadge(data.approvalStatus)}
+                </div>
+              )}
               {/* Thời gian duyệt (nếu đã duyệt) */}
               {data.approvedAt && (
                 <div className="text-xs text-gray-500 mt-2">
                   Đã duyệt: {formatDateTime(data.approvedAt)}
+                </div>
+              )}
+              {/* Ghi chú duyệt */}
+              {data.approvalRemarks && (
+                <div className="text-xs text-gray-500 mt-2">
+                  Ghi chú: {data.approvalRemarks}
                 </div>
               )}
             </div>
@@ -444,18 +444,25 @@ export default function PurchaseRequisitionDetail() {
                   {data.requesterName || "Chưa gán người yêu cầu"}
                 </span>
               </div>
-              {/* Phòng ban (department) */}
-              {data.department && (
+              {/* Phòng ban */}
+              {data.departmentName && (
                 <div>
                   <span className="text-gray-500">Phòng ban: </span>
-                  <span className="font-medium">{data.department}</span>
+                  <span className="font-medium">{data.departmentName}</span>
                 </div>
               )}
-              {/* Ngày cần hàng (neededBy) */}
+              {/* Ngày cần hàng */}
               {data.neededBy && (
                 <div>
-                  <span className="text-gray-500">Cần trước ngày: </span>
+                  <span className="text-gray-500">Ngày cần hàng: </span>
                   <span className="font-medium">{formatDate(data.neededBy)}</span>
+                </div>
+              )}
+              {/* Độ ưu tiên */}
+              {data.priority && (
+                <div>
+                  <span className="text-gray-500">Độ ưu tiên: </span>
+                  <span className="font-medium">{data.priority}</span>
                 </div>
               )}
               {/* Người duyệt (approverName) */}
@@ -507,6 +514,19 @@ export default function PurchaseRequisitionDetail() {
               )}
             </div>
           </div>
+
+          {/* ==================== JUSTIFICATION CARD ==================== */}
+          {/* Hiển thị lý do/biện minh (justification) */}
+          {data.justification && (
+            <div className="border rounded">
+              <div className="px-4 py-3 border-b font-medium">
+                Lý do / Biện minh
+              </div>
+              <div className="p-4 text-sm whitespace-pre-wrap">
+                {data.justification}
+              </div>
+            </div>
+          )}
         </aside>
       </div>
     </div>

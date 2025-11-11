@@ -29,6 +29,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import apiClient from '../../../api/apiClient';
 import { getCurrentUser } from '../../../api/authService';
+import { getAllDepartments } from '../../../api/departmentService';
 import * as ExcelJS from 'exceljs';
 
 const PurchaseRequisitionForm = () => {
@@ -42,23 +43,22 @@ const PurchaseRequisitionForm = () => {
      * Form data state - Cấu trúc khớp với Backend RequestDTO
      * 
      * @property {number} requesterId - ID người yêu cầu (từ JWT token)
-     * @property {string} department - Phòng ban (required)
-     * @property {Date} neededBy - Ngày cần hàng
      * @property {string} purpose - Mục đích sử dụng (required)
-     * @property {string} approvalStatus - Trạng thái duyệt: Pending/Approved/Rejected
      * @property {number} approverId - ID người duyệt
-     * @property {number} totalEstimated - Tổng giá trị ước tính (tự động tính)
-     * @property {string} status - Trạng thái phiếu: Open/Closed/Cancelled
+     * @property {string} status - Trạng thái phiếu: Draft/Pending/Approved/Rejected
      * @property {Array} items - Danh sách sản phẩm trong phiếu
      */
     const [formData, setFormData] = useState({
         requesterId: null,
-        department: '',
-        neededBy: null,
+        departmentId: null,
         purpose: '',
-        approvalStatus: 'Pending',
+        justification: '',
+        neededBy: null,
+        priority: 'Medium',
+        currencyCode: 'VND',
+        approvalStatus: 'Draft',
         approverId: null,
-        totalEstimated: 0,
+        approvalRemarks: '',
         status: 'Open',
         items: []
     });
@@ -67,6 +67,7 @@ const PurchaseRequisitionForm = () => {
     const [loading, setLoading] = useState(false); // Loading state cho form submission
     const [validationErrors, setValidationErrors] = useState({}); // Lưu lỗi validation
     const [products, setProducts] = useState([]); // Danh sách sản phẩm từ DB
+    const [departments, setDepartments] = useState([]); // Danh sách phòng ban từ DB
     const [currentUser, setCurrentUser] = useState(null); // Thông tin user hiện tại
     const [requisitionNo, setRequisitionNo] = useState(''); // Mã phiếu yêu cầu (auto-generated)
     const fileInputRef = React.useRef(null); // Reference cho file input (Excel import)
@@ -74,14 +75,14 @@ const PurchaseRequisitionForm = () => {
     // ==================== COMPUTED VALUES ====================
     /**
      * Tính tổng giá trị của tất cả items trong phiếu
-     * Công thức: Σ(requestedQty × targetUnitPrice)
+     * Công thức: Σ(requestedQty × estimatedUnitPrice)
      */
     const totalValue = useMemo(() => {
         if (!Array.isArray(formData.items)) return 0;
         return formData.items.reduce((sum, it) => {
             const qty = Number(it.requestedQty || 0);
-            const price = Number(it.targetUnitPrice || 0);
-            return sum + qty * price;
+            const estimatedUnitPrice = Number(it.estimatedUnitPrice || 0);
+            return sum + qty * estimatedUnitPrice;
         }, 0);
     }, [formData.items]);
 
@@ -163,6 +164,17 @@ const PurchaseRequisitionForm = () => {
                     product: p
                 })));
 
+                // 1b. Load danh sách phòng ban từ API
+                try {
+                    const departmentsResponse = await getAllDepartments();
+                    const departmentsData = Array.isArray(departmentsResponse?.data) 
+                        ? departmentsResponse.data 
+                        : (Array.isArray(departmentsResponse) ? departmentsResponse : []);
+                    setDepartments(departmentsData);
+                } catch (error) {
+                    console.error('Error loading departments:', error);
+                }
+
                 // 2. Load thông tin user hiện tại
                 const user = getCurrentUser();
                 if (user) {
@@ -229,33 +241,32 @@ const PurchaseRequisitionForm = () => {
 
                     setRequisitionNo(data.requisitionNo || '');
 
-                    // Parse neededBy date từ string sang Date object
-                    let neededByDate = null;
-                    if (data.neededBy) {
-                        neededByDate = new Date(data.neededBy);
-                        if (isNaN(neededByDate.getTime())) {
-                            neededByDate = null;
-                        }
-                    }
 
                     // Set form data từ response
                     setFormData({
                         requesterId: data.requesterId || null,
-                        department: data.department || '',
-                        neededBy: neededByDate,
+                        departmentId: data.departmentId || null,
                         purpose: data.purpose || '',
-                        approvalStatus: data.approvalStatus || 'Pending',
+                        justification: data.justification || '',
+                        neededBy: data.neededBy ? new Date(data.neededBy) : null,
+                        priority: data.priority || 'Medium',
+                        currencyCode: data.currencyCode || 'VND',
+                        approvalStatus: data.approvalStatus || 'Draft',
                         approverId: data.approverId || null,
-                        totalEstimated: data.totalEstimated || 0,
+                        approvalRemarks: data.approvalRemarks || '',
                         status: data.status || 'Open',
                         items: (data.items || []).map(item => ({
                             priId: item.priId || null,
+                            // Xác định productSource: nếu có productId thì là existing, nếu không thì là new
+                            productSource: item.productId ? 'existing' : 'new',
                             productId: item.productId || null,
                             productCode: item.productCode || '',
                             productName: item.productName || '',
+                            specification: item.specification || '',
                             uom: item.uom || '',
                             requestedQty: item.requestedQty || 0,
-                            targetUnitPrice: item.targetUnitPrice || 0,
+                            estimatedUnitPrice: item.estimatedUnitPrice || 0,
+                            deliveryDate: item.deliveryDate ? new Date(item.deliveryDate) : null,
                             note: item.note || ''
                         }))
                     });
@@ -338,15 +349,15 @@ const PurchaseRequisitionForm = () => {
     };
 
     /**
-     * Xử lý thay đổi đơn giá với format display
+     * Xử lý thay đổi estimated unit price với format display
      * 
      * @param {number} index - Index của item
      * @param {string} value - Giá trị input (có thể có dấu phẩy)
      */
-    const handlePriceChange = (index, value) => {
+    const handleEstimatedUnitPriceChange = (index, value) => {
         // Parse value (bỏ dấu phẩy nếu có)
         const numValue = parseFormattedNumber(value);
-        handleItemChange(index, 'targetUnitPrice', numValue);
+        handleItemChange(index, 'estimatedUnitPrice', numValue);
     };
 
     /**
@@ -364,15 +375,19 @@ const PurchaseRequisitionForm = () => {
     /**
      * Thêm một item (sản phẩm) mới vào danh sách
      * Item mới có cấu trúc khớp với Purchase_Requisition_Items table
+     * productSource: 'existing' = chọn từ Product table, 'new' = nhập trực tiếp
      */
     const addItem = () => {
         const newItem = {
-            productId: null,          // product_id (INT, nullable)
-            productCode: '',          // product_code (VARCHAR 50)
-            productName: '',          // product_name (VARCHAR 255)
+            productSource: 'existing', // 'existing' hoặc 'new'
+            productId: null,          // product_id (INT, nullable) - chỉ dùng khi productSource = 'existing'
+            productCode: '',          // product_code (VARCHAR 50) - bắt buộc khi productSource = 'new'
+            productName: '',          // product_name (VARCHAR 255) - bắt buộc khi productSource = 'new'
+            specification: '',        // specification (TEXT)
             uom: '',                  // uom (VARCHAR 50)
             requestedQty: 1,          // requested_qty (DECIMAL 18,2, required)
-            targetUnitPrice: 0,       // target_unit_price (DECIMAL 18,2)
+            estimatedUnitPrice: 0,    // estimated_unit_price (DECIMAL 18,2)
+            deliveryDate: null,       // delivery_date (DATE)
             note: ''                  // note (TEXT)
         };
 
@@ -439,42 +454,59 @@ const PurchaseRequisitionForm = () => {
                 return;
             }
 
-            // Parse dữ liệu từ Excel
+                    // Parse dữ liệu từ Excel
             const importedItems = [];
 
             worksheet.eachRow((row, rowNum) => {
                 if (rowNum === 1) return; // Bỏ qua header row
 
                 // Lấy giá trị từ các cell (1-based index)
-                const productCode = row.getCell(1).value?.toString().trim() || '';
-                const productName = row.getCell(2).value?.toString().trim() || '';
-                const uom = row.getCell(3).value?.toString().trim() || '';
-                const qty = parseFloat(row.getCell(4).value) || 1;
-                const price = parseFloat(row.getCell(5).value) || 0;
-                const note = row.getCell(6).value?.toString().trim() || '';
+                // Format: Product ID | Product Code | Product Name | Specification | UOM | Số lượng | Estimated Unit Price | Ngày giao hàng | Ghi chú
+                const productIdStr = row.getCell(1).value?.toString().trim() || '';
+                const productCode = row.getCell(2).value?.toString().trim() || '';
+                const productName = row.getCell(3).value?.toString().trim() || '';
+                const specification = row.getCell(4).value?.toString().trim() || '';
+                const uom = row.getCell(5).value?.toString().trim() || '';
+                const qty = parseFloat(row.getCell(6).value) || 1;
+                const estimatedUnitPrice = parseFloat(row.getCell(7).value) || 0;
+                const deliveryDateStr = row.getCell(8).value?.toString().trim() || '';
+                const note = row.getCell(9).value?.toString().trim() || '';
 
-                // Bỏ qua dòng trống
-                if (!productCode && !productName) return;
+                // Bỏ qua dòng trống (ít nhất phải có productId hoặc productCode)
+                if (!productIdStr && !productCode) return;
 
-                // Tìm productId từ danh sách products nếu có
+                // Parse productId (có thể null)
                 let productId = null;
-                const foundProduct = products.find(p => {
-                    const label = p.label || '';
-                    return label.includes(productCode) || 
-                           label.toLowerCase().includes(productName.toLowerCase());
-                });
-                if (foundProduct) {
-                    productId = foundProduct.value;
+                if (productIdStr) {
+                    const parsed = parseInt(productIdStr);
+                    if (!isNaN(parsed)) {
+                        productId = parsed;
+                    }
                 }
 
+                // Parse deliveryDate
+                let deliveryDate = null;
+                if (deliveryDateStr) {
+                    deliveryDate = new Date(deliveryDateStr);
+                    if (isNaN(deliveryDate.getTime())) {
+                        deliveryDate = null;
+                    }
+                }
+
+                // Xác định productSource: nếu có productId thì là existing, nếu không thì là new
+                const source = productId ? 'existing' : 'new';
+                
                 // Thêm item vào danh sách import
                 importedItems.push({
+                    productSource: source,
                     productId: productId,
                     productCode: productCode,
                     productName: productName,
+                    specification: specification,
                     uom: uom,
                     requestedQty: isNaN(qty) || qty <= 0 ? 1 : qty,
-                    targetUnitPrice: isNaN(price) ? 0 : price,
+                    estimatedUnitPrice: isNaN(estimatedUnitPrice) ? 0 : estimatedUnitPrice,
+                    deliveryDate: deliveryDate,
                     note: note
                 });
             });
@@ -513,8 +545,8 @@ const PurchaseRequisitionForm = () => {
     };
 
     /**
-     * Xử lý khi user chọn sản phẩm từ dropdown
-     * Tự động điền các thông tin: productCode, productName, uom, targetUnitPrice
+     * Xử lý khi user chọn sản phẩm từ dropdown (khi productSource = 'existing')
+     * Tự động điền estimatedUnitPrice, productCode, productName, uom từ product
      * 
      * @param {number} index - Index của item trong array
      * @param {Object} selectedOption - Option được chọn từ react-select
@@ -529,11 +561,29 @@ const PurchaseRequisitionForm = () => {
                 const newItems = [...prev.items];
                 newItems[index] = {
                     ...newItems[index],
+                    productSource: 'existing',
                     productId: selectedOption.value,
                     productCode: product.sku || product.productCode || '',
                     productName: product.name || '',
-                    uom: product.uom || product.unit || '',
-                    targetUnitPrice: purchasePrice
+                    uom: product.uom || '',
+                    estimatedUnitPrice: purchasePrice
+                };
+                return {
+                    ...prev,
+                    items: newItems
+                };
+            });
+        } else {
+            // Khi bỏ chọn sản phẩm
+            setFormData(prev => {
+                const newItems = [...prev.items];
+                newItems[index] = {
+                    ...newItems[index],
+                    productId: null,
+                    productCode: '',
+                    productName: '',
+                    uom: '',
+                    estimatedUnitPrice: 0
                 };
                 return {
                     ...prev,
@@ -543,20 +593,53 @@ const PurchaseRequisitionForm = () => {
         }
     };
 
+    /**
+     * Xử lý khi user thay đổi loại sản phẩm (existing hoặc new)
+     * 
+     * @param {number} index - Index của item
+     * @param {string} source - 'existing' hoặc 'new'
+     */
+    const handleProductSourceChange = (index, source) => {
+        setFormData(prev => {
+            const newItems = [...prev.items];
+            if (source === 'existing') {
+                // Chuyển sang existing: xóa productCode, productName, giữ productId nếu có
+                newItems[index] = {
+                    ...newItems[index],
+                    productSource: 'existing',
+                    productCode: '',
+                    productName: '',
+                    specification: '',
+                    uom: ''
+                };
+            } else {
+                // Chuyển sang new: xóa productId, giữ productCode, productName nếu đã nhập
+                newItems[index] = {
+                    ...newItems[index],
+                    productSource: 'new',
+                    productId: null,
+                    estimatedUnitPrice: 0
+                };
+            }
+            return {
+                ...prev,
+                items: newItems
+            };
+        });
+    };
+
     // ==================== VALIDATION ====================
     /**
      * Validate toàn bộ form trước khi submit
      * 
      * VALIDATION RULES (khớp với Backend):
-     * - department: required, max 100 chars
      * - purpose: required
      * - items: required, min 1 item
      * 
      * ITEM VALIDATION RULES:
-     * - productCode: required, max 50 chars
-     * - productName: required, max 255 chars
-     * - uom: required, max 50 chars
+     * - productId: required
      * - requestedQty: required, > 0
+     * - deliveryDate: required
      * 
      * @returns {Object} Object chứa các lỗi validation (key: field name, value: error message)
      */
@@ -564,12 +647,14 @@ const PurchaseRequisitionForm = () => {
         const errors = {};
 
         // Validate Purchase Requisition fields
-        if (!formData.department || formData.department.trim() === '') {
-            errors.department = 'Phòng ban là bắt buộc';
+        // Phòng ban là bắt buộc
+        if (!formData.departmentId) {
+            errors.departmentId = 'Phòng ban là bắt buộc';
         }
 
-        if (!formData.purpose || formData.purpose.trim() === '') {
-            errors.purpose = 'Mục đích sử dụng là bắt buộc';
+        // Ngày cần hàng là bắt buộc
+        if (!formData.neededBy) {
+            errors.neededBy = 'Ngày cần hàng là bắt buộc';
         }
 
         if (formData.items.length === 0) {
@@ -578,17 +663,27 @@ const PurchaseRequisitionForm = () => {
 
         // Validate items - matching BE ItemRequestDTO validation
         formData.items.forEach((item, index) => {
-            if (!item.productCode || item.productCode.trim() === '') {
-                errors[`item_${index}_productCode`] = 'Mã sản phẩm là bắt buộc';
+            const productSource = item.productSource || 'existing';
+            
+            // Validate sản phẩm: nếu existing thì cần productId, nếu new thì cần productCode và productName
+            if (productSource === 'existing') {
+                if (!item.productId) {
+                    errors[`item_${index}_productId`] = 'Vui lòng chọn sản phẩm từ danh sách';
+                }
+            } else {
+                if (!item.productCode || item.productCode.trim() === '') {
+                    errors[`item_${index}_productCode`] = 'Mã sản phẩm là bắt buộc';
+                }
+                if (!item.productName || item.productName.trim() === '') {
+                    errors[`item_${index}_productName`] = 'Tên sản phẩm là bắt buộc';
+                }
             }
-            if (!item.productName || item.productName.trim() === '') {
-                errors[`item_${index}_productName`] = 'Tên sản phẩm là bắt buộc';
-            }
-            if (!item.uom || item.uom.trim() === '') {
-                errors[`item_${index}_uom`] = 'Đơn vị tính là bắt buộc';
-            }
+            
             if (!item.requestedQty || Number(item.requestedQty) <= 0) {
                 errors[`item_${index}_requestedQty`] = 'Số lượng phải lớn hơn 0';
+            }
+            if (!item.deliveryDate) {
+                errors[`item_${index}_deliveryDate`] = 'Ngày giao hàng là bắt buộc';
             }
         });
 
@@ -636,22 +731,42 @@ const PurchaseRequisitionForm = () => {
             // 2. Prepare data theo format Backend RequestDTO
             const submitData = {
                 requesterId: formData.requesterId,
-                department: formData.department.trim(),
-                neededBy: formData.neededBy ? formData.neededBy.toISOString().split('T')[0] : null,
+                departmentId: formData.departmentId || null,
                 purpose: formData.purpose.trim(),
-                approvalStatus: formData.approvalStatus,
+                justification: formData.justification?.trim() || null,
+                neededBy: formData.neededBy ? formData.neededBy.toISOString().split('T')[0] : null,
+                priority: formData.priority || 'Medium',
+                currencyCode: formData.currencyCode || 'VND',
+                approvalStatus: formData.approvalStatus || 'Draft',
                 approverId: formData.approverId || null,
-                totalEstimated: totalValue,
-                status: formData.status,
-                items: formData.items.map(item => ({
-                    productId: item.productId || null,
-                    productCode: item.productCode.trim(),
-                    productName: item.productName.trim(),
-                    uom: item.uom.trim(),
-                    requestedQty: parseFloat(item.requestedQty) || 0,
-                    targetUnitPrice: parseFloat(item.targetUnitPrice) || 0,
-                    note: item.note?.trim() || null
-                }))
+                approvalRemarks: formData.approvalRemarks?.trim() || null,
+                status: formData.status || 'Open',
+                items: formData.items.map(item => {
+                    // Chuẩn bị item data cho backend
+                    // productSource chỉ dùng ở frontend, không gửi lên backend
+                    const itemData = {
+                        productId: item.productId || null,
+                        productCode: item.productCode?.trim() || null,
+                        productName: item.productName?.trim() || null,
+                        specification: item.specification?.trim() || null,
+                        uom: item.uom?.trim() || null,
+                        requestedQty: parseFloat(item.requestedQty) || 0,
+                        estimatedUnitPrice: parseFloat(item.estimatedUnitPrice) || 0,
+                        deliveryDate: item.deliveryDate ? item.deliveryDate.toISOString().split('T')[0] : null,
+                        note: item.note?.trim() || null
+                    };
+                    
+                    // Nếu là sản phẩm mới (không có productId), đảm bảo có productCode và productName
+                    if (!itemData.productId) {
+                        // Backend sẽ lưu productCode và productName trực tiếp
+                        if (!itemData.productCode || !itemData.productName) {
+                            // Validation đã được xử lý ở validateAllFields, nhưng đảm bảo ở đây
+                            console.warn(`Item ${item.index} thiếu productCode hoặc productName`);
+                        }
+                    }
+                    
+                    return itemData;
+                })
             };
 
             // 3. Call API
@@ -740,73 +855,145 @@ const PurchaseRequisitionForm = () => {
                             />
                         </div>
 
-                        {/* Phòng ban - Required field, VARCHAR(100) */}
+                        {/* Phòng ban - Required */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Phòng ban <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.department}
-                                onChange={(e) => handleInputChange('department', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.department ? 'border-red-500' : 'border-gray-300'}`}
-                                placeholder="Nhập phòng ban"
-                                maxLength={100}
-                            />
-                            {validationErrors.department && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.department}</p>
+                            <select
+                                value={formData.departmentId || ''}
+                                onChange={(e) => handleInputChange('departmentId', e.target.value ? parseInt(e.target.value) : null)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.departmentId ? 'border-red-500' : 'border-gray-300'}`}
+                            >
+                                <option value="">-- Chọn phòng ban --</option>
+                                {departments.map(dept => (
+                                    <option key={dept.id || dept.departmentId} value={dept.id || dept.departmentId}>
+                                        {dept.departmentName || dept.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {validationErrors.departmentId && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.departmentId}</p>
                             )}
                         </div>
 
-                        {/* Ngày cần hàng - Optional field, DATE */}
+                        {/* Ngày cần hàng - Required */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Cần trước ngày
+                                Ngày cần hàng <span className="text-red-500">*</span>
                             </label>
                             <DatePicker
                                 selected={formData.neededBy}
                                 onChange={(date) => handleInputChange('neededBy', date)}
                                 dateFormat="dd/MM/yyyy"
                                 minDate={new Date()}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className={`w-full px-3 py-2 border rounded-md ${validationErrors.neededBy ? 'border-red-500' : 'border-gray-300'}`}
                                 placeholderText="Chọn ngày"
+                            />
+                            {validationErrors.neededBy && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.neededBy}</p>
+                            )}
+                        </div>
+
+                        {/* Độ ưu tiên */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Độ ưu tiên
+                            </label>
+                            <select
+                                value={formData.priority}
+                                onChange={(e) => handleInputChange('priority', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="Low">Thấp</option>
+                                <option value="Medium">Trung bình</option>
+                                <option value="High">Cao</option>
+                                <option value="Urgent">Khẩn cấp</option>
+                            </select>
+                        </div>
+
+                        {/* Mã tiền tệ */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Mã tiền tệ
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.currencyCode}
+                                onChange={(e) => handleInputChange('currencyCode', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="VND"
                             />
                         </div>
 
-                        {/* Trạng thái phiếu - Chỉ hiển thị khi edit, ENUM(Open/Closed/Cancelled) */}
+                        {/* Trạng thái duyệt - Chỉ hiển thị khi edit */}
                         {isEdit && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Trạng thái
+                                    Trạng thái duyệt
                                 </label>
-                                <input
-                                    type="text"
+                                <select
+                                    value={formData.approvalStatus}
+                                    onChange={(e) => handleInputChange('approvalStatus', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="Draft">Nháp</option>
+                                    <option value="Pending">Chờ duyệt</option>
+                                    <option value="Approved">Đã duyệt</option>
+                                    <option value="Rejected">Từ chối</option>
+                                    <option value="Cancelled">Hủy</option>
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Trạng thái phiếu - Chỉ hiển thị khi edit */}
+                        {isEdit && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Trạng thái phiếu
+                                </label>
+                                <select
                                     value={formData.status}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                                    readOnly
-                                    title="Trạng thái phiếu (Open/Closed/Cancelled)"
-                                />
+                                    onChange={(e) => handleInputChange('status', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="Open">Mở</option>
+                                    <option value="Closed">Đóng</option>
+                                    <option value="Converted">Đã chuyển đổi</option>
+                                    <option value="Cancelled">Hủy</option>
+                                </select>
                             </div>
                         )}
                     </div>
 
-                    {/* Mục đích sử dụng - Required field, TEXT */}
+                    {/* Note/Ghi chú - Optional field, TEXT */}
                     <div className="mt-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Mục đích sử dụng <span className="text-red-500">*</span>
+                            Ghi chú
                         </label>
                         <textarea
                             value={formData.purpose}
                             onChange={(e) => handleInputChange('purpose', e.target.value)}
                             rows={3}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${validationErrors.purpose ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                            placeholder="Mô tả mục đích sử dụng"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Ghi chú (tùy chọn)"
                         />
-                        {validationErrors.purpose && (
-                            <p className="text-red-500 text-sm mt-1">{validationErrors.purpose}</p>
-                        )}
                     </div>
+
+                    {/* Ghi chú duyệt - Chỉ hiển thị khi edit */}
+                    {isEdit && formData.approvalRemarks && (
+                        <div className="mt-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Ghi chú duyệt
+                            </label>
+                            <textarea
+                                value={formData.approvalRemarks}
+                                readOnly
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* ==================== PRODUCT ITEMS TABLE ==================== */}
@@ -815,13 +1002,12 @@ const PurchaseRequisitionForm = () => {
                     
                     COLUMNS:
                     - #: STT
-                    - Sản phẩm: Dropdown chọn product (tự động fill các field)
-                    - Mã sản phẩm: product_code (editable)
-                    - Tên sản phẩm: product_name (editable)
-                    - Đơn vị tính: uom (editable)
+                    - Sản phẩm: Dropdown chọn product (required)
                     - Số lượng: requested_qty (required, > 0)
-                    - Đơn giá: target_unit_price
-                    - Thành tiền: auto-calculated (qty × price)
+                    - Ngày giao hàng: delivery_date (required)
+                    - Giá ước tính: valuation_price
+                    - Đơn vị giá: price_unit (default 1)
+                    - Thành tiền: auto-calculated (qty × valuationPrice × priceUnit)
                     - Ghi chú: note
                     - Thao tác: Nút xóa item
                 */}
@@ -870,146 +1056,214 @@ const PurchaseRequisitionForm = () => {
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr className="bg-gray-50">
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-12">
                                             #
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 min-w-[280px]">
                                             Sản phẩm <span className="text-red-500">*</span>
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Mã sản phẩm <span className="text-red-500">*</span>
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 min-w-[150px]">
+                                            Mô tả
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Tên sản phẩm <span className="text-red-500">*</span>
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-32">
+                                            Đơn vị tính
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn vị tính <span className="text-red-500">*</span>
-                                        </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-28">
                                             Số lượng <span className="text-red-500">*</span>
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
-                                            Đơn giá
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-36">
+                                            Ngày giao hàng <span className="text-red-500">*</span>
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-36">
+                                            Đơn giá ước tính
+                                        </th>
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-36">
                                             Thành tiền
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 min-w-[120px]">
                                             Ghi chú
                                         </th>
-                                        <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">
+                                        <th className="border border-gray-200 px-3 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 w-20">
                                             Thao tác
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {formData.items.map((item, index) => (
+                                    {formData.items.map((item, index) => {
+                                        const productSource = item.productSource || 'existing';
+                                        return (
                                         <tr key={index} className="hover:bg-gray-50">
-                                            <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">
+                                            <td className="border border-gray-200 px-3 py-3 text-sm text-gray-700 text-center font-medium">
                                                 {index + 1}
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2">
-                                                <Select
-                                                    value={products.find(option => {
-                                                        const optionValue = Number(option.value);
-                                                        const itemValue = Number(item.productId);
-                                                        return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
-                                                    }) || null}
-                                                    onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
-                                                    options={products}
-                                                    placeholder="Chọn sản phẩm"
-                                                    className="min-w-48"
-                                                    menuPortalTarget={document.body}
-                                                    menuPosition="fixed"
-                                                    menuShouldScrollIntoView={false}
-                                                    styles={{
-                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
-                                                    }}
-                                                />
-                                            </td>
-                                            <td className="border border-gray-200 px-4 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.productCode}
-                                                    onChange={(e) => handleItemChange(index, 'productCode', e.target.value)}
-                                                    className={`w-32 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_productCode`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                    placeholder="Mã sản phẩm"
-                                                />
-                                                {validationErrors[`item_${index}_productCode`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_productCode`]}</p>
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
+                                                {/* Toggle chọn loại sản phẩm - Compact design */}
+                                                <div className="mb-2 flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleProductSourceChange(index, 'existing')}
+                                                        className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                                            productSource === 'existing'
+                                                                ? 'bg-blue-600 text-white'
+                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                    >
+                                                        Từ kho
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleProductSourceChange(index, 'new')}
+                                                        className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                                            productSource === 'new'
+                                                                ? 'bg-blue-600 text-white'
+                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                    >
+                                                        Nhập mới
+                                                    </button>
+                                                </div>
+
+                                                {/* Hiển thị dropdown nếu chọn "Sản phẩm có sẵn" */}
+                                                {productSource === 'existing' ? (
+                                                    <div>
+                                                        <Select
+                                                            value={products.find(option => {
+                                                                const optionValue = Number(option.value);
+                                                                const itemValue = Number(item.productId);
+                                                                return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
+                                                            }) || null}
+                                                            onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
+                                                            options={products}
+                                                            placeholder="Chọn sản phẩm..."
+                                                            className="text-sm"
+                                                            menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
+                                                            menuShouldScrollIntoView={false}
+                                                            styles={{
+                                                                control: (base) => ({ ...base, minHeight: '36px', fontSize: '14px' }),
+                                                                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                                menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                            }}
+                                                        />
+                                                        {validationErrors[`item_${index}_productId`] && (
+                                                            <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_productId`]}</p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    /* Hiển thị input fields nếu chọn "Sản phẩm mới" */
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            value={item.productCode || ''}
+                                                            onChange={(e) => handleItemChange(index, 'productCode', e.target.value)}
+                                                            placeholder="Mã sản phẩm *"
+                                                            className={`w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${validationErrors[`item_${index}_productCode`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                        />
+                                                        {validationErrors[`item_${index}_productCode`] && (
+                                                            <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_productCode`]}</p>
+                                                        )}
+                                                        <input
+                                                            type="text"
+                                                            value={item.productName || ''}
+                                                            onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
+                                                            placeholder="Tên sản phẩm *"
+                                                            className={`w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${validationErrors[`item_${index}_productName`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                        />
+                                                        {validationErrors[`item_${index}_productName`] && (
+                                                            <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_productName`]}</p>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Mô tả */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
                                                 <input
                                                     type="text"
-                                                    value={item.productName}
-                                                    onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
-                                                    className={`w-48 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_productName`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                    placeholder="Tên sản phẩm"
+                                                    value={item.specification || ''}
+                                                    onChange={(e) => handleItemChange(index, 'specification', e.target.value)}
+                                                    placeholder={productSource === 'new' ? "VD: Hộp 12 chai..." : "Mô tả sản phẩm"}
+                                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    title="Mô tả về sản phẩm: đóng gói, kích thước, thông số kỹ thuật"
                                                 />
-                                                {validationErrors[`item_${index}_productName`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_productName`]}</p>
-                                                )}
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Đơn vị tính */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
                                                 <input
                                                     type="text"
-                                                    value={item.uom}
+                                                    value={item.uom || ''}
                                                     onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                                                    className={`w-20 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_uom`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                    placeholder="UOM"
+                                                    placeholder={productSource === 'new' ? "VD: Chai, Gói..." : "ĐVT"}
+                                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    title="Đơn vị tính của sản phẩm"
                                                 />
-                                                {validationErrors[`item_${index}_uom`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_uom`]}</p>
-                                                )}
                                             </td>
-                                            {/* Số lượng - input với format hiển thị */}
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Số lượng */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
                                                 <input
                                                     type="text"
                                                     value={formatNumber(item.requestedQty)}
                                                     onChange={(e) => handleQtyChange(index, e.target.value)}
-                                                    className={`w-24 px-2 py-1 border rounded text-sm text-right ${validationErrors[`item_${index}_requestedQty`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    className={`w-full px-2 py-1.5 border rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500 ${validationErrors[`item_${index}_requestedQty`] ? 'border-red-500' : 'border-gray-300'}`}
                                                     placeholder="0"
                                                 />
                                                 {validationErrors[`item_${index}_requestedQty`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_requestedQty`]}</p>
+                                                    <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_requestedQty`]}</p>
                                                 )}
                                             </td>
-                                            {/* Đơn giá - input với format hiển thị */}
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Ngày giao hàng */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
+                                                <DatePicker
+                                                    selected={item.deliveryDate}
+                                                    onChange={(date) => handleItemChange(index, 'deliveryDate', date)}
+                                                    dateFormat="dd/MM/yyyy"
+                                                    minDate={new Date()}
+                                                    className={`w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${validationErrors[`item_${index}_deliveryDate`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholderText="Chọn ngày"
+                                                />
+                                                {validationErrors[`item_${index}_deliveryDate`] && (
+                                                    <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_deliveryDate`]}</p>
+                                                )}
+                                            </td>
+                                            {/* Đơn giá ước tính */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
                                                 <input
                                                     type="text"
-                                                    value={formatNumber(item.targetUnitPrice)}
-                                                    onChange={(e) => handlePriceChange(index, e.target.value)}
-                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                                    value={formatNumber(item.estimatedUnitPrice)}
+                                                    onChange={(e) => handleEstimatedUnitPriceChange(index, e.target.value)}
+                                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     placeholder="0"
                                                 />
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2 text-sm">
-                                                {formatCurrency((Number(item.requestedQty || 0) * Number(item.targetUnitPrice || 0)))}
+                                            {/* Thành tiền */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top text-sm font-medium text-gray-900">
+                                                {formatCurrency((Number(item.requestedQty || 0) * Number(item.estimatedUnitPrice || 0)))}
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Ghi chú */}
+                                            <td className="border border-gray-200 px-3 py-3 align-top">
                                                 <input
                                                     type="text"
                                                     value={item.note || ''}
                                                     onChange={(e) => handleItemChange(index, 'note', e.target.value)}
-                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     placeholder="Ghi chú"
                                                 />
                                             </td>
-                                            <td className="border border-gray-200 px-4 py-2">
+                                            {/* Thao tác */}
+                                            <td className="border border-gray-200 px-3 py-3 text-center">
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(index)}
-                                                    className="text-red-600 hover:text-red-800 text-sm"
+                                                    className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                                    title="Xóa sản phẩm này"
                                                 >
-                                                    Xóa
+                                                    <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))}
+                                    );
+                                    })}
                                 </tbody>
                             </table>
                             {/* Tổng giá trị phiếu */}

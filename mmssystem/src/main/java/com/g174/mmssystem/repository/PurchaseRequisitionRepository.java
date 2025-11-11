@@ -25,34 +25,50 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
 
     @Query("SELECT r FROM PurchaseRequisition r WHERE " +
             "(LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.department) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     List<PurchaseRequisition> searchRequisitions(@Param("keyword") String keyword);
 
     @Query("SELECT r FROM PurchaseRequisition r WHERE " +
             "(LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.department) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     Page<PurchaseRequisition> searchRequisitions(@Param("keyword") String keyword, Pageable pageable);
 
     // Query với JOIN FETCH để load tất cả quan hệ cần thiết
     @Query("SELECT DISTINCT r FROM PurchaseRequisition r " +
-            "LEFT JOIN FETCH r.items " +
+            "LEFT JOIN FETCH r.items i " +
+            "LEFT JOIN FETCH i.product " +
+            "LEFT JOIN FETCH i.createdBy " +
+            "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
+            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
+            "LEFT JOIN FETCH r.createdBy cb " +
+            "LEFT JOIN FETCH cb.profile " +
+            "LEFT JOIN FETCH r.updatedBy ub " +
+            "LEFT JOIN FETCH ub.profile " +
             "WHERE r.requisitionId = :id AND r.deletedAt IS NULL")
     Optional<PurchaseRequisition> findByIdWithRelations(@Param("id") Long id);
 
     @Query("SELECT DISTINCT r FROM PurchaseRequisition r " +
-            "LEFT JOIN FETCH r.items " +
+            "LEFT JOIN FETCH r.items i " +
+            "LEFT JOIN FETCH i.product " +
+            "LEFT JOIN FETCH i.createdBy " +
+            "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
+            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
+            "LEFT JOIN FETCH r.createdBy cb " +
+            "LEFT JOIN FETCH cb.profile " +
+            "LEFT JOIN FETCH r.updatedBy ub " +
+            "LEFT JOIN FETCH ub.profile " +
             "WHERE r.deletedAt IS NULL")
     List<PurchaseRequisition> findAllActiveWithRelations();
 
@@ -63,14 +79,22 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
     Page<PurchaseRequisition> findAllActiveWithRelations(Pageable pageable);
 
     @Query("SELECT DISTINCT r FROM PurchaseRequisition r " +
-            "LEFT JOIN FETCH r.items " +
+            "LEFT JOIN FETCH r.items i " +
+            "LEFT JOIN FETCH i.product " +
+            "LEFT JOIN FETCH i.createdBy " +
+            "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
+            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
+            "LEFT JOIN FETCH r.createdBy cb " +
+            "LEFT JOIN FETCH cb.profile " +
+            "LEFT JOIN FETCH r.updatedBy ub " +
+            "LEFT JOIN FETCH ub.profile " +
             "WHERE (LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.department) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     List<PurchaseRequisition> searchRequisitionsWithRelations(@Param("keyword") String keyword);
 }

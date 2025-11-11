@@ -2,6 +2,8 @@ package com.g174.mmssystem.dto.responseDTO;
 
 import lombok.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -13,8 +15,15 @@ public class PurchaseRequisitionItemResponseDTO {
     private Long productId;
     private String productCode;
     private String productName;
+    private String specification;
     private String uom;
     private BigDecimal requestedQty;
-    private BigDecimal targetUnitPrice;
+    private BigDecimal estimatedUnitPrice;
+    private BigDecimal estimatedTotal;
+    private LocalDate deliveryDate;
     private String note;
+    private String createdByName;
+    private String updatedByName;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

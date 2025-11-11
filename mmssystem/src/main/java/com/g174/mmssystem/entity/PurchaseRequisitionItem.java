@@ -3,6 +3,8 @@ package com.g174.mmssystem.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,9 +25,9 @@ public class PurchaseRequisitionItem {
     @JoinColumn(name = "requisition_id", nullable = false)
     private PurchaseRequisition purchaseRequisition;
 
-
-    @Column(name = "product_id")
-    private Long productId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
 
     @Column(name = "product_code", length = 50)
     private String productCode;
@@ -33,15 +35,44 @@ public class PurchaseRequisitionItem {
     @Column(name = "product_name", length = 255)
     private String productName;
 
+    @Column(columnDefinition = "TEXT")
+    private String specification;
+
     @Column(length = 50)
     private String uom;
 
     @Column(name = "requested_qty", precision = 18, scale = 2, nullable = false)
     private BigDecimal requestedQty;
 
-    @Column(name = "target_unit_price", precision = 18, scale = 2)
-    private BigDecimal targetUnitPrice;
+    @Builder.Default
+    @Column(name = "estimated_unit_price", precision = 18, scale = 2)
+    private BigDecimal estimatedUnitPrice = BigDecimal.ZERO;
+
+    @Column(name = "estimated_total", precision = 18, scale = 2)
+    private BigDecimal estimatedTotal;
+
+    @Column(name = "delivery_date")
+    private LocalDate deliveryDate;
 
     @Column(columnDefinition = "TEXT")
     private String note;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
+    @Builder.Default
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Builder.Default
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

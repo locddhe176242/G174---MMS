@@ -73,13 +73,14 @@ export default function PurchaseRequisitionList() {
     /**
      * Tạo badge hiển thị trạng thái phiếu (RequisitionStatus)
      * 
-     * @param {string} status - Open/Closed/Cancelled
+     * @param {string} status - Open/Closed/Converted/Cancelled
      * @returns {JSX.Element} Badge component với màu tương ứng
      */
     const getStatusBadge = (status) => {
         const statusColors = {
             Open: "bg-blue-100 text-blue-800",
             Closed: "bg-gray-100 text-gray-800",
+            Converted: "bg-green-100 text-green-800",
             Cancelled: "bg-red-100 text-red-800",
         };
         const color = statusColors[status] || "bg-gray-100 text-gray-800";
@@ -89,17 +90,19 @@ export default function PurchaseRequisitionList() {
     /**
      * Tạo badge hiển thị trạng thái duyệt (ApprovalStatus)
      * 
-     * @param {string} approvalStatus - Pending/Approved/Rejected
+     * @param {string} approvalStatus - Draft/Pending/Approved/Rejected/Cancelled
      * @returns {JSX.Element} Badge component với màu tương ứng
      */
     const getApprovalStatusBadge = (approvalStatus) => {
         const statusColors = {
+            Draft: "bg-gray-100 text-gray-800",
             Pending: "bg-yellow-100 text-yellow-800",
             Approved: "bg-green-100 text-green-800",
             Rejected: "bg-red-100 text-red-800",
+            Cancelled: "bg-red-100 text-red-800",
         };
         const color = statusColors[approvalStatus] || "bg-gray-100 text-gray-800";
-        return <span className={`px-2 py-1 rounded text-xs font-medium ${color}`}>{approvalStatus || "Pending"}</span>;
+        return <span className={`px-2 py-1 rounded text-xs font-medium ${color}`}>{approvalStatus || "Draft"}</span>;
     };
 
     /**
@@ -377,18 +380,9 @@ export default function PurchaseRequisitionList() {
                                             TRẠNG THÁI {getSortIcon("status")}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        DUYỆT
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHÒNG BAN</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DUYỆT</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MỤC ĐÍCH</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("neededBy")} className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY {getSortIcon("neededBy")}
-                                        </button>
-                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SỐ SẢN PHẨM</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TỔNG GIÁ TRỊ</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         <button onClick={() => handleSort("createdAt")} className="flex items-center gap-1 hover:text-gray-700">
                                             NGÀY TẠO {getSortIcon("createdAt")}
@@ -401,7 +395,7 @@ export default function PurchaseRequisitionList() {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                 {requisitions.length === 0 ? (
                                     <tr>
-                                        <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                                             Không có phiếu yêu cầu nào
                                         </td>
                                     </tr>
@@ -418,16 +412,10 @@ export default function PurchaseRequisitionList() {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{getStatusBadge(requisition.status)}</td>
                                                 {/* Trạng thái duyệt */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{getApprovalStatusBadge(requisition.approvalStatus)}</td>
-                                                {/* Phòng ban */}
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{requisition.department || "-"}</td>
                                                 {/* Mục đích */}
                                                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={requisition.purpose}>{requisition.purpose || "-"}</td>
-                                                {/* Ngày cần hàng */}
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(requisition.neededBy) || "-"}</td>
                                                 {/* Số sản phẩm */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">{getTotalItems(requisition.items || [])}</td>
-                                                {/* Tổng giá trị */}
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">{formatCurrency(requisition.totalEstimated)}</td>
                                                 {/* Ngày tạo */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(requisition.createdAt)}</td>
                                                 {/* Người yêu cầu */}
