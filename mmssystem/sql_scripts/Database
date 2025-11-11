@@ -276,9 +276,7 @@ CREATE TABLE Purchase_Requisitions (
     requisition_no VARCHAR(30) UNIQUE NOT NULL,
     requester_id INT,
     department VARCHAR(100),
-    cost_center VARCHAR(50),
     needed_by DATE,
-    destination_warehouse_id INT,
     purpose TEXT,
     approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
     approver_id INT,
@@ -290,7 +288,6 @@ CREATE TABLE Purchase_Requisitions (
     deleted_at DATETIME DEFAULT NULL,
     FOREIGN KEY (requester_id) REFERENCES Users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (approver_id) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (destination_warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE SET NULL,
     INDEX idx_req_no (requisition_no),
     INDEX idx_req_status (status, approval_status, deleted_at),
     INDEX idx_req_requester (requester_id)
@@ -302,15 +299,12 @@ CREATE TABLE Purchase_Requisition_Items (
     product_id INT,
     product_code VARCHAR(50),
     product_name VARCHAR(255),
-    spec TEXT,
     uom VARCHAR(50),
     requested_qty DECIMAL(18, 2) NOT NULL,
     target_unit_price DECIMAL(18, 2),
-    suggested_vendor_id INT,
     note TEXT,
     FOREIGN KEY (requisition_id) REFERENCES Purchase_Requisitions(requisition_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
-    FOREIGN KEY (suggested_vendor_id) REFERENCES Vendors(vendor_id) ON DELETE SET NULL,
     INDEX idx_pri_requisition (requisition_id),
     INDEX idx_pri_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

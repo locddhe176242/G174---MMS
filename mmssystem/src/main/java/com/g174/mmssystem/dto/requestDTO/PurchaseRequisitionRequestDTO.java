@@ -24,14 +24,8 @@ public class PurchaseRequisitionRequestDTO {
     @Size(max = 100)
     private String department;
 
-    @Size(max = 50)
-    private String costCenter;
-
     @FutureOrPresent(message = "Ngày cần phải lớn hơn hoặc bằng ngày hiện tại")
     private LocalDate neededBy;
-
-    @NotNull(message = "Kho đích đến không được để trống")
-    private Integer destinationWarehouseId;
 
     @NotBlank(message = "Mục đích không được để trống")
     private String purpose;

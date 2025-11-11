@@ -44,7 +44,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH req.profile " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
-            "LEFT JOIN FETCH r.destinationWarehouse " +
             "WHERE r.requisitionId = :id AND r.deletedAt IS NULL")
     Optional<PurchaseRequisition> findByIdWithRelations(@Param("id") Long id);
 
@@ -54,7 +53,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH req.profile " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
-            "LEFT JOIN FETCH r.destinationWarehouse " +
             "WHERE r.deletedAt IS NULL")
     List<PurchaseRequisition> findAllActiveWithRelations();
 
@@ -70,7 +68,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH req.profile " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
-            "LEFT JOIN FETCH r.destinationWarehouse " +
             "WHERE (LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(r.department) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +

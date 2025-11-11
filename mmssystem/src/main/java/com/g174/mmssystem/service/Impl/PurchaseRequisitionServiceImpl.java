@@ -5,14 +5,12 @@ import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
 import com.g174.mmssystem.entity.PurchaseRequisition;
 import com.g174.mmssystem.entity.PurchaseRequisitionItem;
 import com.g174.mmssystem.entity.User;
-import com.g174.mmssystem.entity.Warehouse;
 import com.g174.mmssystem.enums.ApprovalStatus;
 import com.g174.mmssystem.enums.RequisitionStatus;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseRequisitionMapper;
 import com.g174.mmssystem.repository.PurchaseRequisitionRepository;
 import com.g174.mmssystem.repository.UserRepository;
-import com.g174.mmssystem.repository.WarehouseRepository;
 import com.g174.mmssystem.service.IService.IPurchaseRequisitionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +36,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     private final PurchaseRequisitionRepository requisitionRepository;
     private final PurchaseRequisitionMapper requisitionMapper;
     private final UserRepository userRepository;
-    private final WarehouseRepository warehouseRepository;
 
     @Override
     @Transactional
@@ -49,10 +46,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user với ID: " + requesterId));
 
-        // Validate warehouse
-        Warehouse destinationWarehouse = warehouseRepository.findById(dto.getDestinationWarehouseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy warehouse với ID: " + dto.getDestinationWarehouseId()));
-
         // Generate requisition number
         String requisitionNo = generateRequisitionNo();
 
@@ -61,9 +54,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .requisitionNo(requisitionNo)
                 .requester(requester)
                 .department(dto.getDepartment())
-                .costCenter(dto.getCostCenter())
                 .neededBy(dto.getNeededBy())
-                .destinationWarehouse(destinationWarehouse)
                 .purpose(dto.getPurpose())
                 .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : ApprovalStatus.Pending)
                 .approver(dto.getApproverId() != null ? userRepository.findById(dto.getApproverId()).orElse(null) : null)
@@ -89,11 +80,9 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                                 .productId(itemDto.getProductId())
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
-                                .spec(itemDto.getSpec())
                                 .uom(itemDto.getUom())
                                 .requestedQty(itemDto.getRequestedQty())
                                 .targetUnitPrice(itemDto.getTargetUnitPrice())
-                                .suggestedVendorId(itemDto.getSuggestedVendorId())
                                 .note(itemDto.getNote())
                                 .build();
                         return item;
@@ -184,27 +173,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             throw new IllegalStateException("Không thể cập nhật requisition đã được approve");
         }
 
-        // Validate warehouse if changed
-        Warehouse destinationWarehouse = null;
-        if (dto.getDestinationWarehouseId() != null) {
-            destinationWarehouse = warehouseRepository.findById(dto.getDestinationWarehouseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy warehouse với ID: " + dto.getDestinationWarehouseId()));
-        } else {
-            destinationWarehouse = requisition.getDestinationWarehouse();
-        }
-
         // Update basic fields
         if (dto.getDepartment() != null) {
             requisition.setDepartment(dto.getDepartment());
         }
-        if (dto.getCostCenter() != null) {
-            requisition.setCostCenter(dto.getCostCenter());
-        }
         if (dto.getNeededBy() != null) {
             requisition.setNeededBy(dto.getNeededBy());
-        }
-        if (destinationWarehouse != null) {
-            requisition.setDestinationWarehouse(destinationWarehouse);
         }
         if (dto.getPurpose() != null) {
             requisition.setPurpose(dto.getPurpose());
@@ -229,11 +203,9 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                                 .productId(itemDto.getProductId())
                                 .productCode(itemDto.getProductCode())
                                 .productName(itemDto.getProductName())
-                                .spec(itemDto.getSpec())
                                 .uom(itemDto.getUom())
                                 .requestedQty(itemDto.getRequestedQty())
                                 .targetUnitPrice(itemDto.getTargetUnitPrice())
-                                .suggestedVendorId(itemDto.getSuggestedVendorId())
                                 .note(itemDto.getNote())
                                 .build();
                         return item;

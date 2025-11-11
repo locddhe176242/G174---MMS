@@ -18,10 +18,7 @@ public class PurchaseRequisitionResponseDTO {
     private String requisitionNo;
     private String requesterName;
     private String department;
-    private String costCenter;
     private LocalDate neededBy;
-    private Integer destinationWarehouseId;
-    private String destinationWarehouseName;
     private String purpose;
     private ApprovalStatus approvalStatus;
     private Integer approverId;

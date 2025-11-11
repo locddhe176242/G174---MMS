@@ -13,10 +13,8 @@ public class PurchaseRequisitionItemResponseDTO {
     private Long productId;
     private String productCode;
     private String productName;
-    private String spec;
     private String uom;
     private BigDecimal requestedQty;
     private BigDecimal targetUnitPrice;
-    private Long suggestedVendorId;
     private String note;
 }

@@ -35,15 +35,8 @@ public class PurchaseRequisition {
     @Column(name = "department", length = 100)
     private String department;
 
-    @Column(name = "cost_center", length = 50)
-    private String costCenter;
-
     @Column(name = "needed_by")
     private LocalDate neededBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "destination_warehouse_id")
-    private Warehouse destinationWarehouse;
 
     @Column(columnDefinition = "TEXT")
     private String purpose;

@@ -7,7 +7,6 @@ import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
 import com.g174.mmssystem.entity.PurchaseRequisition;
 import com.g174.mmssystem.entity.PurchaseRequisitionItem;
 import com.g174.mmssystem.entity.User;
-import com.g174.mmssystem.entity.Warehouse;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -30,12 +29,7 @@ public class PurchaseRequisitionMapper {
                            requisition.getRequester().getProfile().getLastName()).trim()
                         : null)
                 .department(requisition.getDepartment())
-                .costCenter(requisition.getCostCenter())
                 .neededBy(requisition.getNeededBy())
-                .destinationWarehouseId(requisition.getDestinationWarehouse() != null 
-                        ? requisition.getDestinationWarehouse().getWarehouseId() : null)
-                .destinationWarehouseName(requisition.getDestinationWarehouse() != null 
-                        ? requisition.getDestinationWarehouse().getName() : null)
                 .purpose(requisition.getPurpose())
                 .approvalStatus(requisition.getApprovalStatus())
                 .approverId(requisition.getApprover() != null ? requisition.getApprover().getId() : null)
@@ -62,7 +56,7 @@ public class PurchaseRequisitionMapper {
     // Keeping for reference but service creates entities directly
 
     public void updateEntityFromDTO(PurchaseRequisitionRequestDTO dto, PurchaseRequisition requisition,
-                                    User requester, Warehouse destinationWarehouse) {
+                                    User requester) {
         if (dto == null || requisition == null) {
             return;
         }
@@ -73,14 +67,8 @@ public class PurchaseRequisitionMapper {
         if (dto.getDepartment() != null) {
             requisition.setDepartment(dto.getDepartment());
         }
-        if (dto.getCostCenter() != null) {
-            requisition.setCostCenter(dto.getCostCenter());
-        }
         if (dto.getNeededBy() != null) {
             requisition.setNeededBy(dto.getNeededBy());
-        }
-        if (destinationWarehouse != null) {
-            requisition.setDestinationWarehouse(destinationWarehouse);
         }
         if (dto.getPurpose() != null) {
             requisition.setPurpose(dto.getPurpose());
@@ -115,11 +103,9 @@ public class PurchaseRequisitionMapper {
                 .productId(item.getProductId())
                 .productCode(item.getProductCode())
                 .productName(item.getProductName())
-                .spec(item.getSpec())
                 .uom(item.getUom())
                 .requestedQty(item.getRequestedQty())
                 .targetUnitPrice(item.getTargetUnitPrice())
-                .suggestedVendorId(item.getSuggestedVendorId())
                 .note(item.getNote())
                 .build();
     }
@@ -145,11 +131,9 @@ public class PurchaseRequisitionMapper {
                 .productId(dto.getProductId())
                 .productCode(dto.getProductCode())
                 .productName(dto.getProductName())
-                .spec(dto.getSpec())
                 .uom(dto.getUom())
                 .requestedQty(dto.getRequestedQty())
                 .targetUnitPrice(dto.getTargetUnitPrice())
-                .suggestedVendorId(dto.getSuggestedVendorId())
                 .note(dto.getNote())
                 .build();
     }

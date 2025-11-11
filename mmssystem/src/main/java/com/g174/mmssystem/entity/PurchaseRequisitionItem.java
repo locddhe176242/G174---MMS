@@ -33,9 +33,6 @@ public class PurchaseRequisitionItem {
     @Column(name = "product_name", length = 255)
     private String productName;
 
-    @Column(columnDefinition = "TEXT")
-    private String spec;
-
     @Column(length = 50)
     private String uom;
 
@@ -44,9 +41,6 @@ public class PurchaseRequisitionItem {
 
     @Column(name = "target_unit_price", precision = 18, scale = 2)
     private BigDecimal targetUnitPrice;
-
-    @Column(name = "suggested_vendor_id")
-    private Long suggestedVendorId;
 
     @Column(columnDefinition = "TEXT")
     private String note;

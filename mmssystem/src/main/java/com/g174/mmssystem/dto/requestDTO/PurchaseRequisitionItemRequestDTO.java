@@ -22,8 +22,6 @@ public class PurchaseRequisitionItemRequestDTO {
     @Size(max = 255)
     private String productName;
 
-    private String spec;
-
     @NotBlank(message = "Đơn vị tính không được để trống")
     private String uom;
 
@@ -33,8 +31,6 @@ public class PurchaseRequisitionItemRequestDTO {
 
     @DecimalMin(value = "0.0", inclusive = true)
     private BigDecimal targetUnitPrice;
-
-    private Long suggestedVendorId;
 
     private String note;
 }

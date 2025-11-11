@@ -21,6 +21,9 @@ import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
+import CategoryDetail from "./compnents/pages/Category/CategoryDetail";
+import CategoryEdit from "./compnents/pages/Category/CategoryEdit";
+import CategoryAdd from "./compnents/pages/Category/CategoryAdd";
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
@@ -61,6 +64,9 @@ function App() {
                 <Route path="/customers/:id/edit" element={<CustomerForm />} />
                 <Route path="/products" element={<ProductList />} />
                 <Route path="/categories" element={<CategoryList />} />
+                <Route path="/categories/new" element={<CategoryAdd />} />
+                <Route path="/categories/:id" element={<CategoryDetail />} />
+                <Route path="/categories/:id/edit" element={<CategoryEdit />} />
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/vendors/new" element={<VendorForm />} />
                 <Route path="/vendors/:id/edit" element={<VendorForm />} />
@@ -69,9 +75,9 @@ function App() {
                 <Route path="/warehouse/new" element={<AddWarehouse />} />
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
-                <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
-                <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
-                <Route path="/purchase/purchase-requisitions" element={<PurchaseRequisitionList />} />
+                <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
+                <Route path="/purchase-requisitions" element={<PurchaseRequisitionList />} />
                 <Route path="/purchase/rfqs" element={<RFQList />} />
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
