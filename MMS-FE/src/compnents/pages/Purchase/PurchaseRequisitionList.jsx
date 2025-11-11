@@ -209,7 +209,7 @@ export default function PurchaseRequisitionList() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Quản lý phiếu yêu cầu mua hàng</h1>
             <button
-              onClick={() => navigate("/purchase-requisitions/new")}
+              onClick={() => navigate("/purchase/purchase-requisitions/new")}
               className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
             >
               + Tạo phiếu yêu cầu
