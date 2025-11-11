@@ -21,7 +21,7 @@ INSERT INTO Users (user_id, email, password, employee_code, department_id, statu
 
 -- ==================== 4. USER_ROLES ====================
 INSERT INTO User_Roles (user_id, role_id) VALUES
-(1, 1), -- User 1 (manager@mms.com) có role MANAGER
+(1, 1), -- User 1 (doloc2882003@gmail.com) có role MANAGER
 (2, 2); -- User 2 (sale@mms.com) có role SALE
 
 -- ==================== 5. USER_PROFILE ====================
@@ -46,20 +46,23 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (8, 'accounting', 'Kế toán', '/accounting', 'accounting', 16),
 (9, 'approval', 'Phê duyệt', '/approval', 'approval', 100),
 (10, 'reports', 'Báo cáo', '/reports', 'reports', 101),
-(11, 'staff', 'Nhân sự', '/admin/user', 'staff', 102);
+(11, 'staff', 'Nhân sự', '/admin/user', 'staff', 102),
+(12, 'admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6),
+(13, 'categories', 'Quản lý danh mục', '/categories', 'categories', 3),
+(14, 'rfqs', 'Yêu cầu báo giá', '/purchase/rfqs', 'rfqs', 17);
 
 -- ==================== 8. ROLE_MENUS ====================
--- MANAGER: Có tất cả menus
+-- MANAGER: Có tất cả menus (bao gồm RFQ)
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11);
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14);
 
 -- SALE: Dashboard, Sản phẩm, Xuất hàng, Khách hàng, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 1), (2, 2), (2, 4), (2, 7), (2, 10);
 
--- PURCHASE: Dashboard, Sản phẩm, Nhập hàng, Nhà cung cấp, Báo cáo
+-- PURCHASE: Dashboard, Sản phẩm, Nhập hàng, Nhà cung cấp, Báo cáo, Danh mục
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(3, 1), (3, 3), (3, 4), (3, 6), (3, 10);
+(3, 1), (3, 3), (3, 4), (3, 6), (3, 10), (3, 13);
 
 -- ACCOUNTING: Dashboard, Kế toán, Khách hàng, Nhà cung cấp, Phê duyệt, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
@@ -161,48 +164,3 @@ INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
 -- User 2 (Sale) được cấp quyền phê duyệt đơn bán hàng vĩnh viễn
 INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
 (2, 20, NULL); -- sales.approve, permanent
-
-INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
-VALUES
-('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
-
--- Bước 1: Kiểm tra role MANAGER có tồn tại không
-SELECT 'Kiểm tra role MANAGER:' as status;
-SELECT role_id, role_name FROM roles WHERE role_name = 'MANAGER';
-
--- Bước 2: Thêm menu item cho Department Management
-INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
-VALUES
-('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
-
--- Bước 3: Lấy menu_id vừa tạo
-SET @menu_id = LAST_INSERT_ID();
-SELECT CONCAT('Menu ID vừa tạo: ', @menu_id) as status;
-
--- Bước 4: Kiểm tra menu đã được tạo
-SELECT 'Menu item đã được thêm:' as status;
-SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
-
--- Bước 5: Gán cho role MANAGER (chỉ nếu cả hai đều tồn tại)
-INSERT INTO role_menus (role_id, menu_id)
-SELECT r.role_id, @menu_id
-FROM roles r
-WHERE r.role_name = 'MANAGER'
-AND @menu_id IS NOT NULL
-AND NOT EXISTS (
-    SELECT 1 FROM role_menus rm
-    WHERE rm.role_id = r.role_id AND rm.menu_id = @menu_id
-);
-
--- Kiểm tra kết quả
-SELECT 'Menu item đã được thêm:' as status;
-SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
-
-SELECT 'Role-Menu mapping:' as status;
-SELECT rm.role_id, r.role_name, rm.menu_id, mi.menu_label
-FROM role_menus rm
-JOIN roles r ON rm.role_id = r.role_id
-JOIN menu_items mi ON rm.menu_id = mi.menu_id
-WHERE mi.menu_key = 'admin.departments';
-
-
