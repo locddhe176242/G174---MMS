@@ -1,10 +1,9 @@
 package com.g174.mmssystem.entity;
 
-import com.g174.mmssystem.enums.*;
+import com.g174.mmssystem.enums.RequisitionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,39 +30,16 @@ public class PurchaseRequisition {
     private LocalDate requisitionDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "requester_id")
+    @JoinColumn(name = "requester_id", nullable = false)
     private User requester;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    private Department department;
-
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String purpose;
-
-    @Column(columnDefinition = "TEXT")
-    private String justification;
-
-    @Column(name = "needed_by")
-    private LocalDate neededBy;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
-    private Priority priority = Priority.Medium;
-
-    @Builder.Default
-    @Column(name = "total_estimated", precision = 18, scale = 2)
-    private BigDecimal totalEstimated = BigDecimal.ZERO;
-
-    @Builder.Default
-    @Column(name = "currency_code", length = 10)
-    private String currencyCode = "VND";
-
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "approval_status", length = 20)
-    private ApprovalStatus approvalStatus = ApprovalStatus.Draft;
+    private RequisitionStatus status = RequisitionStatus.Draft;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approver_id")
@@ -71,17 +47,6 @@ public class PurchaseRequisition {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
-
-    @Column(name = "approval_remarks", columnDefinition = "TEXT")
-    private String approvalRemarks;
-
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private RequisitionStatus status = RequisitionStatus.Open;
-
-    @Column(name = "converted_to_po_id")
-    private Long convertedToPoId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

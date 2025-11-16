@@ -26,9 +26,7 @@ public class PurchaseRequisitionController {
     private final IPurchaseRequisitionService requisitionService;
     private final IUserContextService userContextService;
 
-    /**
-     * Wrapper chuẩn cho API response
-     */
+
     @Getter
     @Setter
     @AllArgsConstructor
@@ -54,6 +52,27 @@ public class PurchaseRequisitionController {
         PurchaseRequisitionResponseDTO response = requisitionService.createRequisition(requestDTO, requesterId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Tạo purchase requisition thành công", response));
+    }
+
+    // ===================== SAVE DRAFT =====================
+    @PostMapping("/draft")
+    public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> saveDraft(
+            @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
+
+        log.info("API: Lưu bản nháp purchase requisition");
+
+        Integer requesterId = userContextService.getCurrentUserId();
+        if (requesterId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse<>(false, "Không thể xác định người dùng hiện tại", null));
+        }
+
+    
+        requestDTO.setStatus(com.g174.mmssystem.enums.RequisitionStatus.Draft);
+        
+        PurchaseRequisitionResponseDTO response = requisitionService.createRequisition(requestDTO, requesterId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Lưu bản nháp thành công", response));
     }
 
     // ===================== GET BY ID =====================

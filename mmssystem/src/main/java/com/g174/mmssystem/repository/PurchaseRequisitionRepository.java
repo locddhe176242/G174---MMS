@@ -12,7 +12,7 @@ import java.util.Optional;
 
 public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseRequisition, Long> {
     // Tìm requisition mới nhất theo năm để sinh mã tiếp theo
-    @Query(value = "SELECT r FROM PurchaseRequisition r WHERE r.requisitionNo LIKE CONCAT(:prefix, '%') ORDER BY r.requisitionNo DESC")
+    @Query(value = "SELECT * FROM Purchase_Requisitions WHERE requisition_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY requisition_no DESC LIMIT 1", nativeQuery = true)
     Optional<PurchaseRequisition> findTopByRequisitionNoStartingWithOrderByRequisitionNoDesc(@Param("prefix") String prefix);
 
     boolean existsByRequisitionNo(String requisitionNo);
@@ -25,15 +25,13 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
 
     @Query("SELECT r FROM PurchaseRequisition r WHERE " +
             "(LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     List<PurchaseRequisition> searchRequisitions(@Param("keyword") String keyword);
 
     @Query("SELECT r FROM PurchaseRequisition r WHERE " +
             "(LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     Page<PurchaseRequisition> searchRequisitions(@Param("keyword") String keyword, Pageable pageable);
 
@@ -45,7 +43,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
-            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
             "LEFT JOIN FETCH r.createdBy cb " +
@@ -62,7 +59,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
-            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
             "LEFT JOIN FETCH r.createdBy cb " +
@@ -85,7 +81,6 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH i.updatedBy " +
             "LEFT JOIN FETCH r.requester req " +
             "LEFT JOIN FETCH req.profile " +
-            "LEFT JOIN FETCH r.department " +
             "LEFT JOIN FETCH r.approver app " +
             "LEFT JOIN FETCH app.profile " +
             "LEFT JOIN FETCH r.createdBy cb " +
@@ -93,8 +88,7 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH r.updatedBy ub " +
             "LEFT JOIN FETCH ub.profile " +
             "WHERE (LOWER(r.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(r.justification) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
             "r.deletedAt IS NULL")
     List<PurchaseRequisition> searchRequisitionsWithRelations(@Param("keyword") String keyword);
 }

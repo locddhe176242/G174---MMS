@@ -29,29 +29,16 @@ public class PurchaseRequisitionItem {
     @JoinColumn(name = "product_id")
     private Product product;
 
-    @Column(name = "product_code", length = 50)
-    private String productCode;
-
     @Column(name = "product_name", length = 255)
     private String productName;
-
-    @Column(columnDefinition = "TEXT")
-    private String specification;
-
-    @Column(length = 50)
-    private String uom;
 
     @Column(name = "requested_qty", precision = 18, scale = 2, nullable = false)
     private BigDecimal requestedQty;
 
-    @Builder.Default
-    @Column(name = "estimated_unit_price", precision = 18, scale = 2)
-    private BigDecimal estimatedUnitPrice = BigDecimal.ZERO;
+    @Column(name = "unit", length = 50)
+    private String unit;
 
-    @Column(name = "estimated_total", precision = 18, scale = 2)
-    private BigDecimal estimatedTotal;
-
-    @Column(name = "delivery_date")
+    @Column(name = "delivery_date", nullable = false)
     private LocalDate deliveryDate;
 
     @Column(columnDefinition = "TEXT")

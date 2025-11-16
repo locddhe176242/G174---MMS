@@ -9,7 +9,6 @@ import com.g174.mmssystem.entity.PurchaseRequisitionItem;
 import com.g174.mmssystem.entity.User;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,28 +24,19 @@ public class PurchaseRequisitionMapper {
                 .requisitionId(requisition.getRequisitionId())
                 .requisitionNo(requisition.getRequisitionNo())
                 .requisitionDate(requisition.getRequisitionDate())
+                .requesterId(requisition.getRequester() != null ? requisition.getRequester().getId().longValue() : null)
                 .requesterName(requisition.getRequester() != null && requisition.getRequester().getProfile() != null
                         ? (requisition.getRequester().getProfile().getFirstName() + " " + 
                            requisition.getRequester().getProfile().getLastName()).trim()
                         : null)
-                .departmentId(requisition.getDepartment() != null ? requisition.getDepartment().getId() : null)
-                .departmentName(requisition.getDepartment() != null ? requisition.getDepartment().getDepartmentName() : null)
                 .purpose(requisition.getPurpose())
-                .justification(requisition.getJustification())
-                .neededBy(requisition.getNeededBy())
-                .priority(requisition.getPriority())
-                .totalEstimated(requisition.getTotalEstimated())
-                .currencyCode(requisition.getCurrencyCode())
-                .approvalStatus(requisition.getApprovalStatus())
+                .status(requisition.getStatus())
                 .approverId(requisition.getApprover() != null ? requisition.getApprover().getId() : null)
                 .approverName(requisition.getApprover() != null && requisition.getApprover().getProfile() != null
                         ? (requisition.getApprover().getProfile().getFirstName() + " " + 
                            requisition.getApprover().getProfile().getLastName()).trim()
                         : null)
                 .approvedAt(requisition.getApprovedAt())
-                .approvalRemarks(requisition.getApprovalRemarks())
-                .status(requisition.getStatus())
-                .convertedToPoId(requisition.getConvertedToPoId())
                 .createdByName(requisition.getCreatedBy() != null && requisition.getCreatedBy().getProfile() != null
                         ? (requisition.getCreatedBy().getProfile().getFirstName() + " " + 
                            requisition.getCreatedBy().getProfile().getLastName()).trim()
@@ -95,16 +85,11 @@ public class PurchaseRequisitionMapper {
         return PurchaseRequisitionItemResponseDTO.builder()
                 .priId(item.getPriId())
                 .productId(item.getProduct() != null ? item.getProduct().getProductId().longValue() : null)
-                .productCode(item.getProductCode() != null ? item.getProductCode() : 
-                            (item.getProduct() != null ? item.getProduct().getSku() : null))
                 .productName(item.getProductName() != null ? item.getProductName() : 
                             (item.getProduct() != null ? item.getProduct().getName() : null))
-                .specification(item.getSpecification())
-                .uom(item.getUom() != null ? item.getUom() : 
-                     (item.getProduct() != null ? item.getProduct().getUom() : null))
                 .requestedQty(item.getRequestedQty())
-                .estimatedUnitPrice(item.getEstimatedUnitPrice())
-                .estimatedTotal(item.getEstimatedTotal())
+                .unit(item.getUnit() != null ? item.getUnit() : 
+                     (item.getProduct() != null ? item.getProduct().getUom() : null))
                 .deliveryDate(item.getDeliveryDate())
                 .note(item.getNote())
                 .createdByName(item.getCreatedBy() != null && item.getCreatedBy().getProfile() != null
@@ -138,22 +123,14 @@ public class PurchaseRequisitionMapper {
             return null;
         }
 
-        // Calculate estimatedTotal = requestedQty * estimatedUnitPrice
-        BigDecimal estimatedTotal = null;
-        if (dto.getRequestedQty() != null && dto.getEstimatedUnitPrice() != null) {
-            estimatedTotal = dto.getRequestedQty().multiply(dto.getEstimatedUnitPrice());
-        }
-
         return PurchaseRequisitionItem.builder()
                 .purchaseRequisition(requisition)
                 .product(product)
-                .productCode(dto.getProductCode())
-                .productName(dto.getProductName())
-                .specification(dto.getSpecification())
-                .uom(dto.getUom())
+                .productName(dto.getProductName() != null ? dto.getProductName() : 
+                            (product != null ? product.getName() : null))
                 .requestedQty(dto.getRequestedQty())
-                .estimatedUnitPrice(dto.getEstimatedUnitPrice() != null ? dto.getEstimatedUnitPrice() : BigDecimal.ZERO)
-                .estimatedTotal(estimatedTotal)
+                .unit(dto.getUnit() != null ? dto.getUnit() : 
+                     (product != null ? product.getUom() : null))
                 .deliveryDate(dto.getDeliveryDate())
                 .note(dto.getNote())
                 .createdBy(createdBy)

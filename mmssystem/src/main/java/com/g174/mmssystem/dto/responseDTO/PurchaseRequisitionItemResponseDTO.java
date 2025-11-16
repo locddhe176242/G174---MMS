@@ -13,13 +13,9 @@ import java.time.LocalDateTime;
 public class PurchaseRequisitionItemResponseDTO {
     private Long priId;
     private Long productId;
-    private String productCode;
     private String productName;
-    private String specification;
-    private String uom;
     private BigDecimal requestedQty;
-    private BigDecimal estimatedUnitPrice;
-    private BigDecimal estimatedTotal;
+    private String unit;
     private LocalDate deliveryDate;
     private String note;
     private String createdByName;

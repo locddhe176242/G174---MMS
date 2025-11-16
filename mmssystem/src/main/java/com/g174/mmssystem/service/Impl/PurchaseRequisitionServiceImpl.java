@@ -5,11 +5,9 @@ import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
 import com.g174.mmssystem.entity.PurchaseRequisition;
 import com.g174.mmssystem.entity.PurchaseRequisitionItem;
 import com.g174.mmssystem.entity.User;
-import com.g174.mmssystem.enums.ApprovalStatus;
 import com.g174.mmssystem.enums.RequisitionStatus;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseRequisitionMapper;
-import com.g174.mmssystem.repository.DepartmentRepository;
 import com.g174.mmssystem.repository.PurchaseRequisitionRepository;
 import com.g174.mmssystem.repository.UserRepository;
 import com.g174.mmssystem.service.IService.IPurchaseRequisitionService;
@@ -37,7 +35,6 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     private final PurchaseRequisitionRepository requisitionRepository;
     private final PurchaseRequisitionMapper requisitionMapper;
     private final UserRepository userRepository;
-    private final DepartmentRepository departmentRepository;
     private final com.g174.mmssystem.repository.ProductRepository productRepository;
 
     @Override
@@ -49,42 +46,27 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user với ID: " + requesterId));
 
-        // Generate requisition number
-        String requisitionNo = generateRequisitionNo();
-
-        // Load Department if provided
-        com.g174.mmssystem.entity.Department department = null;
-        if (dto.getDepartmentId() != null) {
-            department = departmentRepository.findById(dto.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy department với ID: " + dto.getDepartmentId()));
+        // Generate requisition number if not provided
+        String requisitionNo = dto.getRequisitionNo();
+        if (requisitionNo == null || requisitionNo.trim().isEmpty()) {
+            requisitionNo = generateRequisitionNo();
         }
 
-        // Calculate total estimated from items
-        BigDecimal totalEstimated = BigDecimal.ZERO;
-        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            totalEstimated = dto.getItems().stream()
-                    .filter(item -> item.getRequestedQty() != null && item.getEstimatedUnitPrice() != null)
-                    .map(item -> item.getRequestedQty().multiply(item.getEstimatedUnitPrice()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Set requisition date if not provided
+        LocalDate requisitionDate = dto.getRequisitionDate();
+        if (requisitionDate == null) {
+            requisitionDate = LocalDate.now();
         }
 
         // Create requisition entity
         PurchaseRequisition requisition = PurchaseRequisition.builder()
                 .requisitionNo(requisitionNo)
-                .requisitionDate(LocalDate.now())
+                .requisitionDate(requisitionDate)
                 .requester(requester)
-                .department(department)
                 .purpose(dto.getPurpose())
-                .justification(dto.getJustification())
-                .neededBy(dto.getNeededBy())
-                .priority(dto.getPriority() != null ? dto.getPriority() : com.g174.mmssystem.enums.Priority.Medium)
-                .totalEstimated(totalEstimated)
-                .currencyCode(dto.getCurrencyCode() != null ? dto.getCurrencyCode() : "VND")
-                .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : ApprovalStatus.Draft)
+                .status(dto.getStatus() != null ? dto.getStatus() : RequisitionStatus.Draft)
                 .approver(dto.getApproverId() != null ? userRepository.findById(dto.getApproverId()).orElse(null) : null)
-                .approvalRemarks(dto.getApprovalRemarks())
-                .status(dto.getStatus() != null ? dto.getStatus() : RequisitionStatus.Open)
-                .convertedToPoId(dto.getConvertedToPoId())
+                .approvedAt(dto.getApprovedAt())
                 .createdBy(requester)
                 .updatedBy(requester)
                 .createdAt(LocalDateTime.now())
@@ -102,23 +84,31 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                                     .orElse(null); // Allow null product
                         }
 
-                        // Calculate estimatedTotal
-                        BigDecimal estimatedTotal = null;
-                        if (itemDto.getRequestedQty() != null && itemDto.getEstimatedUnitPrice() != null) {
-                            estimatedTotal = itemDto.getRequestedQty().multiply(itemDto.getEstimatedUnitPrice());
+                        // Set product name from product if not provided
+                        String productName = itemDto.getProductName();
+                        if (productName == null || productName.trim().isEmpty()) {
+                            productName = product != null ? product.getName() : null;
+                        }
+
+                        // Set unit from product if not provided
+                        String unit = itemDto.getUnit();
+                        if (unit == null || unit.trim().isEmpty()) {
+                            unit = product != null ? product.getUom() : null;
+                        }
+
+                        // Ensure deliveryDate is not null
+                        LocalDate deliveryDate = itemDto.getDeliveryDate();
+                        if (deliveryDate == null) {
+                            deliveryDate = LocalDate.now().plusDays(30); // Default to 30 days from now
                         }
 
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
                                 .product(product)
-                                .productCode(itemDto.getProductCode())
-                                .productName(itemDto.getProductName())
-                                .specification(itemDto.getSpecification())
-                                .uom(itemDto.getUom())
+                                .productName(productName)
                                 .requestedQty(itemDto.getRequestedQty())
-                                .estimatedUnitPrice(itemDto.getEstimatedUnitPrice() != null ? itemDto.getEstimatedUnitPrice() : BigDecimal.ZERO)
-                                .estimatedTotal(estimatedTotal)
-                                .deliveryDate(itemDto.getDeliveryDate())
+                                .unit(unit)
+                                .deliveryDate(deliveryDate)
                                 .note(itemDto.getNote())
                                 .createdBy(requester)
                                 .updatedBy(requester)
@@ -205,13 +195,10 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        // Check if requisition can be updated (only if approvalStatus is Draft or Pending, and status is Open)
-        if (requisition.getApprovalStatus() == ApprovalStatus.Approved || 
-            requisition.getApprovalStatus() == ApprovalStatus.Rejected ||
-            requisition.getApprovalStatus() == ApprovalStatus.Cancelled) {
-            throw new IllegalStateException("Không thể cập nhật requisition khi approvalStatus là " + requisition.getApprovalStatus());
-        }
-        if (requisition.getStatus() != RequisitionStatus.Open) {
+        // Check if requisition can be updated (only if status is Draft or Pending)
+        if (requisition.getStatus() == RequisitionStatus.Approved || 
+            requisition.getStatus() == RequisitionStatus.Rejected ||
+            requisition.getStatus() == RequisitionStatus.Cancelled) {
             throw new IllegalStateException("Không thể cập nhật requisition khi status là " + requisition.getStatus());
         }
 
@@ -220,35 +207,27 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user với ID: " + updatedById));
 
         // Update basic fields
-        if (dto.getDepartmentId() != null) {
-            com.g174.mmssystem.entity.Department department = departmentRepository.findById(dto.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy department với ID: " + dto.getDepartmentId()));
-            requisition.setDepartment(department);
+        if (dto.getRequisitionNo() != null) {
+            requisition.setRequisitionNo(dto.getRequisitionNo());
+        }
+        if (dto.getRequisitionDate() != null) {
+            requisition.setRequisitionDate(dto.getRequisitionDate());
         }
         if (dto.getPurpose() != null) {
             requisition.setPurpose(dto.getPurpose());
         }
-        if (dto.getJustification() != null) {
-            requisition.setJustification(dto.getJustification());
-        }
-        if (dto.getNeededBy() != null) {
-            requisition.setNeededBy(dto.getNeededBy());
-        }
-        if (dto.getPriority() != null) {
-            requisition.setPriority(dto.getPriority());
-        }
-        if (dto.getCurrencyCode() != null) {
-            requisition.setCurrencyCode(dto.getCurrencyCode());
-        }
-        if (dto.getApprovalStatus() != null) {
-            requisition.setApprovalStatus(dto.getApprovalStatus());
-        }
         if (dto.getStatus() != null) {
             requisition.setStatus(dto.getStatus());
         }
+        if (dto.getApproverId() != null) {
+            User approver = userRepository.findById(dto.getApproverId()).orElse(null);
+            requisition.setApprover(approver);
+        }
+        if (dto.getApprovedAt() != null) {
+            requisition.setApprovedAt(dto.getApprovedAt());
+        }
 
         // Update items - remove old items and add new ones
-        BigDecimal totalEstimated = BigDecimal.ZERO;
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             // Remove existing items
             requisition.getItems().clear();
@@ -263,23 +242,31 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                                     .orElse(null); // Allow null product
                         }
 
-                        // Calculate estimatedTotal
-                        BigDecimal estimatedTotal = null;
-                        if (itemDto.getRequestedQty() != null && itemDto.getEstimatedUnitPrice() != null) {
-                            estimatedTotal = itemDto.getRequestedQty().multiply(itemDto.getEstimatedUnitPrice());
+                        // Set product name from product if not provided
+                        String productName = itemDto.getProductName();
+                        if (productName == null || productName.trim().isEmpty()) {
+                            productName = product != null ? product.getName() : null;
+                        }
+
+                        // Set unit from product if not provided
+                        String unit = itemDto.getUnit();
+                        if (unit == null || unit.trim().isEmpty()) {
+                            unit = product != null ? product.getUom() : null;
+                        }
+
+                        // Ensure deliveryDate is not null
+                        LocalDate deliveryDate = itemDto.getDeliveryDate();
+                        if (deliveryDate == null) {
+                            deliveryDate = LocalDate.now().plusDays(30); // Default to 30 days from now
                         }
 
                         PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(requisition)
                                 .product(product)
-                                .productCode(itemDto.getProductCode())
-                                .productName(itemDto.getProductName())
-                                .specification(itemDto.getSpecification())
-                                .uom(itemDto.getUom())
+                                .productName(productName)
                                 .requestedQty(itemDto.getRequestedQty())
-                                .estimatedUnitPrice(itemDto.getEstimatedUnitPrice() != null ? itemDto.getEstimatedUnitPrice() : BigDecimal.ZERO)
-                                .estimatedTotal(estimatedTotal)
-                                .deliveryDate(itemDto.getDeliveryDate())
+                                .unit(unit)
+                                .deliveryDate(deliveryDate)
                                 .note(itemDto.getNote())
                                 .createdBy(requisition.getCreatedBy())
                                 .updatedBy(updatedBy)
@@ -290,14 +277,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                     })
                     .collect(Collectors.toList());
             requisition.setItems(newItems);
-            
-            // Calculate total estimated from items after creating them
-            totalEstimated = newItems.stream()
-                    .filter(item -> item.getEstimatedTotal() != null)
-                    .map(PurchaseRequisitionItem::getEstimatedTotal)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
-        requisition.setTotalEstimated(totalEstimated);
         requisition.setUpdatedBy(updatedBy);
         requisition.setUpdatedAt(LocalDateTime.now());
         PurchaseRequisition saved = requisitionRepository.save(requisition);
@@ -319,14 +299,14 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        if (requisition.getApprovalStatus() == ApprovalStatus.Approved) {
+        if (requisition.getStatus() == RequisitionStatus.Approved) {
             throw new IllegalStateException("Requisition đã được approve rồi");
         }
 
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy approver với ID: " + approverId));
 
-        requisition.setApprovalStatus(ApprovalStatus.Approved);
+        requisition.setStatus(RequisitionStatus.Approved);
         requisition.setApprover(approver);
         requisition.setApprovedAt(LocalDateTime.now());
         requisition.setUpdatedBy(approver);
@@ -351,17 +331,16 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        if (requisition.getApprovalStatus() == ApprovalStatus.Rejected) {
+        if (requisition.getStatus() == RequisitionStatus.Rejected) {
             throw new IllegalStateException("Requisition đã bị reject rồi");
         }
 
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy approver với ID: " + approverId));
 
-        requisition.setApprovalStatus(ApprovalStatus.Rejected);
+        requisition.setStatus(RequisitionStatus.Rejected);
         requisition.setApprover(approver);
         requisition.setApprovedAt(LocalDateTime.now());
-        requisition.setApprovalRemarks(reason);
         requisition.setUpdatedBy(approver);
         requisition.setUpdatedAt(LocalDateTime.now());
 
@@ -384,11 +363,12 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
-        if (requisition.getStatus() == RequisitionStatus.Closed) {
+        // For simplified schema, we can use Cancelled status instead of Closed
+        if (requisition.getStatus() == RequisitionStatus.Cancelled) {
             throw new IllegalStateException("Requisition đã được đóng rồi");
         }
 
-        requisition.setStatus(RequisitionStatus.Closed);
+        requisition.setStatus(RequisitionStatus.Cancelled);
         requisition.setUpdatedAt(LocalDateTime.now());
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);
