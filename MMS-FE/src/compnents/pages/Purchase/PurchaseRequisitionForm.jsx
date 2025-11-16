@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
-import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { getCurrentUser } from '../../../api/authService';
@@ -34,14 +33,9 @@ const PurchaseRequisitionForm = () => {
     const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState(null);
 
-    // Calculate total value
+    // Calculate total value - removed valuation_price
     const totalValue = useMemo(() => {
-        if (!Array.isArray(formData.items)) return 0;
-        return formData.items.reduce((sum, it) => {
-            const qty = Number(it.requested_qty || 0);
-            const price = Number(it.valuation_price || 0);
-            return sum + qty * price;
-        }, 0);
+        return 0; // No longer calculating total since valuation_price is removed
     }, [formData.items]);
 
     const formatCurrency = (n) =>
@@ -382,12 +376,10 @@ const PurchaseRequisitionForm = () => {
     const addItem = () => {
         const newItem = {
             product_id: null,
-            product_name: '', // For manual product input
+            product_name: '',
             requested_qty: 1,
-            unit: '', // Unit field
+            unit: '',
             delivery_date: new Date(),
-            valuation_price: 0,
-            price_unit: 1,
             note: ''
         };
 
@@ -430,7 +422,7 @@ const PurchaseRequisitionForm = () => {
                 return;
             }
 
-            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ngày giao hàng, Giá định giá, Ghi chú
+            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ngày giao hàng, Ghi chú
             // Skip header row (row 1), start from row 2
             const importedItems = [];
 
@@ -488,18 +480,16 @@ const PurchaseRequisitionForm = () => {
                     return cell.value?.toString() || '';
                 };
 
-                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ngày giao hàng, E=Giá định giá, F=Ghi chú
+                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ngày giao hàng, E=Ghi chú
                 const productNameValue = getCellValue(1);
                 const qtyValue = getCellValue(2);
                 const unitValue = getCellValue(3);
                 const deliveryDateValue = getCellValue(4, true); // isDateColumn = true
-                const priceValue = getCellValue(5);
-                const noteValue = getCellValue(6);
+                const noteValue = getCellValue(5);
 
                 const productName = productNameValue ? productNameValue.toString().trim() : '';
                 const qty = qtyValue ? (typeof qtyValue === 'number' ? qtyValue : parseFloat(qtyValue)) : 1;
                 const unit = unitValue ? unitValue.toString().trim() : '';
-                const price = priceValue ? (typeof priceValue === 'number' ? priceValue : parseFloat(priceValue)) : 0;
                 const note = noteValue ? noteValue.toString().trim() : '';
 
                 // Skip empty rows
@@ -577,8 +567,6 @@ const PurchaseRequisitionForm = () => {
                     requested_qty: isNaN(qty) || qty <= 0 ? 1 : qty,
                     unit: unit,
                     delivery_date: deliveryDate,
-                    valuation_price: isNaN(price) ? 0 : price,
-                    price_unit: 1,
                     note: note
                 });
             });
@@ -613,49 +601,95 @@ const PurchaseRequisitionForm = () => {
         }
     };
 
+    // Download Excel template
+    const downloadExcelTemplate = async () => {
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Template');
+
+            // Set column headers
+            worksheet.columns = [
+                { header: 'Sản phẩm', key: 'product', width: 30 },
+                { header: 'Số lượng', key: 'quantity', width: 12 },
+                { header: 'Đơn vị', key: 'unit', width: 12 },
+                { header: 'Ngày giao hàng', key: 'delivery_date', width: 18 },
+                { header: 'Ghi chú', key: 'note', width: 30 }
+            ];
+
+            // Style header row
+            worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            worksheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF4472C4' }
+            };
+            worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+            // Add example row
+            const exampleRow = worksheet.addRow({
+                product: 'Ví dụ: Máy tính Dell XPS 13',
+                quantity: 5,
+                unit: 'Cái',
+                delivery_date: new Date(),
+                note: 'Ghi chú mẫu'
+            });
+
+            // Style example row (light gray background)
+            exampleRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF2F2F2' }
+            };
+
+            // Format date column
+            worksheet.getColumn('delivery_date').numFmt = 'dd/mm/yyyy';
+
+            // Freeze header row
+            worksheet.views = [
+                { state: 'frozen', ySplit: 1 }
+            ];
+
+            // Generate buffer and download
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Template_Phieu_Yeu_Cau_Mua_Hang_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            toast.success('Đã tải template Excel thành công!');
+        } catch (error) {
+            console.error('Error downloading Excel template:', error);
+            toast.error('Lỗi khi tải template Excel: ' + error.message);
+        }
+    };
+
 
     const handleProductSelect = (index, selectedOption) => {
-        if (selectedOption) {
+        if (selectedOption && selectedOption.product) {
             const product = selectedOption.product;
+            const unit = product.uom || '';
             
-            // Check if this is a manually created product (no product object)
-            if (!product) {
-                // Manual product input - use the label as product_name
-                setFormData(prev => {
-                    const newItems = [...prev.items];
-                    newItems[index] = {
-                        ...newItems[index],
-                        product_id: null,
-                        product_name: selectedOption.label || selectedOption.value,
-                        valuation_price: newItems[index].valuation_price || 0,
-                        unit: newItems[index].unit || '' // Keep existing unit or empty
-                    };
-                    return {
-                        ...prev,
-                        items: newItems
-                    };
-                });
-            } else {
-                // Product from list - auto-fill price and unit
-                const purchasePrice = product.purchasePrice ?? product.purchase_price ?? 0;
-                const unit = product.uom || '';
-                
-                // Update cả product_id, valuation_price và unit trong một lần để tránh state không đồng bộ
-                setFormData(prev => {
-                    const newItems = [...prev.items];
-                    newItems[index] = {
-                        ...newItems[index],
-                        product_id: selectedOption.value,
-                        product_name: `${product.sku || product.productCode || ''} - ${product.name || ''}`.trim(),
-                        valuation_price: purchasePrice,
-                        unit: unit
-                    };
-                    return {
-                        ...prev,
-                        items: newItems
-                    };
-                });
-            }
+            // Update product_id and unit
+            setFormData(prev => {
+                const newItems = [...prev.items];
+                newItems[index] = {
+                    ...newItems[index],
+                    product_id: selectedOption.value,
+                    product_name: `${product.sku || product.productCode || ''} - ${product.name || ''}`.trim(),
+                    unit: unit
+                };
+                return {
+                    ...prev,
+                    items: newItems
+                };
+            });
         } else {
             // Clear product selection
             setFormData(prev => {
@@ -664,7 +698,6 @@ const PurchaseRequisitionForm = () => {
                     ...newItems[index],
                     product_id: null,
                     product_name: '',
-                    valuation_price: 0,
                     unit: ''
                 };
                 return {
@@ -857,9 +890,22 @@ const PurchaseRequisitionForm = () => {
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={triggerFileInput}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+                                onClick={downloadExcelTemplate}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition flex items-center gap-2"
                             >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Tải Template Excel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={triggerFileInput}
+                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
                                 Import từ Excel
                             </button>
                             <input
@@ -908,12 +954,6 @@ const PurchaseRequisitionForm = () => {
                                             Ngày giao hàng
                                         </th>
                                         <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                            Giá định giá
-                                        </th>
-                                        <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                            Thành tiền
-                                        </th>
-                                        <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
                                             Ghi chú
                                         </th>
                                         <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
@@ -928,21 +968,20 @@ const PurchaseRequisitionForm = () => {
                                                 {index + 1}
                                             </td>
                                             <td className="border border-gray-200 px-2 py-1">
-                                                <CreatableSelect
+                                                <Select
                                                     value={item.product_id ? products.find(option => {
                                                         const optionValue = Number(option.value);
                                                         const itemValue = Number(item.product_id);
                                                         return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
-                                                    }) || null : (item.product_name ? { value: item.product_name, label: item.product_name } : null)}
+                                                    }) || null : null}
                                                     onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
                                                     options={getAvailableProducts(index)}
-                                                    placeholder="Chọn hoặc nhập"
+                                                    placeholder="Chọn sản phẩm"
                                                     className="text-xs"
                                                     menuPortalTarget={document.body}
                                                     menuPosition="fixed"
                                                     menuShouldScrollIntoView={false}
                                                     isClearable
-                                                    formatCreateLabel={(inputValue) => `Tạo "${inputValue}"`}
                                                     styles={{
                                                         control: (base) => ({ ...base, fontSize: '0.75rem', minHeight: '28px', height: '28px' }),
                                                         valueContainer: (base) => ({ ...base, padding: '2px 8px' }),
@@ -1009,19 +1048,6 @@ const PurchaseRequisitionForm = () => {
                                             </td>
                                             <td className="border border-gray-200 px-2 py-1">
                                                 <input
-                                                    type="number"
-                                                    value={item.valuation_price}
-                                                    onChange={(e) => handleItemChange(index, 'valuation_price', parseFloat(e.target.value) || 0)}
-                                                    className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                    min="0"
-                                                    step="0.01"
-                                                />
-                                            </td>
-                                            <td className="border border-gray-200 px-2 py-1 text-xs">
-                                                {formatCurrency((Number(item.requested_qty || 0) * Number(item.valuation_price || 0)))}
-                                            </td>
-                                            <td className="border border-gray-200 px-2 py-1">
-                                                <input
                                                     type="text"
                                                     value={item.note}
                                                     onChange={(e) => handleItemChange(index, 'note', e.target.value)}
@@ -1042,12 +1068,6 @@ const PurchaseRequisitionForm = () => {
                                     ))}
                                 </tbody>
                             </table>
-                            <div className="flex justify-end mt-3">
-                                <div className="text-right">
-                                    <div className="text-sm text-gray-600">Tổng giá trị</div>
-                                    <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </div>
