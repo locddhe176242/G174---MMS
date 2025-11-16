@@ -1,40 +1,3 @@
-/**
- * PURCHASE REQUISITION DETAIL COMPONENT
- * 
- * Component hiển thị chi tiết phiếu yêu cầu mua hàng
- * 
- * FEATURES:
- * - Hiển thị thông tin tổng quan (tổng giá trị, số sản phẩm, trạng thái)
- * - Hiển thị danh sách sản phẩm trong phiếu với tính năng tính tổng
- * - Hiển thị thông tin cơ bản: mã phiếu, người yêu cầu, phòng ban, ngày cần, người duyệt
- * - Hiển thị mục đích sử dụng
- * - Nút chỉnh sửa phiếu
- * 
- * BACKEND RESPONSE DTO:
- * - requisitionId: Long
- * - requisitionNo: String
- * - requesterName: String
- * - department: String
- * - neededBy: LocalDate
- * - purpose: String
- * - approvalStatus: Enum (Pending/Approved/Rejected)
- * - approverId: Integer
- * - approverName: String
- * - approvedAt: LocalDateTime
- * - totalEstimated: BigDecimal
- * - status: Enum (Open/Closed/Cancelled)
- * - createdAt: LocalDateTime
- * - updatedAt: LocalDateTime
- * - items: List<PurchaseRequisitionItemResponseDTO>
- *   - priId: Long
- *   - productId: Long
- *   - productCode: String
- *   - productName: String
- *   - uom: String
- *   - requestedQty: BigDecimal
- *   - targetUnitPrice: BigDecimal
- *   - note: String
- */
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -293,13 +256,16 @@ export default function PurchaseRequisitionDetail() {
           <div className="border rounded">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="font-medium">Danh sách sản phẩm</div>
-              <button
-                onClick={() => navigate(`/purchase-requisitions/${id}/edit`)}
-                className="text-blue-600 hover:underline text-sm"
-                title="Chỉnh sửa phiếu yêu cầu"
-              >
-                Chỉnh sửa
-              </button>
+              {/* Chỉ hiển thị nút edit khi status là Draft */}
+              {data.status === 'Draft' && (
+                <button
+                  onClick={() => navigate(`/purchase-requisitions/${id}/edit`)}
+                  className="text-blue-600 hover:underline text-sm"
+                  title="Chỉnh sửa phiếu yêu cầu"
+                >
+                  Chỉnh sửa
+                </button>
+              )}
             </div>
             <div className="p-4">
               {items.length === 0 ? (

@@ -172,12 +172,20 @@ const PurchaseRequisitionForm = () => {
                     setLoading(true);
                     const data = await purchaseRequisitionService.getRequisitionById(id);
 
+                    // Kiểm tra status - chỉ cho phép edit khi status là Draft
+                    const status = data.status || 'Draft';
+                    if (status !== 'Draft') {
+                        toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${status}". Chỉ có thể chỉnh sửa khi trạng thái là "Draft".`);
+                        navigate(`/purchase-requisitions/${id}`);
+                        return;
+                    }
+
                     setFormData({
                         requisition_no: data.requisition_no || data.requisitionNo || '',
                         requisition_date: data.requisition_date ? new Date(data.requisition_date) : (data.requisitionDate ? new Date(data.requisitionDate) : new Date()),
                         requester_id: data.requester_id || data.requesterId || null,
                         purpose: data.purpose || '',
-                        status: data.status || 'Draft',
+                        status: status,
                         approver_id: data.approver_id || data.approverId || null,
                         approved_at: data.approved_at ? new Date(data.approved_at) : (data.approvedAt ? new Date(data.approvedAt) : null),
                         items: (data.items || []).map(item => ({
@@ -199,7 +207,7 @@ const PurchaseRequisitionForm = () => {
 
             loadRequisitionData();
         }
-    }, [isEdit, id]);
+    }, [isEdit, id, navigate]);
 
     // Track form changes
     useEffect(() => {

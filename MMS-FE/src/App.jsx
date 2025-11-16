@@ -70,6 +70,7 @@ function App() {
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
                 <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
                 <Route path="/purchase-requisitions" element={<PurchaseRequisitionList />} />
                 <Route path="/purchase/rfqs" element={<RFQList />} />
