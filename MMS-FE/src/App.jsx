@@ -69,9 +69,10 @@ function App() {
                 <Route path="/warehouse/new" element={<AddWarehouse />} />
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
-                <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
-                <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
-                <Route path="/purchase/purchase-requisitions" element={<PurchaseRequisitionList />} />
+                <Route path="/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
+                <Route path="/purchase-requisitions" element={<PurchaseRequisitionList />} />
                 <Route path="/purchase/rfqs" element={<RFQList />} />
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />

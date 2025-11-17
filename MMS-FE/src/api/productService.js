@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8080/api/product";
+// Use relative path to leverage Vite proxy
+const API_BASE_URL = "/api/product";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
