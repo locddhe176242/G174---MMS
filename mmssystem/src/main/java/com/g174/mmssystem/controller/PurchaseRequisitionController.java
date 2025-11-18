@@ -24,7 +24,7 @@ public class PurchaseRequisitionController {
     private final IUserContextService userContextService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> createRequisition(
             @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
         log.info("API: Tạo purchase requisition");
@@ -37,7 +37,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/{requisitionId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> getRequisitionById(@PathVariable Long requisitionId) {
         log.info("API: Lấy purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.getRequisitionById(requisitionId);
@@ -45,7 +45,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Page<PurchaseRequisitionResponseDTO>> getAllRequisitionsPaged(
             @PageableDefault(size = 20) Pageable pageable) {
         log.info("API: Lấy danh sách purchase requisitions với pagination");
@@ -54,7 +54,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Page<PurchaseRequisitionResponseDTO>> searchRequisitionsPaged(
             @RequestParam String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -64,11 +64,11 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{requisitionId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> updateRequisition(
             @PathVariable Long requisitionId,
             @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
-        // Bỏ @Valid vì validation được xử lý ở service level dựa trên status
+        // validation được xử lý ở service level dựa trên status
         // Nếu status = Draft: không validate
         // Nếu status != Draft: validate đầy đủ
         log.info("API: Cập nhật purchase requisition ID: {}", requisitionId);
@@ -81,7 +81,7 @@ public class PurchaseRequisitionController {
     }
 
     @PostMapping("/{requisitionId}/submit")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> submitRequisition(@PathVariable Long requisitionId) {
         log.info("API: Submit purchase requisition ID: {}", requisitionId);
         Integer requesterId = userContextService.getCurrentUserId();
@@ -93,7 +93,7 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{requisitionId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER','APPROVER')")
+    @PreAuthorize("hasAnyRole('MANAGER')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> approveRequisition(@PathVariable Long requisitionId) {
         log.info("API: Approve purchase requisition ID: {}", requisitionId);
         Integer approverId = userContextService.getCurrentUserId();
@@ -105,7 +105,7 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{requisitionId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER','APPROVER')")
+    @PreAuthorize("hasAnyRole('MANAGER')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> rejectRequisition(
             @PathVariable Long requisitionId,
             @RequestParam(required = false) String reason) {
@@ -127,7 +127,7 @@ public class PurchaseRequisitionController {
     }
 
     @DeleteMapping("/{requisitionId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> deleteRequisition(@PathVariable Long requisitionId) {
         log.info("API: Xóa purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.deleteRequisition(requisitionId);
@@ -135,7 +135,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/generate-number")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<String> generateRequisitionNo() {
         log.info("API: Generate requisition number");
         String requisitionNo = requisitionService.generateRequisitionNo();

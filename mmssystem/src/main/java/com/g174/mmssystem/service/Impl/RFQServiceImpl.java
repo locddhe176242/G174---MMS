@@ -89,7 +89,7 @@ public class RFQServiceImpl implements IRFQService {
                     .map(itemDto -> {
                         PurchaseRequisitionItem pri = null;
                         if (itemDto.getPriId() != null) {
-                            pri = requisitionItemRepository.findById(itemDto.getPriId())
+                            pri = requisitionItemRepository.findById(itemDto.getPriId().intValue())
                                     .orElse(null);
                         }
 
@@ -232,7 +232,7 @@ public class RFQServiceImpl implements IRFQService {
                     .map(itemDto -> {
                         PurchaseRequisitionItem pri = null;
                         if (itemDto.getPriId() != null) {
-                            pri = requisitionItemRepository.findById(itemDto.getPriId())
+                            pri = requisitionItemRepository.findById(itemDto.getPriId().intValue())
                                     .orElse(null);
                         }
 

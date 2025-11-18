@@ -70,7 +70,7 @@ public class RFQMapper {
         return RFQItemResponseDTO.builder()
                 .rfqItemId(item.getRfqItemId())
                 .rfqId(item.getRfq() != null ? item.getRfq().getRfqId() : null)
-                .priId(item.getPurchaseRequisitionItem() != null ? item.getPurchaseRequisitionItem().getPriId() : null)
+                .priId(item.getPurchaseRequisitionItem() != null ? item.getPurchaseRequisitionItem().getPriId().longValue() : null)
                 .productId(item.getProduct() != null ? item.getProduct().getProductId() : null)
                 .productCode(item.getProductCode() != null ? item.getProductCode() : 
                             (item.getProduct() != null ? item.getProduct().getSku() : null))

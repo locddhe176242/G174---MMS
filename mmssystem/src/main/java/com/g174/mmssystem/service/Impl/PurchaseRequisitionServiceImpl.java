@@ -4,6 +4,7 @@ import com.g174.mmssystem.dto.requestDTO.PurchaseRequisitionItemRequestDTO;
 import com.g174.mmssystem.dto.requestDTO.PurchaseRequisitionRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
 import com.g174.mmssystem.entity.*;
+import com.g174.mmssystem.enums.PurchaseOrderStatus;
 import com.g174.mmssystem.enums.RequisitionStatus;
 import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
@@ -403,6 +404,30 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
 
+        // Check if user has APPROVER role
+        boolean hasApproverRole = approver.getUserRoles().stream()
+                .anyMatch(ur -> "APPROVER".equalsIgnoreCase(ur.getRole().getRoleName()));
+        
+        if (!hasApproverRole) {
+            log.warn("User {} does not have APPROVER role", approverId);
+            // Có thể throw exception hoặc chỉ log warning tùy business logic
+            // throw new IllegalStateException("User does not have APPROVER role");
+        }
+
+        // Check if user belongs to the correct department for approval
+        // Note: Logic này có thể cần điều chỉnh dựa trên business rules cụ thể
+        // Ví dụ: chỉ department "Purchase" hoặc "Management" mới được approve
+        if (approver.getDepartment() == null) {
+            log.warn("User {} does not belong to any department", approverId);
+        } else {
+            log.info("Approver belongs to department: {}", approver.getDepartment().getDepartmentName());
+            // Có thể thêm logic check department cụ thể nếu cần
+            // String deptName = approver.getDepartment().getDepartmentName();
+            // if (!"Purchase".equalsIgnoreCase(deptName) && !"Management".equalsIgnoreCase(deptName)) {
+            //     throw new IllegalStateException("User's department is not authorized to approve purchase requisitions");
+            // }
+        }
+
         requisition.setStatus(RequisitionStatus.Approved);
         requisition.setApprover(approver);
         requisition.setApprovedAt(LocalDateTime.now());
@@ -429,8 +454,32 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             throw new IllegalStateException("Only pending requisitions can be rejected");
         }
 
+        // Check permission
+        String userEmail = userContextService.getCurrentUserEmail();
+        if (userEmail == null) {
+            throw new IllegalStateException("Cannot determine current user");
+        }
+        if (!permissionService.hasPermission(userEmail, "purchase.approve")) {
+            throw new IllegalStateException("User does not have permission to reject purchase requisitions");
+        }
+
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
+
+        // Check if user has APPROVER role
+        boolean hasApproverRole = approver.getUserRoles().stream()
+                .anyMatch(ur -> "APPROVER".equalsIgnoreCase(ur.getRole().getRoleName()));
+        
+        if (!hasApproverRole) {
+            log.warn("User {} does not have APPROVER role", approverId);
+        }
+
+        // Check if user belongs to the correct department for approval
+        if (approver.getDepartment() == null) {
+            log.warn("User {} does not belong to any department", approverId);
+        } else {
+            log.info("Approver belongs to department: {}", approver.getDepartment().getDepartmentName());
+        }
 
         requisition.setStatus(RequisitionStatus.Rejected);
         requisition.setApprover(approver);
@@ -486,19 +535,39 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
 
-        // Check if RFQ has been created or PO has been processed
+        // Check if RFQ has been created
         List<RFQ> rfqs = rfqRepository.findByRequisitionId(requisitionId);
-        boolean hasRFQ = (rfqs != null && !rfqs.isEmpty());
+        boolean hasRFQ = rfqs != null && !rfqs.isEmpty();
 
         // Check if PO has been processed (check through RFQ -> PQ -> PO)
-        // Note: This is a simplified check. You may need to add a method to check PQs by RFQ
-        // For now, we'll check if any PO exists that might be related
-        // This is a placeholder - you may need to implement proper relationship checking
         boolean hasPO = false;
-        // TODO: Implement proper PO checking logic
+        if (hasRFQ && rfqs != null) {
+            for (RFQ rfq : rfqs) {
+                // Check if RFQ has related Purchase Quotations
+                List<PurchaseQuotation> pqs = purchaseQuotationRepository.findByRfqId(rfq.getRfqId());
+                if (pqs != null && !pqs.isEmpty()) {
+                    // Check if any PQ has related Purchase Orders
+                    for (PurchaseQuotation pq : pqs) {
+                        List<PurchaseOrder> pos = purchaseOrderRepository.findByPqId(pq.getPqId());
+                        if (pos != null && !pos.isEmpty()) {
+                            // Check if any PO has been processed (status is Completed or Sent)
+                            boolean hasProcessedPO = pos.stream()
+                                    .anyMatch(po -> po.getStatus() != null && 
+                                            (po.getStatus() == PurchaseOrderStatus.Completed || 
+                                             po.getStatus() == PurchaseOrderStatus.Sent));
+                            if (hasProcessedPO) {
+                                hasPO = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (hasPO) break;
+            }
+        }
 
         if (!hasRFQ && !hasPO) {
-            throw new IllegalStateException("Cannot close requisition: No RFQ or PO has been created/processed");
+            throw new IllegalStateException("Không thể đóng purchase requisition: Chưa tạo RFQ hoặc chưa xử lý xong PO");
         }
 
         requisition.setStatus(RequisitionStatus.Cancelled); // Or create a "Closed" status if needed

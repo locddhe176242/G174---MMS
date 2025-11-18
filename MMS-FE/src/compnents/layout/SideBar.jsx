@@ -102,8 +102,7 @@ export default function Sidebar({ isCollapsed = false }) {
         const data = await getMenuForCurrentUser();
         
         const transformMenu = (menuItems) => {
-          return menuItems.map((item) => {
-
+          const transformed = menuItems.map((item) => {
             const absolutePath = item.menuPath?.startsWith("/")
                 ? item.menuPath
                 : `/${item.menuPath}`;
@@ -115,6 +114,51 @@ export default function Sidebar({ isCollapsed = false }) {
               icon: getIcon(item.iconName),
             };
           });
+
+          const menuMap = new Map();
+          const rootMenus = [];
+          const processedChildren = new Set();
+
+          // First pass: identify parent menus and their children
+          transformed.forEach((item) => {
+            if (!item.path) return;
+            
+            // Find parent menu (e.g., "/purchase")
+            const parentPath = item.path.split('/').slice(0, 2).join('/'); // Get "/purchase" from "/purchase/xxx"
+            
+            if (item.path === parentPath) {
+              // This is a potential parent menu
+              const children = transformed.filter((child) => 
+                child.id !== item.id && 
+                child.path && 
+                child.path.startsWith(item.path + "/") &&
+                !processedChildren.has(child.id)
+              );
+
+              if (children.length > 0) {
+                children.forEach(child => processedChildren.add(child.id));
+                item.children = children;
+              }
+              rootMenus.push(item);
+            }
+          });
+
+          // Second pass: add remaining items that are not children
+          transformed.forEach((item) => {
+            if (!processedChildren.has(item.id) && !rootMenus.some(m => m.id === item.id)) {
+              rootMenus.push(item);
+            }
+          });
+
+          // Sort by display order
+          rootMenus.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+          rootMenus.forEach(menu => {
+            if (menu.children) {
+              menu.children.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+            }
+          });
+
+          return rootMenus;
         };
         
         setMenuConfig({

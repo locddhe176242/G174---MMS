@@ -205,4 +205,49 @@ JOIN roles r ON rm.role_id = r.role_id
 JOIN menu_items mi ON rm.menu_id = mi.menu_id
 WHERE mi.menu_key = 'admin.departments';
 
+-- Thêm các menu items con cho "Nhập hàng"
+INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
+('purchase-requisition', 'Phiếu yêu cầu mua hàng', '/purchase/purchase-requisitions', 'document', 14),
+('rfq', 'Yêu cầu báo giá', '/purchase/rfqs', 'quote', 15),
+('rfq-vendor', 'Nhà cung cấp RFQ', '/purchase/rfq-vendors', 'vendor', 16),
+('purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 17),
+('purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 18),
+('goods-receipt', 'Phiếu nhập kho', '/purchase/goods-receipts', 'receipt', 19)
+ON DUPLICATE KEY UPDATE 
+  menu_label = VALUES(menu_label),
+  menu_path = VALUES(menu_path),
+  menu_icon = VALUES(menu_icon),
+  display_order = VALUES(display_order);
 
+-- Lấy menu_id của các menu items vừa tạo
+SET @purchase_req_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'purchase-requisition');
+SET @rfq_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'rfq');
+SET @rfq_vendor_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'rfq-vendor');
+SET @pq_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'purchase-quotation');
+SET @po_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'purchase-order');
+SET @gr_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'goods-receipt');
+
+-- Gán các menu items này cho role PURCHASE (role_id = 3)
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(3, @purchase_req_id),
+(3, @rfq_id),
+(3, @rfq_vendor_id),
+(3, @pq_id),
+(3, @po_id),
+(3, @gr_id)
+ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
+
+-- Gán các menu items này cho role MANAGER (role_id = 1) - Manager có tất cả
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(1, @purchase_req_id),
+(1, @rfq_id),
+(1, @rfq_vendor_id),
+(1, @pq_id),
+(1, @po_id),
+(1, @gr_id)
+ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
+
+-- Gán các menu items này cho role WAREHOUSE (role_id = 5) - Warehouse cần xem Goods Receipt
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(5, @gr_id)
+ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);

@@ -37,11 +37,6 @@ public class Department {
     @Column(name = "description")
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @ColumnDefault("'ACTIVE'")
-    private DepartmentStatus status = DepartmentStatus.ACTIVE;
-
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")
     private Instant createdAt;
@@ -63,9 +58,4 @@ public class Department {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
-
-    public enum DepartmentStatus {
-        ACTIVE, INACTIVE
-    }
-
 }

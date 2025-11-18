@@ -12,5 +12,4 @@ public class DepartmentResponseDTO {
     private String departmentCode;
     private String departmentName;
     private String description;
-    private String status;
 }

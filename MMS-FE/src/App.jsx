@@ -70,12 +70,17 @@ function App() {
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
                 <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
                 <Route path="/purchase/purchase-requisitions" element={<PurchaseRequisitionList />} />
                 <Route path="/purchase/rfqs" element={<RFQList />} />
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
+                <Route path="/purchase/rfq-vendors" element={<div className="p-4"><h1>RFQ Vendors - Đang phát triển</h1></div>} />
+                <Route path="/purchase/purchase-quotations" element={<div className="p-4"><h1>Purchase Quotations - Đang phát triển</h1></div>} />
+                <Route path="/purchase/purchase-orders" element={<div className="p-4"><h1>Purchase Orders - Đang phát triển</h1></div>} />
+                <Route path="/purchase/goods-receipts" element={<div className="p-4"><h1>Goods Receipts - Đang phát triển</h1></div>} />
                 <Route path="/approvals" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
