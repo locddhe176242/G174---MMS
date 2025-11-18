@@ -1,0 +1,47 @@
+package com.g174.mmssystem.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Table(name = "Goods_Receipt_Items",
+        indexes = {
+                @Index(name = "idx_gri_receipt", columnList = "receipt_id"),
+                @Index(name = "idx_gri_product", columnList = "product_id")
+        })
+public class GoodsReceiptItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "gri_id")
+    private Integer griId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "receipt_id", nullable = false)
+    private GoodsReceipt goodsReceipt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "poi_id", nullable = false)
+    private PurchaseOrderItem purchaseOrderItem;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @Column(name = "received_qty", precision = 18, scale = 2, nullable = false)
+    private BigDecimal receivedQty;
+
+    @Column(name = "accepted_qty", precision = 18, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal acceptedQty = BigDecimal.ZERO;
+
+    @Column(name = "remark", columnDefinition = "TEXT")
+    private String remark;
+}
+
