@@ -26,7 +26,7 @@ public class ProductResponseDTO {
     private String imageUrl;
     private Integer categoryId;
     private String categoryName;
-    private Integer quantity;
+    private java.math.BigDecimal totalQuantity; // Tổng số lượng từ Warehouse_Stock
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

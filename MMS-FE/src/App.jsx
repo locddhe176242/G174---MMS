@@ -27,6 +27,12 @@ import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisit
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
+import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
+import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
+import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
+import SalesOrderList from "./compnents/pages/Sale/SalesOrder/SalesOrderList.jsx";
+import SalesOrderForm from "./compnents/pages/Sale/SalesOrder/SalesOrderForm.jsx";
+import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
@@ -76,6 +82,14 @@ function App() {
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
+                <Route path="/sales/quotations" element={<SalesQuotationList />} />
+                <Route path="/sales/quotations/new" element={<SalesQuotationForm />} />
+                <Route path="/sales/quotations/:id" element={<SalesQuotationDetail />} />
+                <Route path="/sales/quotations/:id/edit" element={<SalesQuotationForm />} />
+                <Route path="/sales/orders" element={<SalesOrderList />} />
+                <Route path="/sales/orders/new" element={<SalesOrderForm />} />
+                <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
+                <Route path="/sales/orders/:id/edit" element={<SalesOrderForm />} />
                 <Route path="/approvals" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />

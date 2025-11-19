@@ -2,12 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { warehouseService } from "../../../api/warehouseService.js";
 import dayjs from "dayjs";
-import {Card, Spin, Alert, Descriptions, Tag} from "antd";
+import {Card, Spin, Alert, Descriptions, Tag, Table} from "antd";
 
 export default function WarehouseDetail() {
     const { id } = useParams();
     const [warehouse, setWarehouse] = useState(null);
+    const [stock, setStock] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [stockLoading, setStockLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
@@ -23,6 +25,23 @@ export default function WarehouseDetail() {
             }
         };
         fetchWarehouse();
+    }, [id]);
+
+    useEffect(() => {
+        const fetchStock = async () => {
+            if (!id) return;
+            try {
+                setStockLoading(true);
+                const data = await warehouseService.getWarehouseStock(id);
+                setStock(data || []);
+            } catch (err) {
+                console.error("Lỗi khi tải danh sách stock:", err);
+                setStock([]);
+            } finally {
+                setStockLoading(false);
+            }
+        };
+        fetchStock();
     }, [id]);
 
     const formatDate = (dateString) => {
@@ -118,6 +137,81 @@ export default function WarehouseDetail() {
                             {warehouse.updatedBy?.email || "—"}
                         </Descriptions.Item>
                     </Descriptions>
+                </Card>
+
+                {/* Danh sách sản phẩm trong kho */}
+                <Card
+                    title={
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                Danh sách sản phẩm trong kho
+                            </h3>
+                            <span className="text-sm text-gray-500">
+                                Tổng: {stock.length} sản phẩm
+                            </span>
+                        </div>
+                    }
+                    bordered={false}
+                    className="shadow-none mt-6"
+                >
+                    {stockLoading ? (
+                        <div className="text-center py-8">
+                            <Spin size="large" tip="Đang tải danh sách sản phẩm..." />
+                        </div>
+                    ) : stock.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            <p>Kho này chưa có sản phẩm nào</p>
+                        </div>
+                    ) : (
+                        <Table
+                            dataSource={stock}
+                            rowKey={(record) => `${record.warehouseId}-${record.productId}`}
+                            pagination={{
+                                pageSize: 10,
+                                showSizeChanger: true,
+                                showTotal: (total) => `Tổng ${total} sản phẩm`,
+                            }}
+                            columns={[
+                                {
+                                    title: "Mã sản phẩm (SKU)",
+                                    dataIndex: "productSku",
+                                    key: "productSku",
+                                    render: (text) => (
+                                        <span className="font-mono text-sm">{text || "—"}</span>
+                                    ),
+                                },
+                                {
+                                    title: "Tên sản phẩm",
+                                    dataIndex: "productName",
+                                    key: "productName",
+                                    render: (text) => <span className="font-medium">{text || "—"}</span>,
+                                },
+                                {
+                                    title: "Số lượng",
+                                    dataIndex: "quantity",
+                                    key: "quantity",
+                                    align: "right",
+                                    render: (quantity) => {
+                                        const qty = Number(quantity || 0);
+                                        return (
+                                            <span
+                                                className={`font-semibold ${
+                                                    qty > 50
+                                                        ? "text-green-600"
+                                                        : qty > 0
+                                                        ? "text-amber-600"
+                                                        : "text-red-600"
+                                                }`}
+                                            >
+                                                {qty.toLocaleString("vi-VN")}
+                                            </span>
+                                        );
+                                    },
+                                    sorter: (a, b) => Number(a.quantity || 0) - Number(b.quantity || 0),
+                                },
+                            ]}
+                        />
+                    )}
                 </Card>
             </div>
         </div>

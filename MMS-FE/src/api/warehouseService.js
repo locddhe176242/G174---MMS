@@ -67,6 +67,11 @@ export const warehouseService = {
 		const response = await apiClient.get(`${BASE_PATH}/exists/${encodeURIComponent(code)}`);
 		return response.data;
 	},
+
+	getWarehouseStock: async (id) => {
+		const response = await apiClient.get(`${BASE_PATH}/${id}/stock`);
+		return response.data;
+	},
 };
 
 export default warehouseService;

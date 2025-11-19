@@ -3,7 +3,9 @@ package com.g174.mmssystem.controller;
 import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.WarehouseRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.WarehouseResponseDTO;
+import com.g174.mmssystem.dto.responseDTO.WarehouseStockResponseDTO;
 import com.g174.mmssystem.service.IService.IWarehouseService;
+import com.g174.mmssystem.service.IService.IWarehouseStockService;
 import com.g174.mmssystem.service.Impl.WarehouseServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class WarehouseController {
 
     private final IWarehouseService service;
     private final WarehouseServiceImpl warehouseServiceImpl;
+    private final IWarehouseStockService warehouseStockService;
 
     @PostMapping
     @LogActivity(
@@ -116,5 +119,11 @@ public class WarehouseController {
     @GetMapping("/exists/{code}")
     public ResponseEntity<Boolean> checkWarehouseCodeExists(@PathVariable String code) {
         return ResponseEntity.ok(service.existsByCode(code));
+    }
+
+    @GetMapping("/{id}/stock")
+    public ResponseEntity<List<WarehouseStockResponseDTO>> getWarehouseStock(@PathVariable Integer id) {
+        List<WarehouseStockResponseDTO> stock = warehouseStockService.getStockByWarehouseId(id);
+        return ResponseEntity.ok(stock);
     }
 }

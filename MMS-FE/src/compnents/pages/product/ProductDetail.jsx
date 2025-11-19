@@ -66,8 +66,8 @@ const ProductDetail = ({ product, onClose }) => {
                             <p className="text-slate-800">{product.size || '—'}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Số lượng</label>
-                            <p className="text-slate-800">{product.quantity || 0}</p>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Tổng số lượng</label>
+                            <p className="text-slate-800">{product.totalQuantity != null ? Number(product.totalQuantity).toLocaleString('vi-VN') : 0}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>

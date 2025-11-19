@@ -49,16 +49,18 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (11, 'staff', 'Nhân sự', '/admin/user', 'staff', 102),
 (12, 'admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6),
 (13, 'categories', 'Quản lý danh mục', '/categories', 'categories', 3),
-(14, 'rfqs', 'Yêu cầu báo giá', '/purchase/rfqs', 'rfqs', 17);
+(14, 'rfqs', 'Yêu cầu báo giá', '/purchase/rfqs', 'rfqs', 17),
+(15, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 18),
+(16, 'sales-orders', 'Đơn bán hàng', '/sales/orders', 'sales-orders', 19);
 
 -- ==================== 8. ROLE_MENUS ====================
 -- MANAGER: Có tất cả menus (bao gồm RFQ)
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14);
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16);
 
 -- SALE: Dashboard, Sản phẩm, Xuất hàng, Khách hàng, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(2, 1), (2, 2), (2, 4), (2, 7), (2, 10);
+(2, 1), (2, 2), (2, 4), (2, 7), (2, 10), (2, 15), (2, 16);
 
 -- PURCHASE: Dashboard, Sản phẩm, Nhập hàng, Nhà cung cấp, Báo cáo, Danh mục
 INSERT INTO role_menus (role_id, menu_id) VALUES

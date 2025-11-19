@@ -53,10 +53,6 @@ public class ProductRequestDTO {
 
     private String status;
 
-    @NotNull(message = "Số lượng không được để trống")
-    @Min(value = 0, message = "Số lượng không được nhỏ hơn 0")
-    private Integer quantity;
-
     @Size(max = 100, message = "Barcode không được quá 100 ký tự")
     private String barcode;
 }

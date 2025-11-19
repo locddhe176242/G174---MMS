@@ -206,7 +206,6 @@ CREATE TABLE Products (
     description TEXT,
     uom VARCHAR(50),
     size DECIMAL(10, 2) DEFAULT NULL,
-    quantity INT NOT NULL DEFAULT 0,
     purchase_price DECIMAL(18, 2),
     selling_price DECIMAL(18, 2),
     status ENUM('In Stock', 'Out of Stock', 'Discontinued') NOT NULL DEFAULT 'In Stock',
@@ -234,6 +233,7 @@ CREATE TABLE Products (
 CREATE TABLE Warehouses (
     warehouse_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    code VARCHAR(50) NOT NULL UNIQUE,
     location VARCHAR(255),
     status ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
     created_by INT,
