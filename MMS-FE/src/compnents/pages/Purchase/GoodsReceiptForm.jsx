@@ -1,16 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
+import { getCurrentUser } from "../../../api/authService";
 import apiClient from "../../../api/apiClient";
 
 export default function GoodsReceiptForm() {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const isEdit = Boolean(id);
+    const poIdFromQuery = searchParams.get("po_id");
 
     const [formData, setFormData] = useState({
         receipt_no: "",
@@ -24,6 +27,7 @@ export default function GoodsReceiptForm() {
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
     const [poReferenceItems, setPoReferenceItems] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,14 +43,29 @@ export default function GoodsReceiptForm() {
     }, [formData.received_date]);
 
     useEffect(() => {
+        const loadUser = async () => {
+            try {
+                const user = await getCurrentUser();
+                setCurrentUser(user);
+            } catch (error) {
+                console.warn("Could not load current user:", error);
+            }
+        };
+        
+        loadUser();
         loadWarehouses();
         loadPurchaseOrders();
         if (isEdit) {
             loadReceipt();
         } else {
             generateReceiptNumber();
+            if (poIdFromQuery) {
+                console.log("Auto-loading PO from query:", poIdFromQuery);
+                loadPurchaseOrderItems(poIdFromQuery);
+                setFormData((prev) => ({ ...prev, order_id: parseInt(poIdFromQuery) }));
+            }
         }
-    }, [isEdit, id]);
+    }, [isEdit, id, poIdFromQuery]);
 
     const generateReceiptNumber = async () => {
         try {
@@ -64,13 +83,14 @@ export default function GoodsReceiptForm() {
 
     const loadWarehouses = async () => {
         try {
-            const response = await apiClient.get("/warehouses", {
+            const response = await apiClient.get("/warehouses/page", {
                 params: { page: 0, size: 100 },
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
+            console.log("Warehouses loaded:", data);
             setWarehouses(
                 data.map((warehouse) => ({
-                    value: warehouse.warehouse_id || warehouse.id,
+                    value: warehouse.warehouseId || warehouse.warehouse_id || warehouse.id,
                     label: warehouse.name,
                     warehouse,
                 }))
@@ -83,14 +103,14 @@ export default function GoodsReceiptForm() {
 
     const loadPurchaseOrders = async () => {
         try {
-            const response = await apiClient.get("/purchase-orders", {
+            const response = await apiClient.get("/purchase-orders/page", {
                 params: { page: 0, size: 50, sort: "createdAt,desc" },
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
             setPurchaseOrders(
                 data.map((order) => ({
-                    value: order.order_id || order.id,
-                    label: `${order.po_no || order.poNo} - ${order.vendor?.name || order.vendorName || "N/A"}`,
+                    value: order.orderId || order.order_id || order.id,
+                    label: `${order.poNo || order.po_no} - ${order.vendorName || order.vendor?.name || "N/A"}`,
                     order,
                 }))
             );
@@ -104,15 +124,18 @@ export default function GoodsReceiptForm() {
         if (!orderId) return;
         try {
             const response = await apiClient.get(`/purchase-orders/${orderId}/items`);
+            console.log("=== PO ITEMS RAW RESPONSE ===", response.data);
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
+            console.log("=== PO ITEMS ARRAY ===", data);
+            console.log("First item structure:", data[0]);
             setPoReferenceItems(data);
 
             if (receiptItems) {
                 const merged = receiptItems.map((item) => {
-                    const poItem = data.find((po) => (po.poi_id || po.id) === (item.poi_id || item.poiId));
+                    const poItem = data.find((po) => (po.poiId || po.poi_id || po.id) === (item.poi_id || item.poiId));
                     return {
                         ...item,
-                        product_id: item.product_id || poItem?.product_id || poItem?.product?.id,
+                        product_id: item.product_id || poItem?.productId || poItem?.product_id || poItem?.product?.id,
                         productName:
                             poItem?.productName ||
                             poItem?.product_name ||
@@ -126,16 +149,23 @@ export default function GoodsReceiptForm() {
                 });
                 setFormData((prev) => ({ ...prev, items: merged }));
             } else {
-                const mapped = data.map((poItem) => ({
-                    poi_id: poItem.poi_id || poItem.id,
-                    product_id: poItem.product_id || poItem.product?.id,
-                    productName: poItem.productName || poItem.product_name || poItem.product?.name || "-",
-                    productCode: poItem.productCode || poItem.product?.sku || "",
-                    ordered_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                    received_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                    accepted_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                    remark: "",
-                }));
+                const mapped = data.map((poItem, index) => {
+                    console.log(`Mapping item ${index}:`, poItem);
+                    const mapped = {
+                        poi_id: poItem.poiId || poItem.poi_id || poItem.id,
+                        product_id: poItem.productId || poItem.product_id || poItem.product?.id,
+                        productName: poItem.productName || poItem.product_name || poItem.product?.name || "-",
+                        productCode: poItem.productCode || poItem.product?.sku || "",
+                        ordered_qty: Number(poItem.quantity || poItem.order_qty || 0),
+                        received_qty: Number(poItem.quantity || poItem.order_qty || 0),
+                        accepted_qty: Number(poItem.quantity || poItem.order_qty || 0),
+                        remark: "",
+                    };
+                    console.log(`Mapped result ${index}:`, mapped);
+                    console.log(`  -> poi_id: ${mapped.poi_id}, product_id: ${mapped.product_id}`);
+                    return mapped;
+                });
+                console.log("=== FINAL MAPPED ITEMS ===", mapped);
                 setFormData((prev) => ({ ...prev, items: mapped }));
             }
         } catch (err) {
@@ -148,24 +178,27 @@ export default function GoodsReceiptForm() {
         try {
             setLoading(true);
             const receipt = await goodsReceiptService.getGoodsReceiptById(id);
-            const itemsResponse = await goodsReceiptService.getReceiptItems(id);
-            const receiptItems = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.content || [];
+            console.log("Loading receipt for edit:", receipt);
+            
+            // Get items from receipt detail response
+            const receiptItems = Array.isArray(receipt.items) ? receipt.items : receipt.items?.content || [];
+            console.log("Receipt items for edit:", receiptItems);
 
             setFormData({
                 receipt_no: receipt.receipt_no || receipt.receiptNo || "",
                 order_id: receipt.order_id || receipt.orderId || null,
                 warehouse_id: receipt.warehouse_id || receipt.warehouseId || null,
-                received_date: receipt.received_date ? new Date(receipt.received_date) : new Date(),
+                received_date: receipt.received_date || receipt.receivedDate ? new Date(receipt.received_date || receipt.receivedDate) : new Date(),
                 status: receipt.status || "Pending",
                 items: receiptItems.map((item) => ({
-                    gri_id: item.gri_id || item.id,
-                    poi_id: item.poi_id || item.poiId,
-                    product_id: item.product_id || item.productId,
+                    gri_id: item.griId || item.gri_id || item.id,
+                    poi_id: item.poiId || item.poi_id,
+                    product_id: item.productId || item.product_id,
                     productName: item.productName || item.product_name || "-",
-                    productCode: item.productCode || "",
-                    ordered_qty: item.ordered_qty || 0,
-                    received_qty: Number(item.received_qty || item.receivedQty || 0),
-                    accepted_qty: Number(item.accepted_qty || item.acceptedQty || 0),
+                    productCode: item.productCode || item.product_code || "",
+                    ordered_qty: item.orderedQty || item.ordered_qty || 0,
+                    received_qty: Number(item.receivedQty || item.received_qty || 0),
+                    accepted_qty: Number(item.acceptedQty || item.accepted_qty || 0),
                     remark: item.remark || "",
                 })),
             });
@@ -175,6 +208,7 @@ export default function GoodsReceiptForm() {
             }
         } catch (err) {
             console.error("Error loading Goods Receipt:", err);
+            console.error("Error details:", err.response?.data);
             setError("Không thể tải Phiếu nhập kho");
         } finally {
             setLoading(false);
@@ -246,46 +280,79 @@ export default function GoodsReceiptForm() {
     };
 
     const handleSubmit = async (e) => {
+        console.log("=== HANDLE SUBMIT CALLED ===");
         e.preventDefault();
         setIsSubmitting(true);
         setError(null);
         setValidationErrors({});
 
+        console.log("=== VALIDATING FORM ===");
+        console.log("FormData:", formData);
+        console.log("FormData.items:", formData.items);
+        
         const errors = validate();
+        console.log("Validation errors:", errors);
+    
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
             setIsSubmitting(false);
+            toast.error("Vui lòng kiểm tra lại thông tin form!");
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
 
+        console.log("=== VALIDATION PASSED, BUILDING PAYLOAD ===");
+
         try {
             const payload = {
-                receipt_no: formData.receipt_no,
-                order_id: formData.order_id,
-                warehouse_id: formData.warehouse_id,
-                received_date: formData.received_date instanceof Date ? formData.received_date.toISOString() : formData.received_date,
+                receiptNo: formData.receipt_no,
+                orderId: formData.order_id,
+                warehouseId: formData.warehouse_id,
+                receivedDate: formData.received_date instanceof Date ? formData.received_date.toISOString() : formData.received_date,
                 status: formData.status,
-                items: formData.items.map((item) => ({
-                    poi_id: item.poi_id,
-                    product_id: item.product_id,
-                    received_qty: Number(item.received_qty || 0),
-                    accepted_qty: Number(item.accepted_qty || 0),
-                    remark: item.remark || "",
-                })),
+                items: formData.items.map((item, index) => {
+                    console.log(`Item ${index}:`, item);
+                    return {
+                        poiId: item.poi_id,
+                        productId: item.product_id,
+                        receivedQty: Number(item.received_qty || 0),
+                        acceptedQty: Number(item.accepted_qty || 0),
+                        remark: item.remark || "",
+                    };
+                }),
             };
 
+            console.log("=== SUBMITTING PAYLOAD ===", payload);
+            console.log("Items detail:", payload.items);
+
+            const userId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1; // Fallback to 1 for testing
+            console.log("Current user:", currentUser);
+            console.log("User ID:", userId);
+            
             if (isEdit) {
-                await goodsReceiptService.updateGoodsReceipt(id, payload);
+                console.log("Updating with userId:", userId);
+                await goodsReceiptService.updateGoodsReceipt(id, payload, userId);
                 toast.success("Cập nhật Phiếu nhập kho thành công!");
             } else {
-                await goodsReceiptService.createGoodsReceipt(payload);
+                console.log("Creating with userId:", userId);
+                await goodsReceiptService.createGoodsReceipt(payload, userId);
                 toast.success("Tạo Phiếu nhập kho thành công!");
             }
             navigate("/purchase/goods-receipts");
         } catch (err) {
             console.error("Error saving Goods Receipt:", err);
-            setError(err?.response?.data?.message || (isEdit ? "Không thể cập nhật Phiếu nhập kho" : "Không thể tạo Phiếu nhập kho"));
+            console.error("Error response:", err.response?.data);
+            console.error("Validation errors from backend:", err.response?.data?.errors);
+            
+            const backendErrors = err.response?.data?.errors;
+            if (backendErrors && typeof backendErrors === 'object') {
+                const errorMessages = Object.entries(backendErrors)
+                    .map(([field, msg]) => `${field}: ${msg}`)
+                    .join(', ');
+                setError(`Lỗi validate: ${errorMessages}`);
+            } else {
+                setError(err?.response?.data?.message || (isEdit ? "Không thể cập nhật Phiếu nhập kho" : "Không thể tạo Phiếu nhập kho"));
+            }
         } finally {
             setIsSubmitting(false);
         }

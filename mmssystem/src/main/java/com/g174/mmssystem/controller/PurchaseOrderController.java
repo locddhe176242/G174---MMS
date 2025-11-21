@@ -178,6 +178,15 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{orderId}/items")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    public ResponseEntity<List<com.g174.mmssystem.dto.responseDTO.PurchaseOrderItemResponseDTO>> getOrderItems(@PathVariable Integer orderId) {
+        log.info("REST: Fetching items for purchase order ID: {}", orderId);
+
+        PurchaseOrderResponseDTO order = orderService.getOrderById(orderId);
+        return ResponseEntity.ok(order.getItems());
+    }
+
     @GetMapping("/generate-number")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<String> generatePoNo() {

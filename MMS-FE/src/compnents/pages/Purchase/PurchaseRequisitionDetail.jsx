@@ -30,6 +30,7 @@ export default function PurchaseRequisitionDetail() {
     // Popup states
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -201,6 +202,26 @@ export default function PurchaseRequisitionDetail() {
 
     // ==================== APPROVE/REJECT HANDLERS ====================
     /**
+     * Xử lý submit phiếu yêu cầu để chuyển sang trạng thái Pending
+     */
+    const handleSubmit = async () => {
+        try {
+            setIsProcessing(true);
+            await purchaseRequisitionService.submitRequisition(id);
+            toast.success("Đã gửi phiếu yêu cầu để chờ duyệt!");
+            setShowSubmitModal(false);
+            // Reload data
+            const detailData = await purchaseRequisitionService.getRequisitionById(id);
+            setData(detailData);
+        } catch (error) {
+            console.error("Error submitting requisition:", error);
+            toast.error(error.response?.data?.message || "Không thể gửi phiếu yêu cầu");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    /**
      * Xử lý approve phiếu yêu cầu
      */
     const handleApprove = async () => {
@@ -260,6 +281,9 @@ export default function PurchaseRequisitionDetail() {
 
     // Check if user can approve (must be MANAGER and status is Pending)
     const canApprove = hasRole('MANAGER') && (data.approvalStatus === 'Pending' || data.status === 'Pending');
+    
+    // Check if user can submit (must be requester and status is Draft)
+    const canSubmit = (data.approvalStatus === 'Draft' || data.status === 'Draft');
 
     return (
         <div className="p-4 md:p-6 space-y-4">
@@ -277,6 +301,18 @@ export default function PurchaseRequisitionDetail() {
                         Phiếu yêu cầu: {data.requisitionNo || `#${id}`}
                     </h1>
                 </div>
+                {/* Submit button - chỉ hiển thị nếu status là Draft */}
+                {canSubmit && (
+                    <button
+                        onClick={() => setShowSubmitModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm font-medium flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Gửi yêu cầu
+                    </button>
+                )}
                 {/* Approve/Reject buttons - chỉ hiển thị nếu user là approver và status là Pending */}
                 {canApprove && (
                     <div className="flex items-center gap-2">
@@ -575,6 +611,43 @@ export default function PurchaseRequisitionDetail() {
                     )}
                 </aside>
             </div>
+
+            {/* ==================== SUBMIT MODAL ==================== */}
+            {showSubmitModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center mb-4">
+                            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                                Xác nhận gửi phiếu yêu cầu
+                            </h3>
+                        </div>
+                        <p className="text-gray-600 mb-6">
+                            Bạn có chắc chắn muốn gửi phiếu yêu cầu <strong>{data.requisitionNo}</strong> để chờ duyệt không?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowSubmitModal(false)}
+                                disabled={isProcessing}
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={isProcessing}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                                {isProcessing ? "Đang xử lý..." : "Xác nhận gửi"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ==================== APPROVE MODAL ==================== */}
             {showApproveModal && (

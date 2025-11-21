@@ -16,6 +16,8 @@ public interface IPurchaseRequisitionService {
 
     Page<PurchaseRequisitionResponseDTO> getAllRequisitions(Pageable pageable);
 
+    Page<PurchaseRequisitionResponseDTO> getAllRequisitionsByStatus(com.g174.mmssystem.enums.RequisitionStatus status, Pageable pageable);
+
     List<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword);
 
     Page<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword, Pageable pageable);

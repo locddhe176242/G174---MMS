@@ -18,6 +18,7 @@ export default function PurchaseOrderList() {
 
     const [sortField, setSortField] = useState("createdAt");
     const [sortDirection, setSortDirection] = useState("desc");
+    const [statusFilter, setStatusFilter] = useState("ALL");
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
@@ -62,7 +63,17 @@ export default function PurchaseOrderList() {
         }
     };
 
+    const getStatusString = (status, fallback = "Pending") => {
+        if (!status) return fallback;
+        if (typeof status === "string") return status;
+        if (typeof status === "object") {
+            return status?.name || status?.value || status?.toString() || fallback;
+        }
+        return String(status);
+    };
+
     const getStatusBadge = (status) => {
+        const statusStr = getStatusString(status, "Pending");
         const map = {
             Pending: { label: "Đang chờ", color: "bg-yellow-100 text-yellow-800" },
             Approved: { label: "Đã phê duyệt", color: "bg-green-100 text-green-800" },
@@ -70,7 +81,7 @@ export default function PurchaseOrderList() {
             Completed: { label: "Hoàn thành", color: "bg-purple-100 text-purple-800" },
             Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
         };
-        const statusInfo = map[status] || { label: status || "Đang chờ", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[statusStr] || { label: statusStr || "Đang chờ", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -79,12 +90,13 @@ export default function PurchaseOrderList() {
     };
 
     const getApprovalStatusBadge = (approvalStatus) => {
+        const statusStr = getStatusString(approvalStatus, "Pending");
         const map = {
             Pending: { label: "Chờ phê duyệt", color: "bg-yellow-100 text-yellow-800" },
             Approved: { label: "Đã phê duyệt", color: "bg-green-100 text-green-800" },
             Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
-        const statusInfo = map[approvalStatus] || { label: approvalStatus || "Chờ phê duyệt", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[statusStr] || { label: statusStr || "Chờ phê duyệt", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -92,17 +104,30 @@ export default function PurchaseOrderList() {
         );
     };
 
-    const fetchOrders = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc") => {
+    const fetchOrders = async (
+        page = 0,
+        keyword = "",
+        sortField = "createdAt",
+        sortDirection = "desc",
+        statusOverride = statusFilter
+    ) => {
         try {
             setLoading(true);
             setError(null);
 
             const sort = `${sortField},${sortDirection}`;
+            const normalizedStatus =
+                !keyword.trim() && statusOverride !== "ALL" ? statusOverride : undefined;
             let response;
             if (keyword.trim()) {
                 response = await purchaseOrderService.searchPurchaseOrdersWithPagination(keyword, page, pageSize, sort);
             } else {
-                response = await purchaseOrderService.getPurchaseOrdersWithPagination(page, pageSize, sort);
+                response = await purchaseOrderService.getPurchaseOrdersWithPagination(
+                    page,
+                    pageSize,
+                    sort,
+                    normalizedStatus
+                );
             }
 
             setOrders(response.content || []);
@@ -119,12 +144,18 @@ export default function PurchaseOrderList() {
 
     useEffect(() => {
         fetchOrders();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         fetchOrders(currentPage, searchKeyword, sortField, sortDirection);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sortField, sortDirection]);
+
+    useEffect(() => {
+        fetchOrders(0, searchKeyword, sortField, sortDirection, statusFilter);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFilter]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -145,13 +176,15 @@ export default function PurchaseOrderList() {
 
         try {
             setIsDeleting(true);
-            await purchaseOrderService.deletePurchaseOrder(orderToDelete.order_id || orderToDelete.id);
+            await purchaseOrderService.deletePurchaseOrder(
+                orderToDelete.order_id || orderToDelete.orderId || orderToDelete.id
+            );
             toast.success("Xóa Đơn hàng mua thành công!");
             setShowDeleteModal(false);
             setOrderToDelete(null);
-            fetchOrders(currentPage, searchKeyword, sortField, sortDirection);
+            fetchOrders(currentPage, searchKeyword, sortField, sortDirection, statusFilter);
         } catch (err) {
-            toast.error("Không thể xóa Đơn hàng mua");
+            toast.error(err?.response?.data?.message || "Không thể xóa Đơn hàng mua");
             console.error("Error deleting Purchase Order:", err);
         } finally {
             setIsDeleting(false);
@@ -184,7 +217,7 @@ export default function PurchaseOrderList() {
                     <div className="flex items-center justify-between">
                         <h1 className="text-2xl font-bold text-gray-900">Quản lý Đơn hàng mua</h1>
                         <button
-                            onClick={() => navigate("/purchase/orders/new")}
+                            onClick={() => navigate("/purchase/purchase-orders/new")}
                             className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
                         >
                             + Tạo Đơn hàng mua
@@ -200,7 +233,7 @@ export default function PurchaseOrderList() {
                     </div>
 
                     <div className="px-6 py-4 border-b border-gray-200">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <form onSubmit={handleSearch} className="flex items-center gap-4">
                                 <div className="relative">
                                     <input
@@ -222,12 +255,26 @@ export default function PurchaseOrderList() {
                                 </button>
                             </form>
 
-                            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                                </svg>
-                                Bộ lọc
-                            </button>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <label className="text-sm text-gray-600">Trạng thái ERP:</label>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="ALL">Tất cả</option>
+                                    <option value="Pending">Đang chờ</option>
+                                    <option value="Approved">Đã phê duyệt</option>
+                                    <option value="Sent">Đã gửi</option>
+                                    <option value="Completed">Hoàn thành</option>
+                                    <option value="Cancelled">Đã hủy</option>
+                                </select>
+                                {searchKeyword.trim() && (
+                                    <span className="text-xs text-gray-500">
+                                        * Bộ lọc chỉ áp dụng khi không tìm kiếm
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -249,64 +296,49 @@ export default function PurchaseOrderList() {
                                         <input type="checkbox" className="rounded border-gray-300" />
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("order_id")} className="flex items-center gap-1 hover:text-gray-700">
-                                            ID
-                                            {getSortIcon("order_id")}
-                                        </button>
+                                        ID
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("po_no")} className="flex items-center gap-1 hover:text-gray-700">
-                                            SỐ ĐƠN HÀNG
-                                            {getSortIcon("po_no")}
-                                        </button>
+                                        SỐ ĐƠN HÀNG
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         NHÀ CUNG CẤP
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("order_date")} className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY ĐẶT HÀNG
-                                            {getSortIcon("order_date")}
-                                        </button>
+                                        NGÀY ĐẶT HÀNG
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("status")} className="flex items-center gap-1 hover:text-gray-700">
-                                            TRẠNG THÁI
-                                            {getSortIcon("status")}
-                                        </button>
+                                        TRẠNG THÁI
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        TRẠNG THÁI PHÊ DUYỆT
+                                        TỔNG TIỀN
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("total_after_tax")} className="flex items-center gap-1 hover:text-gray-700">
-                                            TỔNG TIỀN
-                                            {getSortIcon("total_after_tax")}
-                                        </button>
+                                        NGÀY GIAO HÀNG
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("delivery_date")} className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY GIAO HÀNG
-                                            {getSortIcon("delivery_date")}
-                                        </button>
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("createdAt")} className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY TẠO
-                                            {getSortIcon("createdAt")}
-                                        </button>
+                                        NGÀY TẠO
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
                                 </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                {orders.map((order) => (
-                                    <tr key={order.order_id || order.id} className="hover:bg-gray-50">
+                                {orders.map((order) => {
+                                    const orderId = order.order_id || order.orderId || order.id;
+                                    const statusStr = getStatusString(order.status, "Pending");
+                                    const approvalStatusStr = getStatusString(order.approval_status || order.approvalStatus, "Pending");
+                                    
+                                    // ERP standard logic: Only allow Edit/Delete when approval_status = Pending
+                                    const canEdit = approvalStatusStr === "Pending" && statusStr === "Pending";
+                                    const canDelete = approvalStatusStr === "Pending" && statusStr === "Pending";
+                                    
+                                    return (
+                                    <tr key={orderId} className="hover:bg-gray-50">
                                         <td className="px-6 py-4">
                                             <input type="checkbox" className="rounded border-gray-300" />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {(order.order_id || order.id)?.toString().padStart(3, "0")}
+                                            {orderId?.toString().padStart(3, "0")}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                                             {order.po_no || order.poNo}
@@ -320,9 +352,6 @@ export default function PurchaseOrderList() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {getStatusBadge(order.status)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {getApprovalStatusBadge(order.approval_status || order.approvalStatus)}
-                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                                             {formatCurrency(order.total_after_tax || order.totalAfterTax || 0)}
                                         </td>
@@ -335,7 +364,7 @@ export default function PurchaseOrderList() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => navigate(`/purchase/orders/${order.order_id || order.id}`)}
+                                                    onClick={() => navigate(`/purchase/purchase-orders/${orderId}`)}
                                                     className="text-blue-600 hover:text-blue-900"
                                                     title="Xem chi tiết"
                                                 >
@@ -344,28 +373,32 @@ export default function PurchaseOrderList() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
-                                                <button
-                                                    onClick={() => navigate(`/purchase/orders/${order.order_id || order.id}/edit`)}
-                                                    className="text-green-600 hover:text-green-900"
-                                                    title="Chỉnh sửa"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(order)}
-                                                    className="text-red-600 hover:text-red-900"
-                                                    title="Xóa"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => navigate(`/purchase/purchase-orders/${orderId}/edit`)}
+                                                        className="text-green-600 hover:text-green-900"
+                                                        title="Chỉnh sửa"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => handleDeleteClick(order)}
+                                                        className="text-red-600 hover:text-red-900"
+                                                        title="Xóa"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                )})}
                                 </tbody>
                             </table>
                         )}

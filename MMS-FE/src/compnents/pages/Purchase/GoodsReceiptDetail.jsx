@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
 import apiClient from "../../../api/apiClient";
+import { getCurrentUser } from "../../../api/authService";
 
 export default function GoodsReceiptDetail() {
     const { id } = useParams();
@@ -13,6 +14,24 @@ export default function GoodsReceiptDetail() {
     const [poItems, setPoItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        loadCurrentUser();
+    }, []);
+
+    const loadCurrentUser = async () => {
+        try {
+            const user = await getCurrentUser();
+            setCurrentUser(user);
+        } catch (error) {
+            console.warn("Could not load current user:", error);
+        }
+    };
 
     const formatDate = (dateString) => {
         if (!dateString) return "-";
@@ -54,17 +73,26 @@ export default function GoodsReceiptDetail() {
                 setLoading(true);
                 setErr(null);
 
+                console.log("=== LOADING GOODS RECEIPT DETAIL ===");
+                console.log("Receipt ID:", id);
+
                 const receipt = await goodsReceiptService.getGoodsReceiptById(id);
-                const receiptItemsResponse = await goodsReceiptService.getReceiptItems(id);
-                const receiptItems = Array.isArray(receiptItemsResponse)
-                    ? receiptItemsResponse
-                    : receiptItemsResponse?.content || [];
+                console.log("Receipt data:", receipt);
+                console.log("Receipt items from detail:", receipt.items);
+
+                // Get items from receipt detail response
+                const receiptItems = Array.isArray(receipt.items)
+                    ? receipt.items
+                    : receipt.items?.content || [];
+                console.log("Receipt items:", receiptItems);
 
                 let orderItems = [];
                 const orderId = receipt.order_id || receipt.orderId;
+                console.log("Order ID:", orderId);
                 if (orderId) {
                     try {
                         const poItemsResponse = await apiClient.get(`/purchase-orders/${orderId}/items`);
+                        console.log("PO items response:", poItemsResponse.data);
                         orderItems = Array.isArray(poItemsResponse.data)
                             ? poItemsResponse.data
                             : poItemsResponse.data?.content || [];
@@ -77,9 +105,12 @@ export default function GoodsReceiptDetail() {
                     setData(receipt);
                     setItems(receiptItems);
                     setPoItems(orderItems);
+                    console.log("=== DATA SET SUCCESSFULLY ===");
                 }
             } catch (error) {
-                console.error("Error loading Goods Receipt detail:", error);
+                console.error("=== ERROR LOADING GOODS RECEIPT ===");
+                console.error("Error:", error);
+                console.error("Error response:", error?.response?.data);
                 if (mounted) {
                     setErr(error?.response?.data?.message || "Không thể tải Phiếu nhập kho");
                 }
@@ -93,30 +124,56 @@ export default function GoodsReceiptDetail() {
         };
     }, [id]);
 
-    const handleApprove = async () => {
-        if (!window.confirm("Bạn có chắc muốn phê duyệt Phiếu nhập kho này?")) return;
+    const handleApproveClick = () => {
+        if (!currentUser || !currentUser.userId) {
+            toast.error("Không tìm thấy thông tin người dùng");
+            return;
+        }
+        setShowApproveModal(true);
+    };
+
+    const handleApproveConfirm = async () => {
+        setIsSubmitting(true);
         try {
-            await goodsReceiptService.approveGoodsReceipt(id);
+            await goodsReceiptService.approveGoodsReceipt(id, currentUser.userId);
             toast.success("Đã phê duyệt Phiếu nhập kho!");
             const updated = await goodsReceiptService.getGoodsReceiptById(id);
             setData(updated);
+            setShowApproveModal(false);
         } catch (error) {
             console.error("Approve Goods Receipt failed:", error);
-            toast.error("Không thể phê duyệt Phiếu nhập kho");
+            toast.error(error?.response?.data?.message || "Không thể phê duyệt Phiếu nhập kho");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleReject = async () => {
-        const reason = window.prompt("Nhập lý do từ chối:");
-        if (!reason) return;
+    const handleRejectClick = () => {
+        if (!currentUser || !currentUser.userId) {
+            toast.error("Không tìm thấy thông tin người dùng");
+            return;
+        }
+        setRejectReason("");
+        setShowRejectModal(true);
+    };
+
+    const handleRejectConfirm = async () => {
+        if (!rejectReason.trim()) {
+            toast.error("Vui lòng nhập lý do từ chối");
+            return;
+        }
+        setIsSubmitting(true);
         try {
-            await goodsReceiptService.rejectGoodsReceipt(id, reason);
+            await goodsReceiptService.rejectGoodsReceipt(id, currentUser.userId, rejectReason);
             toast.success("Đã từ chối Phiếu nhập kho!");
             const updated = await goodsReceiptService.getGoodsReceiptById(id);
             setData(updated);
+            setShowRejectModal(false);
         } catch (error) {
             console.error("Reject Goods Receipt failed:", error);
-            toast.error("Không thể từ chối Phiếu nhập kho");
+            toast.error(error?.response?.data?.message || "Không thể từ chối Phiếu nhập kho");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -180,25 +237,25 @@ export default function GoodsReceiptDetail() {
                             {data.status === "Pending" && (
                                 <>
                                     <button
-                                        onClick={handleApprove}
+                                        onClick={handleApproveClick}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                     >
                                         Phê duyệt
                                     </button>
                                     <button
-                                        onClick={handleReject}
+                                        onClick={handleRejectClick}
                                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                                     >
                                         Từ chối
                                     </button>
+                                    <button
+                                        onClick={() => navigate(`/purchase/goods-receipts/${id}/edit`)}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        Chỉnh sửa
+                                    </button>
                                 </>
                             )}
-                            <button
-                                onClick={() => navigate(`/purchase/goods-receipts/${id}/edit`)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Chỉnh sửa
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -347,6 +404,110 @@ export default function GoodsReceiptDetail() {
                     </aside>
                 </div>
             </div>
+
+            {/* Approve Modal */}
+            {showApproveModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div className="px-6 py-4 border-b">
+                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận phê duyệt</h3>
+                        </div>
+                        <div className="px-6 py-4">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm text-gray-700">
+                                        Bạn có chắc chắn muốn phê duyệt Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong> không?
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-2">
+                                        Sau khi phê duyệt, hàng hóa sẽ được cập nhật vào kho.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowApproveModal(false)}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleApproveConfirm}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {isSubmitting && (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                )}
+                                Phê duyệt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div className="px-6 py-4 border-b">
+                            <h3 className="text-lg font-semibold text-gray-900">Từ chối phiếu nhập kho</h3>
+                        </div>
+                        <div className="px-6 py-4">
+                            <div className="flex items-start gap-3 mb-4">
+                                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm text-gray-700">
+                                        Bạn đang từ chối Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Lý do từ chối <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    rows="4"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    placeholder="Nhập lý do từ chối..."
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleRejectConfirm}
+                                disabled={isSubmitting || !rejectReason.trim()}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {isSubmitting && (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                )}
+                                Từ chối
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

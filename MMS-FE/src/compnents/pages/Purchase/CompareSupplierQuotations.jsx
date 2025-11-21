@@ -2,7 +2,9 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
+import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
 import apiClient from "../../../api/apiClient";
+import { getCurrentUser } from "../../../api/authService";
 
 export default function CompareSupplierQuotations() {
     const { id } = useParams();
@@ -31,8 +33,8 @@ export default function CompareSupplierQuotations() {
         }
     };
 
-    const formatCurrency = (amount, currency = "USD") => {
-        if (!amount) return `0.00 ${currency}`;
+    const formatCurrency = (amount, currency = "VND") => {
+        if (!amount && amount !== 0) return `0 ${currency === "USD" ? "USD" : "₫"}`;
         if (currency === "USD") {
             return new Intl.NumberFormat("en-US", {
                 style: "currency",
@@ -47,19 +49,20 @@ export default function CompareSupplierQuotations() {
     };
 
     const getStatusBadge = (status) => {
+        // Handle both string and enum object formats
+        const statusStr = typeof status === 'string' ? status : (status?.name || status?.toString() || 'Pending');
+        
         const map = {
-            Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
             Pending: { label: "Đang chờ", color: "bg-yellow-100 text-yellow-800" },
-            Submitted: { label: "Đã gửi", color: "bg-green-100 text-green-800" },
             Approved: { label: "Đã phê duyệt", color: "bg-blue-100 text-blue-800" },
             Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
 
-        const statusInfo = map[status] || { label: status || "Đang chờ", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[statusStr] || { label: statusStr || "Đang chờ", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>
-        {statusInfo.label}
-      </span>
+                {statusInfo.label}
+            </span>
         );
     };
 
@@ -170,17 +173,17 @@ export default function CompareSupplierQuotations() {
                     toast.info("Đang sử dụng dữ liệu mẫu để test (chưa có backend)");
                 }
 
-                // Fetch quotations
+                // Fetch quotations by RFQ ID
                 try {
-                    const response = await apiClient.get(`/purchase-quotations`, {
-                        params: { rfq_id: id }
-                    });
-                    quotes = Array.isArray(response.data)
-                        ? response.data
-                        : response.data?.content || [];
+                    quotes = await purchaseQuotationService.getQuotationsByRfqId(id);
+                    if (!Array.isArray(quotes)) {
+                        quotes = [];
+                    }
                 } catch (e) {
-                    console.warn("Error loading quotations, using mock data:", e);
-                    quotes = getMockQuotations();
+                    console.warn("Error loading quotations from backend:", e);
+                    // Fallback to empty array instead of mock data
+                    quotes = [];
+                    toast.warn("Không thể tải danh sách báo giá từ nhà cung cấp");
                 }
 
                 // If all failed, use all mock data
@@ -190,17 +193,29 @@ export default function CompareSupplierQuotations() {
                     toast.info("Đang sử dụng dữ liệu mẫu để test (chưa có backend)");
                 }
 
-                // Mark best quotation
+                // Mark best quotation and map to expected format
                 if (quotes.length > 0) {
                     const best = quotes.reduce((best, current) => {
-                        if (!best || current.totalAmount < best.totalAmount) {
+                        const currentAmount = Number(current.totalAmount || 0);
+                        const bestAmount = best ? Number(best.totalAmount || 0) : Infinity;
+                        if (!best || currentAmount < bestAmount) {
                             return current;
                         }
                         return best;
                     }, null);
                     quotes = quotes.map(q => ({
-                        ...q,
-                        isBest: q.pq_id === best?.pq_id
+                        pqId: q.pqId || q.pq_id,
+                        pqNo: q.pqNo || q.pq_no,
+                        vendorId: q.vendorId || q.vendor_id,
+                        vendorName: q.vendorName || q.vendor_name || '',
+                        vendorAddress: q.vendorAddress || q.vendor_address || '',
+                        status: q.status,
+                        totalAmount: Number(q.totalAmount || q.total_amount || 0),
+                        quotationDate: q.pqDate || q.pq_date || q.createdAt || q.created_at,
+                        fullyQuotedItems: q.items?.length || 0,
+                        totalItems: rfq?.items?.length || 0,
+                        bestPricedItems: 0, // TODO: Calculate based on item comparison
+                        isBest: (q.pqId || q.pq_id) === (best?.pqId || best?.pq_id)
                     }));
                 }
 
@@ -230,6 +245,7 @@ export default function CompareSupplierQuotations() {
     }, [id]);
 
     const handleQuotationSelect = (pqId) => {
+        console.log('Selecting quotation:', pqId, 'Current selected:', selectedQuotations);
         setSelectedQuotations(prev => {
             if (prev.includes(pqId)) {
                 return prev.filter(id => id !== pqId);
@@ -242,17 +258,76 @@ export default function CompareSupplierQuotations() {
         if (selectedQuotations.length === quotations.length) {
             setSelectedQuotations([]);
         } else {
-            setSelectedQuotations(quotations.map(q => q.pq_id));
+            setSelectedQuotations(quotations.map(q => q.pqId || q.pq_id));
         }
     };
 
-    const handleCompareAward = () => {
+    const handleCompareAward = async () => {
         if (selectedQuotations.length === 0) {
             toast.warning("Vui lòng chọn ít nhất một báo giá để so sánh");
             return;
         }
-        // TODO: Implement compare/award functionality
-        toast.info(`Đang so sánh ${selectedQuotations.length} báo giá...`);
+        if (selectedQuotations.length !== 1) {
+            toast.warn("Vui lòng chọn 1 báo giá để tạo PO");
+            return;
+        }
+        const selectedId = selectedQuotations[0];
+        const selectedQuotation = quotations.find(q => (q.pqId || q.pq_id) === selectedId);
+        if (!selectedQuotation) {
+            toast.error("Không tìm thấy báo giá được chọn");
+            return;
+        }
+
+        try {
+            // Get current user for approverId
+            const currentUser = getCurrentUser();
+            const approverId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1;
+
+            console.log('Awarding quotation:', selectedId);
+            
+            // 1. Approve winner quotation
+            await purchaseQuotationService.approveQuotation(selectedId, approverId);
+            toast.success(`Đã phê duyệt báo giá ${selectedQuotation.pqNo || selectedQuotation.pq_no}`);
+
+            // 2. Reject other quotations from the same RFQ
+            const otherQuotations = quotations.filter(q => {
+                const qId = q.pqId || q.pq_id;
+                return qId !== selectedId;
+            });
+
+            if (otherQuotations.length > 0) {
+                await Promise.all(
+                    otherQuotations.map(q => {
+                        const qId = q.pqId || q.pq_id;
+                        return purchaseQuotationService.rejectQuotation(
+                            qId, 
+                            approverId, 
+                            "Báo giá khác đã được chọn"
+                        );
+                    })
+                );
+                console.log(`Rejected ${otherQuotations.length} other quotations`);
+            }
+
+            // 3. Close RFQ after awarding
+            try {
+                await rfqService.closeRFQ(id);
+                console.log('RFQ closed after awarding');
+            } catch (closeErr) {
+                console.warn('Could not close RFQ:', closeErr);
+            }
+
+            // 4. Navigate to PO form with quotation_id and pr_id
+            console.log('Navigating to PO form with quotation_id:', selectedId);
+            const prId = rfqData?.prId || rfqData?.pr_id;
+            const navUrl = prId 
+                ? `/purchase/purchase-orders/new?quotation_id=${selectedId}&pr_id=${prId}`
+                : `/purchase/purchase-orders/new?quotation_id=${selectedId}`;
+            navigate(navUrl);
+        } catch (error) {
+            console.error('Error awarding quotation:', error);
+            toast.error(error.response?.data?.message || "Không thể trao thầu. Vui lòng thử lại");
+        }
     };
 
     // Render
@@ -291,7 +366,10 @@ export default function CompareSupplierQuotations() {
         );
     }
 
-    const submittedCount = quotations.filter(q => q.status === "Submitted").length;
+    const submittedCount = quotations.filter(q => {
+        const statusStr = typeof q.status === 'string' ? q.status : (q.status?.name || q.status?.toString() || '');
+        return statusStr === 'Approved' || statusStr === 'Pending';
+    }).length;
     const invitedCount = rfqData.selectedVendorIds?.length || quotations.length;
     const progressPercentage = invitedCount > 0 ? (submittedCount / invitedCount) * 100 : 0;
 
@@ -407,7 +485,7 @@ export default function CompareSupplierQuotations() {
                                     <div className="flex items-center gap-3">
                                         <div className="h-2 w-24 bg-red-500 rounded"></div>
                                         <div className="text-lg font-bold text-green-600">
-                                            {formatCurrency(bestQuotation.totalAmount, "USD")}
+                                            {formatCurrency(bestQuotation.totalAmount || 0, "VND")}
                                         </div>
                                     </div>
                                 </div>
@@ -466,12 +544,13 @@ export default function CompareSupplierQuotations() {
                                     </thead>
                                     <tbody>
                                     {quotations.map((quotation) => {
-                                        const isSelected = selectedQuotations.includes(quotation.pq_id);
+                                        const pqId = quotation.pqId || quotation.pq_id;
+                                        const isSelected = selectedQuotations.includes(pqId);
                                         const isBest = quotation.isBest;
 
                                         return (
                                             <tr
-                                                key={quotation.pq_id}
+                                                key={pqId}
                                                 className={`border-t hover:bg-gray-50 ${
                                                     isBest ? "bg-green-50" : ""
                                                 }`}
@@ -480,28 +559,28 @@ export default function CompareSupplierQuotations() {
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
-                                                        onChange={() => handleQuotationSelect(quotation.pq_id)}
+                                                        onChange={() => handleQuotationSelect(pqId)}
                                                         className="rounded"
                                                     />
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     <button
-                                                        onClick={() => navigate(`/purchase/vendor-quotations/${quotation.pq_id}`)}
+                                                        onClick={() => navigate(`/purchase/purchase-quotations/${pqId}`)}
                                                         className="text-blue-600 hover:underline"
                                                     >
-                                                        {quotation.pq_no}
+                                                        {quotation.pqNo || quotation.pq_no}
                                                     </button>
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     <button
-                                                        onClick={() => navigate(`/vendors/${quotation.vendor_id}`)}
+                                                        onClick={() => navigate(`/vendors/${quotation.vendorId || quotation.vendor_id}`)}
                                                         className="text-blue-600 hover:underline"
                                                     >
-                                                        {quotation.vendorName}
+                                                        {quotation.vendorName || ''}
                                                     </button>
                                                 </td>
                                                 <td className="py-3 pr-4 text-gray-600">
-                                                    {quotation.vendorAddress}
+                                                    {quotation.vendorAddress || '-'}
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     {getStatusBadge(quotation.status)}
@@ -509,16 +588,16 @@ export default function CompareSupplierQuotations() {
                                                 <td className={`py-3 pr-4 text-right font-medium ${
                                                     isBest ? "text-green-600" : "text-gray-900"
                                                 }`}>
-                                                    {formatCurrency(quotation.totalAmount, "USD")}
+                                                    {formatCurrency(quotation.totalAmount || 0, "VND")}
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     {formatDate(quotation.quotationDate)}
                                                 </td>
                                                 <td className="py-3 pr-4 text-center">
-                                                    {quotation.fullyQuotedItems}/{quotation.totalItems}
+                                                    {quotation.fullyQuotedItems || 0}/{quotation.totalItems || 0}
                                                 </td>
                                                 <td className="py-3 pr-4 text-center">
-                                                    {quotation.bestPricedItems}/{quotation.totalItems}
+                                                    {quotation.bestPricedItems || 0}/{quotation.totalItems || 0}
                                                 </td>
                                             </tr>
                                         );

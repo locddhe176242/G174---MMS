@@ -1,64 +1,93 @@
 import apiClient from "./apiClient";
 
-export const rfqService = {
-  // Get all RFQs (no pagination) - nếu cần
-  getAllRFQs: async () => {
-    const response = await apiClient.get("/rfqs");
-    return response.data;
-  },
+const BASE_PATH = "/rfqs";
 
-  // Get RFQs with pagination
+/**
+ * Extract data from backend response format: { success, message, data }
+ */
+const extractData = (response) => {
+  const result = response.data;
+  if (result && typeof result === 'object' && 'data' in result) {
+    return result.data;
+  }
+  return result;
+};
+
+export const rfqService = {
+  // ===================== GET RFQs WITH PAGINATION (REQUIRED) =====================
+  // Note: getAllRFQs() without pagination is not supported for ERP safety
   getRFQsWithPagination: async (page = 0, size = 10, sort = "createdAt,desc") => {
-    const response = await apiClient.get("/rfqs/page", {
+    const response = await apiClient.get(`${BASE_PATH}/page`, {
       params: { page, size, sort }
     });
-    return response.data;
+    return extractData(response);
   },
 
-  // Search RFQs (no pagination) - nếu cần
-  searchRFQs: async (keyword) => {
-    const response = await apiClient.get("/rfqs/search", {
-      params: { keyword }
-    });
-    return response.data;
-  },
-
-  // Search RFQs with pagination
+  // ===================== SEARCH RFQs WITH PAGINATION (REQUIRED) =====================
+  // Note: searchRFQs() without pagination is not supported for ERP safety
   searchRFQsWithPagination: async (keyword, page = 0, size = 10, sort = "createdAt,desc") => {
-    const response = await apiClient.get("/rfqs/search/page", {
+    const response = await apiClient.get(`${BASE_PATH}/search/page`, {
       params: { keyword, page, size, sort }
     });
-    return response.data;
+    return extractData(response);
   },
 
-  // Get RFQ by ID
+  // ===================== GET RFQ BY ID =====================
   getRFQById: async (id) => {
-    const response = await apiClient.get(`/rfqs/${id}`);
-    return response.data;
+    const response = await apiClient.get(`${BASE_PATH}/${id}`);
+    return extractData(response);
   },
 
-  // Create RFQ
+  // ===================== CREATE RFQ =====================
   createRFQ: async (rfqData) => {
-    const response = await apiClient.post("/rfqs", rfqData);
-    return response.data;
+    const response = await apiClient.post(BASE_PATH, rfqData);
+    return extractData(response);
   },
 
-  // Update RFQ
+  // ===================== UPDATE RFQ =====================
   updateRFQ: async (id, rfqData) => {
-    const response = await apiClient.put(`/rfqs/${id}`, rfqData);
-    return response.data;
+    const response = await apiClient.put(`${BASE_PATH}/${id}`, rfqData);
+    return extractData(response);
   },
 
-  // Delete RFQ (soft delete nếu backend hỗ trợ)
+  // ===================== UPDATE RFQ STATUS =====================
+  updateRFQStatus: async (id, status) => {
+    const response = await apiClient.put(`${BASE_PATH}/${id}/status`, null, {
+      params: { status }
+    });
+    return extractData(response);
+  },
+
+  // ===================== CLOSE RFQ =====================
+  closeRFQ: async (id) => {
+    const response = await apiClient.put(`${BASE_PATH}/${id}/close`);
+    return extractData(response);
+  },
+
+  // ===================== CANCEL RFQ =====================
+  cancelRFQ: async (id) => {
+    const response = await apiClient.put(`${BASE_PATH}/${id}/cancel`);
+    return extractData(response);
+  },
+
+  // ===================== DELETE RFQ =====================
   deleteRFQ: async (id) => {
-    const response = await apiClient.delete(`/rfqs/${id}`);
-    return response.data;
+    const response = await apiClient.delete(`${BASE_PATH}/${id}`);
+    return extractData(response);
   },
 
-  // Optional: Generate RFQ number (nếu backend có)
+  // ===================== GENERATE RFQ NUMBER =====================
   generateRFQNo: async () => {
-    const response = await apiClient.get("/rfqs/generate-number");
-    return response.data;
+    const response = await apiClient.get(`${BASE_PATH}/generate-number`);
+    const data = extractData(response);
+    // Backend trả về string trong data field
+    return typeof data === 'string' ? data : (data?.rfqNo || data);
+  },
+
+  // ===================== GET RFQs BY REQUISITION ID =====================
+  getRFQsByRequisitionId: async (requisitionId) => {
+    const response = await apiClient.get(`${BASE_PATH}/requisition/${requisitionId}`);
+    return extractData(response);
   },
 };
 

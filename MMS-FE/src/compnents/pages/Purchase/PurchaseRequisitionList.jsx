@@ -14,6 +14,7 @@ export default function PurchaseRequisitionList() {
     const [loading, setLoading] = useState(true); // Loading state
     const [error, setError] = useState(null); // Error state
     const [searchKeyword, setSearchKeyword] = useState(""); // Từ khóa tìm kiếm
+    const [statusFilter, setStatusFilter] = useState("ALL");
 
     // Pagination states
     const [currentPage, setCurrentPage] = useState(0);
@@ -123,20 +124,34 @@ export default function PurchaseRequisitionList() {
      * @param {number} size - Page size
      * @param {string} keyword - Search keyword
      */
-    const fetchRequisitions = async (page = 0, size = pageSize, keyword = searchKeyword) => {
+    const fetchRequisitions = async (
+        page = 0,
+        size = pageSize,
+        keyword = searchKeyword,
+        statusOverride = statusFilter
+    ) => {
         try {
             setLoading(true);
             setError(null);
 
             // Build sort parameter (format: "field,direction")
             const sort = `${sortField},${sortDirection}`;
+            const normalizedStatus =
+                !keyword.trim() && statusOverride !== "ALL"
+                    ? statusOverride
+                    : undefined;
 
             let response;
             // Gọi API search hoặc getAll tùy theo có keyword hay không
             if (keyword.trim()) {
                 response = await purchaseRequisitionService.searchRequisitionsWithPagination(keyword, page, size, sort);
             } else {
-                response = await purchaseRequisitionService.getRequisitionsWithPagination(page, size, sort);
+                response = await purchaseRequisitionService.getRequisitionsWithPagination(
+                    page,
+                    size,
+                    sort,
+                    normalizedStatus
+                );
             }
 
             // Set data vào state
@@ -161,6 +176,11 @@ export default function PurchaseRequisitionList() {
     useEffect(() => {
         fetchRequisitions();
     }, []);
+
+    useEffect(() => {
+        fetchRequisitions(0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFilter]);
 
     /**
      * Refetch data khi sort field hoặc direction thay đổi
@@ -311,7 +331,7 @@ export default function PurchaseRequisitionList() {
                 <div className="bg-white rounded-lg shadow-sm">
                     {/* ==================== SEARCH BAR ==================== */}
                     {/* Tìm kiếm theo: requisition_no, department, purpose */}
-                    <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <form onSubmit={handleSearch} className="flex items-center gap-4">
                             <div className="relative">
                                 <input
@@ -332,23 +352,28 @@ export default function PurchaseRequisitionList() {
                                 Tìm kiếm
                             </button>
                         </form>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <label className="text-sm text-gray-600">Lọc trạng thái:</label>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value="ALL">Tất cả</option>
+                                <option value="Draft">Nháp</option>
+                                <option value="Pending">Chờ duyệt</option>
+                                <option value="Approved">Đã duyệt</option>
+                                <option value="Rejected">Đã từ chối</option>
+                                <option value="Cancelled">Đã hủy</option>
+                            </select>
+                            {searchKeyword.trim() && (
+                                <span className="text-xs text-gray-500">
+                                    * Bộ lọc trạng thái áp dụng khi không tìm kiếm
+                                </span>
+                            )}
+                        </div>
                     </div>
 
-                    {/* ==================== DATA TABLE ==================== */}
-                    {/*
-                        TABLE COLUMNS:
-                        1. Mã phiếu: requisitionNo (sortable)
-                        2. Trạng thái: status - Open/Closed/Cancelled (sortable)
-                        3. Duyệt: approvalStatus - Pending/Approved/Rejected
-                        4. Phòng ban: department
-                        5. Mục đích: purpose (truncated)
-                        6. Ngày cần: neededBy (sortable)
-                        7. Số sản phẩm: count of items
-                        8. Tổng giá trị: totalEstimated (formatted as VND)
-                        9. Ngày tạo: createdAt (sortable)
-                        10. Người yêu cầu: requesterName
-                        11. Hành động: View/Edit/Delete buttons
-                    */}
                     <div className="overflow-x-auto">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
@@ -364,34 +389,25 @@ export default function PurchaseRequisitionList() {
                                 <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("requisition_no")}
-                                                className="flex items-center gap-1 hover:text-gray-700">
-                                            MÃ PHIẾU {getSortIcon("requisition_no")}
-                                        </button>
+                                        MÃ PHIẾU
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("approvalStatus")}
-                                                className="flex items-center gap-1 hover:text-gray-700">
-                                            TRẠNG THÁI {getSortIcon("approvalStatus")}
-                                        </button>
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MỤC
-                                        ĐÍCH
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SỐ
-                                        SẢN PHẨM
+                                        TRẠNG THÁI
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("createdAt")}
-                                                className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY TẠO {getSortIcon("createdAt")}
-                                        </button>
+                                        MỤC ĐÍCH
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NGƯỜI
-                                        YÊU CẦU
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        SỐ SẢN PHẨM
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH
-                                        ĐỘNG
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        NGÀY TẠO
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        NGƯỜI YÊU CẦU
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        HÀNH ĐỘNG
                                     </th>
                                 </tr>
                                 </thead>

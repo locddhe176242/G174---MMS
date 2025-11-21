@@ -1,6 +1,7 @@
 package com.g174.mmssystem.repository;
 
 import com.g174.mmssystem.entity.PurchaseRequisition;
+import com.g174.mmssystem.enums.RequisitionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,6 +24,9 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
 
     @Query("SELECT pr FROM PurchaseRequisition pr WHERE pr.deletedAt IS NULL")
     Page<PurchaseRequisition> findAllActive(Pageable pageable);
+
+    @Query("SELECT pr FROM PurchaseRequisition pr WHERE pr.deletedAt IS NULL AND pr.status = :status")
+    Page<PurchaseRequisition> findAllActiveByStatus(@Param("status") RequisitionStatus status, Pageable pageable);
 
     @Query("SELECT pr FROM PurchaseRequisition pr WHERE " +
            "(LOWER(pr.requisitionNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

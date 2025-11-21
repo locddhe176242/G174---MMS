@@ -5,6 +5,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
+import { purchaseRequisitionService } from "../../../api/purchaseRequisitionService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 
@@ -142,13 +143,10 @@ export default function RFQForm() {
 
     const generateRFQNo = async () => {
         try {
-            if (typeof rfqService.generateRFQNo === "function") {
-                const res = await rfqService.generateRFQNo();
-                const rfqNo = res?.rfqNo || res?.number || res?.code || "";
-                if (rfqNo) {
-                    setFormData((prev) => ({ ...prev, rfqNo }));
-                    return;
-                }
+            const rfqNo = await rfqService.generateRFQNo();
+            if (rfqNo) {
+                setFormData((prev) => ({ ...prev, rfqNo }));
+                return;
             }
             // Fallback
             const ts = Date.now().toString().slice(-6);
@@ -172,6 +170,8 @@ export default function RFQForm() {
                     value: p.id ?? p.product_id,
                     label: `${p.sku || p.productCode} - ${p.name}`,
                     product: p,
+                    normalizedCode: (p.sku || p.productCode || "").trim().toLowerCase(),
+                    normalizedName: (p.name || "").trim().toLowerCase(),
                 }))
             );
         } catch (err) {
@@ -184,17 +184,28 @@ export default function RFQForm() {
         try {
             setLoading(true);
             const rfq = await rfqService.getRFQById(id);
+            
+            // Handle status enum (can be string or object)
+            const statusValue = typeof rfq.status === 'string' 
+                ? rfq.status 
+                : (rfq.status?.name || rfq.status?.toString() || 'Draft');
+            
             setFormData({
                 rfqNo: rfq.rfqNo || "",
-                issueDate: rfq.issueDate ? rfq.issueDate.slice(0, 10) : "",
-                dueDate: rfq.dueDate ? rfq.dueDate.slice(0, 10) : "",
-                status: rfq.status || "Draft",
-                selectedVendorIds: rfq.selectedVendorIds || (Array.isArray(rfq.selectedVendors) ? rfq.selectedVendors.map((v) => v.vendorId || v.id) : (rfq.selectedVendorId ? [rfq.selectedVendorId] : [])),
+                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? rfq.issueDate.slice(0, 10) : rfq.issueDate) : "",
+                dueDate: rfq.dueDate ? (typeof rfq.dueDate === 'string' ? rfq.dueDate.slice(0, 10) : rfq.dueDate) : "",
+                status: statusValue,
+                selectedVendorIds: rfq.selectedVendorIds || 
+                    (Array.isArray(rfq.selectedVendors) 
+                        ? rfq.selectedVendors.map((v) => v.vendorId || v.id) 
+                        : (rfq.selectedVendorId ? [rfq.selectedVendorId] : [])),
                 notes: rfq.notes || rfq.note || "",
                 items: (rfq.items || []).map((it) => ({
+                    priId: it.priId || null,
                     productId: it.productId || null,
                     productCode: it.productCode || "",
                     productName: it.productName || "",
+                    spec: it.spec || "",
                     uom: it.uom || "",
                     quantity: it.quantity ?? it.requestedQty ?? 0,
                     deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
@@ -306,12 +317,19 @@ export default function RFQForm() {
     const openImportModal = async () => {
         setShowImportModal(true);
         try {
-            // Sử dụng apiClient để đảm bảo có interceptors và error handling
-            const url = `/api/purchase-requisitions?page=0&size=50&sort=createdAt,desc`;
-            const response = await apiClient.get(url);
+            // Chỉ lấy PR đã Approved để import vào RFQ
+            const response = await apiClient.get("/purchase-requisitions/page", {
+                params: { 
+                    page: 0, 
+                    size: 50, 
+                    sort: "createdAt,desc",
+                    status: "Approved" // Chỉ lấy PR đã approved
+                }
+            });
             
-            const data = response.data || {};
-            const list = Array.isArray(data) ? data : (data?.content || []);
+            // Backend trả về Page object
+            const pageData = response.data || {};
+            const list = pageData.content || [];
             
             if (list.length === 0) {
                 toast.info("Không có phiếu yêu cầu nào");
@@ -329,23 +347,69 @@ export default function RFQForm() {
         } catch (err) {
             console.error("Load PR list error:", err);
             const errorMessage = err?.response?.data?.message || err?.message || 'Lỗi không xác định';
-            
-            // Kiểm tra nếu là lỗi 404 hoặc 500 do endpoint không tồn tại
-            if (err?.response?.status === 404 || err?.response?.status === 500) {
-                toast.error("Backend chưa có endpoint cho danh sách phiếu yêu cầu. Vui lòng liên hệ admin.");
-            } else {
-                toast.error(`Không thể tải danh sách phiếu yêu cầu: ${errorMessage}`);
-            }
+            toast.error(`Không thể tải danh sách phiếu yêu cầu: ${errorMessage}`);
             setPrList([]);
         }
     };
 
     // Import dòng sản phẩm từ PR đã chọn
+    const findMatchingProduct = (prItem) => {
+        if (!products || products.length === 0) {
+            console.warn("Products not loaded yet");
+            return null;
+        }
+
+        const rawId =
+            prItem.productId ||
+            prItem.product_id ||
+            prItem.product?.id ||
+            prItem.product?.product_id ||
+            null;
+        if (rawId) {
+            // So sánh với type coercion để tránh lỗi string vs number
+            const matchById = products.find((p) => String(p.value) === String(rawId) || Number(p.value) === Number(rawId));
+            if (matchById) {
+                console.log("Matched product by ID:", rawId, matchById);
+                return matchById;
+            }
+        }
+
+        const normalizedCode = (prItem.productCode || prItem.product?.sku || prItem.product?.productCode || "").trim().toLowerCase();
+        if (normalizedCode) {
+            const matchByCode = products.find((p) => p.normalizedCode === normalizedCode);
+            if (matchByCode) {
+                console.log("Matched product by code:", normalizedCode, matchByCode);
+                return matchByCode;
+            }
+        }
+
+        const normalizedName = (prItem.productName || prItem.product?.name || "").trim().toLowerCase();
+        if (normalizedName) {
+            const matchByName = products.find((p) => p.normalizedName === normalizedName);
+            if (matchByName) {
+                console.log("Matched product by name:", normalizedName, matchByName);
+                return matchByName;
+            }
+        }
+
+        console.warn("No product match found for:", prItem);
+        return null;
+    };
+
     const importFromSelectedPr = async () => {
         if (!selectedPr?.value) {
             toast.warn("Chọn một phiếu yêu cầu để nhập");
             return;
         }
+
+        // Đảm bảo products đã được load
+        if (!products || products.length === 0) {
+            toast.warn("Đang tải danh sách sản phẩm, vui lòng đợi...");
+            await loadProducts();
+            // Đợi một chút để state được cập nhật
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
         try {
             const res = await apiClient.get(`/purchase-requisitions/${selectedPr.value}`);
             const data = res.data || {};
@@ -356,34 +420,82 @@ export default function RFQForm() {
                 return;
             }
 
+            console.log("Importing PR items:", prItems);
+            console.log("Available products:", products.length);
+
             // Map về đúng shape item của form hiện tại
-            const mapped = prItems.map((it) => {
-                const productId = it.productId || it.product_id || it.product?.id || it.product?.product_id || null;
-                return {
-                    productId,
-                    productCode: it.productCode || it.product?.sku || "",
-                    productName: it.productName || it.product?.name || "",
-                    uom: it.uom || it.product?.uom || "",
-                    quantity: it.quantity ?? it.requestedQty ?? 1,
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
-                    targetPrice: it.targetPrice ?? it.valuation_price ?? 0,
-                    priceUnit: it.priceUnit ?? 1,
-                    note: it.note || it.remark || "",
-                };
-            }).filter(m => m.productId);
+            const mapped = prItems
+                .map((it) => {
+                    const matchedProduct = findMatchingProduct(it);
+                    const fallbackId =
+                        it.productId ||
+                        it.product_id ||
+                        it.product?.id ||
+                        it.product?.product_id ||
+                        null;
+
+                    // CRITICAL FIX: Ưu tiên productId từ PR item, sau đó mới dùng matched product
+                    // Đảm bảo convert sang Number để so sánh đúng
+                    const productId = fallbackId ? Number(fallbackId) : (matchedProduct?.value ? Number(matchedProduct.value) : null);
+
+                    // Tìm product object để lấy thông tin đầy đủ
+                    const productObj = productId
+                        ? products.find(p => Number(p.value) === productId)?.product
+                        : matchedProduct?.product;
+
+                    console.log("Mapping PR item:", {
+                        prItem: it,
+                        matchedProduct: matchedProduct ? { value: matchedProduct.value, label: matchedProduct.label } : null,
+                        fallbackId,
+                        finalProductId: productId,
+                        foundProduct: productObj ? productObj.name : 'NOT FOUND'
+                    });
+
+                    return {
+                        priId: it.priId || it.pri_id || it.id || null, // Purchase Requisition Item ID
+                        productId,
+                        productCode:
+                            productObj?.sku ||
+                            productObj?.productCode ||
+                            it.productCode ||
+                            it.product?.sku ||
+                            "",
+                        productName: productObj?.name || it.productName || it.product?.name || "",
+                        spec: it.spec || "",
+                        uom: productObj?.uom || productObj?.unit || it.uom || it.product?.uom || "",
+                        quantity: it.quantity ?? it.requestedQty ?? 1,
+                        deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
+                        targetPrice: it.targetPrice ?? it.valuation_price ?? it.estimatedUnitPrice ?? productObj?.purchase_price ?? 0,
+                        priceUnit: it.priceUnit ?? 1,
+                        note: it.note || it.remark || "",
+                    };
+                })
+                .filter((item) => {
+                    const hasProductId = !!item.productId && !isNaN(item.productId);
+                    if (!hasProductId) {
+                        console.warn("Filtered out item without valid productId:", item);
+                    }
+                    return hasProductId;
+                });
+
+            console.log("Mapped items after filtering:", mapped);
 
             if (mapped.length === 0) {
-                toast.info("Không có sản phẩm hợp lệ để nhập");
+                toast.warn("Không có sản phẩm hợp lệ để nhập. Các sản phẩm trong PR có thể đã bị xóa hoặc không tồn tại trong danh sách sản phẩm.");
                 return;
             }
 
-            setFormData((prev) => ({ ...prev, items: [...prev.items, ...mapped] }));
+            setFormData((prev) => {
+                const newItems = [...prev.items, ...mapped];
+                console.log("Setting formData items:", newItems);
+                return { ...prev, items: newItems };
+            });
             setShowImportModal(false);
             setSelectedPr(null);
-            toast.success("Đã nhập sản phẩm từ phiếu yêu cầu");
+            toast.success(`Đã nhập ${mapped.length} sản phẩm từ phiếu yêu cầu`);
         } catch (err) {
             console.error("Import PR items error:", err);
-            toast.error("Không thể nhập từ phiếu yêu cầu");
+            toast.error("Không thể nhập từ phiếu yêu cầu: " + (err.message || "Lỗi không xác định"));
         }
     };
 
@@ -402,24 +514,44 @@ export default function RFQForm() {
         }
 
         try {
+            // Format dates to YYYY-MM-DD for LocalDate
+            const formatDateForBackend = (date) => {
+                if (!date) return null;
+                if (typeof date === 'string') {
+                    // If already in YYYY-MM-DD format, return as is
+                    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+                    // Otherwise parse and format
+                    const d = new Date(date);
+                    return d.toISOString().split('T')[0];
+                }
+                if (date instanceof Date) {
+                    return date.toISOString().split('T')[0];
+                }
+                return null;
+            };
+
             const payload = {
                 rfqNo: formData.rfqNo,
-                issueDate: formData.issueDate,
-                dueDate: formData.dueDate,
-                status: formData.status,
-                selectedVendorIds: formData.selectedVendorIds,
-                notes: formData.notes,
-                items: formData.items.map((it) => ({
-                    productId: it.productId,
-                    productCode: it.productCode,
-                    productName: it.productName,
-                    uom: it.uom,
-                    quantity: Number(it.quantity),
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate).toISOString() : null,
-                    targetPrice: Number(it.targetPrice || 0),
-                    priceUnit: Number(it.priceUnit || 1),
-                    note: it.note,
-                })),
+                issueDate: formatDateForBackend(formData.issueDate),
+                dueDate: formatDateForBackend(formData.dueDate),
+                status: formData.status || "Draft",
+                selectedVendorIds: formData.selectedVendorIds || [],
+                notes: formData.notes || "",
+                items: formData.items
+                    .filter(it => it.productId || it.productName || it.productCode) // Filter out empty items
+                    .map((it) => ({
+                        priId: it.priId || null, // Purchase Requisition Item ID if imported from PR
+                        productId: it.productId || null,
+                        productCode: it.productCode || "",
+                        productName: it.productName || "",
+                        spec: it.spec || "",
+                        uom: it.uom || "",
+                        quantity: Number(it.quantity) || 1,
+                        deliveryDate: formatDateForBackend(it.deliveryDate),
+                        targetPrice: Number(it.targetPrice || 0),
+                        priceUnit: Number(it.priceUnit || 1),
+                        note: it.note || "",
+                    })),
             };
 
             if (isEdit) {
@@ -631,7 +763,10 @@ export default function RFQForm() {
                                                             <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">{index + 1}</td>
                                                             <td className="border border-gray-200 px-4 py-2">
                                                                 <Select
-                                                                    value={products.find((o) => o.value === item.productId) || null}
+                                                                    value={item.productId ? products.find((o) => 
+                                                                        String(o.value) === String(item.productId) || 
+                                                                        Number(o.value) === Number(item.productId)
+                                                                    ) || null : null}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
                                                                     options={products}
                                                                     placeholder="Chọn sản phẩm"

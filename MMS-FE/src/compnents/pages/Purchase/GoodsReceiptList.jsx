@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { goodsReceiptService } from "../../../api/goodsReceiptService";
+import { goodsReceiptService } from "../../../api/goodsReceiptService.js";
 
 export default function GoodsReceiptList() {
     const navigate = useNavigate();
@@ -81,6 +81,7 @@ export default function GoodsReceiptList() {
             setError(null);
 
             const sort = `${sortFieldValue},${sortDirectionValue}`;
+            console.log("Fetching goods receipts:", { page, keyword, sort });
             let response;
             if (keyword.trim()) {
                 response = await goodsReceiptService.searchGoodsReceiptsWithPagination(keyword, page, pageSize, sort);
@@ -88,13 +89,22 @@ export default function GoodsReceiptList() {
                 response = await goodsReceiptService.getGoodsReceiptsWithPagination(page, pageSize, sort);
             }
 
+            console.log("Goods receipts response:", response);
+            console.log("First receipt:", response.content?.[0]);
+            console.log("Receipt ID fields:", response.content?.[0] && {
+                receipt_id: response.content[0].receipt_id,
+                receiptId: response.content[0].receiptId,
+                id: response.content[0].id,
+                gri_id: response.content[0].gri_id
+            });
             setReceipts(response.content || []);
             setTotalPages(response.totalPages || 0);
             setTotalElements(response.totalElements || 0);
             setCurrentPage(page);
         } catch (err) {
             console.error("Error fetching Goods Receipts:", err);
-            setError("Không thể tải danh sách Phiếu nhập kho");
+            console.error("Error details:", err.response?.data);
+            setError(err.response?.data?.message || "Không thể tải danh sách Phiếu nhập kho");
         } finally {
             setLoading(false);
         }
@@ -235,10 +245,7 @@ export default function GoodsReceiptList() {
                                         <input type="checkbox" className="rounded border-gray-300" />
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("receipt_no")} className="flex items-center gap-1 hover:text-gray-700">
-                                            SỐ PHIẾU
-                                            {getSortIcon("receipt_no")}
-                                        </button>
+                                        SỐ PHIẾU
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         ĐƠN HÀNG
@@ -247,10 +254,7 @@ export default function GoodsReceiptList() {
                                         KHO
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <button onClick={() => handleSort("received_date")} className="flex items-center gap-1 hover:text-gray-700">
-                                            NGÀY NHẬN
-                                            {getSortIcon("received_date")}
-                                        </button>
+                                        NGÀY NHẬN
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         TRẠNG THÁI
@@ -296,7 +300,7 @@ export default function GoodsReceiptList() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => navigate(`/purchase/goods-receipts/${receipt.receipt_id || receipt.id}`)}
+                                                    onClick={() => navigate(`/purchase/goods-receipts/${receipt.receiptId || receipt.receipt_id || receipt.id}`)}
                                                     className="text-blue-600 hover:text-blue-900"
                                                     title="Xem chi tiết"
                                                 >
@@ -305,24 +309,28 @@ export default function GoodsReceiptList() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
-                                                <button
-                                                    onClick={() => navigate(`/purchase/goods-receipts/${receipt.receipt_id || receipt.id}/edit`)}
-                                                    className="text-green-600 hover:text-green-900"
-                                                    title="Chỉnh sửa"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(receipt)}
-                                                    className="text-red-600 hover:text-red-900"
-                                                    title="Xóa"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                {receipt.status === "Pending" && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => navigate(`/purchase/goods-receipts/${receipt.receiptId || receipt.receipt_id || receipt.id}/edit`)}
+                                                            className="text-green-600 hover:text-green-900"
+                                                            title="Chỉnh sửa"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteClick(receipt)}
+                                                            className="text-red-600 hover:text-red-900"
+                                                            title="Xóa"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

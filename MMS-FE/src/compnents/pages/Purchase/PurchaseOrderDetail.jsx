@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
-import apiClient from "../../../api/apiClient";
+import { getCurrentUser, hasRole } from "../../../api/authService";
 
 const Stat = ({ label, value }) => (
     <div className="flex-1 text-center">
@@ -17,10 +17,13 @@ export default function PurchaseOrderDetail() {
 
     const [data, setData] = useState(null);
     const [items, setItems] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState("");
+    const [showSendConfirm, setShowSendConfirm] = useState(false);
 
     // Helpers
     const formatDate = (dateString) => {
@@ -51,20 +54,12 @@ export default function PurchaseOrderDetail() {
         }).format(amount);
     };
 
-    const getProductName = (productId) => {
-        if (!productId || !products || products.length === 0) return "-";
-        const p = products.find((x) => (x.id || x.product_id) === productId);
-        if (p) {
-            return `${p.sku || p.productCode || ""} - ${p.name || ""}`;
-        }
-        return "-";
-    };
-
-    const getVendorName = (vendorId) => {
-        if (!vendorId || !vendors || vendors.length === 0) return "-";
-        const v = vendors.find((x) => (x.vendorId || x.id) === vendorId);
-        return v ? v.name : "-";
-    };
+    const getProductName = (item) =>
+        item.productName ||
+        item.product_name ||
+        item.productCode ||
+        item.product_code ||
+        "-";
 
     const lineValue = (item) => {
         return Number(item?.line_total || item?.lineTotal || 0);
@@ -75,7 +70,17 @@ export default function PurchaseOrderDetail() {
         return items.reduce((sum, item) => sum + lineValue(item), 0);
     }, [items]);
 
+    const getStatusString = (status, fallback = "Pending") => {
+        if (!status) return fallback;
+        if (typeof status === "string") return status;
+        if (typeof status === "object") {
+            return status?.name || status?.value || status?.toString() || fallback;
+        }
+        return String(status);
+    };
+
     const getStatusBadge = (status) => {
+        const statusStr = getStatusString(status, "Pending");
         const map = {
             Pending: { label: "Đang chờ", color: "bg-yellow-100 text-yellow-800" },
             Approved: { label: "Đã phê duyệt", color: "bg-green-100 text-green-800" },
@@ -83,7 +88,7 @@ export default function PurchaseOrderDetail() {
             Completed: { label: "Hoàn thành", color: "bg-purple-100 text-purple-800" },
             Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
         };
-        const statusInfo = map[status] || { label: status || "Đang chờ", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[statusStr] || { label: statusStr || "Đang chờ", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -92,12 +97,13 @@ export default function PurchaseOrderDetail() {
     };
 
     const getApprovalStatusBadge = (approvalStatus) => {
+        const statusStr = getStatusString(approvalStatus, "Pending");
         const map = {
             Pending: { label: "Chờ phê duyệt", color: "bg-yellow-100 text-yellow-800" },
             Approved: { label: "Đã phê duyệt", color: "bg-green-100 text-green-800" },
             Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
-        const statusInfo = map[approvalStatus] || { label: approvalStatus || "Chờ phê duyệt", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[statusStr] || { label: statusStr || "Chờ phê duyệt", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -105,101 +111,107 @@ export default function PurchaseOrderDetail() {
         );
     };
 
-    // Fetch data from backend
+    const [currentUser, setCurrentUser] = useState(null);
+
     useEffect(() => {
-        let mounted = true;
-
-        (async () => {
+        const loadUser = async () => {
             try {
-                setLoading(true);
-                setErr(null);
-
-                // Fetch Purchase Order detail
-                const orderData = await purchaseOrderService.getPurchaseOrderById(id);
-
-                // Fetch items
-                const itemsResponse = await apiClient.get(`/purchase-orders/${id}/items`);
-                const itemsData = Array.isArray(itemsResponse.data)
-                    ? itemsResponse.data
-                    : itemsResponse.data?.content || [];
-
-                // Fetch products
-                const resProducts = await apiClient.get("/product", {
-                    params: { page: 0, size: 100 }
-                });
-                const prodData = resProducts.data?.content || resProducts.data || [];
-
-                // Fetch vendors
-                const resVendors = await apiClient.get("/vendors");
-                const vendorData = Array.isArray(resVendors.data)
-                    ? resVendors.data
-                    : resVendors.data?.content || [];
-
-                if (mounted) {
-                    setData(orderData);
-                    setItems(itemsData);
-                    setProducts(prodData);
-                    setVendors(vendorData);
-                }
-            } catch (e) {
-                console.error("Error loading Purchase Order detail:", e);
-                if (mounted) {
-                    setErr(
-                        e?.response?.data?.message ||
-                        e.message ||
-                        "Không thể tải dữ liệu Đơn hàng mua"
-                    );
-                }
-            } finally {
-                if (mounted) setLoading(false);
+                const user = await getCurrentUser();
+                setCurrentUser(user);
+            } catch (error) {
+                console.warn("Could not load current user:", error);
             }
-        })();
-
-        return () => {
-            mounted = false;
         };
+        loadUser();
+    }, []);
+
+    const currentUserId = currentUser?.userId || currentUser?.user_id || currentUser?.id;
+
+    const loadOrder = async () => {
+        try {
+            setLoading(true);
+            setErr(null);
+            const orderData = await purchaseOrderService.getPurchaseOrderById(id);
+            console.log("=== ORDER DATA RECEIVED ===", orderData);
+            console.log("Items:", orderData?.items);
+            console.log("Items length:", orderData?.items?.length);
+            setData(orderData);
+            setItems(orderData?.items || []);
+        } catch (e) {
+            console.error("Error loading Purchase Order detail:", e);
+            console.error("Full error:", e.response?.data);
+            setErr(
+                e?.response?.data?.message ||
+                e.message ||
+                "Không thể tải dữ liệu Đơn hàng mua"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (id) {
+            loadOrder();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     const handleApprove = async () => {
-        if (!window.confirm("Bạn có chắc chắn muốn phê duyệt đơn hàng này?")) return;
-
+        if (!currentUserId) {
+            toast.error("Không xác định được người phê duyệt.");
+            return;
+        }
         try {
-            const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-            await purchaseOrderService.approvePurchaseOrder(id, currentUser.userId || currentUser.user_id);
+            setActionLoading(true);
+            await purchaseOrderService.approvePurchaseOrder(id, currentUserId);
             toast.success("Đã phê duyệt đơn hàng thành công!");
-            // Reload data
-            window.location.reload();
+            setShowApproveModal(false);
+            await loadOrder();
         } catch (e) {
-            toast.error("Không thể phê duyệt đơn hàng");
+            toast.error(e?.response?.data?.message || "Không thể phê duyệt đơn hàng");
             console.error("Error approving order:", e);
+        } finally {
+            setActionLoading(false);
         }
     };
 
     const handleReject = async () => {
-        const reason = window.prompt("Nhập lý do từ chối:");
-        if (!reason) return;
-
+        if (!currentUserId) {
+            toast.error("Không xác định được người phê duyệt.");
+            return;
+        }
+        if (!rejectReason.trim()) {
+            toast.warn("Vui lòng nhập lý do từ chối.");
+            return;
+        }
         try {
-            const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-            await purchaseOrderService.rejectPurchaseOrder(id, currentUser.userId || currentUser.user_id, reason);
+            setActionLoading(true);
+            await purchaseOrderService.rejectPurchaseOrder(id, currentUserId, rejectReason.trim());
             toast.success("Đã từ chối đơn hàng!");
-            window.location.reload();
+            setShowRejectModal(false);
+            setRejectReason("");
+            await loadOrder();
         } catch (e) {
-            toast.error("Không thể từ chối đơn hàng");
+            toast.error(e?.response?.data?.message || "Không thể từ chối đơn hàng");
             console.error("Error rejecting order:", e);
+        } finally {
+            setActionLoading(false);
         }
     };
 
     const handleSend = async () => {
-        if (!window.confirm("Bạn có chắc chắn muốn gửi đơn hàng này cho nhà cung cấp?")) return;
-
         try {
+            setActionLoading(true);
             await purchaseOrderService.sendPurchaseOrder(id);
             toast.success("Đã gửi đơn hàng thành công!");
-            window.location.reload();
+            setShowSendConfirm(false);
+            await loadOrder();
         } catch (e) {
-            toast.error("Không thể gửi đơn hàng");
+            toast.error(e?.response?.data?.message || "Không thể gửi đơn hàng");
             console.error("Error sending order:", e);
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -221,7 +233,7 @@ export default function PurchaseOrderDetail() {
                 <div className="bg-white rounded-lg shadow-sm p-6 max-w-md">
                     <div className="text-red-600 mb-4">Lỗi: {err}</div>
                     <button
-                        onClick={() => navigate("/purchase/orders")}
+                        onClick={() => navigate("/purchase/purchase-orders")}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                         Quay lại danh sách
@@ -243,6 +255,11 @@ export default function PurchaseOrderDetail() {
     const totalBeforeTax = Number(data.total_before_tax || data.totalBeforeTax || 0);
     const taxAmount = Number(data.tax_amount || data.taxAmount || 0);
     const totalAfterTax = Number(data.total_after_tax || data.totalAfterTax || 0);
+    const normalizedStatus = getStatusString(data.status, "Pending");
+    const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
+    const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
+    const canSend = normalizedApprovalStatus === "Approved" && normalizedStatus === "Approved";
+    const canCreateGR = normalizedApprovalStatus === "Approved" && (normalizedStatus === "Approved" || normalizedStatus === "Sent");
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -251,7 +268,7 @@ export default function PurchaseOrderDetail() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => navigate("/purchase/orders")}
+                                onClick={() => navigate("/purchase/purchase-orders")}
                                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
                             >
                                 ← Quay lại
@@ -261,33 +278,47 @@ export default function PurchaseOrderDetail() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            {data.approval_status === "Pending" && (
+                            {canApprove && (
                                 <>
                                     <button
-                                        onClick={handleApprove}
+                                        onClick={() => setShowApproveModal(true)}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        disabled={actionLoading}
                                     >
                                         Phê duyệt
                                     </button>
                                     <button
-                                        onClick={handleReject}
+                                        onClick={() => {
+                                            setRejectReason("");
+                                            setShowRejectModal(true);
+                                        }}
                                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                        disabled={actionLoading}
                                     >
                                         Từ chối
                                     </button>
                                 </>
                             )}
-                            {data.approval_status === "Approved" && data.status === "Approved" && (
+                            {canSend && (
                                 <button
-                                    onClick={handleSend}
+                                    onClick={() => setShowSendConfirm(true)}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    disabled={actionLoading}
                                 >
                                     Gửi đơn hàng
                                 </button>
                             )}
+                            {canCreateGR && (
+                                <button
+                                    onClick={() => navigate(`/purchase/goods-receipts/new?po_id=${id}`)}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                                >
+                                    Tạo phiếu nhập kho
+                                </button>
+                            )}
                             <button
-                                onClick={() => navigate(`/purchase/orders/${id}/edit`)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                onClick={() => navigate(`/purchase/purchase-orders/${id}/edit`)}
+                                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
                             >
                                 Chỉnh sửa
                             </button>
@@ -357,7 +388,7 @@ export default function PurchaseOrderDetail() {
                                                     <tr key={item.poi_id || item.id || index} className="border-t hover:bg-gray-50">
                                                         <td className="py-3 pr-4">{index + 1}</td>
                                                         <td className="py-3 pr-4">
-                                                            {item.productName || item.product_name || getProductName(item.product_id || item.productId)}
+                                        {getProductName(item)}
                                                         </td>
                                                         <td className="py-3 pr-4">
                                                             {item.uom || "-"}
@@ -451,7 +482,7 @@ export default function PurchaseOrderDetail() {
                                 <div>
                                     <span className="text-gray-500">Nhà cung cấp: </span>
                                     <span className="font-medium">
-                    {getVendorName(data.vendor_id || data.vendorId)}
+                    {data.vendorName || data.vendor_name || "-"}
                   </span>
                                 </div>
                                 <div>
@@ -528,7 +559,131 @@ export default function PurchaseOrderDetail() {
                     </aside>
                 </div>
             </div>
+            {/* Approve Modal */}
+            {showApproveModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                        <h3 className="text-lg font-semibold mb-3">Phê duyệt đơn hàng</h3>
+                        <p className="text-sm text-gray-600 mb-6">
+                            Bạn có chắc chắn muốn phê duyệt đơn hàng {data.poNo || data.po_no || `#${id}`}?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowApproveModal(false)}
+                                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                                disabled={actionLoading}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleApprove}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? "Đang xử lý..." : "Phê duyệt"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                        <h3 className="text-lg font-semibold mb-3">Từ chối đơn hàng</h3>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Lý do từ chối <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            rows={4}
+                            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            placeholder="Nhập lý do từ chối"
+                            disabled={actionLoading}
+                        />
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                                disabled={actionLoading}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? "Đang xử lý..." : "Từ chối"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Send confirmation */}
+            {showSendConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                        <div className="flex items-center mb-4">
+                            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h3 className="ml-3 text-lg font-semibold">Gửi đơn hàng cho nhà cung cấp</h3>
+                        </div>
+                        <div className="space-y-3">
+                            <p className="text-sm text-gray-700">
+                                Xác nhận gửi đơn hàng <strong>{data.poNo || data.po_no}</strong> cho nhà cung cấp <strong>{data.vendorName || data.vendor_name}</strong>?
+                            </p>
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p className="text-sm text-blue-800">
+                                    <strong>📧 Hệ thống sẽ:</strong>
+                                </p>
+                                <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
+                                    <li>Gửi email thông báo đơn hàng đến nhà cung cấp</li>
+                                    <li>Đính kèm chi tiết đơn hàng PDF</li>
+                                    <li>Chuyển trạng thái đơn hàng sang <strong>Sent</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => setShowSendConfirm(false)}
+                                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                                disabled={actionLoading}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleSend}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Đang gửi...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        Gửi email & cập nhật
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-

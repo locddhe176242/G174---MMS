@@ -36,6 +36,15 @@ import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
 import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
 import UserManagement from "./compnents/pages/Admin/UserManagement";
 import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.jsx";
+import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm.jsx";
+import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.jsx";
+import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
+import PurchaseOrderList from "./compnents/pages/Purchase/PurchaseOrderList.jsx";
+import PurchaseOrderForm from "./compnents/pages/Purchase/PurchaseOrderForm.jsx";
+import PurchaseOrderDetail from "./compnents/pages/Purchase/PurchaseOrderDetail.jsx";
+import GoodsReceiptList from "./compnents/pages/Purchase/GoodsReceiptList.jsx";
+import GoodsReceiptForm from "./compnents/pages/Purchase/GoodsReceiptForm.jsx";
+import GoodsReceiptDetail from "./compnents/pages/Purchase/GoodsReceiptDetail.jsx";
 
 function App() {
     return (
@@ -54,34 +63,53 @@ function App() {
                 }
             >
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/categories" element={<CategoryList />} />
                 <Route path="/profile" element={<UserProfile />} />
+
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/new" element={<CustomerForm />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
                 <Route path="/customers/:id/edit" element={<CustomerForm />} />
+
                 <Route path="/products" element={<ProductList />} />
-                <Route path="/categories" element={<CategoryList />} />
+
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/vendors/new" element={<VendorForm />} />
                 <Route path="/vendors/:id/edit" element={<VendorForm />} />
                 <Route path="/vendors/:id" element={<VendorDetail />} />
+
                 <Route path="/warehouse" element={<WarehouseList />} />
                 <Route path="/warehouse/new" element={<AddWarehouse />} />
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
+
                 <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
                 <Route path="/purchase/purchase-requisitions" element={<PurchaseRequisitionList />} />
+
                 <Route path="/purchase/rfqs" element={<RFQList />} />
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
-                <Route path="/purchase/rfq-vendors" element={<div className="p-4"><h1>RFQ Vendors - Đang phát triển</h1></div>} />
-                <Route path="/purchase/purchase-quotations" element={<div className="p-4"><h1>Purchase Quotations - Đang phát triển</h1></div>} />
-                <Route path="/purchase/purchase-orders" element={<div className="p-4"><h1>Purchase Orders - Đang phát triển</h1></div>} />
-                <Route path="/purchase/goods-receipts" element={<div className="p-4"><h1>Goods Receipts - Đang phát triển</h1></div>} />
-                <Route path="/approvals" element={<ApprovalList />} />
+                <Route path="/purchase/rfqs/:id/compare-quotations" element={<CompareSupplierQuotations />} />
+
+                <Route path="/purchase/purchase-quotations" element={<VendorQuotationList />} />
+                <Route path="/purchase/purchase-quotations/new" element={<VendorQuotationForm />} />
+                <Route path="/purchase/purchase-quotations/:id" element={<VendorQuotationForm />} />
+                <Route path="/purchase/purchase-quotations/:rfqId/:vendorId" element={<VendorQuotationForm />} />
+                
+                <Route path="/purchase/purchase-orders" element={<PurchaseOrderList />} />
+                <Route path="/purchase/purchase-orders/new" element={<PurchaseOrderForm />} />
+                <Route path="/purchase/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+                <Route path="/purchase/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+
+                <Route path="/purchase/goods-receipts" element={<GoodsReceiptList />} />
+                <Route path="/purchase/goods-receipts/new" element={<GoodsReceiptForm />} />
+                <Route path="/purchase/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
+                <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
+
+                <Route path="/approval" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
                 <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
@@ -89,6 +117,7 @@ function App() {
                 <Route path="/admin/permissions" element={<PermissionManagement />} />
                 <Route path="/admin/user-permissions" element={<UserPermissionManagement />} />
                 <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/user" element={<UserManagement />} />
                 <Route path="/admin/departments" element={<DepartmentManagement />} />
             </Route>
 

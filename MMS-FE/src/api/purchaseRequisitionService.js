@@ -17,10 +17,14 @@ export const purchaseRequisitionService = {
 
   // ------------------- GET ALL WITH PAGINATION (REQUIRED) -------------------
   // Note: getAllRequisitions() without pagination is not supported for ERP safety
-  getRequisitionsWithPagination: async (page = 0, size = 20, sort = "createdAt,desc") => {
-    const response = await apiClient.get(`${BASE_PATH}/page`, {
-      params: { page, size, sort }
-    });
+        getRequisitionsWithPagination: async (page = 0, size = 20, sort = "createdAt,desc", status) => {
+          const params = { page, size, sort };
+          if (status) {
+            params.status = status;
+          }
+          const response = await apiClient.get(`${BASE_PATH}/page`, {
+            params
+          });
     return response.data;
   },
 

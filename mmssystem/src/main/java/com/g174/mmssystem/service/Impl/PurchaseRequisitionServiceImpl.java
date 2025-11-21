@@ -205,6 +205,23 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     }
 
     @Override
+    public Page<PurchaseRequisitionResponseDTO> getAllRequisitionsByStatus(RequisitionStatus status, Pageable pageable) {
+        log.info("Fetching purchase requisitions with status: {} and pagination", status);
+
+        // Fetch page without relations first
+        Page<PurchaseRequisition> requisitions = requisitionRepository.findAllActiveByStatus(status, pageable);
+
+        // Fetch each requisition with relations to avoid N+1
+        List<PurchaseRequisition> requisitionsWithRelations = requisitions.getContent().stream()
+                .map(r -> requisitionRepository.findByIdWithRelations(r.getRequisitionId()).orElse(r))
+                .collect(Collectors.toList());
+
+        List<PurchaseRequisitionResponseDTO> dtoList = requisitionMapper.toResponseDTOList(requisitionsWithRelations);
+
+        return new PageImpl<>(dtoList, pageable, requisitions.getTotalElements());
+    }
+
+    @Override
     public List<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword) {
         throw new UnsupportedOperationException("searchRequisitions() without pagination is not supported. Please use searchRequisitions(String, Pageable) instead.");
     }

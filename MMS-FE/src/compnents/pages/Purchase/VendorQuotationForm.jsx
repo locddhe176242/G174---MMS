@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { rfqService } from '../../../api/rfqService';
+import { purchaseQuotationService } from '../../../api/purchaseQuotationService';
 import apiClient from '../../../api/apiClient';
 import { getCurrentUser } from '../../../api/authService';
 
@@ -13,21 +15,21 @@ const VendorQuotationForm = () => {
     const rfqId = searchParams.get('rfq_id');
     const vendorId = searchParams.get('vendor_id');
 
-    // Form data state
+    // Form data state - using camelCase to match backend DTO
     const [formData, setFormData] = useState({
-        pq_no: '',
-        rfq_id: rfqId ? parseInt(rfqId) : null,
-        vendor_id: vendorId ? parseInt(vendorId) : null,
-        pq_date: new Date(),
-        valid_until: null,
-        is_tax_included: false,
-        delivery_terms: '',
-        payment_terms: '',
-        lead_time_days: null,
-        warranty_months: null,
-        header_discount: 0,
-        shipping_cost: 0,
-        total_amount: 0,
+        pqNo: '',
+        rfqId: rfqId ? parseInt(rfqId) : null,
+        vendorId: vendorId ? parseInt(vendorId) : null,
+        pqDate: new Date(),
+        validUntil: null,
+        isTaxIncluded: false,
+        deliveryTerms: '',
+        paymentTerms: '',
+        leadTimeDays: null,
+        warrantyMonths: null,
+        headerDiscount: 0,
+        shippingCost: 0,
+        totalAmount: 0,
         status: 'Pending',
         notes: '',
         items: []
@@ -41,9 +43,43 @@ const VendorQuotationForm = () => {
     const [validationErrors, setValidationErrors] = useState({});
     const [currentUser, setCurrentUser] = useState(null);
 
+    // Common options for delivery and payment terms
+    const deliveryTermsOptions = [
+        { value: 'FOB - Giao tại kho người bán', label: 'FOB - Giao tại kho người bán' },
+        { value: 'CIF - Bao gồm phí vận chuyển và bảo hiểm', label: 'CIF - Bao gồm phí vận chuyển và bảo hiểm' },
+        { value: 'EXW - Lấy tại kho nhà máy', label: 'EXW - Lấy tại kho nhà máy' },
+        { value: 'DDP - Giao tận nơi, đã bao gồm thuế', label: 'DDP - Giao tận nơi, đã bao gồm thuế' },
+        { value: 'Giao hàng miễn phí trong nội thành', label: 'Giao hàng miễn phí trong nội thành' },
+        { value: 'Giao hàng trong 7-10 ngày làm việc', label: 'Giao hàng trong 7-10 ngày làm việc' },
+    ];
+
+    const paymentTermsOptions = [
+        { value: 'COD - Thanh toán khi nhận hàng', label: 'COD - Thanh toán khi nhận hàng' },
+        { value: 'Net 30 - Thanh toán trong 30 ngày', label: 'Net 30 - Thanh toán trong 30 ngày' },
+        { value: 'Net 60 - Thanh toán trong 60 ngày', label: 'Net 60 - Thanh toán trong 60 ngày' },
+        { value: '50% trả trước, 50% trước khi giao', label: '50% trả trước, 50% trước khi giao' },
+        { value: '100% trả trước', label: '100% trả trước' },
+        { value: 'Chuyển khoản trong 7 ngày', label: 'Chuyển khoản trong 7 ngày' },
+        { value: 'LC 90 ngày', label: 'LC 90 ngày (Letter of Credit)' },
+    ];
+
     // Format currency
     const formatCurrency = (n) =>
         new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
+
+    // Format number with thousand separator (for input display)
+    const formatNumber = (value) => {
+        if (!value && value !== 0) return '';
+        const num = value.toString().replace(/\./g, ''); // Remove existing dots
+        return num.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); // Add dots every 3 digits
+    };
+
+    // Parse formatted number back to number
+    const parseFormattedNumber = (value) => {
+        if (!value) return 0;
+        const cleaned = value.toString().replace(/\./g, ''); // Remove dots
+        return parseFloat(cleaned) || 0;
+    };
 
     // Calculate totals
     const calculateTotals = useMemo(() => {
@@ -51,34 +87,27 @@ const VendorQuotationForm = () => {
 
         const subtotal = formData.items.reduce((sum, item) => {
             const qty = Number(item.quantity || 0);
-            const price = Number(item.unit_price || 0);
+            const price = Number(item.unitPrice || 0);
             return sum + qty * price;
         }, 0);
 
         const tax = formData.items.reduce((sum, item) => {
-            return sum + Number(item.tax_amount || 0);
+            return sum + Number(item.taxAmount || 0);
         }, 0);
 
-        const discount = Number(formData.header_discount || 0);
-        const shipping = Number(formData.shipping_cost || 0);
-        const total = subtotal + tax - discount + shipping;
+        const discountPercent = Number(formData.headerDiscount || 0);
+        const discountAmount = (subtotal + tax) * (discountPercent / 100);
+        const shipping = Number(formData.shippingCost || 0);
+        const total = subtotal + tax - discountAmount + shipping;
 
-        return { subtotal, tax, total };
-    }, [formData.items, formData.header_discount, formData.shipping_cost]);
+        return { subtotal, tax, discountAmount, total };
+    }, [formData.items, formData.headerDiscount, formData.shippingCost]);
 
     // Auto-generate quotation number
     const generateQuotationNumber = async () => {
         try {
-            const response = await fetch('/api/purchase-quotations/generate-number');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.success) {
-                return data.pq_no;
-            } else {
-                throw new Error(data.message || 'Failed to generate quotation number');
-            }
+            const pqNo = await purchaseQuotationService.generateQuotationNo();
+            return pqNo || `PQ-${new Date().getFullYear()}-999`;
         } catch (error) {
             console.error('Error generating quotation number:', error);
             const currentYear = new Date().getFullYear();
@@ -97,18 +126,18 @@ const VendorQuotationForm = () => {
                     const rfq = await rfqService.getRFQById(rfqId);
                     setRfqData(rfq);
 
-                    // Map RFQ items to quotation items
+                    // Map RFQ items to quotation items - using camelCase to match backend DTO
                     if (rfq.items && Array.isArray(rfq.items)) {
                         const mappedItems = rfq.items.map(item => ({
-                            rfq_item_id: item.rfq_item_id || item.id,
-                            product_id: item.productId || item.product_id,
-                            product_code: item.productCode || item.product_code || '',
-                            product_name: item.productName || item.product_name || '',
+                            rfqItemId: item.rfqItemId || item.rfq_item_id || item.id,
+                            productId: item.productId || item.product_id || null,
+                            productCode: item.productCode || item.product_code || '',
+                            productName: item.productName || item.product_name || '',
                             quantity: Number(item.quantity || 0),
-                            unit_price: Number(item.targetPrice || item.target_price || 0),
-                            tax_rate: 0,
-                            tax_amount: 0,
-                            line_total: 0,
+                            unitPrice: Number(item.targetPrice || item.target_price || 0),
+                            taxRate: 0,
+                            taxAmount: 0,
+                            lineTotal: 0,
                             remark: item.note || item.remark || ''
                         }));
 
@@ -142,7 +171,7 @@ const VendorQuotationForm = () => {
                     setCurrentUser(user);
                     setFormData(prev => ({
                         ...prev,
-                        created_by: user.userId || user.user_id
+                        createdById: user.userId || user.user_id
                     }));
                 }
 
@@ -150,7 +179,7 @@ const VendorQuotationForm = () => {
                 const pqNo = await generateQuotationNumber();
                 setFormData(prev => ({
                     ...prev,
-                    pq_no: pqNo
+                    pqNo: pqNo
                 }));
             } catch (error) {
                 console.error('Error loading initial data:', error);
@@ -172,25 +201,25 @@ const VendorQuotationForm = () => {
     useEffect(() => {
         const updatedItems = formData.items.map(item => {
             const qty = Number(item.quantity || 0);
-            const price = Number(item.unit_price || 0);
-            const taxRate = Number(item.tax_rate || 0);
+            const price = Number(item.unitPrice || 0);
+            const taxRate = Number(item.taxRate || 0);
             const subtotal = qty * price;
-            const taxAmount = formData.is_tax_included ? 0 : (subtotal * taxRate / 100);
+            const taxAmount = formData.isTaxIncluded ? 0 : (subtotal * taxRate / 100);
             const lineTotal = subtotal + taxAmount;
 
             return {
                 ...item,
-                tax_amount: taxAmount,
-                line_total: lineTotal
+                taxAmount: taxAmount,
+                lineTotal: lineTotal
             };
         });
 
         setFormData(prev => ({
             ...prev,
             items: updatedItems,
-            total_amount: calculateTotals.total
+            totalAmount: calculateTotals.total
         }));
-    }, [formData.items.map(i => `${i.quantity}-${i.unit_price}-${i.tax_rate}`).join(','), formData.is_tax_included, calculateTotals.total]);
+    }, [formData.items.map(i => `${i.quantity}-${i.unitPrice}-${i.taxRate}`).join(','), formData.isTaxIncluded, calculateTotals.total]);
 
     // Handle input changes
     const handleInputChange = (field, value) => {
@@ -225,20 +254,20 @@ const VendorQuotationForm = () => {
     const validateAllFields = () => {
         const errors = {};
 
-        if (!formData.pq_no) {
-            errors.pq_no = 'Mã báo giá là bắt buộc';
+        if (!formData.pqNo) {
+            errors.pqNo = 'Mã báo giá là bắt buộc';
         }
 
-        if (!formData.rfq_id) {
-            errors.rfq_id = 'RFQ là bắt buộc';
+        if (!formData.rfqId) {
+            errors.rfqId = 'RFQ là bắt buộc';
         }
 
-        if (!formData.vendor_id) {
-            errors.vendor_id = 'Nhà cung cấp là bắt buộc';
+        if (!formData.vendorId) {
+            errors.vendorId = 'Nhà cung cấp là bắt buộc';
         }
 
-        if (!formData.valid_until) {
-            errors.valid_until = 'Ngày hết hạn là bắt buộc';
+        if (!formData.validUntil) {
+            errors.validUntil = 'Ngày hết hạn là bắt buộc';
         }
 
         if (formData.items.length === 0) {
@@ -250,8 +279,8 @@ const VendorQuotationForm = () => {
             if (!item.quantity || item.quantity <= 0) {
                 errors[`item_${index}_quantity`] = 'Số lượng phải lớn hơn 0';
             }
-            if (!item.unit_price || item.unit_price <= 0) {
-                errors[`item_${index}_unit_price`] = 'Đơn giá phải lớn hơn 0';
+            if (!item.unitPrice || item.unitPrice <= 0) {
+                errors[`item_${index}_unitPrice`] = 'Đơn giá phải lớn hơn 0';
             }
         });
 
@@ -272,27 +301,75 @@ const VendorQuotationForm = () => {
 
         try {
             setLoading(true);
-            const response = await fetch('/api/purchase-quotations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...formData,
-                    total_amount: calculateTotals.total
-                }),
-            });
 
-            if (response.ok) {
-                toast.success('Tạo báo giá thành công!');
-                navigate(`/purchase/rfqs/${rfqId}`);
-            } else {
-                const errorData = await response.json();
-                toast.error(errorData.message || 'Có lỗi xảy ra');
-            }
+            // Format dates to YYYY-MM-DD or ISO string for backend
+            const formatDateForBackend = (date) => {
+                if (!date) return null;
+                if (typeof date === 'string') {
+                    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+                    const d = new Date(date);
+                    return d.toISOString().split('T')[0];
+                }
+                if (date instanceof Date) {
+                    return date.toISOString().split('T')[0];
+                }
+                return null;
+            };
+
+            const formatDateTimeForBackend = (date) => {
+                if (!date) return null;
+                if (date instanceof Date) {
+                    return date.toISOString();
+                }
+                if (typeof date === 'string') {
+                    return new Date(date).toISOString();
+                }
+                return null;
+            };
+
+            // Get current user ID
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const createdById = currentUser?.userId || currentUser?.user_id || currentUser?.id || null;
+
+            // Prepare payload matching PurchaseQuotationRequestDTO
+            const payload = {
+                pqNo: formData.pqNo,
+                rfqId: formData.rfqId,
+                vendorId: formData.vendorId,
+                pqDate: formatDateTimeForBackend(formData.pqDate),
+                validUntil: formatDateForBackend(formData.validUntil),
+                isTaxIncluded: formData.isTaxIncluded || false,
+                deliveryTerms: formData.deliveryTerms || '',
+                paymentTerms: formData.paymentTerms || '',
+                leadTimeDays: formData.leadTimeDays || null,
+                warrantyMonths: formData.warrantyMonths || null,
+                headerDiscount: Number(formData.headerDiscount || 0),
+                shippingCost: Number(formData.shippingCost || 0),
+                totalAmount: Number(calculateTotals.total || 0),
+                // status: formData.status || 'Pending', // Temporarily comment out to avoid NoClassDefFoundError
+                notes: formData.notes || '',
+                items: formData.items.map(item => ({
+                    rfqItemId: item.rfqItemId,
+                    productId: item.productId || null,
+                    quantity: Number(item.quantity || 0),
+                    unitPrice: Number(item.unitPrice || 0),
+                    taxRate: Number(item.taxRate || 0),
+                    taxAmount: Number(item.taxAmount || 0),
+                    lineTotal: Number(item.lineTotal || 0),
+                    remark: item.remark || ''
+                }))
+            };
+
+            console.log('Payload being sent:', payload); // Debug log
+
+            await purchaseQuotationService.createQuotation(payload, createdById);
+            toast.success('Tạo báo giá thành công!');
+            navigate(`/purchase/rfqs/${rfqId}`);
         } catch (error) {
             console.error('Error submitting form:', error);
-            toast.error('Có lỗi xảy ra khi gửi dữ liệu');
+            console.error('Error response:', error?.response?.data); // Debug log
+            const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi gửi dữ liệu';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -349,15 +426,15 @@ const VendorQuotationForm = () => {
                             </label>
                             <input
                                 type="text"
-                                value={formData.pq_no}
-                                onChange={(e) => handleInputChange('pq_no', e.target.value)}
+                                value={formData.pqNo}
+                                onChange={(e) => handleInputChange('pqNo', e.target.value)}
                                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    validationErrors.pq_no ? 'border-red-500' : 'border-gray-300'
+                                    validationErrors.pqNo ? 'border-red-500' : 'border-gray-300'
                                 }`}
                                 placeholder="Mã báo giá"
                             />
-                            {validationErrors.pq_no && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.pq_no}</p>
+                            {validationErrors.pqNo && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.pqNo}</p>
                             )}
                         </div>
 
@@ -367,8 +444,8 @@ const VendorQuotationForm = () => {
                                 Ngày báo giá
                             </label>
                             <DatePicker
-                                selected={formData.pq_date}
-                                onChange={(date) => handleInputChange('pq_date', date)}
+                                selected={formData.pqDate}
+                                onChange={(date) => handleInputChange('pqDate', date)}
                                 dateFormat="dd/MM/yyyy"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                             />
@@ -380,16 +457,16 @@ const VendorQuotationForm = () => {
                                 Có hiệu lực đến <span className="text-red-500">*</span>
                             </label>
                             <DatePicker
-                                selected={formData.valid_until}
-                                onChange={(date) => handleInputChange('valid_until', date)}
+                                selected={formData.validUntil}
+                                onChange={(date) => handleInputChange('validUntil', date)}
                                 dateFormat="dd/MM/yyyy"
                                 className={`w-full px-3 py-2 border rounded-md ${
-                                    validationErrors.valid_until ? 'border-red-500' : 'border-gray-300'
+                                    validationErrors.validUntil ? 'border-red-500' : 'border-gray-300'
                                 }`}
                                 placeholderText="Chọn ngày"
                             />
-                            {validationErrors.valid_until && (
-                                <p className="text-red-500 text-sm mt-1">{validationErrors.valid_until}</p>
+                            {validationErrors.validUntil && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.validUntil}</p>
                             )}
                         </div>
 
@@ -401,8 +478,8 @@ const VendorQuotationForm = () => {
                             <div className="flex items-center mt-2">
                                 <input
                                     type="checkbox"
-                                    checked={formData.is_tax_included}
-                                    onChange={(e) => handleInputChange('is_tax_included', e.target.checked)}
+                                    checked={formData.isTaxIncluded}
+                                    onChange={(e) => handleInputChange('isTaxIncluded', e.target.checked)}
                                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
                                 <span className="ml-2 text-sm text-gray-700">Đã bao gồm thuế VAT</span>
@@ -416,8 +493,8 @@ const VendorQuotationForm = () => {
                             </label>
                             <input
                                 type="number"
-                                value={formData.lead_time_days || ''}
-                                onChange={(e) => handleInputChange('lead_time_days', e.target.value ? parseInt(e.target.value) : null)}
+                                value={formData.leadTimeDays || ''}
+                                onChange={(e) => handleInputChange('leadTimeDays', e.target.value ? parseInt(e.target.value) : null)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                                 min="0"
                                 placeholder="Số ngày"
@@ -431,8 +508,8 @@ const VendorQuotationForm = () => {
                             </label>
                             <input
                                 type="number"
-                                value={formData.warranty_months || ''}
-                                onChange={(e) => handleInputChange('warranty_months', e.target.value ? parseInt(e.target.value) : null)}
+                                value={formData.warrantyMonths || ''}
+                                onChange={(e) => handleInputChange('warrantyMonths', e.target.value ? parseInt(e.target.value) : null)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                                 min="0"
                                 placeholder="Số tháng"
@@ -444,13 +521,18 @@ const VendorQuotationForm = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Điều khoản giao hàng
                             </label>
-                            <input
-                                type="text"
-                                value={formData.delivery_terms}
-                                onChange={(e) => handleInputChange('delivery_terms', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                placeholder="Điều khoản giao hàng"
+                            <CreatableSelect
+                                isClearable
+                                options={deliveryTermsOptions}
+                                value={formData.deliveryTerms ? { value: formData.deliveryTerms, label: formData.deliveryTerms } : null}
+                                onChange={(option) => handleInputChange('deliveryTerms', option ? option.value : '')}
+                                placeholder="Chọn hoặc nhập điều khoản giao hàng..."
+                                formatCreateLabel={(inputValue) => `Nhập: "${inputValue}"`}
+                                noOptionsMessage={() => "Không có lựa chọn"}
+                                className="react-select-container"
+                                classNamePrefix="react-select"
                             />
+                            <p className="text-xs text-gray-500 mt-1">VD: FOB, CIF, EXW, DDP, giao trong X ngày</p>
                         </div>
 
                         {/* Payment Terms */}
@@ -458,13 +540,18 @@ const VendorQuotationForm = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Điều khoản thanh toán
                             </label>
-                            <input
-                                type="text"
-                                value={formData.payment_terms}
-                                onChange={(e) => handleInputChange('payment_terms', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                placeholder="Điều khoản thanh toán"
+                            <CreatableSelect
+                                isClearable
+                                options={paymentTermsOptions}
+                                value={formData.paymentTerms ? { value: formData.paymentTerms, label: formData.paymentTerms } : null}
+                                onChange={(option) => handleInputChange('paymentTerms', option ? option.value : '')}
+                                placeholder="Chọn hoặc nhập điều khoản thanh toán..."
+                                formatCreateLabel={(inputValue) => `Nhập: "${inputValue}"`}
+                                noOptionsMessage={() => "Không có lựa chọn"}
+                                className="react-select-container"
+                                classNamePrefix="react-select"
                             />
+                            <p className="text-xs text-gray-500 mt-1">VD: COD, Net 30, 50% trả trước, LC 90 ngày</p>
                         </div>
 
                         {/* Header Discount */}
@@ -474,8 +561,8 @@ const VendorQuotationForm = () => {
                             </label>
                             <input
                                 type="number"
-                                value={formData.header_discount}
-                                onChange={(e) => handleInputChange('header_discount', parseFloat(e.target.value) || 0)}
+                                value={formData.headerDiscount}
+                                onChange={(e) => handleInputChange('headerDiscount', parseFloat(e.target.value) || 0)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                                 min="0"
                                 step="0.01"
@@ -489,8 +576,8 @@ const VendorQuotationForm = () => {
                             </label>
                             <input
                                 type="number"
-                                value={formData.shipping_cost}
-                                onChange={(e) => handleInputChange('shipping_cost', parseFloat(e.target.value) || 0)}
+                                value={formData.shippingCost}
+                                onChange={(e) => handleInputChange('shippingCost', parseFloat(e.target.value) || 0)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                                 min="0"
                                 step="0.01"
@@ -546,7 +633,7 @@ const VendorQuotationForm = () => {
                                             {index + 1}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {item.product_name || `${item.product_code || ''} - Sản phẩm`}
+                                            {item.productName || `${item.productCode || ''} - Sản phẩm`}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
@@ -563,31 +650,38 @@ const VendorQuotationForm = () => {
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
-                                                type="number"
-                                                value={item.unit_price}
-                                                onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                className="w-24 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                min="0"
-                                                step="0.01"
+                                                type="text"
+                                                value={formatNumber(item.unitPrice)}
+                                                onChange={(e) => {
+                                                    const rawValue = parseFormattedNumber(e.target.value);
+                                                    handleItemChange(index, 'unitPrice', rawValue);
+                                                }}
+                                                onBlur={(e) => {
+                                                    // Re-format on blur to ensure proper display
+                                                    const rawValue = parseFormattedNumber(e.target.value);
+                                                    handleItemChange(index, 'unitPrice', rawValue);
+                                                }}
+                                                className="w-32 px-1.5 py-0.5 border border-gray-300 rounded text-xs text-right"
+                                                placeholder="0"
                                             />
-                                            {validationErrors[`item_${index}_unit_price`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_unit_price`]}</p>
+                                            {validationErrors[`item_${index}_unitPrice`] && (
+                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_unitPrice`]}</p>
                                             )}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
                                                 type="number"
-                                                value={item.tax_rate || 0}
-                                                onChange={(e) => handleItemChange(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                value={item.taxRate || 0}
+                                                onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
                                                 className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
                                                 min="0"
                                                 max="100"
                                                 step="0.01"
-                                                disabled={formData.is_tax_included}
+                                                disabled={formData.isTaxIncluded}
                                             />
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {formatCurrency(item.line_total || 0)}
+                                            {formatCurrency(item.lineTotal || 0)}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
@@ -611,7 +705,7 @@ const VendorQuotationForm = () => {
                                     </td>
                                     <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
-                                {!formData.is_tax_included && (
+                                {!formData.isTaxIncluded && (
                                     <tr className="bg-gray-50">
                                         <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                             Thuế:
@@ -622,24 +716,24 @@ const VendorQuotationForm = () => {
                                         <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>
                                 )}
-                                {formData.header_discount > 0 && (
+                                {formData.headerDiscount > 0 && (
                                     <tr className="bg-gray-50">
                                         <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                            Chiết khấu:
+                                            Chiết khấu ({formData.headerDiscount}%):
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
-                                            -{formatCurrency(formData.header_discount)}
+                                            -{formatCurrency(calculateTotals.discountAmount || 0)}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>
                                 )}
-                                {formData.shipping_cost > 0 && (
+                                {formData.shippingCost > 0 && (
                                     <tr className="bg-gray-50">
                                         <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                             Phí vận chuyển:
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {formatCurrency(formData.shipping_cost)}
+                                            {formatCurrency(formData.shippingCost)}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>

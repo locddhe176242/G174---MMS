@@ -2,6 +2,7 @@ package com.g174.mmssystem.controller;
 
 import com.g174.mmssystem.dto.requestDTO.PurchaseRequisitionRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
+import com.g174.mmssystem.enums.RequisitionStatus;
 import com.g174.mmssystem.service.IService.IPurchaseRequisitionService;
 import com.g174.mmssystem.service.IService.IUserContextService;
 import lombok.RequiredArgsConstructor;
@@ -47,9 +48,21 @@ public class PurchaseRequisitionController {
     @GetMapping("/page")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<Page<PurchaseRequisitionResponseDTO>> getAllRequisitionsPaged(
+            @RequestParam(required = false) String status,
             @PageableDefault(size = 20) Pageable pageable) {
-        log.info("API: Lấy danh sách purchase requisitions với pagination");
-        Page<PurchaseRequisitionResponseDTO> response = requisitionService.getAllRequisitions(pageable);
+        log.info("API: Lấy danh sách purchase requisitions với pagination, status: {}", status);
+        Page<PurchaseRequisitionResponseDTO> response;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                RequisitionStatus statusEnum = RequisitionStatus.valueOf(status.trim());
+                response = requisitionService.getAllRequisitionsByStatus(statusEnum, pageable);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status value: {}, returning all requisitions", status);
+                response = requisitionService.getAllRequisitions(pageable);
+            }
+        } else {
+            response = requisitionService.getAllRequisitions(pageable);
+        }
         return ResponseEntity.ok(response);
     }
 

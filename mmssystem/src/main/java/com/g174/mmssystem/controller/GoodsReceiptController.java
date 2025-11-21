@@ -154,11 +154,11 @@ public class GoodsReceiptController {
 
     @GetMapping("/generate-number")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
-    public ResponseEntity<String> generateReceiptNo() {
+    public ResponseEntity<java.util.Map<String, String>> generateReceiptNo() {
         log.info("REST: Generating Receipt number");
 
         String receiptNo = receiptService.generateReceiptNo();
-        return ResponseEntity.ok(receiptNo);
+        return ResponseEntity.ok(java.util.Map.of("receiptNo", receiptNo, "receipt_no", receiptNo));
     }
 }
 

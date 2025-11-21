@@ -76,6 +76,9 @@ export default function RFQDetail() {
   }, [data]);
 
   const getStatusBadge = (status) => {
+    // Handle both string and enum object formats
+    const statusStr = typeof status === 'string' ? status : (status?.name || status?.toString() || 'Draft');
+    
     const map = {
       Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
       Pending: { label: "Chờ phản hồi", color: "bg-yellow-100 text-yellow-800" },
@@ -84,7 +87,7 @@ export default function RFQDetail() {
       Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
     };
 
-    const statusInfo = map[status] || { label: status || "Draft", color: "bg-gray-100 text-gray-800" };
+    const statusInfo = map[statusStr] || { label: statusStr || "Draft", color: "bg-gray-100 text-gray-800" };
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -184,6 +187,8 @@ export default function RFQDetail() {
       : data.selectedVendorId 
         ? [data.selectedVendorId]
         : []);
+  
+  const selectedVendors = data.selectedVendors || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -201,12 +206,30 @@ export default function RFQDetail() {
                 Yêu cầu báo giá: {data.rfqNo || data.rfq_no || `#${id}`}
               </h1>
             </div>
-            <button
-              onClick={() => navigate(`/purchase/rfqs/${id}/edit`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Chỉnh sửa
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Chỉ hiển thị nút edit khi status là Draft */}
+              {(() => {
+                const statusStr = typeof data.status === 'string' 
+                  ? data.status 
+                  : (data.status?.name || data.status?.toString() || 'Draft');
+                return statusStr === 'Draft' && (
+                  <button
+                    onClick={() => navigate(`/purchase/rfqs/${id}/edit`)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Chỉnh sửa
+                  </button>
+                );
+              })()}
+              {/* Nút so sánh báo giá - chỉ hiển thị khi RFQ đã có báo giá */}
+              <button
+                onClick={() => navigate(`/purchase/rfqs/${id}/compare-quotations`)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="So sánh báo giá từ các nhà cung cấp"
+              >
+                So sánh báo giá
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -368,18 +391,45 @@ export default function RFQDetail() {
                 Nhà cung cấp
               </div>
               <div className="p-6">
-                {selectedVendorIds.length === 0 ? (
+                {selectedVendors.length === 0 && selectedVendorIds.length === 0 ? (
                   <div className="text-sm text-gray-500">Chưa chọn nhà cung cấp</div>
                 ) : (
-                  <div className="space-y-2">
-                    {selectedVendorIds.map((vendorId, index) => (
-                      <div key={vendorId || index} className="text-sm">
-                        <span className="text-gray-500">{index + 1}. </span>
-                        <span className="font-medium">
-                          {getVendorName(vendorId)}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {selectedVendors.length > 0
+                      ? selectedVendors.map((vendor, index) => (
+                          <div key={vendor.vendorId || vendor.id || index} className="flex items-center justify-between">
+                            <div className="text-sm">
+                              <span className="text-gray-500">{index + 1}. </span>
+                              <span className="font-medium">
+                                {vendor.vendorName || vendor.name || getVendorName(vendor.vendorId || vendor.id)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/purchase/purchase-quotations/new?rfq_id=${id}&vendor_id=${vendor.vendorId || vendor.id}`)}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              title="Tạo báo giá cho nhà cung cấp này"
+                            >
+                              Tạo báo giá
+                            </button>
+                          </div>
+                        ))
+                      : selectedVendorIds.map((vendorId, index) => (
+                          <div key={vendorId || index} className="flex items-center justify-between">
+                            <div className="text-sm">
+                              <span className="text-gray-500">{index + 1}. </span>
+                              <span className="font-medium">
+                                {getVendorName(vendorId)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/purchase/purchase-quotations/new?rfq_id=${id}&vendor_id=${vendorId}`)}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              title="Tạo báo giá cho nhà cung cấp này"
+                            >
+                              Tạo báo giá
+                            </button>
+                          </div>
+                        ))}
                   </div>
                 )}
               </div>

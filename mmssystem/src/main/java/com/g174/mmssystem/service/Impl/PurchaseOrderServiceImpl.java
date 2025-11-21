@@ -305,6 +305,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
 
         order.setApprovalStatus(PurchaseOrderApprovalStatus.Rejected);
+        order.setStatus(PurchaseOrderStatus.Cancelled);
         order.setApprover(approver);
         order.setApprovedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());

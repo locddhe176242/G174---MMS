@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
+import { purchaseRequisitionService } from "../../../api/purchaseRequisitionService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 
 export default function PurchaseOrderForm() {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const isEdit = Boolean(id);
+    const prIdFromQuery = searchParams.get("pr_id");
 
     const [formData, setFormData] = useState({
         po_no: "",
@@ -50,6 +53,14 @@ export default function PurchaseOrderForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const [validationErrors, setValidationErrors] = useState({});
+
+    const currentUserId = useMemo(() => {
+        if (currentUser?.userId || currentUser?.user_id || currentUser?.id) {
+            return currentUser.userId || currentUser.user_id || currentUser.id;
+        }
+        const storedUser = getCurrentUser();
+        return storedUser?.userId || storedUser?.user_id || storedUser?.id || null;
+    }, [currentUser]);
 
     // Import Quotation state
     const [showImportModal, setShowImportModal] = useState(false);
@@ -104,22 +115,41 @@ export default function PurchaseOrderForm() {
     };
 
     useEffect(() => {
-        loadVendors();
-        loadProducts();
-        loadCurrentUser();
-        if (isEdit) {
-            loadOrder();
-        } else {
-            // Generate PO number for new order
-            generatePONumber();
-        }
+        const initializeForm = async () => {
+            // Load vendors and products first
+            await Promise.all([
+                loadVendors(),
+                loadProducts(),
+                loadCurrentUser()
+            ]);
+
+            if (isEdit) {
+                loadOrder();
+            } else {
+                // Generate PO number for new order
+                generatePONumber();
+                // Check if importing from quotation
+                const urlParams = new URLSearchParams(window.location.search);
+                const quotationId = urlParams.get('quotation_id');
+                if (quotationId) {
+                    console.log('Loading quotation data for ID:', quotationId);
+                    await loadQuotationData(quotationId);
+                }
+            }
+        };
+
+        initializeForm();
     }, [id]);
 
     const generatePONumber = async () => {
         try {
             const response = await purchaseOrderService.generatePONo();
-            if (response?.po_no || response?.poNo) {
-                setFormData(prev => ({ ...prev, po_no: response.po_no || response.poNo }));
+            const poNumber =
+                typeof response === "string"
+                    ? response
+                    : response?.poNo || response?.po_no || response;
+            if (poNumber) {
+                setFormData((prev) => ({ ...prev, po_no: poNumber }));
             }
         } catch (err) {
             console.warn("Could not generate PO number:", err);
@@ -197,58 +227,145 @@ export default function PurchaseOrderForm() {
         }
     };
 
+    const loadQuotationData = async (quotationId) => {
+        try {
+            console.log('Fetching quotation ID:', quotationId);
+            const res = await apiClient.get(`/purchase-quotations/${quotationId}`);
+            const data = res.data || {};
+            console.log('Quotation data received:', data);
+            
+            const pqItems = data.items || data.pqItems || [];
+
+            if (!Array.isArray(pqItems) || pqItems.length === 0) {
+                toast.info("Báo giá không có dòng sản phẩm");
+                return;
+            }
+
+            // Set vendor from quotation
+            const vendorId = data.vendor_id || data.vendorId;
+            console.log('Setting vendor ID:', vendorId);
+            
+            if (vendorId) {
+                setFormData(prev => ({
+                    ...prev,
+                    vendor_id: vendorId,
+                    pq_id: quotationId
+                }));
+            }
+
+            // Map items
+            const mapped = pqItems.map((it) => {
+                const productId = it.product_id || it.productId || it.product?.id || it.product?.product_id || null;
+                const quantity = it.quantity || it.quoted_quantity || 1;
+                const unitPrice = it.unit_price || it.unitPrice || it.quoted_price || 0;
+                const taxRate = it.tax_rate || it.taxRate || 0;
+                const calc = {
+                    quantity,
+                    unit_price: unitPrice,
+                    tax_rate: taxRate
+                };
+                const totals = calculateItemTotal(calc);
+
+                return {
+                    pq_item_id: it.pq_item_id || it.pqItemId || null,
+                    product_id: productId,
+                    productCode: it.productCode || it.product?.sku || "",
+                    productName: it.productName || it.product_name || it.product?.name || "",
+                    uom: it.uom || it.product?.uom || "",
+                    quantity,
+                    unit_price: unitPrice,
+                    tax_rate: taxRate,
+                    tax_amount: totals.tax,
+                    line_total: totals.total,
+                    delivery_date: it.delivery_date || it.deliveryDate
+                        ? new Date(it.delivery_date || it.deliveryDate).toISOString().split('T')[0]
+                        : null,
+                    note: it.note || "",
+                };
+            }).filter(m => m.product_id);
+
+            console.log('Mapped items:', mapped.length, 'items');
+
+            if (mapped.length === 0) {
+                toast.info("Không có sản phẩm hợp lệ để nhập");
+                return;
+            }
+
+            setFormData((prev) => ({ 
+                ...prev, 
+                items: mapped,
+                vendor_id: vendorId,
+                pq_id: quotationId
+            }));
+            toast.success(`Đã tải ${mapped.length} sản phẩm từ báo giá`);
+        } catch (err) {
+            console.error("Load quotation data error:", err);
+            console.error("Error response:", err.response?.data);
+            toast.error("Không thể tải dữ liệu từ báo giá");
+        }
+    };
+
+    const normalizeEnum = (value, fallback = "Pending") => {
+        if (!value) return fallback;
+        if (typeof value === "string") return value;
+        if (typeof value === "object") {
+            return value?.name || value?.value || value?.toString() || fallback;
+        }
+        return String(value);
+    };
+
     const loadOrder = async () => {
         try {
             setLoading(true);
             const order = await purchaseOrderService.getPurchaseOrderById(id);
-
-            // Load items
-            const itemsResponse = await apiClient.get(`/purchase-orders/${id}/items`);
-            const itemsData = Array.isArray(itemsResponse.data)
-                ? itemsResponse.data
-                : itemsResponse.data?.content || [];
+            const itemsData = Array.isArray(order?.items) ? order.items : [];
 
             setFormData({
                 po_no: order.po_no || order.poNo || "",
                 vendor_id: order.vendor_id || order.vendorId || null,
                 pq_id: order.pq_id || order.pqId || null,
                 order_date: order.order_date || order.orderDate
-                    ? new Date(order.order_date || order.orderDate).toISOString().split('T')[0]
-                    : new Date().toISOString().split('T')[0],
-                status: order.status || "Pending",
-                approval_status: order.approval_status || order.approvalStatus || "Pending",
+                    ? new Date(order.order_date || order.orderDate).toISOString().split("T")[0]
+                    : new Date().toISOString().split("T")[0],
+                status: normalizeEnum(order.status, "Pending"),
+                approval_status: normalizeEnum(order.approval_status || order.approvalStatus, "Pending"),
                 payment_terms: order.payment_terms || order.paymentTerms || "",
                 delivery_date: order.delivery_date || order.deliveryDate
-                    ? new Date(order.delivery_date || order.deliveryDate).toISOString().split('T')[0]
+                    ? new Date(order.delivery_date || order.deliveryDate).toISOString().split("T")[0]
                     : null,
                 shipping_address: order.shipping_address || order.shippingAddress || "",
-                items: itemsData.length > 0 ? itemsData.map((it) => ({
-                    product_id: it.product_id || it.productId || null,
-                    productCode: it.productCode || "",
-                    productName: it.productName || it.product_name || "",
-                    uom: it.uom || "",
-                    quantity: it.quantity || 1,
-                    unit_price: it.unit_price || it.unitPrice || 0,
-                    tax_rate: it.tax_rate || it.taxRate || 0,
-                    tax_amount: it.tax_amount || it.taxAmount || 0,
-                    line_total: it.line_total || it.lineTotal || 0,
-                    delivery_date: it.delivery_date || it.deliveryDate
-                        ? new Date(it.delivery_date || it.deliveryDate).toISOString().split('T')[0]
-                        : null,
-                    note: it.note || "",
-                })) : [{
-                    product_id: null,
-                    productCode: "",
-                    productName: "",
-                    uom: "",
-                    quantity: 1,
-                    unit_price: 0,
-                    tax_rate: 0,
-                    tax_amount: 0,
-                    line_total: 0,
-                    delivery_date: null,
-                    note: "",
-                }],
+                items: itemsData.length > 0
+                    ? itemsData.map((it) => ({
+                        pq_item_id: it.pq_item_id || it.pqItemId || null,
+                        product_id: it.product_id || it.productId || null,
+                        productCode: it.productCode || "",
+                        productName: it.productName || it.product_name || "",
+                        uom: it.uom || "",
+                        quantity: Number(it.quantity || 1),
+                        unit_price: Number(it.unit_price || it.unitPrice || 0),
+                        tax_rate: Number(it.tax_rate || it.taxRate || 0),
+                        tax_amount: Number(it.tax_amount || it.taxAmount || 0),
+                        line_total: Number(it.line_total || it.lineTotal || 0),
+                        delivery_date: it.delivery_date || it.deliveryDate
+                            ? new Date(it.delivery_date || it.deliveryDate).toISOString().split("T")[0]
+                            : null,
+                        note: it.note || "",
+                    }))
+                    : [
+                        {
+                            product_id: null,
+                            productCode: "",
+                            productName: "",
+                            uom: "",
+                            quantity: 1,
+                            unit_price: 0,
+                            tax_rate: 0,
+                            tax_amount: 0,
+                            line_total: 0,
+                            delivery_date: null,
+                            note: "",
+                        },
+                    ],
             });
         } catch (err) {
             console.error("Error loading Purchase Order:", err);
@@ -447,6 +564,7 @@ export default function PurchaseOrderForm() {
                 const totals = calculateItemTotal(calc);
 
                 return {
+                    pq_item_id: it.pq_item_id || it.pqItemId || null,
                     product_id: productId,
                     productCode: it.productCode || it.product?.sku || "",
                     productName: it.productName || it.product_name || it.product?.name || "",
@@ -494,39 +612,50 @@ export default function PurchaseOrderForm() {
 
         try {
             const payload = {
-                po_no: formData.po_no,
-                vendor_id: formData.vendor_id,
-                pq_id: formData.pq_id,
-                order_date: formData.order_date,
-                status: formData.status,
-                approval_status: formData.approval_status,
-                payment_terms: formData.payment_terms,
-                delivery_date: formData.delivery_date,
-                shipping_address: formData.shipping_address,
-                total_before_tax: totalBeforeTax,
-                tax_amount: totalTax,
-                total_after_tax: totalAfterTax,
+                poNo: formData.po_no,
+                vendorId: formData.vendor_id,
+                pqId: formData.pq_id,
+                orderDate: formData.order_date ? new Date(formData.order_date).toISOString() : null,
+                status: formData.status || "Pending",
+                approvalStatus: formData.approval_status || "Pending",
+                paymentTerms: formData.payment_terms || "",
+                deliveryDate: formData.delivery_date ? new Date(formData.delivery_date).toISOString() : null,
+                shippingAddress: formData.shipping_address || "",
+                totalBeforeTax,
+                taxAmount: totalTax,
+                totalAfterTax,
                 items: formData.items.map((it) => ({
-                    product_id: it.product_id,
+                    pqItemId: it.pq_item_id || it.pqItemId || null,
+                    productId: it.product_id,
                     uom: it.uom,
-                    quantity: Number(it.quantity),
-                    unit_price: Number(it.unit_price || 0),
-                    tax_rate: Number(it.tax_rate || 0),
-                    tax_amount: Number(it.tax_amount || 0),
-                    line_total: Number(it.line_total || 0),
-                    delivery_date: it.delivery_date || null,
+                    quantity: Number(it.quantity || 0),
+                    unitPrice: Number(it.unit_price || 0),
+                    taxRate: Number(it.tax_rate || 0),
+                    taxAmount: Number(it.tax_amount || 0),
+                    lineTotal: Number(it.line_total || 0),
+                    deliveryDate: it.delivery_date ? new Date(it.delivery_date).toISOString() : null,
                     note: it.note || "",
                 })),
             };
 
             if (isEdit) {
-                await purchaseOrderService.updatePurchaseOrder(id, payload);
+                await purchaseOrderService.updatePurchaseOrder(id, payload, currentUserId);
                 toast.success("Cập nhật Đơn hàng mua thành công!");
             } else {
-                await purchaseOrderService.createPurchaseOrder(payload);
+                await purchaseOrderService.createPurchaseOrder(payload, currentUserId);
                 toast.success("Tạo Đơn hàng mua thành công!");
+                
+                // Close PR after creating PO
+                if (prIdFromQuery) {
+                    try {
+                        await purchaseRequisitionService.closeRequisition(prIdFromQuery);
+                        console.log("PR closed after creating PO:", prIdFromQuery);
+                    } catch (closeErr) {
+                        console.warn("Could not close PR:", closeErr);
+                    }
+                }
             }
-            navigate("/purchase/orders");
+            navigate("/purchase/purchase-orders");
         } catch (err) {
             console.error("Error saving Purchase Order:", err);
             const msg = err?.response?.data?.message || (isEdit ? "Không thể cập nhật Đơn hàng mua" : "Không thể tạo Đơn hàng mua");
@@ -537,7 +666,7 @@ export default function PurchaseOrderForm() {
     };
 
     const handleCancel = () => {
-        navigate("/purchase/orders");
+        navigate("/purchase/purchase-orders");
     };
 
     if (loading) {
