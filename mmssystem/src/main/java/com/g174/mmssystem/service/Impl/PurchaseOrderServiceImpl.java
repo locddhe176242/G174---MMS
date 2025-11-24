@@ -5,6 +5,7 @@ import com.g174.mmssystem.dto.responseDTO.PurchaseOrderResponseDTO;
 import com.g174.mmssystem.entity.*;
 import com.g174.mmssystem.enums.PurchaseOrderApprovalStatus;
 import com.g174.mmssystem.enums.PurchaseOrderStatus;
+import com.g174.mmssystem.enums.PurchaseQuotationStatus;
 import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseOrderMapper;
@@ -32,6 +33,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     private final PurchaseOrderMapper orderMapper;
     private final VendorRepository vendorRepository;
     private final PurchaseQuotationRepository quotationRepository;
+    private final RFQRepository rfqRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PurchaseQuotationItemRepository quotationItemRepository;
@@ -53,6 +55,27 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         if (dto.getPqId() != null) {
             purchaseQuotation = quotationRepository.findById(dto.getPqId())
                     .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + dto.getPqId()));
+            
+            // Validate: PQ must be Approved
+            if (purchaseQuotation.getStatus() != PurchaseQuotationStatus.Approved) {
+                throw new IllegalStateException("Chỉ có thể tạo PO từ Purchase Quotation đã Approved (hiện tại: " + purchaseQuotation.getStatus() + ")");
+            }
+            
+            // Validate: One PQ can only create one PO
+            List<PurchaseOrder> existingOrders = orderRepository.findByPqId(dto.getPqId());
+            if (existingOrders != null && !existingOrders.isEmpty()) {
+                long activeOrderCount = existingOrders.stream()
+                        .filter(po -> po.getDeletedAt() == null)
+                        .count();
+                if (activeOrderCount > 0) {
+                    PurchaseOrder existing = existingOrders.stream()
+                            .filter(po -> po.getDeletedAt() == null)
+                            .findFirst()
+                            .orElse(null);
+                    String existingPoNo = existing != null ? existing.getPoNo() : "unknown";
+                    throw new IllegalStateException("Purchase Quotation đã được chuyển thành PO (PO: " + existingPoNo + "). Mỗi PQ chỉ có thể tạo 1 PO duy nhất.");
+                }
+            }
         }
 
         // Generate PO number if not provided
@@ -115,6 +138,24 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         }
 
         PurchaseOrder saved = orderRepository.save(order);
+        
+        // Update PQ status to "Ordered" after creating PO
+        if (purchaseQuotation != null) {
+            purchaseQuotation.setStatus(PurchaseQuotationStatus.Ordered);
+            purchaseQuotation.setUpdatedAt(LocalDateTime.now());
+            quotationRepository.save(purchaseQuotation);
+            log.info("Updated Purchase Quotation {} status to Ordered", purchaseQuotation.getPqNo());
+            
+            // Update RFQ status to "Completed" if PO created
+            RFQ rfq = purchaseQuotation.getRfq();
+            if (rfq != null && rfq.getStatus() != RFQ.RFQStatus.Completed) {
+                rfq.setStatus(RFQ.RFQStatus.Completed);
+                rfq.setUpdatedAt(LocalDateTime.now());
+                rfqRepository.save(rfq);
+                log.info("Updated RFQ {} status to Completed", rfq.getRfqNo());
+            }
+        }
+        
         PurchaseOrder savedWithRelations = orderRepository.findByIdWithRelations(saved.getOrderId())
                 .orElse(saved);
 

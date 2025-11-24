@@ -67,7 +67,7 @@ public class RFQ {
     private List<RFQItem> items;
 
     public enum RFQStatus {
-        Draft, Pending, Sent, Closed, Cancelled
+        Draft, Pending, Sent, Completed, Closed, Cancelled
     }
 
     @PrePersist
