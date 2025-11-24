@@ -32,6 +32,8 @@ public interface IPurchaseRequisitionService {
 
     PurchaseRequisitionResponseDTO closeRequisition(Long requisitionId);
 
+    PurchaseRequisitionResponseDTO convertRequisition(Long requisitionId);
+
     PurchaseRequisitionResponseDTO restoreRequisition(Long requisitionId);
 
     PurchaseRequisitionResponseDTO deleteRequisition(Long requisitionId);

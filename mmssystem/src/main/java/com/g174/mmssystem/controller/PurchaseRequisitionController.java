@@ -139,6 +139,14 @@ public class PurchaseRequisitionController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{requisitionId}/convert")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    public ResponseEntity<PurchaseRequisitionResponseDTO> convertRequisition(@PathVariable Long requisitionId) {
+        log.info("API: Convert purchase requisition ID: {} to RFQ", requisitionId);
+        PurchaseRequisitionResponseDTO response = requisitionService.convertRequisition(requisitionId);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{requisitionId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> deleteRequisition(@PathVariable Long requisitionId) {

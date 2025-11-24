@@ -126,6 +126,35 @@ const VendorQuotationForm = () => {
                     const rfq = await rfqService.getRFQById(rfqId);
                     setRfqData(rfq);
 
+                    // Check if this vendor already has a PQ for this RFQ
+                    try {
+                        const existingPqResponse = await apiClient.get('/purchase-quotations/page', {
+                            params: { page: 0, size: 100, sort: 'createdAt,desc' }
+                        });
+                        const allPqs = existingPqResponse.data?.content || existingPqResponse.data || [];
+                        
+                        const existingPq = allPqs.find(pq => {
+                            const pqRfqId = pq.rfqId || pq.rfq_id || pq.rfq?.id;
+                            const pqVendorId = pq.vendorId || pq.vendor_id || pq.vendor?.id;
+                            return Number(pqRfqId) === Number(rfqId) && Number(pqVendorId) === Number(vendorId);
+                        });
+
+                        if (existingPq) {
+                            const pqId = existingPq.id || existingPq.pq_id || existingPq.pqId;
+                            const pqNo = existingPq.pqNo || existingPq.pq_no;
+                            toast.warning(`Nhà cung cấp này đã có báo giá ${pqNo} cho RFQ này. Chuyển sang chế độ chỉnh sửa...`);
+                            
+                            // Redirect to edit mode
+                            setTimeout(() => {
+                                navigate(`/purchase/vendor-quotations/${pqId}`);
+                            }, 2000);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error checking existing PQ:', error);
+                        // Continue if check fails
+                    }
+
                     // Map RFQ items to quotation items - using camelCase to match backend DTO
                     if (rfq.items && Array.isArray(rfq.items)) {
                         const mappedItems = rfq.items.map(item => ({

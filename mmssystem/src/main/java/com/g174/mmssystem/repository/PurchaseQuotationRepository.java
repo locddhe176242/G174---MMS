@@ -40,6 +40,9 @@ public interface PurchaseQuotationRepository extends JpaRepository<PurchaseQuota
     @Query("SELECT pq FROM PurchaseQuotation pq WHERE pq.vendor.vendorId = :vendorId AND pq.deletedAt IS NULL")
     List<PurchaseQuotation> findByVendorId(@Param("vendorId") Integer vendorId);
 
+    @Query("SELECT pq FROM PurchaseQuotation pq WHERE pq.rfq.rfqId = :rfqId AND pq.vendor.vendorId = :vendorId")
+    List<PurchaseQuotation> findByRfqIdAndVendorId(@Param("rfqId") Integer rfqId, @Param("vendorId") Integer vendorId);
+
     @Query("SELECT DISTINCT pq FROM PurchaseQuotation pq " +
            "LEFT JOIN FETCH pq.items i " +
            "LEFT JOIN FETCH i.product " +

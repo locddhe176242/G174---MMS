@@ -48,6 +48,23 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
 
+        // Validate: One vendor can only submit one PQ per RFQ
+        List<PurchaseQuotation> existingQuotations = quotationRepository.findByRfqIdAndVendorId(dto.getRfqId(), dto.getVendorId());
+        if (existingQuotations != null && !existingQuotations.isEmpty()) {
+            // Filter out deleted quotations
+            long activeQuotationCount = existingQuotations.stream()
+                    .filter(pq -> pq.getDeletedAt() == null)
+                    .count();
+            if (activeQuotationCount > 0) {
+                PurchaseQuotation existing = existingQuotations.stream()
+                        .filter(pq -> pq.getDeletedAt() == null)
+                        .findFirst()
+                        .orElse(null);
+                String existingPqNo = existing != null ? existing.getPqNo() : "unknown";
+                throw new IllegalStateException("Vendor đã có báo giá cho RFQ này (PQ: " + existingPqNo + "). Mỗi vendor chỉ có thể submit 1 PQ cho 1 RFQ.");
+            }
+        }
+
         User createdBy = userRepository.findById(createdById)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
 

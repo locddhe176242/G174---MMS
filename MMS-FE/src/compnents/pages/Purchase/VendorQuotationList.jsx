@@ -94,6 +94,21 @@ const VendorQuotationList = () => {
         };
     }, [sortDirection, sortField]);
 
+    // Group quotations by RFQ for visual indication
+    const rfqGroups = useMemo(() => {
+        const groups = {};
+        quotations.forEach((q) => {
+            const rfqId = q?.rfqId || q?.rfq_id || q?.rfq?.id;
+            if (rfqId) {
+                if (!groups[rfqId]) {
+                    groups[rfqId] = [];
+                }
+                groups[rfqId].push(q);
+            }
+        });
+        return groups;
+    }, [quotations]);
+
     const fetchQuotations = async (page = 0, keyword = searchKeyword, sort = `${sortField},${sortDirection}`, status = statusFilter) => {
         try {
             setLoading(true);
@@ -209,24 +224,44 @@ const VendorQuotationList = () => {
             );
         }
 
-        return quotations.map((quotation) => {
+        return quotations.map((quotation, index) => {
             const id = quotation?.id || quotation?.pqId || quotation?.quotationId;
             const pqNo = quotation?.pqNo || quotation?.quotationNo || quotation?.pq_no;
             const vendorName = quotation?.vendorName || quotation?.vendor?.name;
             const rfqNo = quotation?.rfqNo || quotation?.rfq?.rfqNo || quotation?.rfq?.code;
+            const rfqId = quotation?.rfqId || quotation?.rfq_id || quotation?.rfq?.id;
             const status = getSafeString(quotation?.status, "Pending");
             const totalAmount = quotation?.totalAmount || quotation?.total_amount;
             const validUntil = quotation?.validUntil || quotation?.valid_until;
             const createdAt = quotation?.createdAt || quotation?.created_at;
 
+            // Check if this RFQ has multiple quotations
+            const rfqQuotations = rfqGroups[rfqId] || [];
+            const hasMultiple = rfqQuotations.length > 1;
+            const isFirstInGroup = index === 0 || (quotations[index - 1]?.rfqId || quotations[index - 1]?.rfq_id || quotations[index - 1]?.rfq?.id) !== rfqId;
+            
+            // Generate distinct colors for different RFQ groups
+            const groupColors = ['bg-blue-50', 'bg-purple-50', 'bg-green-50', 'bg-yellow-50', 'bg-pink-50'];
+            const colorIndex = Object.keys(rfqGroups).indexOf(String(rfqId)) % groupColors.length;
+            const rowBgColor = hasMultiple ? groupColors[colorIndex] : 'bg-white';
+
             return (
-                <tr key={id} className="hover:bg-gray-50">
+                <tr key={id} className={`hover:bg-gray-100 ${rowBgColor}`}>
                     <td className="px-6 py-4">
                         <input type="checkbox" className="rounded border-gray-300" />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pqNo || "N/A"}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{vendorName || "-"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{rfqNo || "-"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-700">{rfqNo || "-"}</span>
+                            {hasMultiple && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium" title={`${rfqQuotations.length} nhà cung cấp đã báo giá`}>
+                                    {rfqQuotations.length} PQs
+                                </span>
+                            )}
+                        </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDate(quotation?.pqDate || quotation?.pq_date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDate(validUntil)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -250,9 +285,20 @@ const VendorQuotationList = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                             </button>
+                            {hasMultiple && (
+                                <button
+                                    onClick={() => navigate(`/purchase/rfqs/${rfqId}/compare-quotations`)}
+                                    className="text-green-600 hover:text-green-800"
+                                    title="So sánh các báo giá"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </button>
+                            )}
                             <button
-                                onClick={() => navigate(`/purchase/rfqs/${quotation?.rfqId || quotation?.rfq_id || quotation?.rfq?.id || ""}`)}
-                                disabled={!quotation?.rfqId && !quotation?.rfq_id && !quotation?.rfq?.id}
+                                onClick={() => navigate(`/purchase/rfqs/${rfqId}`)}
+                                disabled={!rfqId}
                                 className="text-gray-600 hover:text-gray-800 disabled:text-gray-300 disabled:cursor-not-allowed"
                                 title="Xem RFQ"
                             >

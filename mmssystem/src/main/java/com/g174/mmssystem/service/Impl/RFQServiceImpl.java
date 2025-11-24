@@ -50,6 +50,18 @@ public class RFQServiceImpl implements IRFQService {
             requisition = requisitionRepository.findById(dto.getRequisitionId())
                     .filter(r -> r.getDeletedAt() == null)
                     .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + dto.getRequisitionId()));
+            
+            // Validate: One PR can only create one RFQ
+            List<RFQ> existingRfqs = rfqRepository.findByRequisitionId(dto.getRequisitionId());
+            if (existingRfqs != null && !existingRfqs.isEmpty()) {
+                // Filter out deleted RFQs
+                long activeRfqCount = existingRfqs.stream()
+                        .filter(rfq -> rfq.getDeletedAt() == null)
+                        .count();
+                if (activeRfqCount > 0) {
+                    throw new IllegalStateException("Purchase Requisition đã được chuyển thành RFQ. Mỗi PR chỉ có thể tạo 1 RFQ duy nhất.");
+                }
+            }
         }
 
         User createdBy = userRepository.findById(createdById)

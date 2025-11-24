@@ -21,6 +21,9 @@ import java.util.List;
                 @Index(name = "idx_pq_status", columnList = "status, deleted_at"),
                 @Index(name = "idx_pq_rfq", columnList = "rfq_id"),
                 @Index(name = "idx_pq_vendor", columnList = "vendor_id")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_pq_rfq_vendor", columnNames = {"rfq_id", "vendor_id"})
         })
 public class PurchaseQuotation {
     @Id

@@ -280,7 +280,7 @@ CREATE TABLE Purchase_Requisitions (
     requisition_date DATE DEFAULT (CURRENT_DATE),
     requester_id INT NOT NULL,
     purpose TEXT NOT NULL,
-    status ENUM('Draft', 'Pending', 'Approved', 'Rejected', 'Cancelled') DEFAULT 'Draft',
+    status ENUM('Draft', 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Converted') DEFAULT 'Draft',
     approver_id INT,
     approved_at DATETIME,
     created_by INT,
@@ -349,7 +349,8 @@ CREATE TABLE RFQs (
       FOREIGN KEY (selected_vendor_id) REFERENCES Vendors(vendor_id) ON DELETE SET NULL,
     INDEX idx_rfq_no (rfq_no),
     INDEX idx_rfq_status (status, deleted_at),
-    INDEX idx_rfq_requisition (requisition_id)
+    INDEX idx_rfq_requisition (requisition_id),
+    UNIQUE KEY uk_rfq_requisition (requisition_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE RFQ_Items (
@@ -413,6 +414,7 @@ CREATE TABLE Purchase_Quotations (
     FOREIGN KEY (rfq_id) REFERENCES RFQs(rfq_id) ON DELETE CASCADE,
     FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    UNIQUE KEY uk_pq_rfq_vendor (rfq_id, vendor_id),
     INDEX idx_pq_no (pq_no),
     INDEX idx_pq_status (status, deleted_at),
     INDEX idx_pq_rfq (rfq_id),

@@ -101,6 +101,23 @@ export default function PurchaseOrderForm() {
         return totalBeforeTax + totalTax;
     }, [totalBeforeTax, totalTax]);
 
+    const selectedVendor = useMemo(() => {
+        if (!formData.vendor_id || vendors.length === 0) return null;
+        
+        // Try to find vendor with both strict and loose comparison
+        const found = vendors.find((v) => v.value === formData.vendor_id) || 
+                      vendors.find((v) => v.value == formData.vendor_id) || // eslint-disable-line eqeqeq
+                      vendors.find((v) => Number(v.value) === Number(formData.vendor_id));
+        
+        console.log("Selected vendor lookup:", {
+            vendor_id: formData.vendor_id,
+            found: found?.label,
+            vendors_count: vendors.length
+        });
+        
+        return found || null;
+    }, [vendors, formData.vendor_id]);
+
     const formatCurrency = (n) =>
         new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
 
@@ -140,6 +157,18 @@ export default function PurchaseOrderForm() {
 
         initializeForm();
     }, [id]);
+
+    // Debug: Log formData changes
+    useEffect(() => {
+        console.log("FormData changed:", {
+            vendor_id: formData.vendor_id,
+            vendor_id_type: typeof formData.vendor_id,
+            delivery_date: formData.delivery_date,
+            items_count: formData.items.length,
+            vendors_count: vendors.length,
+            vendors_sample: vendors.slice(0, 2).map(v => ({ value: v.value, type: typeof v.value }))
+        });
+    }, [formData.vendor_id, formData.delivery_date, formData.items, vendors]);
 
     const generatePONumber = async () => {
         try {
@@ -234,7 +263,7 @@ export default function PurchaseOrderForm() {
             const data = res.data || {};
             console.log('Quotation data received:', data);
             
-            const pqItems = data.items || data.pqItems || [];
+            const pqItems = data.items || [];
 
             if (!Array.isArray(pqItems) || pqItems.length === 0) {
                 toast.info("Báo giá không có dòng sản phẩm");
@@ -242,48 +271,52 @@ export default function PurchaseOrderForm() {
             }
 
             // Set vendor from quotation
-            const vendorId = data.vendor_id || data.vendorId;
+            const vendorId = data.vendorId;
             console.log('Setting vendor ID:', vendorId);
-            
-            if (vendorId) {
-                setFormData(prev => ({
-                    ...prev,
-                    vendor_id: vendorId,
-                    pq_id: quotationId
-                }));
-            }
 
-            // Map items
-            const mapped = pqItems.map((it) => {
-                const productId = it.product_id || it.productId || it.product?.id || it.product?.product_id || null;
-                const quantity = it.quantity || it.quoted_quantity || 1;
-                const unitPrice = it.unit_price || it.unitPrice || it.quoted_price || 0;
-                const taxRate = it.tax_rate || it.taxRate || 0;
-                const calc = {
-                    quantity,
-                    unit_price: unitPrice,
-                    tax_rate: taxRate
-                };
-                const totals = calculateItemTotal(calc);
+            // Load product details for each item to get UOM
+            const itemsWithDetails = await Promise.all(
+                pqItems.map(async (it) => {
+                    try {
+                        const productId = it.productId;
+                        if (!productId) return null;
 
-                return {
-                    pq_item_id: it.pq_item_id || it.pqItemId || null,
-                    product_id: productId,
-                    productCode: it.productCode || it.product?.sku || "",
-                    productName: it.productName || it.product_name || it.product?.name || "",
-                    uom: it.uom || it.product?.uom || "",
-                    quantity,
-                    unit_price: unitPrice,
-                    tax_rate: taxRate,
-                    tax_amount: totals.tax,
-                    line_total: totals.total,
-                    delivery_date: it.delivery_date || it.deliveryDate
-                        ? new Date(it.delivery_date || it.deliveryDate).toISOString().split('T')[0]
-                        : null,
-                    note: it.note || "",
-                };
-            }).filter(m => m.product_id);
+                        // Fetch product details to get UOM
+                        const productRes = await apiClient.get(`/product/${productId}`);
+                        const product = productRes.data || {};
 
+                        const quantity = Number(it.quantity || 1);
+                        const unitPrice = Number(it.unitPrice || 0);
+                        const taxRate = Number(it.taxRate || 0);
+                        const calc = {
+                            quantity,
+                            unit_price: unitPrice,
+                            tax_rate: taxRate
+                        };
+                        const totals = calculateItemTotal(calc);
+
+                        return {
+                            pq_item_id: it.pqItemId,
+                            product_id: productId,
+                            productCode: it.productCode || product.sku || product.productCode || "",
+                            productName: it.productName || product.name || "",
+                            uom: product.uom || product.unit || "",
+                            quantity,
+                            unit_price: unitPrice,
+                            tax_rate: taxRate,
+                            tax_amount: totals.tax,
+                            line_total: totals.total,
+                            delivery_date: null,
+                            note: it.remark || "",
+                        };
+                    } catch (err) {
+                        console.warn('Could not load product details:', err);
+                        return null;
+                    }
+                })
+            );
+
+            const mapped = itemsWithDetails.filter(m => m !== null);
             console.log('Mapped items:', mapped.length, 'items');
 
             if (mapped.length === 0) {
@@ -380,6 +413,7 @@ export default function PurchaseOrderForm() {
     };
 
     const handleVendorChange = (option) => {
+        console.log("Vendor changed:", option);
         if (option) {
             handleInputChange("vendor_id", option.value);
         } else {
@@ -499,29 +533,77 @@ export default function PurchaseOrderForm() {
     const openImportModal = async () => {
         setShowImportModal(true);
         try {
-            const response = await apiClient.get("/purchase-quotations", {
-                params: { page: 0, size: 50, sort: "createdAt,desc" }
+            // Use /page endpoint to get paginated results
+            const response = await apiClient.get("/purchase-quotations/page", {
+                params: { page: 0, size: 100, sort: "createdAt,desc" }
             });
 
             const data = response.data || {};
-            const list = Array.isArray(data) ? data : (data?.content || []);
+            const allList = data?.content || [];
 
-            if (list.length === 0) {
+            console.log("Quotation list response:", data);
+            console.log("Quotations found:", allList.length);
+
+            if (!Array.isArray(allList) || allList.length === 0) {
                 toast.info("Không có báo giá nào");
                 setQuotationList([]);
                 return;
             }
 
+            // Filter: Chỉ hiển thị báo giá đã được Approved và chưa được sử dụng để tạo PO
+            const approvedQuotations = allList.filter(pq => {
+                const status = typeof pq.status === 'string' ? pq.status : pq.status?.name || pq.status?.value;
+                // Chỉ lấy các báo giá đã được phê duyệt
+                return status === 'Approved';
+            });
+
+            console.log("Approved quotations found:", approvedQuotations.length);
+
+            // Check which quotations already have POs
+            const quotationsWithPOStatus = await Promise.all(
+                approvedQuotations.map(async (pq) => {
+                    try {
+                        // Check if this quotation already has a PO
+                        const poResponse = await apiClient.get(`/purchase-orders/pq/${pq.pqId}`);
+                        const pos = poResponse.data || [];
+                        const hasActivePO = Array.isArray(pos) && pos.length > 0;
+                        return {
+                            ...pq,
+                            hasActivePO
+                        };
+                    } catch (err) {
+                        // If error (like 404), assume no PO exists
+                        return {
+                            ...pq,
+                            hasActivePO: false
+                        };
+                    }
+                })
+            );
+
+            // Only show quotations that don't have active POs
+            const availableQuotations = quotationsWithPOStatus.filter(pq => !pq.hasActivePO);
+
+            console.log("Available quotations (not used in PO):", availableQuotations.length);
+
+            if (availableQuotations.length === 0) {
+                toast.info("Không có báo giá khả dụng (tất cả báo giá đã được phê duyệt đều đã được sử dụng)");
+                setQuotationList([]);
+                return;
+            }
+
             setQuotationList(
-                list.map((pq) => ({
-                    value: pq.pq_id || pq.id,
-                    label: `${pq.pq_no || pq.pqNo || "PQ"} - ${pq.vendorName || pq.vendor?.name || ""} - ${formatCurrency(pq.totalAmount || pq.total_amount || 0)}`,
+                availableQuotations.map((pq) => ({
+                    value: pq.pqId || pq.pq_id,
+                    label: `${pq.pqNo || pq.pq_no || "PQ"} - ${pq.vendorName || pq.vendor?.name || "N/A"} - ${formatCurrency(pq.totalAmount || 0)}`,
                     quotation: pq,
                 }))
             );
         } catch (err) {
             console.error("Load quotation list error:", err);
-            toast.error("Không thể tải danh sách báo giá");
+            console.error("Error response:", err.response?.data);
+            console.error("Error status:", err.response?.status);
+            toast.error("Không thể tải danh sách báo giá: " + (err.response?.data?.message || err.message));
             setQuotationList([]);
         }
     };
@@ -534,62 +616,125 @@ export default function PurchaseOrderForm() {
         try {
             const res = await apiClient.get(`/purchase-quotations/${selectedQuotation.value}`);
             const data = res.data || {};
-            const pqItems = data.items || data.pqItems || [];
+            const pqItems = data.items || [];
 
             if (!Array.isArray(pqItems) || pqItems.length === 0) {
                 toast.info("Báo giá không có dòng sản phẩm");
                 return;
             }
 
-            // Set vendor from quotation
-            if (data.vendor_id || data.vendorId) {
-                const vendorOption = vendors.find(v => v.value === (data.vendor_id || data.vendorId));
-                if (vendorOption) {
-                    handleInputChange("vendor_id", data.vendor_id || data.vendorId);
-                    handleInputChange("pq_id", selectedQuotation.value);
-                }
+            // Get vendor and other info from quotation
+            const vendorId = data.vendorId;
+            const deliveryTerms = data.deliveryTerms || "";
+            const paymentTerms = data.paymentTerms || "";
+            const leadTimeDays = data.leadTimeDays || 0;
+            
+            // Calculate delivery date based on leadTimeDays
+            let deliveryDate = null;
+            if (leadTimeDays > 0) {
+                const today = new Date();
+                today.setDate(today.getDate() + leadTimeDays);
+                deliveryDate = today.toISOString().split('T')[0];
+            }
+            
+            console.log("Importing from quotation - Vendor ID:", vendorId);
+            console.log("Lead time days:", leadTimeDays, "Calculated delivery date:", deliveryDate);
+
+            if (!vendorId) {
+                toast.error("Báo giá không có thông tin nhà cung cấp");
+                return;
             }
 
-            // Map items
-            const mapped = pqItems.map((it) => {
-                const productId = it.product_id || it.productId || it.product?.id || it.product?.product_id || null;
-                const quantity = it.quantity || it.quoted_quantity || 1;
-                const unitPrice = it.unit_price || it.unitPrice || it.quoted_price || 0;
-                const taxRate = it.tax_rate || it.taxRate || 0;
-                const calc = {
-                    quantity,
-                    unit_price: unitPrice,
-                    tax_rate: taxRate
-                };
-                const totals = calculateItemTotal(calc);
+            // Load product details for each item to get UOM
+            const itemsWithDetails = await Promise.all(
+                pqItems.map(async (it) => {
+                    try {
+                        const productId = it.productId;
+                        if (!productId) return null;
 
-                return {
-                    pq_item_id: it.pq_item_id || it.pqItemId || null,
-                    product_id: productId,
-                    productCode: it.productCode || it.product?.sku || "",
-                    productName: it.productName || it.product_name || it.product?.name || "",
-                    uom: it.uom || it.product?.uom || "",
-                    quantity,
-                    unit_price: unitPrice,
-                    tax_rate: taxRate,
-                    tax_amount: totals.tax,
-                    line_total: totals.total,
-                    delivery_date: it.delivery_date || it.deliveryDate
-                        ? new Date(it.delivery_date || it.deliveryDate).toISOString().split('T')[0]
-                        : null,
-                    note: it.note || "",
-                };
-            }).filter(m => m.product_id);
+                        // Fetch product details to get UOM
+                        const productRes = await apiClient.get(`/product/${productId}`);
+                        const product = productRes.data || {};
+
+                        const quantity = Number(it.quantity || 1);
+                        const unitPrice = Number(it.unitPrice || 0);
+                        const taxRate = Number(it.taxRate || 0);
+                        const calc = {
+                            quantity,
+                            unit_price: unitPrice,
+                            tax_rate: taxRate
+                        };
+                        const totals = calculateItemTotal(calc);
+
+                        return {
+                            pq_item_id: it.pqItemId,
+                            product_id: productId,
+                            productCode: it.productCode || product.sku || product.productCode || "",
+                            productName: it.productName || product.name || "",
+                            uom: product.uom || product.unit || "",
+                            quantity,
+                            unit_price: unitPrice,
+                            tax_rate: taxRate,
+                            tax_amount: totals.tax,
+                            line_total: totals.total,
+                            delivery_date: null,
+                            note: it.remark || "",
+                        };
+                    } catch (err) {
+                        console.warn('Could not load product details:', err);
+                        return null;
+                    }
+                })
+            );
+
+            const mapped = itemsWithDetails.filter(m => m !== null);
+
+            console.log("Mapped items count:", mapped.length);
 
             if (mapped.length === 0) {
                 toast.info("Không có sản phẩm hợp lệ để nhập");
                 return;
             }
 
-            setFormData((prev) => ({ ...prev, items: mapped }));
+            // Check if vendor exists in vendors list
+            const vendorExists = vendors.find(v => 
+                v.value === vendorId || 
+                v.value == vendorId || // eslint-disable-line eqeqeq
+                Number(v.value) === Number(vendorId)
+            );
+            
+            console.log("Vendor check:", {
+                vendorId,
+                vendorId_type: typeof vendorId,
+                vendorExists: vendorExists?.label,
+                total_vendors: vendors.length
+            });
+
+            if (!vendorExists) {
+                console.error("Vendor not found in vendors list!", {
+                    looking_for: vendorId,
+                    available_vendors: vendors.map(v => ({ value: v.value, label: v.label }))
+                });
+                toast.error("Không tìm thấy nhà cung cấp trong danh sách");
+                return;
+            }
+
+            // Update formData with ALL information from quotation
+            setFormData((prev) => ({ 
+                ...prev, 
+                vendor_id: vendorId,
+                pq_id: selectedQuotation.value,
+                payment_terms: paymentTerms || prev.payment_terms,
+                delivery_date: deliveryDate || prev.delivery_date,
+                shipping_address: deliveryTerms || prev.shipping_address,
+                items: mapped 
+            }));
+            
+            console.log("FormData updated - vendor_id:", vendorId, "delivery_date:", deliveryDate, "items:", mapped.length);
+            
             setShowImportModal(false);
             setSelectedQuotation(null);
-            toast.success("Đã nhập sản phẩm từ báo giá");
+            toast.success(`Đã nhập ${mapped.length} sản phẩm từ báo giá`);
         } catch (err) {
             console.error("Import quotation items error:", err);
             toast.error("Không thể nhập từ báo giá");
@@ -614,8 +759,8 @@ export default function PurchaseOrderForm() {
             const payload = {
                 poNo: formData.po_no,
                 vendorId: formData.vendor_id,
-                pqId: formData.pq_id,
-                orderDate: formData.order_date ? new Date(formData.order_date).toISOString() : null,
+                pqId: formData.pq_id || null,
+                orderDate: formData.order_date ? new Date(formData.order_date).toISOString() : new Date().toISOString(),
                 status: formData.status || "Pending",
                 approvalStatus: formData.approval_status || "Pending",
                 paymentTerms: formData.payment_terms || "",
@@ -627,22 +772,27 @@ export default function PurchaseOrderForm() {
                 items: formData.items.map((it) => ({
                     pqItemId: it.pq_item_id || it.pqItemId || null,
                     productId: it.product_id,
-                    uom: it.uom,
+                    uom: it.uom || "",
                     quantity: Number(it.quantity || 0),
                     unitPrice: Number(it.unit_price || 0),
                     taxRate: Number(it.tax_rate || 0),
                     taxAmount: Number(it.tax_amount || 0),
                     lineTotal: Number(it.line_total || 0),
-                    deliveryDate: it.delivery_date ? new Date(it.delivery_date).toISOString() : null,
+                    deliveryDate: it.delivery_date ? new Date(it.delivery_date).toISOString().split('T')[0] : null,
                     note: it.note || "",
                 })),
             };
+
+            console.log("=== Submitting Purchase Order ===");
+            console.log("Payload:", JSON.stringify(payload, null, 2));
+            console.log("Current User ID:", currentUserId);
 
             if (isEdit) {
                 await purchaseOrderService.updatePurchaseOrder(id, payload, currentUserId);
                 toast.success("Cập nhật Đơn hàng mua thành công!");
             } else {
-                await purchaseOrderService.createPurchaseOrder(payload, currentUserId);
+                const response = await purchaseOrderService.createPurchaseOrder(payload, currentUserId);
+                console.log("Create response:", response);
                 toast.success("Tạo Đơn hàng mua thành công!");
                 
                 // Close PR after creating PO
@@ -657,9 +807,13 @@ export default function PurchaseOrderForm() {
             }
             navigate("/purchase/purchase-orders");
         } catch (err) {
-            console.error("Error saving Purchase Order:", err);
-            const msg = err?.response?.data?.message || (isEdit ? "Không thể cập nhật Đơn hàng mua" : "Không thể tạo Đơn hàng mua");
+            console.error("=== Error saving Purchase Order ===");
+            console.error("Error object:", err);
+            console.error("Response data:", err?.response?.data);
+            console.error("Response status:", err?.response?.status);
+            const msg = err?.response?.data?.message || err?.message || (isEdit ? "Không thể cập nhật Đơn hàng mua" : "Không thể tạo Đơn hàng mua");
             setError(msg);
+            toast.error(msg);
         } finally {
             setIsSubmitting(false);
         }
@@ -721,7 +875,11 @@ export default function PurchaseOrderForm() {
                                             type="text"
                                             value={formData.po_no}
                                             readOnly
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 ${validationErrors.po_no ? "border-red-500" : "border-gray-300"}`}
+                                            className={
+                                                validationErrors.po_no
+                                                    ? "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 border-red-500"
+                                                    : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 border-gray-300"
+                                            }
                                             placeholder="Số sẽ được tự động tạo"
                                         />
                                         {validationErrors.po_no && (
@@ -748,7 +906,7 @@ export default function PurchaseOrderForm() {
                                             Nhà cung cấp <span className="text-red-500">*</span>
                                         </label>
                                         <Select
-                                            value={vendors.find((v) => v.value === formData.vendor_id) || null}
+                                            value={selectedVendor}
                                             onChange={handleVendorChange}
                                             options={vendors}
                                             isLoading={loadingVendors}
@@ -769,7 +927,11 @@ export default function PurchaseOrderForm() {
                                             type="date"
                                             value={formData.order_date}
                                             onChange={(e) => handleInputChange("order_date", e.target.value)}
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.order_date ? "border-red-500" : "border-gray-300"}`}
+                                            className={
+                                                validationErrors.order_date
+                                                    ? "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-red-500"
+                                                    : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300"
+                                            }
                                         />
                                         {validationErrors.order_date && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.order_date}</p>

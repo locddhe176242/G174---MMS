@@ -600,6 +600,31 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
+    public PurchaseRequisitionResponseDTO convertRequisition(Long requisitionId) {
+        log.info("Converting purchase requisition ID: {} to RFQ", requisitionId);
+
+        PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
+                .filter(r -> r.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+
+        // Check current status - must be Approved
+        if (requisition.getStatus() != RequisitionStatus.Approved) {
+            throw new IllegalStateException("Chỉ có thể chuyển đổi PR với trạng thái Approved");
+        }
+
+        requisition.setStatus(RequisitionStatus.Converted);
+        requisition.setUpdatedAt(LocalDateTime.now());
+
+        PurchaseRequisition saved = requisitionRepository.save(requisition);
+        PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
+                .orElse(saved);
+
+        log.info("Purchase requisition converted successfully");
+        return requisitionMapper.toResponseDTO(savedWithRelations);
+    }
+
+    @Override
+    @Transactional
     public PurchaseRequisitionResponseDTO restoreRequisition(Long requisitionId) {
         log.info("Restoring purchase requisition ID: {}", requisitionId);
 
