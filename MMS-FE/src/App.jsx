@@ -27,6 +27,9 @@ import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisit
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
+import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
+import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
+import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
@@ -77,6 +80,9 @@ function App() {
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
+                <Route path="/purchase/ap-payments" element={<APaymentList />} />
+                <Route path="/purchase/ap-payments/:id" element={<APaymentDetail />} />
+                <Route path="/purchase/ap-payments/new" element={<APaymentForm />} />
                 <Route path="/approvals" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
