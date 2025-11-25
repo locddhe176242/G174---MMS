@@ -78,7 +78,7 @@ public class PurchaseRequisitionController {
     // ===================== GET BY ID =====================
     @GetMapping("/{requisitionId}")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> getRequisitionById(
-            @PathVariable Long requisitionId) {
+            @PathVariable Integer requisitionId) {
 
         log.info("API: Lấy purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.getRequisitionById(requisitionId);
@@ -132,7 +132,7 @@ public class PurchaseRequisitionController {
     // ===================== UPDATE =====================
     @PutMapping("/{requisitionId}")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> updateRequisition(
-            @PathVariable Long requisitionId,
+            @PathVariable Integer requisitionId,
             @Valid @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
 
         log.info("API: Cập nhật purchase requisition ID: {}", requisitionId);
@@ -150,7 +150,7 @@ public class PurchaseRequisitionController {
     // ===================== APPROVE =====================
     @PostMapping("/{requisitionId}/approve")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> approveRequisition(
-            @PathVariable Long requisitionId) {
+            @PathVariable Integer requisitionId) {
 
         log.info("API: Approve purchase requisition ID: {}", requisitionId);
 
@@ -167,7 +167,7 @@ public class PurchaseRequisitionController {
     // ===================== REJECT =====================
     @PostMapping("/{requisitionId}/reject")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> rejectRequisition(
-            @PathVariable Long requisitionId,
+            @PathVariable Integer requisitionId,
             @RequestParam(required = false, defaultValue = "") String reason) {
 
         log.info("API: Reject purchase requisition ID: {} với lý do: {}", requisitionId, reason);
@@ -185,7 +185,7 @@ public class PurchaseRequisitionController {
     // ===================== CLOSE =====================
     @PostMapping("/{requisitionId}/close")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> closeRequisition(
-            @PathVariable Long requisitionId) {
+            @PathVariable Integer requisitionId) {
 
         log.info("API: Đóng purchase requisition ID: {}", requisitionId);
 
@@ -196,7 +196,7 @@ public class PurchaseRequisitionController {
     // ===================== RESTORE =====================
     @PostMapping("/{requisitionId}/restore")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> restoreRequisition(
-            @PathVariable Long requisitionId) {
+            @PathVariable Integer requisitionId) {
 
         log.info("API: Khôi phục purchase requisition ID: {}", requisitionId);
 
@@ -207,7 +207,7 @@ public class PurchaseRequisitionController {
     // ===================== DELETE =====================
     @DeleteMapping("/{requisitionId}")
     public ResponseEntity<ApiResponse<PurchaseRequisitionResponseDTO>> deleteRequisition(
-            @PathVariable Long requisitionId) {
+            @PathVariable Integer requisitionId) {
 
         log.info("API: Xóa purchase requisition ID: {}", requisitionId);
 

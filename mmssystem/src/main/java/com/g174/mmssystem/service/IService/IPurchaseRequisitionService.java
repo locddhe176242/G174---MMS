@@ -10,7 +10,7 @@ import java.util.List;
 public interface IPurchaseRequisitionService {
     PurchaseRequisitionResponseDTO createRequisition(PurchaseRequisitionRequestDTO dto, Integer requesterId);
 
-    PurchaseRequisitionResponseDTO getRequisitionById(Long requisitionId);
+    PurchaseRequisitionResponseDTO getRequisitionById(Integer requisitionId);
 
     List<PurchaseRequisitionResponseDTO> getAllRequisitions();
 
@@ -20,17 +20,17 @@ public interface IPurchaseRequisitionService {
 
     Page<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword, Pageable pageable);
 
-    PurchaseRequisitionResponseDTO updateRequisition(Long requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById);
+    PurchaseRequisitionResponseDTO updateRequisition(Integer requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById);
 
-    PurchaseRequisitionResponseDTO approveRequisition(Long requisitionId, Integer approverId);
+    PurchaseRequisitionResponseDTO approveRequisition(Integer requisitionId, Integer approverId);
 
-    PurchaseRequisitionResponseDTO rejectRequisition(Long requisitionId, Integer approverId, String reason);
+    PurchaseRequisitionResponseDTO rejectRequisition(Integer requisitionId, Integer approverId, String reason);
 
-    PurchaseRequisitionResponseDTO closeRequisition(Long requisitionId);
+    PurchaseRequisitionResponseDTO closeRequisition(Integer requisitionId);
 
-    PurchaseRequisitionResponseDTO restoreRequisition(Long requisitionId);
+    PurchaseRequisitionResponseDTO restoreRequisition(Integer requisitionId);
 
-    PurchaseRequisitionResponseDTO deleteRequisition(Long requisitionId);
+    PurchaseRequisitionResponseDTO deleteRequisition(Integer requisitionId);
 
     boolean existsByRequisitionNo(String requisitionNo);
     

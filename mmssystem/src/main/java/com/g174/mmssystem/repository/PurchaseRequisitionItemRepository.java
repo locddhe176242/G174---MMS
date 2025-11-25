@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface PurchaseRequisitionItemRepository extends JpaRepository<PurchaseRequisitionItem, Long> {
-    List<PurchaseRequisitionItem> findByPurchaseRequisition_RequisitionId(Long requisitionId);
+public interface PurchaseRequisitionItemRepository extends JpaRepository<PurchaseRequisitionItem, Integer> {
+    List<PurchaseRequisitionItem> findByPurchaseRequisition_RequisitionId(Integer requisitionId);
 }

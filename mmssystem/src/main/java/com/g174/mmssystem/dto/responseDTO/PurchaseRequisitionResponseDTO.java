@@ -12,7 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class PurchaseRequisitionResponseDTO {
-    private Long requisitionId;
+    private Integer requisitionId;
     private String requisitionNo;
     private LocalDate requisitionDate;
     private Long requesterId;

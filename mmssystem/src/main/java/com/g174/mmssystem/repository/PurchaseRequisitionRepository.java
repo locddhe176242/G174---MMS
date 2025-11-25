@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseRequisition, Long> {
+public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseRequisition, Integer> {
     // Tìm requisition mới nhất theo năm để sinh mã tiếp theo
     @Query(value = "SELECT * FROM Purchase_Requisitions WHERE requisition_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY requisition_no DESC LIMIT 1", nativeQuery = true)
     Optional<PurchaseRequisition> findTopByRequisitionNoStartingWithOrderByRequisitionNoDesc(@Param("prefix") String prefix);
@@ -50,7 +50,7 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
             "LEFT JOIN FETCH r.updatedBy ub " +
             "LEFT JOIN FETCH ub.profile " +
             "WHERE r.requisitionId = :id AND r.deletedAt IS NULL")
-    Optional<PurchaseRequisition> findByIdWithRelations(@Param("id") Long id);
+    Optional<PurchaseRequisition> findByIdWithRelations(@Param("id") Integer id);
 
     @Query("SELECT DISTINCT r FROM PurchaseRequisition r " +
             "LEFT JOIN FETCH r.items i " +

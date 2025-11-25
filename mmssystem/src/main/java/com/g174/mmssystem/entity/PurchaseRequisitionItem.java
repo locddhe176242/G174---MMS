@@ -19,7 +19,7 @@ public class PurchaseRequisitionItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "pri_id")
-    private Long priId;
+    private Integer priId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requisition_id", nullable = false)

@@ -1,3 +1,4 @@
+
 CREATE DATABASE IF NOT EXISTS mms;
 USE mms;
 CREATE TABLE Departments (
@@ -205,7 +206,6 @@ CREATE TABLE Products (
     description TEXT,
     uom VARCHAR(50),
     size DECIMAL(10, 2) DEFAULT NULL,
-    quantity INT NOT NULL DEFAULT 0,
     purchase_price DECIMAL(18, 2),
     selling_price DECIMAL(18, 2),
     status ENUM('In Stock', 'Out of Stock', 'Discontinued') NOT NULL DEFAULT 'In Stock',
@@ -233,6 +233,7 @@ CREATE TABLE Products (
 CREATE TABLE Warehouses (
     warehouse_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    code VARCHAR(50) NOT NULL UNIQUE,
     location VARCHAR(255),
     status ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
     created_by INT,
@@ -276,56 +277,40 @@ CREATE TABLE Warehouse_Stock (
 
 CREATE TABLE Purchase_Requisitions (
     requisition_id INT AUTO_INCREMENT PRIMARY KEY,
-    requisition_no VARCHAR(30) UNIQUE NOT NULL,
-    requisition_date DATE DEFAULT (CURRENT_DATE),
-    requester_id INT NOT NULL,
-    purpose TEXT NOT NULL,
-    status ENUM('Draft', 'Pending', 'Approved', 'Rejected', 'Cancelled') DEFAULT 'Draft',
+    requisition_no VARCHAR(30) UNIQUE,
+    requester_id INT,
+    purpose TEXT,
+    status ENUM('Draft', 'Pending', 'Approved', 'Rejected') DEFAULT 'Draft',
     approver_id INT,
     approved_at DATETIME,
-    created_by INT,
-    updated_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-
-    CONSTRAINT fk_pr_requester FOREIGN KEY (requester_id) REFERENCES Users(user_id) ON DELETE RESTRICT,
-    CONSTRAINT fk_pr_approver FOREIGN KEY (approver_id) REFERENCES Users(user_id) ON DELETE SET NULL,
-    CONSTRAINT fk_pr_created_by FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    CONSTRAINT fk_pr_updated_by FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-
-    INDEX idx_pr_no (requisition_no),
+    CONSTRAINT fk_pr_requester
+      FOREIGN KEY (requester_id) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_pr_approver
+      FOREIGN KEY (approver_id) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_pr_status (status, deleted_at),
     INDEX idx_pr_requester (requester_id),
     INDEX idx_pr_approver (approver_id),
-    INDEX idx_pr_created_at (created_at),
-    INDEX idx_pr_date (requisition_date)
+    INDEX idx_pr_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Purchase_Requisition_Items (
     pri_id INT AUTO_INCREMENT PRIMARY KEY,
     requisition_id INT NOT NULL,
-    product_id INT,
-    product_name VARCHAR(255),
+    product_id INT NOT NULL,
     requested_qty DECIMAL(18, 2) NOT NULL,
-    unit VARCHAR(50),
     delivery_date DATE NOT NULL,
+    valuation_price DECIMAL(18, 2),
+    price_unit DECIMAL(10, 2) DEFAULT 1,
     note TEXT,
-    created_by INT,
-    updated_by INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL,
-
-    CONSTRAINT fk_pri_requisition FOREIGN KEY (requisition_id) REFERENCES Purchase_Requisitions(requisition_id) ON DELETE CASCADE,
-    CONSTRAINT fk_pri_product FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
-    CONSTRAINT fk_pri_created_by FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    CONSTRAINT fk_pri_updated_by FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-
-    INDEX idx_pri_requisition (requisition_id),
+    CONSTRAINT fk_pri_requisition
+      FOREIGN KEY (requisition_id) REFERENCES Purchase_Requisitions(requisition_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pri_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_pri_product (product_id),
-    INDEX idx_pri_delivery_date (delivery_date),
-    INDEX idx_pri_created_at (created_at)
+    INDEX idx_pri_delivery_date (delivery_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE RFQs (
@@ -388,7 +373,6 @@ CREATE TABLE RFQ_Vendors (
     INDEX idx_rfq_vendor_vendor (vendor_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
---
 CREATE TABLE Purchase_Quotations (
     pq_id INT AUTO_INCREMENT PRIMARY KEY,
     pq_no VARCHAR(30) UNIQUE NOT NULL,
@@ -410,9 +394,12 @@ CREATE TABLE Purchase_Quotations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (rfq_id) REFERENCES RFQs(rfq_id) ON DELETE CASCADE,
-    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_pq_rfq
+      FOREIGN KEY (rfq_id) REFERENCES RFQs(rfq_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pq_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pq_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_pq_no (pq_no),
     INDEX idx_pq_status (status, deleted_at),
     INDEX idx_pq_rfq (rfq_id),
@@ -430,9 +417,12 @@ CREATE TABLE Purchase_Quotation_Items (
     tax_amount DECIMAL(18, 2),
     line_total DECIMAL(18, 2) NOT NULL,
     remark TEXT,
-    FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
-    FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
+    CONSTRAINT fk_pqi_pq
+      FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_rfq_item
+      FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
     INDEX idx_pqi_pq (pq_id),
     INDEX idx_pqi_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -458,11 +448,16 @@ CREATE TABLE Purchase_Orders (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
-    FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE SET NULL,
-    FOREIGN KEY (approver_id) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_po_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_po_pq
+      FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE SET NULL,
+    CONSTRAINT fk_po_approver
+      FOREIGN KEY (approver_id) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_po_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_po_updated_by
+      FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_po_no (po_no),
     INDEX idx_po_status (status, approval_status, deleted_at),
     INDEX idx_po_vendor (vendor_id)
@@ -481,13 +476,15 @@ CREATE TABLE Purchase_Order_Items (
     line_total DECIMAL(18, 2) NOT NULL,
     delivery_date DATE,
     note TEXT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_poi_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_poi_pq_item
+      FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
+    CONSTRAINT fk_poi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_poi_order (order_id),
     INDEX idx_poi_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
---
 
 CREATE TABLE Goods_Receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -502,10 +499,14 @@ CREATE TABLE Goods_Receipts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gr_warehouse
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gr_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_approved_by
+      FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_gr_no (receipt_no),
     INDEX idx_gr_status (status, deleted_at),
     INDEX idx_gr_order (order_id),
@@ -520,13 +521,55 @@ CREATE TABLE Goods_Receipt_Items (
     received_qty DECIMAL(18, 2) NOT NULL,
     accepted_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
     remark TEXT,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gri_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gri_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gri_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_gri_receipt (receipt_id),
     INDEX idx_gri_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE Purchase_Deliveries (
+    pd_id INT AUTO_INCREMENT PRIMARY KEY,
+    pd_no VARCHAR(30) UNIQUE NOT NULL,
+    order_id INT NOT NULL,
+    delivery_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    vendor_id INT NOT NULL,
+    status ENUM('Pending', 'Shipped', 'Delivered', 'Cancelled') DEFAULT 'Pending',
+    notes TEXT,
+    created_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
+    CONSTRAINT fk_pd_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pd_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_pd_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    INDEX idx_pd_no (pd_no),
+    INDEX idx_pd_status (status, deleted_at),
+    INDEX idx_pd_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE Purchase_Delivery_Items (
+    pdi_id INT AUTO_INCREMENT PRIMARY KEY,
+    pd_id INT NOT NULL,
+    poi_id INT NOT NULL,
+    product_id INT NOT NULL,
+    shipped_qty DECIMAL(18, 2) NOT NULL,
+    note TEXT,
+    CONSTRAINT fk_pdi_pd
+      FOREIGN KEY (pd_id) REFERENCES Purchase_Deliveries(pd_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pdi_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pdi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    INDEX idx_pdi_pd (pd_id),
+    INDEX idx_pdi_product (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE AP_Invoices (
     ap_invoice_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -545,9 +588,12 @@ CREATE TABLE AP_Invoices (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_api_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
     INDEX idx_ap_invoice_no (invoice_no),
     INDEX idx_ap_status (status, deleted_at),
     INDEX idx_ap_vendor (vendor_id),
@@ -564,9 +610,12 @@ CREATE TABLE AP_Invoice_Items (
     unit_price DECIMAL(18, 2),
     tax_rate DECIMAL(5, 2),
     line_total DECIMAL(18, 2),
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
-    FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_apii_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_gri
+      FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
     INDEX idx_api_invoice (ap_invoice_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -579,10 +628,12 @@ CREATE TABLE AP_Payments (
     reference_no VARCHAR(100),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_app_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
     INDEX idx_app_invoice (ap_invoice_id),
     INDEX idx_app_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 -- =====================================================
 -- SALES FLOW
@@ -689,24 +740,30 @@ CREATE TABLE Deliveries (
     delivery_id INT AUTO_INCREMENT PRIMARY KEY,
     delivery_no VARCHAR(30) UNIQUE NOT NULL,
     so_id INT NOT NULL,
-    delivery_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     warehouse_id INT NOT NULL,
-    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    planned_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actual_date DATETIME NULL,
+    shipping_address TEXT,
+    carrier_name VARCHAR(150),
+    driver_name VARCHAR(150),
+    driver_phone VARCHAR(50),
+    tracking_code VARCHAR(100),
+    status ENUM('Draft', 'Picked', 'Shipped', 'Delivered', 'Cancelled') DEFAULT 'Draft',
     created_by INT,
-    approved_by INT,
-    approved_at DATETIME,
-    notes TEXT,
+    updated_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
+    notes TEXT,
     FOREIGN KEY (so_id) REFERENCES Sales_Orders(so_id) ON DELETE CASCADE,
     FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
     FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_del_no (delivery_no),
     INDEX idx_del_status (status, deleted_at),
     INDEX idx_del_so (so_id),
-    INDEX idx_del_warehouse (warehouse_id)
+    INDEX idx_del_warehouse (warehouse_id),
+    INDEX idx_del_tracking (tracking_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Delivery_Items (
@@ -714,13 +771,19 @@ CREATE TABLE Delivery_Items (
     delivery_id INT NOT NULL,
     soi_id INT NOT NULL,
     product_id INT NOT NULL,
-    issued_qty DECIMAL(18, 2) NOT NULL,
+    warehouse_id INT,
+    ordered_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    planned_qty DECIMAL(18, 2) NOT NULL,
+    delivered_qty DECIMAL(18, 2) DEFAULT 0,
+    uom VARCHAR(50),
     note TEXT,
     FOREIGN KEY (delivery_id) REFERENCES Deliveries(delivery_id) ON DELETE CASCADE,
     FOREIGN KEY (soi_id) REFERENCES Sales_Order_Items(soi_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE SET NULL,
     INDEX idx_di_delivery (delivery_id),
-    INDEX idx_di_product (product_id)
+    INDEX idx_di_product (product_id),
+    INDEX idx_di_soi (soi_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE AR_Invoices (
@@ -893,8 +956,6 @@ CREATE INDEX idx_purchase_orders_created_range ON Purchase_Orders(created_at);
 CREATE INDEX idx_sales_orders_created_range ON Sales_Orders(created_at);
 
 -- Status-based indexes for workflow
-CREATE INDEX idx_purchase_requisitions_approval ON Purchase_Requisitions(approval_status, status);
-CREATE INDEX idx_purchase_orders_approval ON Purchase_Orders(approval_status, status);
 CREATE INDEX idx_sales_orders_approval ON Sales_Orders(approval_status, status);
 
 -- Vendor/Customer relationship indexes

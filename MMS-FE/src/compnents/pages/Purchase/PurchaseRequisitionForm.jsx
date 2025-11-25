@@ -9,7 +9,7 @@ import { getCurrentUser } from '../../../api/authService';
 import { getProducts } from '../../../api/productService';
 import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
 import { getCurrentUserProfile } from '../../../api/userProfileService';
-import * as ExcelJS from 'exceljs';
+//import * as ExcelJS from 'exceljs';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();

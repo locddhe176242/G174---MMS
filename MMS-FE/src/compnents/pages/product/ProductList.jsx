@@ -297,10 +297,10 @@ const ProductList = () => {
                     <td className="px-4 py-3 text-sm text-slate-800">{product.name || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-semibold ${product.quantity > 50 ? 'text-green-600' : product.quantity > 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                          {product.quantity || 0}
+                        <span className={`text-sm font-semibold ${(product.totalQuantity || 0) > 50 ? 'text-green-600' : (product.totalQuantity || 0) > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {product.totalQuantity != null ? Number(product.totalQuantity).toLocaleString('vi-VN') : 0}
                         </span>
-                        {product.quantity === 0 && (
+                        {(product.totalQuantity == null || product.totalQuantity === 0) && (
                           <span className="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-full">
                             Hết hàng
                           </span>
