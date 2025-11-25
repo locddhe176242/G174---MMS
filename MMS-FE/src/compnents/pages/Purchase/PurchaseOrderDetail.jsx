@@ -260,6 +260,8 @@ export default function PurchaseOrderDetail() {
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
     const canSend = normalizedApprovalStatus === "Approved" && normalizedStatus === "Approved";
     const canCreateGR = normalizedApprovalStatus === "Approved" && (normalizedStatus === "Approved" || normalizedStatus === "Sent");
+    // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
+    const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -316,12 +318,14 @@ export default function PurchaseOrderDetail() {
                                     Tạo phiếu nhập kho
                                 </button>
                             )}
-                            <button
-                                onClick={() => navigate(`/purchase/purchase-orders/${id}/edit`)}
-                                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
-                            >
-                                Chỉnh sửa
-                            </button>
+                            {canEdit && (
+                                <button
+                                    onClick={() => navigate(`/purchase/purchase-orders/${id}/edit`)}
+                                    className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                                >
+                                    Chỉnh sửa
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -645,7 +649,6 @@ export default function PurchaseOrderDetail() {
                                 </p>
                                 <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
                                     <li>Gửi email thông báo đơn hàng đến nhà cung cấp</li>
-                                    <li>Đính kèm chi tiết đơn hàng PDF</li>
                                     <li>Chuyển trạng thái đơn hàng sang <strong>Sent</strong></li>
                                 </ul>
                             </div>

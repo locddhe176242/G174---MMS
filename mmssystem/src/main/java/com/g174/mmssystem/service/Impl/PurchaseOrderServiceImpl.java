@@ -10,6 +10,7 @@ import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseOrderMapper;
 import com.g174.mmssystem.repository.*;
+import com.g174.mmssystem.service.EmailService;
 import com.g174.mmssystem.service.IService.IPurchaseOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,6 +40,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     private final ProductRepository productRepository;
     private final PurchaseQuotationItemRepository quotationItemRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -372,6 +375,15 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             throw new IllegalStateException("Only approved orders can be sent");
         }
 
+        // Send email to vendor
+        try {
+            sendPurchaseOrderEmail(order);
+            log.info("Purchase order email sent successfully to vendor");
+        } catch (Exception e) {
+            log.error("Failed to send purchase order email, but continuing with status update", e);
+            // Continue even if email fails
+        }
+
         order.setStatus(PurchaseOrderStatus.Sent);
         order.setUpdatedAt(LocalDateTime.now());
 
@@ -381,6 +393,172 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         log.info("Purchase order sent successfully");
         return orderMapper.toResponseDTO(savedWithRelations);
+    }
+
+    private void sendPurchaseOrderEmail(PurchaseOrder order) {
+        Vendor vendor = order.getVendor();
+        if (vendor == null || vendor.getContact() == null || vendor.getContact().getEmail() == null) {
+            log.warn("Vendor email not found for PO: {}", order.getPoNo());
+            return;
+        }
+
+        String vendorEmail = vendor.getContact().getEmail();
+        String subject = "Đơn Hàng Mua #" + order.getPoNo() + " - " + vendor.getName();
+        String htmlBody = buildPurchaseOrderEmailTemplate(order);
+
+        try {
+            emailService.sendSimpleEmail(vendorEmail, subject, htmlBody);
+        } catch (Exception e) {
+            log.error("Error sending PO email to {}: {}", vendorEmail, e.getMessage());
+            throw e;
+        }
+    }
+
+    private String buildPurchaseOrderEmailTemplate(PurchaseOrder order) {
+        Vendor vendor = order.getVendor();
+        List<PurchaseOrderItem> items = order.getItems();
+        
+        StringBuilder itemsHtml = new StringBuilder();
+        int index = 1;
+        for (PurchaseOrderItem item : items) {
+            String productName = item.getProduct() != null ? item.getProduct().getName() : "N/A";
+            BigDecimal quantity = item.getQuantity();
+            BigDecimal unitPrice = item.getUnitPrice();
+            BigDecimal lineTotal = item.getLineTotal();
+            
+            itemsHtml.append(String.format("""
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">%d</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">%s</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">%s</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">%.0f</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">%,.0f ₫</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right; font-weight: bold;">%,.0f ₫</td>
+                </tr>
+                """, 
+                index++,
+                productName,
+                item.getUom() != null ? item.getUom() : "Cái",
+                quantity,
+                unitPrice,
+                lineTotal
+            ));
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String deliveryDate = order.getDeliveryDate() != null ? order.getDeliveryDate().format(formatter) : "N/A";
+
+        return String.format("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); 
+                             color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background-color: #fff; padding: 30px; border: 1px solid #ddd; border-top: none; }
+                    .info-box { background-color: #f8f9fa; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; border-radius: 5px; }
+                    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+                    .info-label { font-weight: bold; color: #666; }
+                    .info-value { color: #333; }
+                    table { width: 100%%; border-collapse: collapse; margin: 20px 0; }
+                    th { background-color: #667eea; color: white; padding: 12px; text-align: left; }
+                    .total-row { background-color: #f8f9fa; font-weight: bold; font-size: 18px; }
+                    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; }
+                    .note { background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; border-radius: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0;">📦 ĐƠN HÀNG MUA</h1>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold;">%s</p>
+                    </div>
+                    <div class="content">
+                        <p style="font-size: 16px;">Kính gửi <strong>%s</strong>,</p>
+                        <p>Chúng tôi xin gửi đến quý công ty đơn hàng mua với thông tin chi tiết như sau:</p>
+                        
+                        <div class="info-box">
+                            <h3 style="margin-top: 0; color: #667eea;">📋 Thông Tin Đơn Hàng</h3>
+                            <div class="info-row">
+                                <span class="info-label">Số đơn hàng:</span>
+                                <span class="info-value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Nhà cung cấp:</span>
+                                <span class="info-value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Ngày giao hàng:</span>
+                                <span class="info-value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Điều khoản thanh toán:</span>
+                                <span class="info-value">%s</span>
+                            </div>
+                            <div class="info-row" style="border-bottom: none;">
+                                <span class="info-label">Địa chỉ giao hàng:</span>
+                                <span class="info-value">%s</span>
+                            </div>
+                        </div>
+                        
+                        <h3 style="color: #667eea; margin-top: 30px;">🛍️ Chi Tiết Sản Phẩm</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="text-align: center;">STT</th>
+                                    <th>Sản phẩm</th>
+                                    <th style="text-align: center;">ĐVT</th>
+                                    <th style="text-align: right;">Số lượng</th>
+                                    <th style="text-align: right;">Đơn giá</th>
+                                    <th style="text-align: right;">Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                %s
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="5" style="padding: 15px; text-align: right; border: 1px solid #ddd;">TỔNG CỘNG:</td>
+                                    <td style="padding: 15px; text-align: right; color: #667eea; border: 1px solid #ddd;">%,.0f ₫</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="note">
+                            <strong>⚠️ Lưu ý:</strong>
+                            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                                <li>Vui lòng xác nhận đơn hàng trong vòng 24 giờ</li>
+                                <li>Giao hàng đúng thời hạn cam kết</li>
+                                <li>Đảm bảo chất lượng sản phẩm theo yêu cầu</li>
+                                <li>Cung cấp đầy đủ chứng từ xuất hàng</li>
+                            </ul>
+                        </div>
+                        
+                        <p style="margin-top: 30px;">Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi.</p>
+                        <p><strong>Trân trọng,</strong><br>
+                        <strong style="color: #667eea;">Hệ Thống MMS</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p style="margin: 5px 0;">Đây là email tự động, vui lòng không trả lời trực tiếp.</p>
+                        <p style="margin: 5px 0;">&copy; 2025 MMS System. Bảo lưu mọi quyền.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """,
+            order.getPoNo(),
+            vendor.getName(),
+            order.getPoNo(),
+            vendor.getName(),
+            deliveryDate,
+            order.getPaymentTerms() != null ? order.getPaymentTerms() : "N/A",
+            order.getShippingAddress() != null ? order.getShippingAddress() : "N/A",
+            itemsHtml.toString(),
+            order.getTotalAfterTax()
+        );
     }
 
     @Override

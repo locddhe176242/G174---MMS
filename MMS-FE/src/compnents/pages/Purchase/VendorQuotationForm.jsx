@@ -63,6 +63,16 @@ const VendorQuotationForm = () => {
         { value: 'LC 90 ngày', label: 'LC 90 ngày (Letter of Credit)' },
     ];
 
+    // Check if delivery terms requires shipping cost
+    const requiresShippingCost = (deliveryTerms) => {
+        if (!deliveryTerms) return true; // Default allow shipping cost
+        const term = deliveryTerms.toUpperCase();
+        // FOB and EXW means buyer handles shipping - no shipping cost from vendor
+        if (term.includes('FOB') || term.includes('EXW')) return false;
+        // CIF, DDP, or custom delivery means vendor handles shipping - has shipping cost
+        return true;
+    };
+
     // Format currency
     const formatCurrency = (n) =>
         new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
@@ -250,6 +260,19 @@ const VendorQuotationForm = () => {
         }));
     }, [formData.items.map(i => `${i.quantity}-${i.unitPrice}-${i.taxRate}`).join(','), formData.isTaxIncluded, calculateTotals.total]);
 
+    // Auto-reset shipping cost when delivery terms change
+    useEffect(() => {
+        if (formData.deliveryTerms && !requiresShippingCost(formData.deliveryTerms)) {
+            // FOB or EXW selected - reset shipping cost to 0
+            if (formData.shippingCost !== 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    shippingCost: 0
+                }));
+            }
+        }
+    }, [formData.deliveryTerms]);
+
     // Handle input changes
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -288,7 +311,7 @@ const VendorQuotationForm = () => {
         }
 
         if (!formData.rfqId) {
-            errors.rfqId = 'RFQ là bắt buộc';
+            errors.rfqId = 'RFQ tham chiếu là bắt buộc';
         }
 
         if (!formData.vendorId) {
@@ -296,20 +319,17 @@ const VendorQuotationForm = () => {
         }
 
         if (!formData.validUntil) {
-            errors.validUntil = 'Ngày hết hạn là bắt buộc';
+            errors.validUntil = 'Ngày nhận hàng dự kiến là bắt buộc';
         }
 
         if (formData.items.length === 0) {
-            errors.items = 'Phải có ít nhất một sản phẩm';
+            errors.items = 'Danh mục sản phẩm từ RFQ không được để trống';
         }
 
-        // Validate items
+        // Validate items - Số lượng từ RFQ không cần validate, chỉ validate giá
         formData.items.forEach((item, index) => {
-            if (!item.quantity || item.quantity <= 0) {
-                errors[`item_${index}_quantity`] = 'Số lượng phải lớn hơn 0';
-            }
             if (!item.unitPrice || item.unitPrice <= 0) {
-                errors[`item_${index}_unitPrice`] = 'Đơn giá phải lớn hơn 0';
+                errors[`item_${index}_unitPrice`] = 'Đơn giá báo phải lớn hơn 0';
             }
         });
 
@@ -437,9 +457,18 @@ const VendorQuotationForm = () => {
                         Tạo báo giá từ nhà cung cấp
                     </h1>
                 </div>
-                <p className="text-gray-600">
-                    RFQ: {rfqData.rfqNo || rfqData.rfq_no} | Nhà cung cấp: {vendorData?.name || 'Đang tải...'}
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                        <span className="font-semibold">RFQ tham chiếu:</span> {rfqData.rfqNo || rfqData.rfq_no}
+                    </p>
+                    <p className="text-sm text-blue-800">
+                        <span className="font-semibold">Nhà cung cấp:</span> {vendorData?.name || 'Đang tải...'}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-2">
+                        <strong>Lưu ý:</strong> Chỉ có thể tạo 1 báo giá duy nhất từ RFQ này. 
+                        Danh mục sản phẩm và số lượng được tham chiếu từ RFQ và không thể thay đổi.
+                    </p>
+                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -467,23 +496,23 @@ const VendorQuotationForm = () => {
                             )}
                         </div>
 
-                        {/* Quotation Date */}
+                        {/* Quotation Date - Ngày tạo (không cho sửa) */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Ngày báo giá
+                                Ngày tạo
                             </label>
-                            <DatePicker
-                                selected={formData.pqDate}
-                                onChange={(date) => handleInputChange('pqDate', date)}
-                                dateFormat="dd/MM/yyyy"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            <input
+                                type="text"
+                                value={formData.pqDate ? new Date(formData.pqDate).toLocaleDateString('vi-VN') : ''}
+                                disabled
+                                className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed"
                             />
                         </div>
 
-                        {/* Valid Until */}
+                        {/* Valid Until - Ngày nhận hàng dự kiến */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Có hiệu lực đến <span className="text-red-500">*</span>
+                                Ngày nhận hàng dự kiến <span className="text-red-500">*</span>
                             </label>
                             <DatePicker
                                 selected={formData.validUntil}
@@ -492,7 +521,8 @@ const VendorQuotationForm = () => {
                                 className={`w-full px-3 py-2 border rounded-md ${
                                     validationErrors.validUntil ? 'border-red-500' : 'border-gray-300'
                                 }`}
-                                placeholderText="Chọn ngày"
+                                placeholderText="Chọn ngày nhận hàng dự kiến"
+                                minDate={new Date()}
                             />
                             {validationErrors.validUntil && (
                                 <p className="text-red-500 text-sm mt-1">{validationErrors.validUntil}</p>
@@ -586,7 +616,7 @@ const VendorQuotationForm = () => {
                         {/* Header Discount */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Chiết khấu (%)
+                                Giảm giá từ nhà cung cấp (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
                             </label>
                             <input
                                 type="number"
@@ -594,8 +624,13 @@ const VendorQuotationForm = () => {
                                 onChange={(e) => handleInputChange('headerDiscount', parseFloat(e.target.value) || 0)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                                 min="0"
+                                max="100"
                                 step="0.01"
+                                placeholder="VD: 5 (giảm 5%)"
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                                💡 Nhà cung cấp giảm giá (promotional discount)
+                            </p>
                         </div>
 
                         {/* Shipping Cost */}
@@ -607,10 +642,21 @@ const VendorQuotationForm = () => {
                                 type="number"
                                 value={formData.shippingCost}
                                 onChange={(e) => handleInputChange('shippingCost', parseFloat(e.target.value) || 0)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                disabled={!requiresShippingCost(formData.deliveryTerms)}
+                                className={`w-full px-3 py-2 border rounded-md ${
+                                    !requiresShippingCost(formData.deliveryTerms)
+                                        ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
+                                        : 'border-gray-300'
+                                }`}
                                 min="0"
                                 step="0.01"
+                                placeholder={!requiresShippingCost(formData.deliveryTerms) ? "Không áp dụng (FOB/EXW)" : "Nhập phí vận chuyển"}
                             />
+                            {!requiresShippingCost(formData.deliveryTerms) && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    💡 FOB/EXW: Buyer tự lo vận chuyển - không có phí ship từ vendor
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -647,9 +693,9 @@ const VendorQuotationForm = () => {
                                 <thead>
                                 <tr className="bg-gray-50">
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">#</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Số lượng</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Đơn giá</th>
+                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm (từ RFQ)</th>
+                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">SL yêu cầu</th>
+                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Đơn giá báo</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thuế (%)</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thành tiền</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Ghi chú</th>
@@ -662,20 +708,20 @@ const VendorQuotationForm = () => {
                                             {index + 1}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {item.productName || `${item.productCode || ''} - Sản phẩm`}
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-blue-600">🔗</span>
+                                                <span className="font-medium">{item.productName || `${item.productCode || ''} - Sản phẩm`}</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-0.5">Mã: {item.productCode || 'N/A'}</p>
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
                                                 type="number"
                                                 value={item.quantity}
-                                                onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
-                                                className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                min="0"
-                                                step="0.01"
+                                                disabled
+                                                className="w-20 px-1.5 py-0.5 border border-gray-200 rounded text-xs bg-gray-50 text-gray-600 cursor-not-allowed"
                                             />
-                                            {validationErrors[`item_${index}_quantity`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_quantity`]}</p>
-                                            )}
+                                            <p className="text-xs text-gray-500 mt-0.5">Từ RFQ</p>
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input

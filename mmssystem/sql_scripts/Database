@@ -441,7 +441,7 @@ CREATE TABLE Purchase_Quotation_Items (
 
 CREATE TABLE Purchase_Orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
-    po_no VARCHAR(30) UNIQUE NOT NULL,
+    po_no VARCHAR(30) NOT NULL,
     vendor_id INT NOT NULL,
     pq_id INT,
     order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -466,7 +466,7 @@ CREATE TABLE Purchase_Orders (
     FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     UNIQUE KEY uk_po_pq (pq_id),
-    INDEX idx_po_no (po_no),
+    UNIQUE KEY uk_po_no_active (po_no, deleted_at),
     INDEX idx_po_status (status, approval_status, deleted_at),
     INDEX idx_po_vendor (vendor_id),
     INDEX idx_po_pq (pq_id)

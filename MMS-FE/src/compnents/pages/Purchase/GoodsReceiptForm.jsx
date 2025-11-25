@@ -104,15 +104,57 @@ export default function GoodsReceiptForm() {
     const loadPurchaseOrders = async () => {
         try {
             const response = await apiClient.get("/purchase-orders/page", {
-                params: { page: 0, size: 50, sort: "createdAt,desc" },
+                params: { page: 0, size: 100, sort: "createdAt,desc" },
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
+            
+            // Filter: Chỉ lấy PO đã Approved và chưa Completed
+            const eligibleOrders = data.filter((order) => {
+                const status = order.status?.toString() || order.status || "";
+                const approvalStatus = order.approvalStatus?.toString() || order.approval_status?.toString() || order.approvalStatus || order.approval_status || "";
+                
+                // Chỉ lấy PO đã Approved và status là Approved/Sent (không lấy Rejected, Pending, Completed, Cancelled)
+                const isApproved = approvalStatus.toUpperCase() === "APPROVED";
+                const isValidStatus = ["APPROVED", "SENT"].includes(status.toUpperCase());
+                
+                return isApproved && isValidStatus;
+            });
+
+            // Check xem PO nào đã có Goods Receipt
+            const ordersWithGRStatus = await Promise.all(
+                eligibleOrders.map(async (order) => {
+                    try {
+                        const orderId = order.orderId || order.order_id || order.id;
+                        const grResponse = await apiClient.get(`/goods-receipts/po/${orderId}`);
+                        const receipts = grResponse.data || [];
+                        const hasReceipt = Array.isArray(receipts) && receipts.length > 0;
+                        return {
+                            ...order,
+                            hasReceipt
+                        };
+                    } catch (err) {
+                        // Nếu 404 = chưa có GR
+                        return {
+                            ...order,
+                            hasReceipt: false
+                        };
+                    }
+                })
+            );
+
             setPurchaseOrders(
-                data.map((order) => ({
-                    value: order.orderId || order.order_id || order.id,
-                    label: `${order.poNo || order.po_no} - ${order.vendorName || order.vendor?.name || "N/A"}`,
-                    order,
-                }))
+                ordersWithGRStatus.map((order) => {
+                    const poNo = order.poNo || order.po_no;
+                    const vendorName = order.vendorName || order.vendor?.name || "N/A";
+                    const suffix = order.hasReceipt ? " (Đã nhập kho)" : "";
+                    
+                    return {
+                        value: order.orderId || order.order_id || order.id,
+                        label: `${poNo} - ${vendorName}${suffix}`,
+                        order,
+                        isDisabled: order.hasReceipt // Disable nếu đã có GR
+                    };
+                })
             );
         } catch (err) {
             console.error("Error loading purchase orders:", err);
@@ -126,8 +168,6 @@ export default function GoodsReceiptForm() {
             const response = await apiClient.get(`/purchase-orders/${orderId}/items`);
             console.log("=== PO ITEMS RAW RESPONSE ===", response.data);
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
-            console.log("=== PO ITEMS ARRAY ===", data);
-            console.log("First item structure:", data[0]);
             setPoReferenceItems(data);
 
             if (receiptItems) {
@@ -158,7 +198,7 @@ export default function GoodsReceiptForm() {
                         productCode: poItem.productCode || poItem.product?.sku || "",
                         ordered_qty: Number(poItem.quantity || poItem.order_qty || 0),
                         received_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                        accepted_qty: Number(poItem.quantity || poItem.order_qty || 0),
+                        accepted_qty: Number(poItem.quantity || poItem.order_qty || 0), // Will be auto-set to received_qty
                         remark: "",
                     };
                     console.log(`Mapped result ${index}:`, mapped);
@@ -198,7 +238,7 @@ export default function GoodsReceiptForm() {
                     productCode: item.productCode || item.product_code || "",
                     ordered_qty: item.orderedQty || item.ordered_qty || 0,
                     received_qty: Number(item.receivedQty || item.received_qty || 0),
-                    accepted_qty: Number(item.acceptedQty || item.accepted_qty || 0),
+                    accepted_qty: Number(item.receivedQty || item.received_qty || 0), // Auto-accept received qty
                     remark: item.remark || "",
                 })),
             });
@@ -267,9 +307,7 @@ export default function GoodsReceiptForm() {
                 if (!item.received_qty || Number(item.received_qty) <= 0) {
                     err.received_qty = "SL nhận > 0";
                 }
-                if (Number(item.accepted_qty) > Number(item.received_qty)) {
-                    err.accepted_qty = "SL chấp nhận ≤ SL nhận";
-                }
+                // Accepted qty validation removed - no longer needed
                 return err;
             });
             if (itemErrors.some((e) => Object.keys(e).length > 0)) {
@@ -316,7 +354,7 @@ export default function GoodsReceiptForm() {
                         poiId: item.poi_id,
                         productId: item.product_id,
                         receivedQty: Number(item.received_qty || 0),
-                        acceptedQty: Number(item.accepted_qty || 0),
+                        acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
                         remark: item.remark || "",
                     };
                 }),
@@ -438,9 +476,23 @@ export default function GoodsReceiptForm() {
                                             value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
                                             onChange={handleOrderChange}
                                             options={purchaseOrders}
-                                            placeholder="Chọn đơn hàng"
+                                            placeholder="Chọn đơn hàng (chỉ hiện PO đã duyệt)"
                                             isClearable
                                             classNamePrefix="react-select"
+                                            isOptionDisabled={(option) => option.isDisabled}
+                                            styles={{
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    color: state.isDisabled ? '#9ca3af' : provided.color,
+                                                    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                                    fontStyle: state.isDisabled ? 'italic' : 'normal',
+                                                    backgroundColor: state.isDisabled 
+                                                        ? '#f3f4f6' 
+                                                        : state.isFocused 
+                                                        ? '#e5e7eb' 
+                                                        : provided.backgroundColor
+                                                })
+                                            }}
                                         />
                                         {validationErrors.order_id && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
@@ -501,12 +553,11 @@ export default function GoodsReceiptForm() {
                                         <table className="w-full border-collapse">
                                             <thead>
                                             <tr className="bg-gray-50">
-                                                <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">#</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-center text-xs font-medium text-gray-700 w-12">#</th>
                                                 <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700">SL đặt</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700">SL nhận</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700">SL chấp nhận</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Ghi chú</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-28">SL đặt</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-32">SL nhận</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700 w-48">Ghi chú</th>
                                             </tr>
                                             </thead>
                                             <tbody>
@@ -537,19 +588,6 @@ export default function GoodsReceiptForm() {
                                                             />
                                                             {itemErr.received_qty && (
                                                                 <p className="text-red-500 text-xs mt-0.5">{itemErr.received_qty}</p>
-                                                            )}
-                                                        </td>
-                                                        <td className="border border-gray-200 px-2 py-1">
-                                                            <input
-                                                                type="number"
-                                                                value={item.accepted_qty}
-                                                                onChange={(e) => handleItemChange(index, "accepted_qty", parseFloat(e.target.value) || 0)}
-                                                                className={`w-24 px-2 py-1 border rounded text-sm text-right ${itemErr.accepted_qty ? "border-red-500" : "border-gray-300"}`}
-                                                                min="0"
-                                                                step="0.01"
-                                                            />
-                                                            {itemErr.accepted_qty && (
-                                                                <p className="text-red-500 text-xs mt-0.5">{itemErr.accepted_qty}</p>
                                                             )}
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1">

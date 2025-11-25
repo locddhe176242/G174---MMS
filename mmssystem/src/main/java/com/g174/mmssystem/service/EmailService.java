@@ -41,6 +41,7 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
+            helper.setFrom(fromName + " <noreply@mmssystem.com>");
             helper.setTo(toEmail);
             helper.setSubject("Mã OTP Đặt Lại Mật Khẩu - MMS System");
 
@@ -109,17 +110,40 @@ public class EmailService {
 
     public void sendSimpleEmail(String toEmail, String subject, String body) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(toEmail);
-            message.setSubject(subject);
-            message.setText(body);
+            // Check if body contains HTML tags - if yes, send as HTML email
+            if (body.trim().startsWith("<!DOCTYPE") || body.trim().startsWith("<html")) {
+                sendHtmlEmail(toEmail, subject, body);
+            } else {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(toEmail);
+                message.setSubject(subject);
+                message.setText(body);
 
-            mailSender.send(message);
-            log.info("Simple email sent successfully to: {}", toEmail);
-
+                mailSender.send(message);
+                log.info("Simple email sent successfully to: {}", toEmail);
+            }
         } catch (Exception e) {
             log.error("Failed to send email to: {}", toEmail, e);
             throw new EmailSendingException("Gửi email thất bại. Vui lòng thử lại sau.", e);
+        }
+    }
+
+    public void sendHtmlEmail(String toEmail, String subject, String htmlBody) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromName + " <noreply@mmssystem.com>");
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true); // true = HTML
+
+            mailSender.send(message);
+            log.info("HTML email sent successfully to: {}", toEmail);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send HTML email to: {}", toEmail, e);
+            throw new EmailSendingException("Gửi email HTML thất bại. Vui lòng thử lại sau.", e);
         }
     }
 }

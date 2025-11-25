@@ -14,9 +14,11 @@ import java.util.Optional;
 @Repository
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Integer> {
     
-    Optional<PurchaseOrder> findByPoNo(String poNo);
+    @Query("SELECT po FROM PurchaseOrder po WHERE po.poNo = :poNo AND po.deletedAt IS NULL")
+    Optional<PurchaseOrder> findByPoNo(@Param("poNo") String poNo);
     
-    boolean existsByPoNo(String poNo);
+    @Query("SELECT COUNT(po) > 0 FROM PurchaseOrder po WHERE po.poNo = :poNo AND po.deletedAt IS NULL")
+    boolean existsByPoNo(@Param("poNo") String poNo);
 
     @Query("SELECT po FROM PurchaseOrder po WHERE po.deletedAt IS NULL")
     List<PurchaseOrder> findAllActive();

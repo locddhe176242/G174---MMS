@@ -53,6 +53,7 @@ export default function PurchaseOrderForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const [validationErrors, setValidationErrors] = useState({});
+    const [isImportedFromPQ, setIsImportedFromPQ] = useState(false); // Track if imported from PQ
 
     const currentUserId = useMemo(() => {
         if (currentUser?.userId || currentUser?.user_id || currentUser?.id) {
@@ -109,12 +110,7 @@ export default function PurchaseOrderForm() {
                       vendors.find((v) => v.value == formData.vendor_id) || // eslint-disable-line eqeqeq
                       vendors.find((v) => Number(v.value) === Number(formData.vendor_id));
         
-        console.log("Selected vendor lookup:", {
-            vendor_id: formData.vendor_id,
-            found: found?.label,
-            vendors_count: vendors.length
-        });
-        
+
         return found || null;
     }, [vendors, formData.vendor_id]);
 
@@ -160,15 +156,16 @@ export default function PurchaseOrderForm() {
 
     // Debug: Log formData changes
     useEffect(() => {
-        console.log("FormData changed:", {
+        console.log("📋 FormData changed:", {
             vendor_id: formData.vendor_id,
-            vendor_id_type: typeof formData.vendor_id,
+            payment_terms: formData.payment_terms,
             delivery_date: formData.delivery_date,
+            shipping_address: formData.shipping_address,
             items_count: formData.items.length,
             vendors_count: vendors.length,
-            vendors_sample: vendors.slice(0, 2).map(v => ({ value: v.value, type: typeof v.value }))
+            selectedVendor: selectedVendor?.label || 'NULL'
         });
-    }, [formData.vendor_id, formData.delivery_date, formData.items, vendors]);
+    }, [formData.vendor_id, formData.payment_terms, formData.delivery_date, formData.shipping_address, formData.items, vendors, selectedVendor]);
 
     const generatePONumber = async () => {
         try {
@@ -192,13 +189,25 @@ export default function PurchaseOrderForm() {
             const data = Array.isArray(response.data)
                 ? response.data
                 : response.data?.content || [];
-            setVendors(
-                data.map((v) => ({
-                    value: v.vendor_id || v.id,
-                    label: v.name || `Vendor ${v.vendor_id || v.id}`,
+            
+            
+            const mapped = data.map((v) => {
+                // Try multiple possible field names for vendor ID
+                const vendorId = v.vendorId || v.vendor_id || v.id;
+                console.log("Mapping vendor:", { 
+                    name: v.name, 
+                    vendorId: v.vendorId,
+                    vendor_id: v.vendor_id,
+                    id: v.id,
+                    final_value: vendorId 
+                });
+                return {
+                    value: vendorId,
+                    label: v.name || `Vendor ${vendorId}`,
                     vendor: v,
-                }))
-            );
+                };
+            });
+            setVendors(mapped);
         } catch (err) {
             console.error("Error loading vendors:", err);
             toast.error("Không thể tải danh sách nhà cung cấp");
@@ -550,11 +559,21 @@ export default function PurchaseOrderForm() {
                 return;
             }
 
+            // Debug: Log all quotations with their statuses
+            console.log("All quotations:", allList.map(pq => ({
+                pqNo: pq.pqNo || pq.pq_no,
+                status: pq.status,
+                statusType: typeof pq.status,
+                statusName: pq.status?.name,
+                statusValue: pq.status?.value
+            })));
+
             // Filter: Chỉ hiển thị báo giá đã được Approved và chưa được sử dụng để tạo PO
             const approvedQuotations = allList.filter(pq => {
                 const status = typeof pq.status === 'string' ? pq.status : pq.status?.name || pq.status?.value;
-                // Chỉ lấy các báo giá đã được phê duyệt
-                return status === 'Approved';
+                // Chỉ lấy các báo giá đã được phê duyệt (case-insensitive)
+                const normalizedStatus = status?.toString().toUpperCase();
+                return normalizedStatus === 'APPROVED';
             });
 
             console.log("Approved quotations found:", approvedQuotations.length);
@@ -581,24 +600,36 @@ export default function PurchaseOrderForm() {
                 })
             );
 
-            // Only show quotations that don't have active POs
-            const availableQuotations = quotationsWithPOStatus.filter(pq => !pq.hasActivePO);
+            // Hiển thị tất cả PQ nhưng đánh dấu và disable những PQ đã sử dụng
+            const currentPqId = formData.pq_id;
 
-            console.log("Available quotations (not used in PO):", availableQuotations.length);
+            console.log("Current form PQ ID:", currentPqId);
+            console.log("Total approved quotations:", quotationsWithPOStatus.length);
+            console.log("Quotations with PO:", quotationsWithPOStatus.filter(pq => pq.hasActivePO).length);
 
-            if (availableQuotations.length === 0) {
-                toast.info("Không có báo giá khả dụng (tất cả báo giá đã được phê duyệt đều đã được sử dụng)");
-                setQuotationList([]);
-                return;
-            }
+            // Hiển thị tất cả, nhưng đánh dấu và disable những PQ đã dùng hoặc đang dùng
+            const quotationOptions = quotationsWithPOStatus.map((pq) => {
+                const pqId = pq.pqId || pq.pq_id;
+                const isCurrentlyUsed = pqId === currentPqId;
+                const isUsedInOtherPO = pq.hasActivePO && !isCurrentlyUsed;
+                const isDisabled = isCurrentlyUsed || isUsedInOtherPO;
 
-            setQuotationList(
-                availableQuotations.map((pq) => ({
-                    value: pq.pqId || pq.pq_id,
-                    label: `${pq.pqNo || pq.pq_no || "PQ"} - ${pq.vendorName || pq.vendor?.name || "N/A"} - ${formatCurrency(pq.totalAmount || 0)}`,
+                let labelSuffix = '';
+                if (isCurrentlyUsed) {
+                    labelSuffix = ' (Đang sử dụng)';
+                } else if (isUsedInOtherPO) {
+                    labelSuffix = ' (Đã sử dụng)';
+                }
+
+                return {
+                    value: pqId,
+                    label: `${pq.pqNo || pq.pq_no || "PQ"} - ${pq.vendorName || pq.vendor?.name || "N/A"} - ${formatCurrency(pq.totalAmount || 0)}${labelSuffix}`,
                     quotation: pq,
-                }))
-            );
+                    isDisabled: isDisabled
+                };
+            });
+
+            setQuotationList(quotationOptions);
         } catch (err) {
             console.error("Load quotation list error:", err);
             console.error("Error response:", err.response?.data);
@@ -623,11 +654,28 @@ export default function PurchaseOrderForm() {
                 return;
             }
 
-            // Get vendor and other info from quotation
-            const vendorId = data.vendorId;
-            const deliveryTerms = data.deliveryTerms || "";
-            const paymentTerms = data.paymentTerms || "";
-            const leadTimeDays = data.leadTimeDays || 0;
+            // Get vendor and other info from quotation - try both camelCase and snake_case
+            const vendorId = data.vendorId || data.vendor_id || data.vendor?.vendorId || data.vendor?.vendor_id || data.vendor?.id;
+            const deliveryTerms = data.deliveryTerms || data.delivery_terms || "";
+            const paymentTerms = data.paymentTerms || data.payment_terms || "";
+            const leadTimeDays = data.leadTimeDays || data.lead_time_days || 0;
+            
+            console.log("=== IMPORT FROM QUOTATION DEBUG ===");
+            console.log("Full PQ data:", JSON.stringify(data, null, 2));
+            console.log("Extracted values:", {
+                vendorId,
+                deliveryTerms,
+                paymentTerms,
+                leadTimeDays,
+                "raw_deliveryTerms": data.deliveryTerms,
+                "raw_delivery_terms": data.delivery_terms,
+                "raw_paymentTerms": data.paymentTerms,
+                "raw_payment_terms": data.payment_terms,
+                "raw_leadTimeDays": data.leadTimeDays,
+                "raw_lead_time_days": data.lead_time_days
+            });
+            console.log("Current vendors list length:", vendors.length);
+            console.log("First 3 vendors:", vendors.slice(0, 3));
             
             // Calculate delivery date based on leadTimeDays
             let deliveryDate = null;
@@ -696,41 +744,42 @@ export default function PurchaseOrderForm() {
                 return;
             }
 
-            // Check if vendor exists in vendors list
-            const vendorExists = vendors.find(v => 
-                v.value === vendorId || 
-                v.value == vendorId || // eslint-disable-line eqeqeq
-                Number(v.value) === Number(vendorId)
-            );
+            // Check if vendor exists - just log warning but continue
+            const vendorIdNum = Number(vendorId);
+            const vendorExists = vendors.find(v => Number(v.value) === vendorIdNum);
             
-            console.log("Vendor check:", {
-                vendorId,
-                vendorId_type: typeof vendorId,
-                vendorExists: vendorExists?.label,
-                total_vendors: vendors.length
-            });
-
             if (!vendorExists) {
-                console.error("Vendor not found in vendors list!", {
-                    looking_for: vendorId,
-                    available_vendors: vendors.map(v => ({ value: v.value, label: v.label }))
+                console.warn("⚠️ Vendor not found in current list, but will proceed with import:", {
+                    vendorId,
+                    vendorIdNum,
+                    total_vendors: vendors.length
                 });
-                toast.error("Không tìm thấy nhà cung cấp trong danh sách");
-                return;
+                // Still continue - form validation will catch if vendor is truly invalid
+            } else {
+                console.log("✅ Vendor found:", vendorExists.label);
             }
 
             // Update formData with ALL information from quotation
-            setFormData((prev) => ({ 
-                ...prev, 
+            const updatedFormData = { 
+                ...formData, 
                 vendor_id: vendorId,
                 pq_id: selectedQuotation.value,
-                payment_terms: paymentTerms || prev.payment_terms,
-                delivery_date: deliveryDate || prev.delivery_date,
-                shipping_address: deliveryTerms || prev.shipping_address,
+                payment_terms: paymentTerms || "",
+                delivery_date: deliveryDate || "",
+                shipping_address: deliveryTerms || "",
                 items: mapped 
-            }));
+            };
             
-            console.log("FormData updated - vendor_id:", vendorId, "delivery_date:", deliveryDate, "items:", mapped.length);
+            console.log("✅ Setting form data with PQ info:", {
+                vendor_id: vendorId,
+                payment_terms: paymentTerms,
+                delivery_date: deliveryDate,
+                shipping_address: deliveryTerms,
+                items_count: mapped.length
+            });
+            
+            setFormData(updatedFormData);
+            setIsImportedFromPQ(true); // Mark as imported from PQ
             
             setShowImportModal(false);
             setSelectedQuotation(null);
@@ -984,13 +1033,15 @@ export default function PurchaseOrderForm() {
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
                                     <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={addItem}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                                        >
-                                            Thêm sản phẩm
-                                        </button>
+                                        {!isImportedFromPQ && (
+                                            <button
+                                                type="button"
+                                                onClick={addItem}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                                            >
+                                                Thêm sản phẩm
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={openImportModal}
@@ -1000,6 +1051,14 @@ export default function PurchaseOrderForm() {
                                         </button>
                                     </div>
                                 </div>
+                                
+                                {isImportedFromPQ && (
+                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <p className="text-sm text-blue-800">
+                                            ℹ️ Danh sách sản phẩm đã được nhập từ báo giá. Chỉ có thể import lại từ báo giá khác hoặc chỉnh sửa thông tin hiện tại.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {validationErrors.items && (
                                     <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
@@ -1015,7 +1074,8 @@ export default function PurchaseOrderForm() {
                                             <thead>
                                             <tr className="bg-gray-50">
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">#</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Mã SP</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Tên sản phẩm</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">ĐVT</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
@@ -1027,22 +1087,43 @@ export default function PurchaseOrderForm() {
                                             <tbody>
                                             {formData.items.map((item, index) => {
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
+                                                const selectedProduct = products.find((o) => o.value === item.product_id);
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
                                                         <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">{index + 1}</td>
                                                         <td className="border border-gray-200 px-4 py-2">
-                                                            <Select
-                                                                value={products.find((o) => o.value === item.product_id) || null}
-                                                                onChange={(opt) => handleProductSelect(index, opt)}
-                                                                options={products}
-                                                                placeholder="Chọn sản phẩm"
-                                                                menuPortalTarget={document.body}
-                                                                menuPosition="fixed"
-                                                                styles={{
-                                                                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                                                    menu: (base) => ({ ...base, zIndex: 9999 }),
-                                                                }}
+                                                            <input
+                                                                type="text"
+                                                                value={item.productCode || selectedProduct?.product?.sku || selectedProduct?.product?.productCode || ''}
+                                                                readOnly
+                                                                className="w-28 px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
+                                                                placeholder="Mã SP"
                                                             />
+                                                        </td>
+                                                        <td className="border border-gray-200 px-4 py-2">
+                                                            {item.productName && item.product_id ? (
+                                                                // Show read-only name if imported from PQ with productName
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.productName}
+                                                                    readOnly
+                                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
+                                                                />
+                                                            ) : (
+                                                                // Show Select dropdown for manual selection
+                                                                <Select
+                                                                    value={selectedProduct || null}
+                                                                    onChange={(opt) => handleProductSelect(index, opt)}
+                                                                    options={products}
+                                                                    placeholder="Chọn sản phẩm"
+                                                                    menuPortalTarget={document.body}
+                                                                    menuPosition="fixed"
+                                                                    styles={{
+                                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                                    }}
+                                                                />
+                                                            )}
                                                             {itemErr.productName && (
                                                                 <p className="text-red-500 text-xs mt-1">{itemErr.productName}</p>
                                                             )}
@@ -1186,6 +1267,15 @@ export default function PurchaseOrderForm() {
                                 options={quotationList}
                                 placeholder="Chọn báo giá"
                                 classNamePrefix="react-select"
+                                isOptionDisabled={(option) => option.isDisabled}
+                                styles={{
+                                    option: (provided, state) => ({
+                                        ...provided,
+                                        color: state.isDisabled ? '#9ca3af' : provided.color,
+                                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                        fontStyle: state.isDisabled ? 'italic' : 'normal'
+                                    })
+                                }}
                             />
                         </div>
                         <div className="flex items-center justify-end gap-3">
