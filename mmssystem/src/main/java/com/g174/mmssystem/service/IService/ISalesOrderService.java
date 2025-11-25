@@ -20,6 +20,8 @@ public interface ISalesOrderService {
 
     SalesOrderResponseDTO changeStatus(Integer id, String status, String approvalStatus);
 
+    SalesOrderResponseDTO changeApprovalStatus(Integer id, String approvalStatus);
+
     SalesOrderResponseDTO createFromQuotation(Integer quotationId);
 }
 

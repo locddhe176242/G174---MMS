@@ -740,24 +740,30 @@ CREATE TABLE Deliveries (
     delivery_id INT AUTO_INCREMENT PRIMARY KEY,
     delivery_no VARCHAR(30) UNIQUE NOT NULL,
     so_id INT NOT NULL,
-    delivery_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     warehouse_id INT NOT NULL,
-    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    planned_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actual_date DATETIME NULL,
+    shipping_address TEXT,
+    carrier_name VARCHAR(150),
+    driver_name VARCHAR(150),
+    driver_phone VARCHAR(50),
+    tracking_code VARCHAR(100),
+    status ENUM('Draft', 'Picked', 'Shipped', 'Delivered', 'Cancelled') DEFAULT 'Draft',
     created_by INT,
-    approved_by INT,
-    approved_at DATETIME,
-    notes TEXT,
+    updated_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
+    notes TEXT,
     FOREIGN KEY (so_id) REFERENCES Sales_Orders(so_id) ON DELETE CASCADE,
     FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
     FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_del_no (delivery_no),
     INDEX idx_del_status (status, deleted_at),
     INDEX idx_del_so (so_id),
-    INDEX idx_del_warehouse (warehouse_id)
+    INDEX idx_del_warehouse (warehouse_id),
+    INDEX idx_del_tracking (tracking_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Delivery_Items (
@@ -765,13 +771,19 @@ CREATE TABLE Delivery_Items (
     delivery_id INT NOT NULL,
     soi_id INT NOT NULL,
     product_id INT NOT NULL,
-    issued_qty DECIMAL(18, 2) NOT NULL,
+    warehouse_id INT,
+    ordered_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    planned_qty DECIMAL(18, 2) NOT NULL,
+    delivered_qty DECIMAL(18, 2) DEFAULT 0,
+    uom VARCHAR(50),
     note TEXT,
     FOREIGN KEY (delivery_id) REFERENCES Deliveries(delivery_id) ON DELETE CASCADE,
     FOREIGN KEY (soi_id) REFERENCES Sales_Order_Items(soi_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE SET NULL,
     INDEX idx_di_delivery (delivery_id),
-    INDEX idx_di_product (product_id)
+    INDEX idx_di_product (product_id),
+    INDEX idx_di_soi (soi_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE AR_Invoices (

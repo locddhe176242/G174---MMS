@@ -135,12 +135,24 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             if (newApproval == SalesOrder.ApprovalStatus.Approved) {
                 order.setApprovedAt(Instant.now());
                 order.setApprover(getCurrentUser());
+                // Tự động cập nhật status từ Pending sang Approved khi phê duyệt
+                if (order.getStatus() == SalesOrder.OrderStatus.Pending) {
+                    order.setStatus(SalesOrder.OrderStatus.Approved);
+                }
+            } else if (newApproval == SalesOrder.ApprovalStatus.Rejected) {
+                // Tự động chuyển status sang Cancelled khi từ chối
+                order.setStatus(SalesOrder.OrderStatus.Cancelled);
             }
         }
 
         SalesOrder saved = salesOrderRepository.save(order);
         List<SalesOrderItem> items = salesOrderItemRepository.findBySalesOrder_SoId(id);
         return salesOrderMapper.toResponse(saved, items);
+    }
+
+    @Override
+    public SalesOrderResponseDTO changeApprovalStatus(Integer id, String approvalStatus) {
+        return changeStatus(id, null, approvalStatus);
     }
 
     @Override

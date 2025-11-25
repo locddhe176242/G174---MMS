@@ -133,19 +133,32 @@ public class WarehouseStockServiceImpl implements IWarehouseStockService {
 
         WarehouseStock stock = warehouseStockRepository
                 .findByWarehouseIdAndProductId(warehouseId, productId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Stock not found for warehouse ID: " + warehouseId + " and product ID: " + productId));
+                .orElseGet(() -> {
+                    // Tạo mới nếu chưa có (giống increaseStock)
+                    Warehouse warehouse = warehouseRepository.findById(warehouseId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + warehouseId));
+                    Product product = productRepository.findById(productId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+                    WarehouseStock newStock = new WarehouseStock();
+                    newStock.setWarehouseId(warehouseId);
+                    newStock.setProductId(productId);
+                    newStock.setWarehouse(warehouse);
+                    newStock.setProduct(product);
+                    newStock.setQuantity(BigDecimal.ZERO);
+                    return newStock;
+                });
 
         BigDecimal newQuantity = stock.getQuantity().subtract(quantity);
         if (newQuantity.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException(
-                    "Insufficient stock. Available: " + stock.getQuantity() + ", Requested: " + quantity);
+                    "Không đủ số lượng trong kho. Số lượng hiện có: " + stock.getQuantity() + ", Yêu cầu: " + quantity);
         }
 
         stock.setQuantity(newQuantity);
         WarehouseStock saved = warehouseStockRepository.save(stock);
-        log.info("Decreased stock for warehouse ID: {} and product ID: {} by quantity: {}", 
-                warehouseId, productId, quantity);
+        log.info("Đã trừ {} sản phẩm ID {} ra khỏi kho ID {}. Số lượng còn lại: {}", 
+                quantity, productId, warehouseId, newQuantity);
         return convertToDTO(saved);
     }
 

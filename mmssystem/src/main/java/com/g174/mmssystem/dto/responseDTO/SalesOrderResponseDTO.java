@@ -27,6 +27,8 @@ public class SalesOrderResponseDTO {
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private String notes;
+    private String approverName;
+    private Instant approvedAt;
     private Instant createdAt;
     private String createdBy;
     private Instant updatedAt;

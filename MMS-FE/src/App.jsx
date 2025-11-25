@@ -33,6 +33,9 @@ import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuo
 import SalesOrderList from "./compnents/pages/Sale/SalesOrder/SalesOrderList.jsx";
 import SalesOrderForm from "./compnents/pages/Sale/SalesOrder/SalesOrderForm.jsx";
 import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail.jsx";
+import DeliveryList from "./compnents/pages/Sale/Delivery/DeliveryList.jsx";
+import DeliveryForm from "./compnents/pages/Sale/Delivery/DeliveryForm.jsx";
+import DeliveryDetail from "./compnents/pages/Sale/Delivery/DeliveryDetail.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
@@ -90,6 +93,10 @@ function App() {
                 <Route path="/sales/orders/new" element={<SalesOrderForm />} />
                 <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
                 <Route path="/sales/orders/:id/edit" element={<SalesOrderForm />} />
+                <Route path="/sales/deliveries" element={<DeliveryList />} />
+                <Route path="/sales/deliveries/new" element={<DeliveryForm />} />
+                <Route path="/sales/deliveries/:id" element={<DeliveryDetail />} />
+                <Route path="/sales/deliveries/:id/edit" element={<DeliveryForm />} />
                 <Route path="/approvals" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />

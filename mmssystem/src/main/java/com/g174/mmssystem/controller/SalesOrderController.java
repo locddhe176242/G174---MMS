@@ -77,6 +77,14 @@ public class SalesOrderController {
         return ResponseEntity.ok(salesOrderService.changeStatus(id, status, approvalStatus));
     }
 
+    @PatchMapping("/{id}/approval-status")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<SalesOrderResponseDTO> changeApprovalStatus(
+            @PathVariable Integer id,
+            @RequestParam String approvalStatus) {
+        return ResponseEntity.ok(salesOrderService.changeApprovalStatus(id, approvalStatus));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {

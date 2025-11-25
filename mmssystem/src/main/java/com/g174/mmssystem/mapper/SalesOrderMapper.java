@@ -64,6 +64,8 @@ public class SalesOrderMapper {
                 .orderNo(order.getSoNo())
                 .status(order.getStatus())
                 .approvalStatus(order.getApprovalStatus())
+                .approverName(order.getApprover() != null ? order.getApprover().getEmail() : null)
+                .approvedAt(order.getApprovedAt())
                 .customerId(order.getCustomer() != null ? order.getCustomer().getCustomerId() : null)
                 .customerName(order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null)
                 .customerCode(order.getCustomer() != null ? order.getCustomer().getCustomerCode() : null)
