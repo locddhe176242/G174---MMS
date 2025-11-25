@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.SalesQuotationRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.SalesQuotationListResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.SalesQuotationResponseDTO;
@@ -13,6 +14,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/sales/quotations")
@@ -44,6 +47,15 @@ public class SalesQuotationController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    public ResponseEntity<List<SalesQuotationListResponseDTO>> getAllQuotations(
+            @RequestParam(required = false) Integer customerId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(salesQuotationService.getAllQuotations(customerId, status, keyword));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
     public ResponseEntity<SalesQuotationResponseDTO> getQuotation(@PathVariable Integer id) {
@@ -52,6 +64,12 @@ public class SalesQuotationController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "CREATE_SALES_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Tạo báo giá mới cho khách hàng ID: #{#request.customerId}",
+            entityId = "#{#result.body.quotationId}"
+    )
     public ResponseEntity<SalesQuotationResponseDTO> createQuotation(
             @Valid @RequestBody SalesQuotationRequestDTO request) {
         return ResponseEntity.ok(salesQuotationService.createQuotation(request));
@@ -59,6 +77,12 @@ public class SalesQuotationController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "UPDATE_SALES_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Cập nhật báo giá ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<SalesQuotationResponseDTO> updateQuotation(
             @PathVariable Integer id,
             @Valid @RequestBody SalesQuotationRequestDTO request) {
@@ -67,6 +91,12 @@ public class SalesQuotationController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "CHANGE_SALES_QUOTATION_STATUS",
+            activityType = "SALES_MANAGEMENT",
+            description = "Đổi trạng thái báo giá ID: #{#id} sang #{#status}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<SalesQuotationResponseDTO> changeStatus(
             @PathVariable Integer id,
             @RequestParam String status) {
@@ -75,6 +105,12 @@ public class SalesQuotationController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
+    @LogActivity(
+            action = "DELETE_SALES_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Xóa báo giá ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<Void> deleteQuotation(@PathVariable Integer id) {
         salesQuotationService.deleteQuotation(id);
         return ResponseEntity.noContent().build();

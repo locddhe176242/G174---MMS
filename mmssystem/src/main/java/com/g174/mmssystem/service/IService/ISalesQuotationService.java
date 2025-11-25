@@ -6,6 +6,8 @@ import com.g174.mmssystem.dto.responseDTO.SalesQuotationResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 public interface ISalesQuotationService {
 
     SalesQuotationResponseDTO createQuotation(SalesQuotationRequestDTO request);
@@ -15,6 +17,8 @@ public interface ISalesQuotationService {
     SalesQuotationResponseDTO getQuotation(Integer id);
 
     Page<SalesQuotationListResponseDTO> getQuotations(Integer customerId, String status, String keyword, Pageable pageable);
+
+    List<SalesQuotationListResponseDTO> getAllQuotations(Integer customerId, String status, String keyword);
 
     void deleteQuotation(Integer id);
 

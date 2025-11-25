@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { salesQuotationService } from "../../../../api/salesQuotationService";
+import Pagination from "../../../common/Pagination";
 
 const STATUS_LABELS = {
   Draft: "Nháp",
@@ -28,41 +29,23 @@ const formatDateTime = (value) =>
 
 export default function SalesQuotationList() {
   const navigate = useNavigate();
-  const [data, setData] = useState({
-    content: [],
-    totalPages: 0,
-    totalElements: 0,
-    number: 0,
-    size: 10,
-  });
+  const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    keyword: "",
-    status: "",
-    page: 0,
-    size: 10,
-    sortBy: "quotationDate",
-    sortDir: "desc",
-  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState("quotationDate");
+  const [sortDir, setSortDir] = useState("desc");
 
-  const fetchData = async () => {
+  const fetchAllQuotations = async () => {
     try {
       setLoading(true);
-      const response = await salesQuotationService.getQuotations({
-        keyword: filters.keyword || undefined,
-        status: filters.status || undefined,
-        page: filters.page,
-        size: filters.size,
-        sortBy: filters.sortBy,
-        sortDir: filters.sortDir,
-      });
-      setData({
-        content: response.content || [],
-        totalPages: response.totalPages || 0,
-        totalElements: response.totalElements || 0,
-        number: response.number || 0,
-        size: response.size || filters.size,
-      });
+      const response = await salesQuotationService.getAllQuotations();
+      const list = Array.isArray(response)
+        ? response
+        : response?.content || response?.data || [];
+      setQuotations(list);
     } catch (error) {
       console.error("Error fetching quotations:", error);
       toast.error("Không thể tải danh sách báo giá");
@@ -72,14 +55,69 @@ export default function SalesQuotationList() {
   };
 
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.page, filters.size, filters.sortBy, filters.sortDir]);
+    fetchAllQuotations();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return quotations.filter((quotation) => {
+      const matchesKeyword =
+        !term ||
+        (quotation.quotationNo || "")
+          .toLowerCase()
+          .includes(term) ||
+        (quotation.customerName || "")
+          .toLowerCase()
+          .includes(term);
+      const matchesStatus =
+        !statusFilter || quotation.status === statusFilter;
+      return matchesKeyword && matchesStatus;
+    });
+  }, [quotations, searchTerm, statusFilter]);
+
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    const direction = sortDir === "asc" ? 1 : -1;
+
+    return list.sort((a, b) => {
+      const valueA = a?.[sortField];
+      const valueB = b?.[sortField];
+
+      if (valueA === valueB) return 0;
+
+      if (sortField === "quotationDate" || sortField === "validUntil") {
+        return (
+          (new Date(valueA || 0) - new Date(valueB || 0)) * direction
+        );
+      }
+
+      if (
+        typeof valueA === "number" ||
+        typeof valueB === "number" ||
+        sortField === "totalAmount"
+      ) {
+        return (Number(valueA || 0) - Number(valueB || 0)) * direction;
+      }
+
+      return valueA
+        ?.toString()
+        .localeCompare(valueB?.toString() || "", "vi", {
+          sensitivity: "base",
+          numeric: true,
+        }) * direction;
+    });
+  }, [filtered, sortField, sortDir]);
+
+  const paginated = useMemo(() => {
+    const start = currentPage * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setFilters((prev) => ({ ...prev, page: 0 }));
-    fetchData();
+    setCurrentPage(0);
   };
 
   const handleDelete = async (id) => {
@@ -87,31 +125,27 @@ export default function SalesQuotationList() {
     try {
       await salesQuotationService.deleteQuotation(id);
       toast.success("Đã xóa báo giá");
-      fetchData();
+      fetchAllQuotations();
     } catch (error) {
       console.error(error);
       toast.error("Không thể xóa báo giá");
     }
   };
 
-  const changePage = (page) => {
-    setFilters((prev) => ({ ...prev, page }));
-  };
-
   const changeSort = (field) => {
-    setFilters((prev) => {
-      if (prev.sortBy === field) {
-        return { ...prev, sortDir: prev.sortDir === "asc" ? "desc" : "asc" };
-      }
-      return { ...prev, sortBy: field, sortDir: "asc" };
-    });
+    if (sortField === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
   };
 
   const getSortIcon = (field) => {
-    if (filters.sortBy !== field) {
+    if (sortField !== field) {
       return <span className="text-gray-300">↕</span>;
     }
-    return filters.sortDir === "asc" ? (
+    return sortDir === "asc" ? (
       <span className="text-blue-600">↑</span>
     ) : (
       <span className="text-blue-600">↓</span>
@@ -149,21 +183,19 @@ export default function SalesQuotationList() {
               <input
                 type="text"
                 placeholder="Tìm theo số báo giá, khách hàng..."
-                value={filters.keyword}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, keyword: e.target.value }))
-                }
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(0);
+                }}
                 className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
               />
               <select
-                value={filters.status}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: e.target.value,
-                    page: 0,
-                  }))
-                }
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(0);
+                }}
                 className="px-3 py-2 border rounded-lg"
               >
                 {STATUS_OPTIONS.map((opt) => (
@@ -186,7 +218,7 @@ export default function SalesQuotationList() {
               <div className="py-12 text-center text-gray-500">
                 Đang tải dữ liệu...
               </div>
-            ) : data.content.length === 0 ? (
+            ) : sorted.length === 0 ? (
               <div className="py-12 text-center text-gray-500">
                 Không có báo giá nào
               </div>
@@ -239,7 +271,7 @@ export default function SalesQuotationList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {data.content.map((quotation) => (
+              {paginated.map((quotation) => (
                     <tr key={quotation.quotationId} className="hover:bg-gray-50">
                       <td className="px-6 py-3 font-semibold text-sm text-gray-900">
                         {quotation.quotationNo}
@@ -310,28 +342,18 @@ export default function SalesQuotationList() {
             )}
           </div>
 
-          {data.totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Trang {data.number + 1} / {data.totalPages}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => changePage(filters.page - 1)}
-                  disabled={filters.page === 0}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
-                >
-                  Trước
-                </button>
-                <button
-                  onClick={() => changePage(filters.page + 1)}
-                  disabled={filters.page >= data.totalPages - 1}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
-                >
-                  Sau
-                </button>
-              </div>
-            </div>
+          {sorted.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalElements={sorted.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(0);
+              }}
+            />
           )}
         </div>
       </div>

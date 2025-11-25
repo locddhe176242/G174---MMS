@@ -8,6 +8,11 @@ export const salesQuotationService = {
     return response.data;
   },
 
+  getAllQuotations: async (params = {}) => {
+    const response = await apiClient.get(`${BASE_PATH}/all`, { params });
+    return response.data;
+  },
+
   getQuotationById: async (id) => {
     const response = await apiClient.get(`${BASE_PATH}/${id}`);
     return response.data;

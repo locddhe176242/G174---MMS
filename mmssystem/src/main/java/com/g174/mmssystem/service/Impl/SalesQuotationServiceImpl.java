@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -123,6 +124,20 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
 
         Page<SalesQuotation> page = quotationRepository.findAll(spec, pageable);
         return page.map(quotationMapper::toListResponseDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SalesQuotationListResponseDTO> getAllQuotations(Integer customerId, String status, String keyword) {
+        Specification<SalesQuotation> spec = Specification.where(SalesQuotationSpecifications.notDeleted())
+                .and(SalesQuotationSpecifications.hasCustomer(customerId))
+                .and(SalesQuotationSpecifications.hasStatus(parseStatus(status)))
+                .and(SalesQuotationSpecifications.keywordLike(keyword));
+
+        List<SalesQuotation> quotations = quotationRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "quotationDate"));
+        return quotations.stream()
+                .map(quotationMapper::toListResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
