@@ -10,6 +10,7 @@ import com.g174.mmssystem.repository.ProductCategoryRepository;
 import com.g174.mmssystem.repository.ProductRepository;
 import com.g174.mmssystem.repository.UserRepository;
 import com.g174.mmssystem.service.IService.IProductService;
+import com.g174.mmssystem.service.IService.IWarehouseStockService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,21 +33,31 @@ public class ProductServiceImpl implements IProductService {
     private final ProductCategoryRepository productCategoryRepository;
     private final UserRepository userRepository;
     private final ProductMapper productMapper;
+    private final IWarehouseStockService warehouseStockService;
 
     public ProductServiceImpl(ProductRepository productRepository,
                               ProductCategoryRepository productCategoryRepository,
                               UserRepository userRepository,
-                              ProductMapper productMapper) {
+                              ProductMapper productMapper,
+                              IWarehouseStockService warehouseStockService) {
         this.productRepository = productRepository;
         this.productCategoryRepository = productCategoryRepository;
         this.userRepository = userRepository;
         this.productMapper = productMapper;
+        this.warehouseStockService = warehouseStockService;
     }
 
     @Override
     public List<ProductResponseDTO> getProducts() {
         List<Product> products = productRepository.findAllActiveOrderByCreatedAt();
-        return productMapper.toResponseDTOList(products);
+        List<ProductResponseDTO> dtos = productMapper.toResponseDTOList(products);
+        // Tính totalQuantity từ Warehouse_Stock
+        dtos.forEach(dto -> {
+            if (dto.getProductId() != null) {
+                dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(dto.getProductId()));
+            }
+        });
+        return dtos;
     }
 
     @Override
@@ -55,13 +66,27 @@ public class ProductServiceImpl implements IProductService {
             return getProducts();
         }
         List<Product> products = productRepository.searchActiveProducts(keyword.trim());
-        return productMapper.toResponseDTOList(products);
+        List<ProductResponseDTO> dtos = productMapper.toResponseDTOList(products);
+        // Tính totalQuantity từ Warehouse_Stock
+        dtos.forEach(dto -> {
+            if (dto.getProductId() != null) {
+                dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(dto.getProductId()));
+            }
+        });
+        return dtos;
     }
 
     @Override
     public List<ProductResponseDTO> getDeletedProducts() {
         List<Product> products = productRepository.findAllDeletedOrderByCreatedAt();
-        return productMapper.toResponseDTOList(products);
+        List<ProductResponseDTO> dtos = productMapper.toResponseDTOList(products);
+        // Tính totalQuantity từ Warehouse_Stock
+        dtos.forEach(dto -> {
+            if (dto.getProductId() != null) {
+                dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(dto.getProductId()));
+            }
+        });
+        return dtos;
     }
 
     @Override
@@ -73,7 +98,10 @@ public class ProductServiceImpl implements IProductService {
             throw new RuntimeException("Sản phẩm đã bị xóa");
         }
 
-        return productMapper.toResponseDTO(product);
+        ProductResponseDTO dto = productMapper.toResponseDTO(product);
+        // Tính totalQuantity từ Warehouse_Stock
+        dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(id));
+        return dto;
     }
 
     @Override
@@ -89,7 +117,10 @@ public class ProductServiceImpl implements IProductService {
         User user = getCurrentUser();
         Product product = productMapper.toEntity(request, category, user);
         Product savedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(savedProduct);
+        ProductResponseDTO dto = productMapper.toResponseDTO(savedProduct);
+        // Tính totalQuantity từ Warehouse_Stock (sẽ là 0 vì sản phẩm mới)
+        dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(savedProduct.getProductId()));
+        return dto;
     }
 
     @Override
@@ -120,7 +151,10 @@ public class ProductServiceImpl implements IProductService {
         User user = getCurrentUser();
         productMapper.updateEntityFromDTO(product, request, category, user);
         Product updatedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(updatedProduct);
+        ProductResponseDTO dto = productMapper.toResponseDTO(updatedProduct);
+        // Tính totalQuantity từ Warehouse_Stock
+        dto.setTotalQuantity(warehouseStockService.getTotalQuantityByProductId(id));
+        return dto;
     }
 
     @Override
