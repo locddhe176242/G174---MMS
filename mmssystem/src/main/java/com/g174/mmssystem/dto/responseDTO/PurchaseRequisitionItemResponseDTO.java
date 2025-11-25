@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class PurchaseRequisitionItemResponseDTO {
-    private Long priId;
+    private Integer priId;
     private Long productId;
     private String productName;
     private BigDecimal requestedQty;
