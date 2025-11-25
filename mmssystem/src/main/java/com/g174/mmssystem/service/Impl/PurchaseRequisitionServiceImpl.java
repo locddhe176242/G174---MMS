@@ -10,6 +10,7 @@ import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.PurchaseRequisitionMapper;
 import com.g174.mmssystem.repository.PurchaseRequisitionRepository;
 import com.g174.mmssystem.repository.UserRepository;
+import com.g174.mmssystem.service.IService.IPurchaseRequisitionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -131,7 +133,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     }
 
     @Override
-    public PurchaseRequisitionResponseDTO getRequisitionById(Long requisitionId) {
+    public PurchaseRequisitionResponseDTO getRequisitionById(Integer requisitionId) {
         log.info("Lấy purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findByIdWithRelations(requisitionId)
@@ -186,7 +188,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO updateRequisition(Long requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById) {
+    public PurchaseRequisitionResponseDTO updateRequisition(Integer requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById) {
         log.info("Cập nhật purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
@@ -290,7 +292,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO approveRequisition(Long requisitionId, Integer approverId) {
+    public PurchaseRequisitionResponseDTO approveRequisition(Integer requisitionId, Integer approverId) {
         log.info("Approve purchase requisition ID: {} bởi approver ID: {}", requisitionId, approverId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
@@ -322,7 +324,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO rejectRequisition(Long requisitionId, Integer approverId, String reason) {
+    public PurchaseRequisitionResponseDTO rejectRequisition(Integer requisitionId, Integer approverId, String reason) {
         log.info("Reject purchase requisition ID: {} bởi approver ID: {} với lý do: {}", requisitionId, approverId, reason);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
@@ -354,7 +356,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO closeRequisition(Long requisitionId) {
+    public PurchaseRequisitionResponseDTO closeRequisition(Integer requisitionId) {
         log.info("Đóng purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
@@ -381,7 +383,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO restoreRequisition(Long requisitionId) {
+    public PurchaseRequisitionResponseDTO restoreRequisition(Integer requisitionId) {
         log.info("Khôi phục purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
@@ -406,7 +408,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO deleteRequisition(Long requisitionId) {
+    public PurchaseRequisitionResponseDTO deleteRequisition(Integer requisitionId) {
         log.info("Xóa purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)

@@ -21,7 +21,7 @@ public class PurchaseRequisition {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "requisition_id")
-    private Long requisitionId;
+    private Integer requisitionId;
 
     @Column(name = "requisition_no", length = 30, unique = true, nullable = false)
     private String requisitionNo;
