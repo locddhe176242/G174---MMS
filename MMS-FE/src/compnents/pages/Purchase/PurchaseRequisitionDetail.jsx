@@ -108,17 +108,17 @@ export default function PurchaseRequisitionDetail() {
      * @returns {JSX.Element} Badge component
      */
     const getStatusBadge = (status) => {
-        const map = {
-            Open: "bg-blue-100 text-blue-800",
-            Closed: "bg-gray-100 text-gray-800",
-            Converted: "bg-green-100 text-green-800",
-            Cancelled: "bg-red-100 text-red-800",
+        const statusMap = {
+            Open: { label: "Đang mở", color: "bg-blue-100 text-blue-800" },
+            Closed: { label: "Đã đóng", color: "bg-gray-100 text-gray-800" },
+            Converted: { label: "Đã chuyển đổi", color: "bg-green-100 text-green-800" },
+            Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
         };
 
-        const color = map[status] || "bg-gray-100 text-gray-800";
+        const statusInfo = statusMap[status] || { label: status || "Đang mở", color: "bg-gray-100 text-gray-800" };
         return (
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}>
-        {status || "Open"}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
+        {statusInfo.label}
       </span>
         );
     };
@@ -130,18 +130,18 @@ export default function PurchaseRequisitionDetail() {
      * @returns {JSX.Element} Badge component
      */
     const getApprovalStatusBadge = (approvalStatus) => {
-        const map = {
-            Draft: "bg-gray-100 text-gray-800",
-            Pending: "bg-yellow-100 text-yellow-800",
-            Approved: "bg-green-100 text-green-800",
-            Rejected: "bg-red-100 text-red-800",
-            Cancelled: "bg-red-100 text-red-800",
+        const statusMap = {
+            Draft: { label: "Bản nháp", color: "bg-gray-100 text-gray-800" },
+            Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
+            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
+            Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
+            Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
         };
 
-        const color = map[approvalStatus] || "bg-gray-100 text-gray-800";
+        const status = statusMap[approvalStatus] || { label: approvalStatus || "Bản nháp", color: "bg-gray-100 text-gray-800" };
         return (
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}>
-        {approvalStatus || "Draft"}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
+        {status.label}
       </span>
         );
     };

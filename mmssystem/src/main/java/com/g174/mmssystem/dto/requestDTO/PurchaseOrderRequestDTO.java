@@ -39,6 +39,8 @@ public class PurchaseOrderRequestDTO {
 
     private String shippingAddress;
 
+    private BigDecimal headerDiscount;
+
     private BigDecimal totalBeforeTax;
 
     private BigDecimal taxAmount;

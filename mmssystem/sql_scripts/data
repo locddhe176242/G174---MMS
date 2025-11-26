@@ -162,48 +162,23 @@ INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
 INSERT INTO user_permissions (user_id, permission_id, expires_at) VALUES
 (2, 20, NULL); -- sales.approve, permanent
 
+-- ==================== 12. ADDITIONAL MENU ITEMS ====================
+-- Thêm menu Quản lý Phòng ban
 INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
-VALUES
-('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
+VALUES ('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 103)
+ON DUPLICATE KEY UPDATE
+  menu_label = VALUES(menu_label),
+  menu_path = VALUES(menu_path),
+  menu_icon = VALUES(menu_icon),
+  display_order = VALUES(display_order);
 
--- Bước 1: Kiểm tra role MANAGER có tồn tại không
-SELECT 'Kiểm tra role MANAGER:' as status;
-SELECT role_id, role_name FROM roles WHERE role_name = 'MANAGER';
+-- Lấy menu_id của Department Management
+SET @dept_menu_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'admin.departments');
 
--- Bước 2: Thêm menu item cho Department Management
-INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order)
-VALUES
-('admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 6);
-
--- Bước 3: Lấy menu_id vừa tạo
-SET @menu_id = LAST_INSERT_ID();
-SELECT CONCAT('Menu ID vừa tạo: ', @menu_id) as status;
-
--- Bước 4: Kiểm tra menu đã được tạo
-SELECT 'Menu item đã được thêm:' as status;
-SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
-
--- Bước 5: Gán cho role MANAGER (chỉ nếu cả hai đều tồn tại)
+-- Gán cho role MANAGER
 INSERT INTO role_menus (role_id, menu_id)
-SELECT r.role_id, @menu_id
-FROM roles r
-WHERE r.role_name = 'MANAGER'
-AND @menu_id IS NOT NULL
-AND NOT EXISTS (
-    SELECT 1 FROM role_menus rm
-    WHERE rm.role_id = r.role_id AND rm.menu_id = @menu_id
-);
-
--- Kiểm tra kết quả
-SELECT 'Menu item đã được thêm:' as status;
-SELECT * FROM menu_items WHERE menu_key = 'admin.departments';
-
-SELECT 'Role-Menu mapping:' as status;
-SELECT rm.role_id, r.role_name, rm.menu_id, mi.menu_label
-FROM role_menus rm
-JOIN roles r ON rm.role_id = r.role_id
-JOIN menu_items mi ON rm.menu_id = mi.menu_id
-WHERE mi.menu_key = 'admin.departments';
+VALUES (1, @dept_menu_id)
+ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
 
 -- Thêm các menu items con cho "Nhập hàng"
 INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
@@ -211,7 +186,8 @@ INSERT INTO menu_items (menu_key, menu_label, menu_path, menu_icon, display_orde
 ('rfq', 'Yêu cầu báo giá', '/purchase/rfqs', 'quote', 18),
 ('purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 19),
 ('purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 20),
-('goods-receipt', 'Phiếu nhập kho', '/purchase/goods-receipts', 'receipt', 21)
+('goods-receipt', 'Phiếu nhập kho', '/purchase/goods-receipts', 'receipt', 21),
+('ap-invoices', 'Hóa đơn phải trả', '/purchase/ap-invoices', 'accounting', 22)
 ON DUPLICATE KEY UPDATE
   menu_label = VALUES(menu_label),
   menu_path = VALUES(menu_path),
@@ -224,6 +200,7 @@ SET @rfq_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'rfq');
 SET @pq_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'purchase-quotation');
 SET @po_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'purchase-order');
 SET @gr_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'goods-receipt');
+SET @ap_invoice_id = (SELECT menu_id FROM menu_items WHERE menu_key = 'ap-invoices');
 
 -- Gán các menu items này cho role PURCHASE (role_id = 3)
 INSERT INTO role_menus (role_id, menu_id) VALUES
@@ -231,7 +208,8 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (3, @rfq_id),
 (3, @pq_id),
 (3, @po_id),
-(3, @gr_id)
+(3, @gr_id),
+(3, @ap_invoice_id)
 ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
 
 -- Gán các menu items này cho role MANAGER (role_id = 1) - Manager có tất cả
@@ -240,10 +218,16 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (1, @rfq_id),
 (1, @pq_id),
 (1, @po_id),
-(1, @gr_id)
+(1, @gr_id),
+(1, @ap_invoice_id)
 ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
 
 -- Gán các menu items này cho role WAREHOUSE (role_id = 5) - Warehouse cần xem Goods Receipt
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, @gr_id)
+ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
+
+-- Gán menu AP Invoices cho role ACCOUNTING (role_id = 4)
+INSERT INTO role_menus (role_id, menu_id) VALUES
+(4, @ap_invoice_id)
 ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);

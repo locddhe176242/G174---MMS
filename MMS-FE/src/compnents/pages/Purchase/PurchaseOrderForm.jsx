@@ -26,6 +26,7 @@ export default function PurchaseOrderForm() {
         payment_terms: "",
         delivery_date: null,
         shipping_address: "",
+        header_discount: 0,
         items: [
             {
                 product_id: null,
@@ -34,6 +35,7 @@ export default function PurchaseOrderForm() {
                 uom: "",
                 quantity: 1,
                 unit_price: 0,
+                discount_percent: 0,
                 tax_rate: 0,
                 tax_amount: 0,
                 line_total: 0,
@@ -98,9 +100,14 @@ export default function PurchaseOrderForm() {
         }, 0);
     }, [formData.items]);
 
+    const headerDiscountAmount = useMemo(() => {
+        const discountPercent = Number(formData.header_discount || 0);
+        return (totalBeforeTax + totalTax) * (discountPercent / 100);
+    }, [totalBeforeTax, totalTax, formData.header_discount]);
+
     const totalAfterTax = useMemo(() => {
-        return totalBeforeTax + totalTax;
-    }, [totalBeforeTax, totalTax]);
+        return totalBeforeTax + totalTax - headerDiscountAmount;
+    }, [totalBeforeTax, totalTax, headerDiscountAmount]);
 
     const selectedVendor = useMemo(() => {
         if (!formData.vendor_id || vendors.length === 0) return null;
@@ -290,13 +297,23 @@ export default function PurchaseOrderForm() {
                         const productId = it.productId;
                         if (!productId) return null;
 
-                        // Fetch product details to get UOM
+                        console.log('🔍 PQ Item from backend:', it);
+
+                        // Fetch product details to get UOM and original price
                         const productRes = await apiClient.get(`/product/${productId}`);
                         const product = productRes.data || {};
 
                         const quantity = Number(it.quantity || 1);
                         const unitPrice = Number(it.unitPrice || 0);
+                        const discountPercent = Number(it.discountPercent || 0);
                         const taxRate = Number(it.taxRate || 0);
+                        
+                        console.log('💰 PQ Item Data:', {
+                            pqUnitPrice: it.unitPrice,
+                            pqDiscount: it.discountPercent,
+                            parsedValues: { unitPrice, discountPercent, taxRate }
+                        });
+                        
                         const calc = {
                             quantity,
                             unit_price: unitPrice,
@@ -304,7 +321,7 @@ export default function PurchaseOrderForm() {
                         };
                         const totals = calculateItemTotal(calc);
 
-                        return {
+                        const itemData = {
                             pq_item_id: it.pqItemId,
                             product_id: productId,
                             productCode: it.productCode || product.sku || product.productCode || "",
@@ -312,12 +329,17 @@ export default function PurchaseOrderForm() {
                             uom: product.uom || product.unit || "",
                             quantity,
                             unit_price: unitPrice,
+                            discount_percent: discountPercent,
                             tax_rate: taxRate,
                             tax_amount: totals.tax,
                             line_total: totals.total,
                             delivery_date: null,
                             note: it.remark || "",
                         };
+                        
+                        console.log('📦 Imported PQ Item:', itemData);
+                        
+                        return itemData;
                     } catch (err) {
                         console.warn('Could not load product details:', err);
                         return null;
@@ -326,7 +348,7 @@ export default function PurchaseOrderForm() {
             );
 
             const mapped = itemsWithDetails.filter(m => m !== null);
-            console.log('Mapped items:', mapped.length, 'items');
+            console.log('✅ Mapped items:', mapped.length, 'items', mapped);
 
             if (mapped.length === 0) {
                 toast.info("Không có sản phẩm hợp lệ để nhập");
@@ -337,7 +359,8 @@ export default function PurchaseOrderForm() {
                 ...prev, 
                 items: mapped,
                 vendor_id: vendorId,
-                pq_id: quotationId
+                pq_id: quotationId,
+                header_discount: Number(data.headerDiscount || 0)
             }));
             toast.success(`Đã tải ${mapped.length} sản phẩm từ báo giá`);
         } catch (err) {
@@ -458,6 +481,7 @@ export default function PurchaseOrderForm() {
                     uom: "",
                     quantity: 1,
                     unit_price: 0,
+                    discount_percent: 0,
                     tax_rate: 0,
                     tax_amount: 0,
                     line_total: 0,
@@ -494,11 +518,15 @@ export default function PurchaseOrderForm() {
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption) {
             const product = selectedOption.product;
+            const currentItem = formData.items[index];
+            
             handleItemChange(index, "product_id", product.product_id || product.id);
             handleItemChange(index, "productCode", product.sku || product.productCode || "");
             handleItemChange(index, "productName", product.name || "");
             handleItemChange(index, "uom", product.uom || product.unit || "");
-            if (product.purchase_price) {
+            
+            // Only update price if NOT imported from PQ (to preserve PQ negotiated price)
+            if (product.purchase_price && !currentItem.pq_item_id) {
                 handleItemChange(index, "unit_price", product.purchase_price);
             }
         }
@@ -815,6 +843,7 @@ export default function PurchaseOrderForm() {
                 paymentTerms: formData.payment_terms || "",
                 deliveryDate: formData.delivery_date ? new Date(formData.delivery_date).toISOString() : null,
                 shippingAddress: formData.shipping_address || "",
+                headerDiscount: Number(formData.header_discount || 0),
                 totalBeforeTax,
                 taxAmount: totalTax,
                 totalAfterTax,
@@ -824,6 +853,7 @@ export default function PurchaseOrderForm() {
                     uom: it.uom || "",
                     quantity: Number(it.quantity || 0),
                     unitPrice: Number(it.unit_price || 0),
+                    discountPercent: Number(it.discount_percent || 0),
                     taxRate: Number(it.tax_rate || 0),
                     taxAmount: Number(it.tax_amount || 0),
                     lineTotal: Number(it.line_total || 0),
@@ -1027,6 +1057,25 @@ export default function PurchaseOrderForm() {
                                         placeholder="Nhập địa chỉ giao hàng"
                                     />
                                 </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Chiết khấu tổng đơn (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={formData.header_discount}
+                                        onChange={(e) => handleInputChange("header_discount", parseFloat(e.target.value) || 0)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        placeholder="VD: 2 (giảm 2%)"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        💡 Chiết khấu chung cho toàn bộ đơn hàng (Document Discount)
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="bg-white rounded-lg">
@@ -1079,6 +1128,7 @@ export default function PurchaseOrderForm() {
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">ĐVT</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">CK (%)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thuế (%)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
@@ -1165,6 +1215,18 @@ export default function PurchaseOrderForm() {
                                                         <td className="border border-gray-200 px-4 py-2">
                                                             <input
                                                                 type="number"
+                                                                value={item.discount_percent || 0}
+                                                                readOnly={!!item.pq_item_id}
+                                                                onChange={(e) => !item.pq_item_id && handleItemChange(index, "discount_percent", parseFloat(e.target.value) || 0)}
+                                                                className={`w-20 px-2 py-1 border border-gray-300 rounded text-sm ${item.pq_item_id ? 'bg-gray-50 text-green-600 font-medium' : ''}`}
+                                                                min="0"
+                                                                max="100"
+                                                                step="0.01"
+                                                            />
+                                                        </td>
+                                                        <td className="border border-gray-200 px-4 py-2">
+                                                            <input
+                                                                type="number"
                                                                 value={item.tax_rate}
                                                                 onChange={(e) => handleItemChange(index, "tax_rate", parseFloat(e.target.value) || 0)}
                                                                 className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -1191,7 +1253,7 @@ export default function PurchaseOrderForm() {
                                             </tbody>
                                             <tfoot>
                                             <tr className="bg-gray-50">
-                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
                                                     Tổng trước thuế:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
@@ -1200,7 +1262,7 @@ export default function PurchaseOrderForm() {
                                                 <td className="border border-gray-200"></td>
                                             </tr>
                                             <tr className="bg-gray-50">
-                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
                                                     Tổng thuế:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
@@ -1208,8 +1270,19 @@ export default function PurchaseOrderForm() {
                                                 </td>
                                                 <td className="border border-gray-200"></td>
                                             </tr>
+                                            {formData.header_discount > 0 && (
+                                                <tr className="bg-gray-50">
+                                                    <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                        Chiết khấu tổng đơn ({formData.header_discount}%):
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
+                                                        -{formatCurrency(headerDiscountAmount)}
+                                                    </td>
+                                                    <td className="border border-gray-200"></td>
+                                                </tr>
+                                            )}
                                             <tr className="bg-gray-100">
-                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-bold">
+                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-bold">
                                                     Tổng cộng:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-bold">

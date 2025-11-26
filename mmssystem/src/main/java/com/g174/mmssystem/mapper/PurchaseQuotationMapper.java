@@ -68,6 +68,7 @@ public class PurchaseQuotationMapper {
                 .productCode(item.getProduct() != null ? item.getProduct().getSku() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
+                .discountPercent(item.getDiscountPercent())
                 .taxRate(item.getTaxRate())
                 .taxAmount(item.getTaxAmount())
                 .lineTotal(item.getLineTotal())

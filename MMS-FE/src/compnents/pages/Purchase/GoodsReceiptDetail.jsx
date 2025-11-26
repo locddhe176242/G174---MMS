@@ -53,11 +53,11 @@ export default function GoodsReceiptDetail() {
 
     const getStatusBadge = (status) => {
         const map = {
-            Pending: { label: "Pending", color: "bg-yellow-100 text-yellow-800" },
-            Approved: { label: "Approved", color: "bg-green-100 text-green-800" },
-            Rejected: { label: "Rejected", color: "bg-red-100 text-red-800" },
+            Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
+            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
+            Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
-        const statusInfo = map[status] || { label: status || "Pending", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[status] || { label: status || "Chờ duyệt", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}

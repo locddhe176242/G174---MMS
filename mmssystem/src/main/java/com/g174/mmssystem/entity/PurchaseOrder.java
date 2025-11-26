@@ -67,6 +67,10 @@ public class PurchaseOrder {
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
 
+    @Column(name = "header_discount", precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal headerDiscount = BigDecimal.ZERO;
+
     @Column(name = "total_before_tax", precision = 18, scale = 2)
     @Builder.Default
     private BigDecimal totalBeforeTax = BigDecimal.ZERO;

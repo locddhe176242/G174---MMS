@@ -21,6 +21,7 @@ import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
+
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
@@ -28,6 +29,18 @@ import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
+import PurchaseOrderList from "./compnents/pages/Purchase/PurchaseOrderList.jsx";
+import PurchaseOrderForm from "./compnents/pages/Purchase/PurchaseOrderForm.jsx";
+import PurchaseOrderDetail from "./compnents/pages/Purchase/PurchaseOrderDetail.jsx";
+import GoodsReceiptList from "./compnents/pages/Purchase/GoodsReceiptList.jsx";
+import GoodsReceiptForm from "./compnents/pages/Purchase/GoodsReceiptForm.jsx";
+import GoodsReceiptDetail from "./compnents/pages/Purchase/GoodsReceiptDetail.jsx";
+import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm.jsx";
+import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.jsx";
+import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
+import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
+import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
+import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -36,15 +49,8 @@ import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
 import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
 import UserManagement from "./compnents/pages/Admin/UserManagement";
 import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.jsx";
-import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm.jsx";
-import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.jsx";
-import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
-import PurchaseOrderList from "./compnents/pages/Purchase/PurchaseOrderList.jsx";
-import PurchaseOrderForm from "./compnents/pages/Purchase/PurchaseOrderForm.jsx";
-import PurchaseOrderDetail from "./compnents/pages/Purchase/PurchaseOrderDetail.jsx";
-import GoodsReceiptList from "./compnents/pages/Purchase/GoodsReceiptList.jsx";
-import GoodsReceiptForm from "./compnents/pages/Purchase/GoodsReceiptForm.jsx";
-import GoodsReceiptDetail from "./compnents/pages/Purchase/GoodsReceiptDetail.jsx";
+
+
 
 function App() {
     return (
@@ -108,6 +114,10 @@ function App() {
                 <Route path="/purchase/goods-receipts/new" element={<GoodsReceiptForm />} />
                 <Route path="/purchase/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
                 <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
+
+                <Route path="/purchase/ap-invoices" element={<APaymentList />} />
+                <Route path="/purchase/ap-invoices/:invoiceId/payment" element={<APaymentForm />} />
+                <Route path="/purchase/ap-invoices/:id" element={<APaymentDetail />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 

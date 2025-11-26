@@ -44,6 +44,9 @@ public class PurchaseOrderItem {
     @Column(name = "unit_price", precision = 18, scale = 2, nullable = false)
     private BigDecimal unitPrice;
 
+    @Column(name = "discount_percent", precision = 5, scale = 2)
+    private BigDecimal discountPercent;
+
     @Column(name = "tax_rate", precision = 5, scale = 2)
     private BigDecimal taxRate;
 

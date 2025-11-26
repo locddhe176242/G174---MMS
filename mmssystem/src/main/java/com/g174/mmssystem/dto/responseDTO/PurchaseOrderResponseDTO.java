@@ -30,6 +30,7 @@ public class PurchaseOrderResponseDTO {
     private String paymentTerms;
     private LocalDateTime deliveryDate;
     private String shippingAddress;
+    private BigDecimal headerDiscount;
     private BigDecimal totalBeforeTax;
     private BigDecimal taxAmount;
     private BigDecimal totalAfterTax;

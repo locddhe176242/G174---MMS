@@ -8,6 +8,7 @@ import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.GoodsReceiptMapper;
 import com.g174.mmssystem.repository.*;
 import com.g174.mmssystem.service.IService.IGoodsReceiptService;
+import com.g174.mmssystem.service.IService.IAPInvoiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
+    private final IAPInvoiceService apInvoiceService;
 
     @Override
     @Transactional
@@ -227,10 +229,25 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         receipt.setUpdatedAt(LocalDateTime.now());
 
         GoodsReceipt saved = receiptRepository.save(receipt);
+        
+        log.info("Goods receipt approved successfully");
+
+        // Auto-create AP Invoice in separate transaction (REQUIRES_NEW)
+        try {
+            log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
+            apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
+            log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
+        } catch (IllegalStateException e) {
+            log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to auto-create AP Invoice for Goods Receipt ID: {}. Error: {}", receiptId, e.getMessage(), e);
+        }
+        
+        // Load full relations for response - split queries to avoid cartesian product
         GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
                 .orElse(saved);
+        receiptRepository.findByIdWithItems(saved.getReceiptId()); // Load items separately
 
-        log.info("Goods receipt approved successfully");
         return receiptMapper.toResponseDTO(savedWithRelations);
     }
 

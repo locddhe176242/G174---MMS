@@ -18,6 +18,7 @@ public class PurchaseQuotationItemResponseDTO {
     private String productCode;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
     private BigDecimal lineTotal;

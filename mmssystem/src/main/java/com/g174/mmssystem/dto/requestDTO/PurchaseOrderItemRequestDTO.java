@@ -25,6 +25,8 @@ public class PurchaseOrderItemRequestDTO {
     @NotNull(message = "Đơn giá là bắt buộc")
     private BigDecimal unitPrice;
 
+    private BigDecimal discountPercent;
+
     private BigDecimal taxRate;
 
     private BigDecimal taxAmount;

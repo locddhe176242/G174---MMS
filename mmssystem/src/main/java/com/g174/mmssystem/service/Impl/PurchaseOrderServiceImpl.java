@@ -100,6 +100,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 .paymentTerms(dto.getPaymentTerms())
                 .deliveryDate(dto.getDeliveryDate())
                 .shippingAddress(dto.getShippingAddress())
+                .headerDiscount(dto.getHeaderDiscount() != null ? dto.getHeaderDiscount() : BigDecimal.ZERO)
                 .totalBeforeTax(dto.getTotalBeforeTax() != null ? dto.getTotalBeforeTax() : BigDecimal.ZERO)
                 .taxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO)
                 .totalAfterTax(dto.getTotalAfterTax() != null ? dto.getTotalAfterTax() : BigDecimal.ZERO)
@@ -129,6 +130,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                                 .uom(itemDto.getUom())
                                 .quantity(itemDto.getQuantity())
                                 .unitPrice(itemDto.getUnitPrice())
+                                .discountPercent(itemDto.getDiscountPercent())
                                 .taxRate(itemDto.getTaxRate())
                                 .taxAmount(itemDto.getTaxAmount())
                                 .lineTotal(itemDto.getLineTotal())
@@ -375,15 +377,23 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             throw new IllegalStateException("Only approved orders can be sent");
         }
 
+        // Validate vendor has email before sending
+        Vendor vendor = order.getVendor();
+        if (vendor == null || vendor.getContact() == null || 
+            vendor.getContact().getEmail() == null || vendor.getContact().getEmail().trim().isEmpty()) {
+            throw new IllegalStateException("Cannot send purchase order: Vendor does not have email address. Please update vendor contact information.");
+        }
+
         // Send email to vendor
         try {
             sendPurchaseOrderEmail(order);
-            log.info("Purchase order email sent successfully to vendor");
+            log.info("Purchase order email sent successfully to vendor: {}", vendor.getContact().getEmail());
         } catch (Exception e) {
-            log.error("Failed to send purchase order email, but continuing with status update", e);
-            // Continue even if email fails
+            log.error("Failed to send purchase order email to vendor: {}", vendor.getContact().getEmail(), e);
+            throw new RuntimeException("Failed to send email to vendor. Purchase order status not updated.", e);
         }
 
+        // Only update status if email sent successfully
         order.setStatus(PurchaseOrderStatus.Sent);
         order.setUpdatedAt(LocalDateTime.now());
 
@@ -391,27 +401,44 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         PurchaseOrder savedWithRelations = orderRepository.findByIdWithRelations(saved.getOrderId())
                 .orElse(saved);
 
-        log.info("Purchase order sent successfully");
+        log.info("Purchase order sent successfully with email notification");
         return orderMapper.toResponseDTO(savedWithRelations);
     }
 
     private void sendPurchaseOrderEmail(PurchaseOrder order) {
         Vendor vendor = order.getVendor();
-        if (vendor == null || vendor.getContact() == null || vendor.getContact().getEmail() == null) {
-            log.warn("Vendor email not found for PO: {}", order.getPoNo());
-            return;
-        }
-
         String vendorEmail = vendor.getContact().getEmail();
         String subject = "Đơn Hàng Mua #" + order.getPoNo() + " - " + vendor.getName();
         String htmlBody = buildPurchaseOrderEmailTemplate(order);
 
         try {
             emailService.sendSimpleEmail(vendorEmail, subject, htmlBody);
+            log.info("Email sent successfully to vendor: {}", vendorEmail);
         } catch (Exception e) {
             log.error("Error sending PO email to {}: {}", vendorEmail, e.getMessage());
-            throw e;
+            throw new RuntimeException("Failed to send email to vendor: " + vendorEmail, e);
         }
+    }
+
+    private String buildHeaderDiscountRow(PurchaseOrder order) {
+        BigDecimal headerDiscount = order.getHeaderDiscount();
+        if (headerDiscount == null || headerDiscount.compareTo(BigDecimal.ZERO) <= 0) {
+            return "";
+        }
+        
+        BigDecimal discountAmount = (order.getTotalBeforeTax().add(order.getTaxAmount()))
+                .multiply(headerDiscount)
+                .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+        
+        return String.format("""
+                <tr style="background-color: #f8f9fa;">
+                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Chiết khấu tổng đơn (%.2f%%):</td>
+                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: #dc3545;">-%,.0f ₫</td>
+                </tr>
+                """,
+                headerDiscount,
+                discountAmount
+        );
     }
 
     private String buildPurchaseOrderEmailTemplate(PurchaseOrder order) {
@@ -424,6 +451,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             String productName = item.getProduct() != null ? item.getProduct().getName() : "N/A";
             BigDecimal quantity = item.getQuantity();
             BigDecimal unitPrice = item.getUnitPrice();
+            BigDecimal discountPercent = item.getDiscountPercent() != null ? item.getDiscountPercent() : BigDecimal.ZERO;
+            BigDecimal taxRate = item.getTaxRate() != null ? item.getTaxRate() : BigDecimal.ZERO;
+            BigDecimal taxAmount = item.getTaxAmount() != null ? item.getTaxAmount() : BigDecimal.ZERO;
             BigDecimal lineTotal = item.getLineTotal();
             
             itemsHtml.append(String.format("""
@@ -433,6 +463,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                     <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">%s</td>
                     <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">%.0f</td>
                     <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">%,.0f ₫</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">%.2f%%</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">%.2f%%</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">%,.0f ₫</td>
                     <td style="padding: 12px; border: 1px solid #ddd; text-align: right; font-weight: bold;">%,.0f ₫</td>
                 </tr>
                 """, 
@@ -441,6 +474,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 item.getUom() != null ? item.getUom() : "Cái",
                 quantity,
                 unitPrice,
+                discountPercent,
+                taxRate,
+                taxAmount,
                 lineTotal
             ));
         }
@@ -513,6 +549,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                                     <th style="text-align: center;">ĐVT</th>
                                     <th style="text-align: right;">Số lượng</th>
                                     <th style="text-align: right;">Đơn giá</th>
+                                    <th style="text-align: center;">CK (%%)</th>
+                                    <th style="text-align: center;">Thuế (%%)</th>
+                                    <th style="text-align: right;">Tiền thuế</th>
                                     <th style="text-align: right;">Thành tiền</th>
                                 </tr>
                             </thead>
@@ -520,8 +559,17 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                                 %s
                             </tbody>
                             <tfoot>
+                                <tr style="background-color: #f8f9fa;">
+                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng trước thuế:</td>
+                                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
+                                </tr>
+                                <tr style="background-color: #f8f9fa;">
+                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng thuế:</td>
+                                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
+                                </tr>
+                                %s
                                 <tr class="total-row">
-                                    <td colspan="5" style="padding: 15px; text-align: right; border: 1px solid #ddd;">TỔNG CỘNG:</td>
+                                    <td colspan="8" style="padding: 15px; text-align: right; border: 1px solid #ddd;">TỔNG CỘNG:</td>
                                     <td style="padding: 15px; text-align: right; color: #667eea; border: 1px solid #ddd;">%,.0f ₫</td>
                                 </tr>
                             </tfoot>
@@ -557,6 +605,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             order.getPaymentTerms() != null ? order.getPaymentTerms() : "N/A",
             order.getShippingAddress() != null ? order.getShippingAddress() : "N/A",
             itemsHtml.toString(),
+            order.getTotalBeforeTax(),
+            order.getTaxAmount(),
+            buildHeaderDiscountRow(order),
             order.getTotalAfterTax()
         );
     }

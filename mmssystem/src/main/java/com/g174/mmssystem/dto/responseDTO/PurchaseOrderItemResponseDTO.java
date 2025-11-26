@@ -20,6 +20,7 @@ public class PurchaseOrderItemResponseDTO {
     private String uom;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
     private BigDecimal lineTotal;

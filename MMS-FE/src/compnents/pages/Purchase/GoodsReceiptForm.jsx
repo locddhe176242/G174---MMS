@@ -152,7 +152,7 @@ export default function GoodsReceiptForm() {
                         value: order.orderId || order.order_id || order.id,
                         label: `${poNo} - ${vendorName}${suffix}`,
                         order,
-                        isDisabled: order.hasReceipt // Disable nếu đã có GR
+                        isDisabled: order.hasReceipt 
                     };
                 })
             );

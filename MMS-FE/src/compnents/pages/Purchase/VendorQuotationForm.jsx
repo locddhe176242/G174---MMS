@@ -174,6 +174,7 @@ const VendorQuotationForm = () => {
                             productName: item.productName || item.product_name || '',
                             quantity: Number(item.quantity || 0),
                             unitPrice: Number(item.targetPrice || item.target_price || 0),
+                            discountPercent: 0,
                             taxRate: 0,
                             taxAmount: 0,
                             lineTotal: 0,
@@ -402,6 +403,7 @@ const VendorQuotationForm = () => {
                     productId: item.productId || null,
                     quantity: Number(item.quantity || 0),
                     unitPrice: Number(item.unitPrice || 0),
+                    discountPercent: Number(item.discountPercent || 0),
                     taxRate: Number(item.taxRate || 0),
                     taxAmount: Number(item.taxAmount || 0),
                     lineTotal: Number(item.lineTotal || 0),
@@ -616,7 +618,7 @@ const VendorQuotationForm = () => {
                         {/* Header Discount */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Giảm giá từ nhà cung cấp (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
+                                Chiết khấu tổng đơn (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
                             </label>
                             <input
                                 type="number"
@@ -626,10 +628,10 @@ const VendorQuotationForm = () => {
                                 min="0"
                                 max="100"
                                 step="0.01"
-                                placeholder="VD: 5 (giảm 5%)"
+                                placeholder="VD: 2 (giảm 2%)"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                💡 Nhà cung cấp giảm giá (promotional discount)
+                                💡 Chiết khấu chung cho toàn bộ đơn hàng (Document Discount)
                             </p>
                         </div>
 
@@ -696,6 +698,7 @@ const VendorQuotationForm = () => {
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm (từ RFQ)</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">SL yêu cầu</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Đơn giá báo</th>
+                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">CK (%)</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thuế (%)</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thành tiền</th>
                                     <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Ghi chú</th>
@@ -746,6 +749,17 @@ const VendorQuotationForm = () => {
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
                                                 type="number"
+                                                value={item.discountPercent || 0}
+                                                onChange={(e) => handleItemChange(index, 'discountPercent', parseFloat(e.target.value) || 0)}
+                                                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                            />
+                                        </td>
+                                        <td className="border border-gray-200 px-2 py-1">
+                                            <input
+                                                type="number"
                                                 value={item.taxRate || 0}
                                                 onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
                                                 className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
@@ -772,7 +786,7 @@ const VendorQuotationForm = () => {
                                 </tbody>
                                 <tfoot>
                                 <tr className="bg-gray-50 font-semibold">
-                                    <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                    <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                         Tổng phụ:
                                     </td>
                                     <td className="border border-gray-200 px-2 py-1 text-xs">
@@ -782,7 +796,7 @@ const VendorQuotationForm = () => {
                                 </tr>
                                 {!formData.isTaxIncluded && (
                                     <tr className="bg-gray-50">
-                                        <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                             Thuế:
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
@@ -793,8 +807,8 @@ const VendorQuotationForm = () => {
                                 )}
                                 {formData.headerDiscount > 0 && (
                                     <tr className="bg-gray-50">
-                                        <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                            Chiết khấu ({formData.headerDiscount}%):
+                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                            Chiết khấu tổng đơn ({formData.headerDiscount}%):
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
                                             -{formatCurrency(calculateTotals.discountAmount || 0)}
@@ -804,7 +818,7 @@ const VendorQuotationForm = () => {
                                 )}
                                 {formData.shippingCost > 0 && (
                                     <tr className="bg-gray-50">
-                                        <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                             Phí vận chuyển:
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
@@ -814,7 +828,7 @@ const VendorQuotationForm = () => {
                                     </tr>
                                 )}
                                 <tr className="bg-blue-50 font-bold">
-                                    <td colSpan="5" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                    <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
                                         Tổng cộng:
                                     </td>
                                     <td className="border border-gray-200 px-2 py-1 text-xs">

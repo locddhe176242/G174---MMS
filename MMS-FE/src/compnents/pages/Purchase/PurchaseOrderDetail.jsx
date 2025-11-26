@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
 import { getCurrentUser, hasRole } from "../../../api/authService";
+import apiClient from "../../../api/apiClient";
 
 const Stat = ({ label, value }) => (
     <div className="flex-1 text-center">
@@ -133,8 +134,20 @@ export default function PurchaseOrderDetail() {
             setErr(null);
             const orderData = await purchaseOrderService.getPurchaseOrderById(id);
             console.log("=== ORDER DATA RECEIVED ===", orderData);
-            console.log("Items:", orderData?.items);
-            console.log("Items length:", orderData?.items?.length);
+            
+            // Fetch vendor details to get email
+            if (orderData?.vendorId) {
+                try {
+                    const vendorResponse = await apiClient.get(`/vendors/${orderData.vendorId}`);
+                    console.log("📧 Vendor details:", vendorResponse.data);
+                    // Add vendor email to order data
+                    orderData.vendorEmail = vendorResponse.data?.email || vendorResponse.data?.vendorEmail || vendorResponse.data?.contact?.email;
+                    console.log("✅ Vendor email found:", orderData.vendorEmail);
+                } catch (vendorErr) {
+                    console.warn("Could not fetch vendor details:", vendorErr);
+                }
+            }
+            
             setData(orderData);
             setItems(orderData?.items || []);
         } catch (e) {
@@ -200,7 +213,23 @@ export default function PurchaseOrderDetail() {
         }
     };
 
-    const handleSend = async () => {
+    const handleSend = async () => {   
+        // Validate vendor email before sending
+        const vendorEmail = data.vendorEmail || data.vendor_email || data.vendor?.email || data.vendor?.contact?.email || data.vendorContact?.email;
+        console.log("🔍 Check vendor email:", {
+            vendorEmail,
+            vendorData: data.vendor,
+            vendorContact: data.vendorContact,
+            rawVendorEmail: data.vendor_email,
+            rawVendorEmail2: data.vendorEmail,
+            fullData: data
+        });
+        
+        if (!vendorEmail || vendorEmail.trim() === '') {
+            toast.warning("Nhà cung cấp chưa có email. Vui lòng cập nhật thông tin liên hệ của nhà cung cấp trước khi gửi đơn hàng.");
+            setShowSendConfirm(false);
+            return;
+        } 
         try {
             setActionLoading(true);
             await purchaseOrderService.sendPurchaseOrder(id);
@@ -262,6 +291,10 @@ export default function PurchaseOrderDetail() {
     const canCreateGR = normalizedApprovalStatus === "Approved" && (normalizedStatus === "Approved" || normalizedStatus === "Sent");
     // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
     const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
+    
+    // Check if vendor has email
+    const vendorEmail = data.vendorEmail || data.vendor_email || data.vendor?.email || data.vendor?.contact?.email || data.vendorContact?.email;
+    const hasVendorEmail = vendorEmail && vendorEmail.trim() !== '';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -306,6 +339,7 @@ export default function PurchaseOrderDetail() {
                                     onClick={() => setShowSendConfirm(true)}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                     disabled={actionLoading}
+                                    title="Gửi đơn hàng cho nhà cung cấp"
                                 >
                                     Gửi đơn hàng
                                 </button>
@@ -380,6 +414,7 @@ export default function PurchaseOrderDetail() {
                                                 <th className="py-3 pr-4">ĐVT</th>
                                                 <th className="py-3 pr-4">Số lượng</th>
                                                 <th className="py-3 pr-4">Đơn giá</th>
+                                                <th className="py-3 pr-4">CK (%)</th>
                                                 <th className="py-3 pr-4">Thuế (%)</th>
                                                 <th className="py-3 pr-4">Tiền thuế</th>
                                                 <th className="py-3 pr-4 text-right">Thành tiền</th>
@@ -404,6 +439,11 @@ export default function PurchaseOrderDetail() {
                                                             {formatCurrency(item.unit_price || item.unitPrice || 0)}
                                                         </td>
                                                         <td className="py-3 pr-4">
+                                                            <span className={item.discount_percent || item.discountPercent ? "text-green-600 font-medium" : ""}>
+                                                                {Number(item.discount_percent || item.discountPercent || 0).toFixed(2)}%
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 pr-4">
                                                             {Number(item.tax_rate || item.taxRate || 0).toFixed(2)}%
                                                         </td>
                                                         <td className="py-3 pr-4">
@@ -418,7 +458,7 @@ export default function PurchaseOrderDetail() {
                                             </tbody>
                                             <tfoot>
                                             <tr className="border-t font-semibold bg-gray-50">
-                                                <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
                                                     Tổng trước thuế:
                                                 </td>
                                                 <td className="py-3 pr-0 text-right">
@@ -426,15 +466,25 @@ export default function PurchaseOrderDetail() {
                                                 </td>
                                             </tr>
                                             <tr className="border-t font-semibold bg-gray-50">
-                                                <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
                                                     Tổng thuế:
                                                 </td>
                                                 <td className="py-3 pr-0 text-right">
                                                     {formatCurrency(taxAmount)}
                                                 </td>
                                             </tr>
+                                            {data.headerDiscount > 0 && (
+                                                <tr className="border-t font-semibold bg-gray-50">
+                                                    <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
+                                                        Chiết khấu tổng đơn ({data.headerDiscount}%):
+                                                    </td>
+                                                    <td className="py-3 pr-0 text-right text-red-600">
+                                                        -{formatCurrency((totalBeforeTax + taxAmount) * (data.headerDiscount / 100))}
+                                                    </td>
+                                                </tr>
+                                            )}
                                             <tr className="border-t-2 font-semibold bg-gray-100">
-                                                <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
                                                     Tổng cộng:
                                                 </td>
                                                 <td className="py-3 pr-0 text-right">
@@ -643,15 +693,31 @@ export default function PurchaseOrderDetail() {
                             <p className="text-sm text-gray-700">
                                 Xác nhận gửi đơn hàng <strong>{data.poNo || data.po_no}</strong> cho nhà cung cấp <strong>{data.vendorName || data.vendor_name}</strong>?
                             </p>
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                <p className="text-sm text-blue-800">
-                                    <strong>📧 Hệ thống sẽ:</strong>
-                                </p>
-                                <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
-                                    <li>Gửi email thông báo đơn hàng đến nhà cung cấp</li>
-                                    <li>Chuyển trạng thái đơn hàng sang <strong>Sent</strong></li>
-                                </ul>
-                            </div>
+                            
+                            {hasVendorEmail ? (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p className="text-sm text-blue-800">
+                                        <strong>📧 Hệ thống sẽ:</strong>
+                                    </p>
+                                    <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
+                                        <li>Gửi email thông báo đơn hàng đến: <strong>{vendorEmail}</strong></li>
+                                        <li>Chuyển trạng thái đơn hàng sang <strong>Đã gửi</strong></li>
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <p className="text-sm text-yellow-800">
+                                        <strong>⚠️ Cảnh báo:</strong>
+                                    </p>
+                                    <p className="text-sm text-yellow-700 mt-2">
+                                        Nhà cung cấp <strong>{data.vendorName || data.vendor_name}</strong> chưa có email. 
+                                        Hệ thống sẽ cập nhật trạng thái nhưng không gửi được email thông báo.
+                                    </p>
+                                    <p className="text-sm text-yellow-700 mt-2">
+                                        💡 Vui lòng cập nhật email cho nhà cung cấp để gửi thông báo tự động.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button
@@ -663,8 +729,12 @@ export default function PurchaseOrderDetail() {
                             </button>
                             <button
                                 onClick={handleSend}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                                disabled={actionLoading}
+                                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                                    hasVendorEmail 
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                }`}
+                                disabled={actionLoading || !hasVendorEmail}
                             >
                                 {actionLoading ? (
                                     <>
@@ -679,7 +749,7 @@ export default function PurchaseOrderDetail() {
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                         </svg>
-                                        Gửi email & cập nhật
+                                        {hasVendorEmail ? 'Gửi email & cập nhật' : 'Không thể gửi (thiếu email)'}
                                     </>
                                 )}
                             </button>

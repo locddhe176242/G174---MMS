@@ -40,11 +40,9 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.warehouse.warehouseId = :warehouseId AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findByWarehouseId(@Param("warehouseId") Integer warehouseId);
 
-    @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
-           "LEFT JOIN FETCH gr.items i " +
-           "LEFT JOIN FETCH i.product " +
-           "LEFT JOIN FETCH i.purchaseOrderItem " +
-           "LEFT JOIN FETCH gr.purchaseOrder " +
+    @Query("SELECT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
+           "LEFT JOIN FETCH po.vendor " +
            "LEFT JOIN FETCH gr.warehouse " +
            "LEFT JOIN FETCH gr.createdBy cb " +
            "LEFT JOIN FETCH cb.profile " +
@@ -52,6 +50,13 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
            "LEFT JOIN FETCH ab.profile " +
            "WHERE gr.receiptId = :id AND gr.deletedAt IS NULL")
     Optional<GoodsReceipt> findByIdWithRelations(@Param("id") Integer id);
+    
+    @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN FETCH gr.items i " +
+           "LEFT JOIN FETCH i.product " +
+           "LEFT JOIN FETCH i.purchaseOrderItem " +
+           "WHERE gr.receiptId = :id AND gr.deletedAt IS NULL")
+    Optional<GoodsReceipt> findByIdWithItems(@Param("id") Integer id);
 
     @Query(value = "SELECT * FROM Goods_Receipts WHERE receipt_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY receipt_no DESC LIMIT 1", nativeQuery = true)
     Optional<GoodsReceipt> findTopByReceiptNoStartingWithOrderByReceiptNoDesc(@Param("prefix") String prefix);
