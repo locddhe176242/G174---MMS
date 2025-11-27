@@ -31,6 +31,9 @@ import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuota
 import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
 import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
+import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
+import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
+import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -84,6 +87,10 @@ function App() {
                 <Route path="/sales/quotations/:id" element={<SalesQuotationDetail />} />
                 <Route path="/sales/quotations/:id/edit" element={<SalesQuotationForm />} />
                 <Route path="/approvals" element={<ApprovalList />} />
+                <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
+                <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
+                <Route path="/purchase/ap-invoices/:id" element={<APInvoiceDetail />} />
+                <Route path="/purchase/ap-invoices/:id/edit" element={<APInvoiceForm />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
                 <Route path="/admin/roles/:roleId" element={<RoleDetail />} />
