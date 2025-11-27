@@ -34,6 +34,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
+    private final WarehouseStockRepository warehouseStockRepository;
     private final IAPInvoiceService apInvoiceService;
 
     @Override
@@ -230,7 +231,55 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
 
         GoodsReceipt saved = receiptRepository.save(receipt);
         
-        log.info("Goods receipt approved successfully");
+        // Update PO Items: Track received quantities
+        log.info("Updating PO items received_qty for {} GRN items", saved.getItems().size());
+        for (GoodsReceiptItem grItem : saved.getItems()) {
+            PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
+            if (poItem != null) {
+                BigDecimal acceptedQty = grItem.getAcceptedQty();
+                BigDecimal currentReceived = poItem.getReceivedQty() != null ? poItem.getReceivedQty() : BigDecimal.ZERO;
+                BigDecimal newReceived = currentReceived.add(acceptedQty);
+                
+                poItem.setReceivedQty(newReceived);
+                orderItemRepository.save(poItem);
+                
+                log.info("POI {} received_qty: {} + {} = {} (ordered: {})", 
+                         poItem.getPoiId(), currentReceived, acceptedQty, newReceived, poItem.getQuantity());
+                
+                // Check over-receipt
+                if (newReceived.compareTo(poItem.getQuantity()) > 0) {
+                    log.warn("Over-receipt detected! POI {}: received {} > ordered {}", 
+                             poItem.getPoiId(), newReceived, poItem.getQuantity());
+                }
+            }
+        }
+        
+        // Update Warehouse Stock: Increase inventory quantity
+        Integer warehouseId = saved.getWarehouse().getWarehouseId();
+        log.info("Updating warehouse stock for warehouse ID: {}", warehouseId);
+        
+        for (GoodsReceiptItem grItem : saved.getItems()) {
+            Integer productId = grItem.getProduct().getProductId();
+            BigDecimal acceptedQty = grItem.getAcceptedQty();
+            
+            // Try to update existing stock
+            int updated = warehouseStockRepository.updateStockQuantity(warehouseId, productId, acceptedQty);
+            
+            if (updated == 0) {
+                // Stock record doesn't exist, create new one
+                log.info("Creating new stock record for warehouse {} product {}", warehouseId, productId);
+                WarehouseStock newStock = new WarehouseStock();
+                newStock.setWarehouseId(warehouseId);
+                newStock.setProductId(productId);
+                newStock.setQuantity(acceptedQty);
+                warehouseStockRepository.save(newStock);
+                log.info("Created stock: warehouse {} product {} quantity {}", warehouseId, productId, acceptedQty);
+            } else {
+                log.info("Updated stock: warehouse {} product {} +{}", warehouseId, productId, acceptedQty);
+            }
+        }
+        
+        log.info("Goods receipt approved successfully, PO items and warehouse stock updated");
 
         // Auto-create AP Invoice in separate transaction (REQUIRES_NEW)
         try {

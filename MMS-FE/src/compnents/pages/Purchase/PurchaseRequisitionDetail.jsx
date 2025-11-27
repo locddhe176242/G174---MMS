@@ -278,6 +278,7 @@ export default function PurchaseRequisitionDetail() {
 
     const items = data.items || [];
     const totalItems = items.length;
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0);
 
     // Check if user can approve (must be MANAGER and status is Pending)
     const canApprove = hasRole('MANAGER') && (data.approvalStatus === 'Pending' || data.status === 'Pending');
@@ -347,14 +348,11 @@ export default function PurchaseRequisitionDetail() {
                     {/* Hiển thị các metrics quan trọng: tổng giá trị, số SP, trạng thái */}
                     <div className="border rounded p-4">
                         <div className="flex flex-col md:flex-row md:items-center gap-4">
-                            {/* Tổng giá trị phiếu */}
-                            <Stat
-                                label="Tổng giá trị"
-                                value={`${Number(totalValue).toLocaleString()} đ`}
-                            />
-                            <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                             {/* Số lượng sản phẩm */}
                             <Stat label="Số sản phẩm" value={totalItems} />
+                            <div className="hidden md:block w-px bg-gray-200 self-stretch" />
+                            {/* Tổng số lượng */}
+                            <Stat label="Tổng số lượng" value={totalQuantity.toLocaleString()} />
                             <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                             {/* Trạng thái phiếu */}
                             <div className="flex-1 text-center">
@@ -405,8 +403,6 @@ export default function PurchaseRequisitionDetail() {
                                             <th className="py-2 pr-4">Sản phẩm</th>
                                             <th className="py-2 pr-4">Số lượng</th>
                                             <th className="py-2 pr-4">Ngày giao hàng</th>
-                                            <th className="py-2 pr-4">Đơn giá ước tính</th>
-                                            <th className="py-2 pr-4 text-right">Thành tiền</th>
                                             <th className="py-2 pr-4">Ghi chú</th>
                                         </tr>
                                         </thead>
@@ -431,14 +427,6 @@ export default function PurchaseRequisitionDetail() {
                                                     <td className="py-2 pr-4">
                                                         {item.deliveryDate ? formatDate(item.deliveryDate) : "-"}
                                                     </td>
-                                                    {/* Đơn giá ước tính */}
-                                                    <td className="py-2 pr-4">
-                                                        {Number(item.estimatedUnitPrice || 0).toLocaleString()} đ
-                                                    </td>
-                                                    {/* Thành tiền */}
-                                                    <td className="py-2 pr-4 text-right">
-                                                        {Number(itemTotal).toLocaleString()} đ
-                                                    </td>
                                                     {/* Ghi chú */}
                                                     <td className="py-2 pr-4 text-gray-600">
                                                         {item.note || "-"}
@@ -447,19 +435,11 @@ export default function PurchaseRequisitionDetail() {
                                             );
                                         })}
                                         </tbody>
-                                        {/* Footer: Tổng cộng */}
                                         <tfoot>
                                         <tr className="border-t-2 font-semibold">
-                                            <td
-                                                colSpan={5}
-                                                className="py-2 pr-4 text-right whitespace-nowrap"
-                                            >
-                                                Tổng cộng:
-                                            </td>
-                                            <td className="py-2 pr-4 text-right">
-                                                {Number(totalValue).toLocaleString()} đ
-                                            </td>
-                                            <td className="py-2 pr-4"></td>
+                                            <td colSpan={2} className="py-2 pr-4 text-right">Tổng cộng:</td>
+                                            <td className="py-2 pr-4">{totalQuantity.toLocaleString()}</td>
+                                            <td colSpan={2} className="py-2 pr-4"></td>
                                         </tr>
                                         </tfoot>
                                     </table>

@@ -41,19 +41,23 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     @Override
     @Transactional
     public APInvoiceResponseDTO createInvoice(APInvoiceRequestDTO dto) {
-        log.info("Creating AP Invoice for Vendor ID: {}", dto.getVendorId());
+        log.info("Creating AP Invoice for Vendor ID: {} (PO: {}, GRN: {})", 
+                 dto.getVendorId(), dto.getOrderId(), dto.getReceiptId());
 
         // Validate and load entities
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
 
+        // Optional: Link to Purchase Order (can be null for prepayment/manual invoices)
         PurchaseOrder purchaseOrder = null;
         if (dto.getOrderId() != null) {
             purchaseOrder = orderRepository.findById(dto.getOrderId())
                     .filter(o -> o.getDeletedAt() == null)
                     .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + dto.getOrderId()));
+            log.info("Invoice linked to PO: {}", purchaseOrder.getPoNo());
         }
 
+        // Optional: Link to Goods Receipt (can be null for prepayment/PO-based invoices)
         GoodsReceipt goodsReceipt = null;
         if (dto.getReceiptId() != null) {
             goodsReceipt = receiptRepository.findById(dto.getReceiptId())
@@ -64,7 +68,13 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             if (goodsReceipt.getStatus() != GoodsReceipt.GoodsReceiptStatus.Approved) {
                 throw new IllegalStateException("Only approved Goods Receipts can be invoiced (current status: " + goodsReceipt.getStatus() + ")");
             }
+            log.info("Invoice linked to GRN: {}", goodsReceipt.getReceiptNo());
         }
+        
+        // Note: Both PO and GRN can be null - this allows:
+        // 1. Prepayment invoices (no PO/GRN)
+        // 2. Manual invoices
+        // 3. Future: Consolidated invoices (multiple PO/GRN)
 
         // Generate invoice number if not provided
         String invoiceNo = dto.getInvoiceNo();

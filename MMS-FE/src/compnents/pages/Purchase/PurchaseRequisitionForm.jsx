@@ -1087,13 +1087,13 @@ const PurchaseRequisitionForm = () => {
                                                 onBlur={(e) => {
                                                     const value = e.target.value;
                                                     const numValue = parseFloat(value);
-                                                    // Auto-set to 0.01 if empty or < 0.01 (match backend @DecimalMin(0.01))
-                                                    if (value === '' || value === null || isNaN(numValue) || numValue < 0.01) {
+                                                    // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
+                                                    if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
                                                         setFormData(prev => {
                                                             const newItems = [...prev.items];
                                                             newItems[index] = {
                                                                 ...newItems[index],
-                                                                requested_qty: 0.01
+                                                                requested_qty: 1
                                                             };
                                                             return {
                                                                 ...prev,
@@ -1103,8 +1103,8 @@ const PurchaseRequisitionForm = () => {
                                                     }
                                                 }}
                                                 className={`w-16 px-1.5 py-0.5 border rounded text-xs ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                step="0.01"
-                                                min="0.01"
+                                                step="1"
+                                                min="1"
                                             />
                                             {validationErrors[`item_${index}_qty`] && (
                                                 <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_qty`]}</p>

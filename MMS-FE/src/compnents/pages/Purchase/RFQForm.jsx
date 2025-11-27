@@ -16,7 +16,7 @@ export default function RFQForm() {
 
     const [formData, setFormData] = useState({
         rfqNo: "",
-        issueDate: "",
+        issueDate: new Date().toISOString().split('T')[0],
         dueDate: "",
         status: "Draft",
         selectedVendorIds: [],
@@ -797,7 +797,7 @@ export default function RFQForm() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Ngày phát hành <span className="text-red-500">*</span>
+                                            Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="date"
@@ -820,6 +820,7 @@ export default function RFQForm() {
                                             onChange={(e) => handleInputChange("dueDate", e.target.value)}
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.dueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
+                                        <p className="mt-1 text-xs text-gray-500">Ngày cuối cùng nhà cung cấp phải gửi báo giá</p>
                                         {validationErrors.dueDate && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.dueDate}</p>
                                         )}
@@ -867,8 +868,6 @@ export default function RFQForm() {
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Ngày cần</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Giá mục tiêu</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                                 </tr>
                                             </thead>
@@ -933,20 +932,6 @@ export default function RFQForm() {
                                                                 )}
                                                             </td>
                                                             <td className="border border-gray-200 px-4 py-2">
-                                                                <input
-                                                                    type="number"
-                                                                    value={item.targetPrice}
-                                                                    onChange={(e) => handleItemChange(index, "targetPrice", parseFloat(e.target.value) || 0)}
-                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                                                    min="0"
-                                                                    step="0.01"
-                                                                />
-                                                            </td>
-                                                            <td className="border border-gray-200 px-4 py-2 text-sm">
-                                                                {formatCurrency((Number(item.quantity || 0) * Number(item.targetPrice || 0)))}
-                                                            </td>
-                                                            <td className="border border-gray-200 px-4 py-2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeItem(index)}
@@ -963,8 +948,8 @@ export default function RFQForm() {
                                         </table>
                                         <div className="flex justify-end mt-3">
                                             <div className="text-right">
-                                                <div className="text-sm text-gray-600">Tổng giá trị</div>
-                                                <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
+                                                <div className="text-sm text-gray-600">Tổng số lượng</div>
+                                                <div className="text-lg font-semibold">{formData.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0).toLocaleString()}</div>
                                             </div>
                                         </div>
                                     </div>

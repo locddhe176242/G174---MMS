@@ -479,7 +479,7 @@ export default function PurchaseOrderDetail() {
                                                         Chiết khấu tổng đơn ({data.headerDiscount}%):
                                                     </td>
                                                     <td className="py-3 pr-0 text-right text-red-600">
-                                                        -{formatCurrency((totalBeforeTax + taxAmount) * (data.headerDiscount / 100))}
+                                                        -{formatCurrency(totalBeforeTax * (data.headerDiscount / 100))}
                                                     </td>
                                                 </tr>
                                             )}

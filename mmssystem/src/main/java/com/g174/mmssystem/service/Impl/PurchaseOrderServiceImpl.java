@@ -89,7 +89,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             throw new DuplicateResourceException("Purchase Order number already exists: " + poNo);
         }
 
-        // Create order entity
+        // Create order entity - sync from PQ if creating from PQ
         PurchaseOrder order = PurchaseOrder.builder()
                 .poNo(poNo)
                 .vendor(vendor)
@@ -97,10 +97,11 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 .orderDate(dto.getOrderDate() != null ? dto.getOrderDate() : LocalDateTime.now())
                 .status(dto.getStatus() != null ? dto.getStatus() : PurchaseOrderStatus.Pending)
                 .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : PurchaseOrderApprovalStatus.Pending)
-                .paymentTerms(dto.getPaymentTerms())
+                .paymentTerms(purchaseQuotation != null ? purchaseQuotation.getPaymentTerms() : dto.getPaymentTerms())
                 .deliveryDate(dto.getDeliveryDate())
                 .shippingAddress(dto.getShippingAddress())
-                .headerDiscount(dto.getHeaderDiscount() != null ? dto.getHeaderDiscount() : BigDecimal.ZERO)
+                .headerDiscount(purchaseQuotation != null ? purchaseQuotation.getHeaderDiscount() : 
+                               (dto.getHeaderDiscount() != null ? dto.getHeaderDiscount() : BigDecimal.ZERO))
                 .totalBeforeTax(dto.getTotalBeforeTax() != null ? dto.getTotalBeforeTax() : BigDecimal.ZERO)
                 .taxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO)
                 .totalAfterTax(dto.getTotalAfterTax() != null ? dto.getTotalAfterTax() : BigDecimal.ZERO)
@@ -123,6 +124,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                                     .orElse(null);
                         }
 
+                        // Sync discount and tax from PQItem if available, otherwise use DTO
+                        BigDecimal discountPercent = (pqItem != null && pqItem.getDiscountPercent() != null) ? 
+                                                     pqItem.getDiscountPercent() : itemDto.getDiscountPercent();
+                        BigDecimal taxRate = (pqItem != null && pqItem.getTaxRate() != null) ? 
+                                            pqItem.getTaxRate() : itemDto.getTaxRate();
+                        BigDecimal taxAmount = (pqItem != null && pqItem.getTaxAmount() != null) ? 
+                                              pqItem.getTaxAmount() : itemDto.getTaxAmount();
+
                         return PurchaseOrderItem.builder()
                                 .purchaseOrder(order)
                                 .purchaseQuotationItem(pqItem)
@@ -130,9 +139,9 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                                 .uom(itemDto.getUom())
                                 .quantity(itemDto.getQuantity())
                                 .unitPrice(itemDto.getUnitPrice())
-                                .discountPercent(itemDto.getDiscountPercent())
-                                .taxRate(itemDto.getTaxRate())
-                                .taxAmount(itemDto.getTaxAmount())
+                                .discountPercent(discountPercent)
+                                .taxRate(taxRate)
+                                .taxAmount(taxAmount)
                                 .lineTotal(itemDto.getLineTotal())
                                 .deliveryDate(itemDto.getDeliveryDate())
                                 .note(itemDto.getNote())

@@ -41,6 +41,14 @@ public class PurchaseOrderItem {
     @Column(name = "quantity", precision = 18, scale = 2, nullable = false)
     private BigDecimal quantity;
 
+    @Column(name = "received_qty", precision = 18, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal receivedQty = BigDecimal.ZERO;
+
+    @Column(name = "invoiced_qty", precision = 18, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal invoicedQty = BigDecimal.ZERO;
+
     @Column(name = "unit_price", precision = 18, scale = 2, nullable = false)
     private BigDecimal unitPrice;
 

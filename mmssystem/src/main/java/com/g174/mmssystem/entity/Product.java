@@ -69,10 +69,6 @@ public class Product {
     @Column(name = "image_url", length = 255)
     private String imageUrl;
 
-    @NotNull(message = "Số lượng không được để trống")
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private ProductCategory category;

@@ -75,6 +75,11 @@ export default function RFQDetail() {
     return data.items.reduce((sum, item) => sum + lineValue(item), 0);
   }, [data]);
 
+  const totalQuantity = useMemo(() => {
+    if (!data || !Array.isArray(data.items)) return 0;
+    return data.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  }, [data]);
+
   const getStatusBadge = (status) => {
     // Handle both string and enum object formats
     const statusStr = typeof status === 'string' ? status : (status?.name || status?.toString() || 'Draft');
@@ -242,12 +247,9 @@ export default function RFQDetail() {
             {/* Summary */}
             <div className="bg-white border rounded-lg p-6">
               <div className="flex flex-col md:flex-row md:items-center gap-4">
-                <Stat
-                  label="Tổng giá trị"
-                  value={formatCurrency(totalValue)}
-                />
-                <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <Stat label="Số sản phẩm" value={totalItems} />
+                <div className="hidden md:block w-px bg-gray-200 self-stretch" />
+                <Stat label="Tổng số lượng" value={totalQuantity.toLocaleString()} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <Stat label="Số nhà cung cấp" value={selectedVendorIds.length} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
@@ -277,8 +279,6 @@ export default function RFQDetail() {
                           <th className="py-3 pr-4">Sản phẩm</th>
                           <th className="py-3 pr-4">Số lượng</th>
                           <th className="py-3 pr-4">Ngày cần</th>
-                          <th className="py-3 pr-4">Giá mục tiêu</th>
-                          <th className="py-3 pr-4 text-right">Thành tiền</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -298,27 +298,15 @@ export default function RFQDetail() {
                                   ? formatDate(item.deliveryDate || item.delivery_date)
                                   : "-"}
                               </td>
-                              <td className="py-3 pr-4">
-                                {formatCurrency(item.targetPrice || item.target_price || 0)}
-                              </td>
-                              <td className="py-3 pr-0 text-right font-medium">
-                                {formatCurrency(itemTotal)}
-                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 font-semibold bg-gray-50">
-                          <td
-                            colSpan={5}
-                            className="py-3 pr-4 text-right whitespace-nowrap"
-                          >
-                            Tổng cộng:
-                          </td>
-                          <td className="py-3 pr-0 text-right">
-                            {formatCurrency(totalValue)}
-                          </td>
+                          <td colSpan={2} className="py-3 pr-4 text-right">Tổng cộng:</td>
+                          <td className="py-3 pr-4">{totalQuantity.toLocaleString()}</td>
+                          <td className="py-3 pr-4"></td>
                         </tr>
                       </tfoot>
                     </table>

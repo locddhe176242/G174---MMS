@@ -34,7 +34,6 @@ public class ProductMapper {
                 .category(category)
                 .imageUrl(dto.getImageUrl())
                 .status(status)
-                .quantity(dto.getQuantity())
                 .barcode(dto.getBarcode())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -62,7 +61,6 @@ public class ProductMapper {
                 .imageUrl(entity.getImageUrl())
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getCategoryId() : null)
                 .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : null)
-                .quantity(entity.getQuantity())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .deletedAt(entity.getDeletedAt())
@@ -101,7 +99,6 @@ public class ProductMapper {
                 // Invalid status value, keep existing status
             }
         }
-        if (dto.getQuantity() != null) entity.setQuantity(dto.getQuantity());
         if (dto.getBarcode() != null) entity.setBarcode(dto.getBarcode());
         if (category != null) entity.setCategory(category);
         entity.setUpdatedAt(LocalDateTime.now());

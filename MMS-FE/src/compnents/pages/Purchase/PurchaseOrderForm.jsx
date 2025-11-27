@@ -677,6 +677,9 @@ export default function PurchaseOrderForm() {
             const data = res.data || {};
             const pqItems = data.items || [];
 
+            console.log("📦 PQ Detail Response:", JSON.stringify(data, null, 2));
+            console.log("📦 PQ Items:", JSON.stringify(pqItems, null, 2));
+
             if (!Array.isArray(pqItems) || pqItems.length === 0) {
                 toast.info("Báo giá không có dòng sản phẩm");
                 return;
@@ -723,41 +726,56 @@ export default function PurchaseOrderForm() {
 
             // Load product details for each item to get UOM
             const itemsWithDetails = await Promise.all(
-                pqItems.map(async (it) => {
+                pqItems.map(async (it, idx) => {
                     try {
-                        const productId = it.productId;
-                        if (!productId) return null;
+                        console.log(`🔍 Processing PQ item ${idx}:`, JSON.stringify(it, null, 2));
+                        
+                        const productId = it.productId || it.product_id || it.product?.productId || it.product?.product_id;
+                        console.log(`   Product ID extracted: ${productId}`);
+                        
+                        if (!productId) {
+                            console.warn(`   ⚠️ No product ID found for item ${idx}`);
+                            return null;
+                        }
 
                         // Fetch product details to get UOM
                         const productRes = await apiClient.get(`/product/${productId}`);
                         const product = productRes.data || {};
+                        console.log(`   ✅ Product details loaded:`, product.sku, product.name);
 
                         const quantity = Number(it.quantity || 1);
-                        const unitPrice = Number(it.unitPrice || 0);
-                        const taxRate = Number(it.taxRate || 0);
+                        const unitPrice = Number(it.unitPrice || it.unit_price || 0);
+                        const discountPercent = Number(it.discountPercent || it.discount_percent || 0);
+                        const taxRate = Number(it.taxRate || it.tax_rate || 0);
                         const calc = {
                             quantity,
                             unit_price: unitPrice,
+                            discount_percent: discountPercent,
                             tax_rate: taxRate
                         };
                         const totals = calculateItemTotal(calc);
 
-                        return {
-                            pq_item_id: it.pqItemId,
+                        const mappedItem = {
+                            pq_item_id: it.pqItemId || it.pq_item_id,
                             product_id: productId,
-                            productCode: it.productCode || product.sku || product.productCode || "",
-                            productName: it.productName || product.name || "",
+                            productCode: it.productCode || it.product_code || product.sku || product.productCode || "",
+                            productName: it.productName || it.product_name || product.name || "",
                             uom: product.uom || product.unit || "",
                             quantity,
                             unit_price: unitPrice,
+                            discount_percent: discountPercent,
                             tax_rate: taxRate,
                             tax_amount: totals.tax,
                             line_total: totals.total,
                             delivery_date: null,
-                            note: it.remark || "",
+                            note: it.remark || it.note || "",
                         };
+                        
+                        console.log(`   ✅ Mapped item:`, mappedItem);
+                        return mappedItem;
                     } catch (err) {
-                        console.warn('Could not load product details:', err);
+                        console.error(`   ❌ Error processing item ${idx}:`, err);
+                        console.error(`   Error details:`, err.response?.data || err.message);
                         return null;
                     }
                 })
@@ -765,7 +783,8 @@ export default function PurchaseOrderForm() {
 
             const mapped = itemsWithDetails.filter(m => m !== null);
 
-            console.log("Mapped items count:", mapped.length);
+            console.log("✅ Mapped items count:", mapped.length);
+            console.log("✅ Final mapped items:", JSON.stringify(mapped, null, 2));
 
             if (mapped.length === 0) {
                 toast.info("Không có sản phẩm hợp lệ để nhập");
@@ -788,6 +807,8 @@ export default function PurchaseOrderForm() {
             }
 
             // Update formData with ALL information from quotation
+            const headerDiscount = Number(data.headerDiscount || data.header_discount || 0);
+            
             const updatedFormData = { 
                 ...formData, 
                 vendor_id: vendorId,
@@ -795,6 +816,7 @@ export default function PurchaseOrderForm() {
                 payment_terms: paymentTerms || "",
                 delivery_date: deliveryDate || "",
                 shipping_address: deliveryTerms || "",
+                header_discount: headerDiscount,
                 items: mapped 
             };
             
@@ -803,11 +825,18 @@ export default function PurchaseOrderForm() {
                 payment_terms: paymentTerms,
                 delivery_date: deliveryDate,
                 shipping_address: deliveryTerms,
-                items_count: mapped.length
+                items_count: mapped.length,
+                items: mapped
             });
             
-            setFormData(updatedFormData);
-            setIsImportedFromPQ(true); // Mark as imported from PQ
+            
+            // Verify formData was updated
+            setTimeout(() => {
+                console.log("🔄 FormData after setState:", {
+                    items_length: updatedFormData.items.length,
+                    first_item: updatedFormData.items[0]
+                });
+            }, 100);
             
             setShowImportModal(false);
             setSelectedQuotation(null);
@@ -1113,6 +1142,12 @@ export default function PurchaseOrderForm() {
                                     <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
                                 )}
 
+                                {(() => {
+                                    console.log("🎨 RENDER CHECK - formData.items.length:", formData.items.length);
+                                    console.log("🎨 RENDER CHECK - formData.items:", formData.items);
+                                    return null;
+                                })()}
+
                                 {formData.items.length === 0 ? (
                                     <div className="text-center py-8 text-gray-500">
                                         <p>Chưa có sản phẩm nào. Nhấn "Thêm sản phẩm" để bắt đầu.</p>
@@ -1124,7 +1159,6 @@ export default function PurchaseOrderForm() {
                                             <tr className="bg-gray-50">
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">#</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Mã SP</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Tên sản phẩm</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">ĐVT</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
@@ -1136,31 +1170,31 @@ export default function PurchaseOrderForm() {
                                             </thead>
                                             <tbody>
                                             {formData.items.map((item, index) => {
+                                                console.log(`🎨 Rendering row ${index}:`, {
+                                                    productCode: item.productCode,
+                                                    productName: item.productName,
+                                                    product_id: item.product_id,
+                                                    quantity: item.quantity
+                                                });
+                                                
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 const selectedProduct = products.find((o) => o.value === item.product_id);
+                                                
+                                                console.log(`   selectedProduct:`, selectedProduct ? selectedProduct.label : 'NULL');
+                                                console.log(`   Will show: ${item.productCode ? 'readonly input' : 'Select dropdown'}`);
+                                                
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
                                                         <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">{index + 1}</td>
                                                         <td className="border border-gray-200 px-4 py-2">
-                                                            <input
-                                                                type="text"
-                                                                value={item.productCode || selectedProduct?.product?.sku || selectedProduct?.product?.productCode || ''}
-                                                                readOnly
-                                                                className="w-28 px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
-                                                                placeholder="Mã SP"
-                                                            />
-                                                        </td>
-                                                        <td className="border border-gray-200 px-4 py-2">
-                                                            {item.productName && item.product_id ? (
-                                                                // Show read-only name if imported from PQ with productName
+                                                            {item.productCode ? (
                                                                 <input
                                                                     type="text"
-                                                                    value={item.productName}
+                                                                    value={item.productCode}
                                                                     readOnly
                                                                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
                                                                 />
                                                             ) : (
-                                                                // Show Select dropdown for manual selection
                                                                 <Select
                                                                     value={selectedProduct || null}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}

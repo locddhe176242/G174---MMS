@@ -41,7 +41,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
         uom: product?.uom || '',
         size: product?.size || '',
         status: product?.status || 'IN_STOCK',
-        quantity: product?.quantity || 0,
         imageUrl: product?.imageUrl || product?.image_url || null,
         imageFile: null, // Lưu file object để upload
         sku: product?.sku || ''
@@ -169,15 +168,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                 const priceValue = parseFloat(formData.sellingPrice);
                 if (priceValue > 0) payload.sellingPrice = priceValue;
             }
-            if (formData.quantity !== undefined && formData.quantity !== '') {
-                const qtyValue = parseInt(formData.quantity);
-                if (isNaN(qtyValue) || qtyValue < 0) {
-                    toast.warning('Số lượng phải lớn hơn hoặc bằng 0!');
-                    setLoading(false);
-                    return;
-                }
-                payload.quantity = qtyValue;
-            }
             if (formData.categoryId && formData.categoryId !== '') {
                 const catId = parseInt(formData.categoryId);
                 if (!isNaN(catId)) payload.categoryId = catId;
@@ -240,7 +230,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                             'purchasePrice': 'Giá vốn',
                             'sellingPrice': 'Giá bán',
                             'categoryId': 'Danh mục',
-                            'quantity': 'Số lượng',
                             'status': 'Trạng thái',
                             'imageUrl': 'Ảnh sản phẩm'
                         };
@@ -354,23 +343,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                                 value={formData.size}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Số lượng</label>
-                            <input
-                                type="number"
-                                name="quantity"
-                                value={formData.quantity}
-                                onChange={handleChange}
-                                min="0"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
-                                onInvalid={(e) => {
-                                    e.target.setCustomValidity('Số lượng phải lớn hơn hoặc bằng 0');
-                                }}
-                                onInput={(e) => {
-                                    e.target.setCustomValidity('');
-                                }}
                             />
                         </div>
                         <div>

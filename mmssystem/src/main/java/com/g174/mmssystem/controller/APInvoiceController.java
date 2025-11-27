@@ -1,9 +1,7 @@
 package com.g174.mmssystem.controller;
 
 import com.g174.mmssystem.dto.requestDTO.APInvoiceRequestDTO;
-import com.g174.mmssystem.dto.requestDTO.APPaymentRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.APInvoiceResponseDTO;
-import com.g174.mmssystem.dto.responseDTO.APPaymentResponseDTO;
 import com.g174.mmssystem.entity.APInvoice;
 import com.g174.mmssystem.service.IService.IAPInvoiceService;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -116,18 +113,6 @@ public class APInvoiceController {
     @DeleteMapping("/{invoiceId}")
     public ResponseEntity<APInvoiceResponseDTO> deleteInvoice(@PathVariable Integer invoiceId) {
         APInvoiceResponseDTO response = apInvoiceService.deleteInvoice(invoiceId);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/payments")
-    public ResponseEntity<APPaymentResponseDTO> addPayment(@RequestBody APPaymentRequestDTO dto) {
-        APPaymentResponseDTO response = apInvoiceService.addPayment(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    @GetMapping("/{invoiceId}/payments")
-    public ResponseEntity<List<APPaymentResponseDTO>> getPaymentsByInvoiceId(@PathVariable Integer invoiceId) {
-        List<APPaymentResponseDTO> response = apInvoiceService.getPaymentsByInvoiceId(invoiceId);
         return ResponseEntity.ok(response);
     }
 
