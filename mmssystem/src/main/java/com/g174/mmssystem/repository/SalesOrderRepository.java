@@ -4,6 +4,7 @@ import com.g174.mmssystem.entity.SalesOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,7 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Repository
-public interface SalesOrderRepository extends JpaRepository<SalesOrder, Integer> {
+public interface SalesOrderRepository extends JpaRepository<SalesOrder, Integer>, JpaSpecificationExecutor<SalesOrder> {
 
     @Query("SELECT so FROM SalesOrder so WHERE so.customer.customerId = :customerId AND so.deletedAt IS NULL")
     List<SalesOrder> findByCustomerIdAndNotDeleted(@Param("customerId") Integer customerId);
