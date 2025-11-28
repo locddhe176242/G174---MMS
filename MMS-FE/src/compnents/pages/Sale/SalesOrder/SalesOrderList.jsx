@@ -1,24 +1,74 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { salesQuotationService } from "../../../../api/salesQuotationService";
+import { salesOrderService } from "../../../../api/salesOrderService";
 import Pagination from "../../../common/Pagination";
 
-const STATUS_LABELS = {
-  Draft: "Nháp",
-  Active: "Đang mở",
-  Cancelled: "Đã hủy",
-  Expired: "Hết hạn",
-};
-
 const STATUS_OPTIONS = [
-  { value: "", label: "Tất cả" },
-  ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "Pending", label: "Chờ xử lý" },
+  { value: "Approved", label: "Đã duyệt" },
+  { value: "Fulfilled", label: "Đã hoàn thành" },
+  { value: "Cancelled", label: "Đã hủy" },
 ];
 
-const formatCurrency = (value) =>
+const APPROVAL_OPTIONS = [
+  { value: "", label: "Tất cả phê duyệt" },
+  { value: "Pending", label: "Chờ phê duyệt" },
+  { value: "Approved", label: "Đã phê duyệt" },
+  { value: "Rejected", label: "Từ chối" },
+];
+
+const getStatusLabel = (status) => {
+  const statusMap = {
+    Pending: "Chờ xử lý",
+    Approved: "Đã duyệt",
+    Fulfilled: "Đã hoàn thành",
+    Cancelled: "Đã hủy",
+  };
+  return statusMap[status] || status;
+};
+
+const getApprovalStatusLabel = (approvalStatus) => {
+  const approvalMap = {
+    Pending: "Chờ phê duyệt",
+    Approved: "Đã phê duyệt",
+    Rejected: "Từ chối",
+  };
+  return approvalMap[approvalStatus] || approvalStatus;
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case "Pending":
+      return "bg-yellow-100 text-yellow-700";
+    case "Approved":
+      return "bg-blue-100 text-blue-700";
+    case "Fulfilled":
+      return "bg-green-100 text-green-700";
+    case "Cancelled":
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-gray-100 text-gray-700";
+  }
+};
+
+const getApprovalStatusColor = (approvalStatus) => {
+  switch (approvalStatus) {
+    case "Pending":
+      return "bg-yellow-100 text-yellow-700";
+    case "Approved":
+      return "bg-green-100 text-green-700";
+    case "Rejected":
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-gray-100 text-gray-700";
+  }
+};
+
+const formatCurrency = (num) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    Number(value || 0)
+    Number(num || 0)
   );
 
 const formatDate = (value) =>
@@ -27,53 +77,53 @@ const formatDate = (value) =>
 const formatDateTime = (value) =>
   value ? new Date(value).toLocaleString("vi-VN") : "—";
 
-export default function SalesQuotationList() {
+export default function SalesOrderList() {
   const navigate = useNavigate();
-  const [quotations, setQuotations] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [sortField, setSortField] = useState("quotationDate");
+  const [sortField, setSortField] = useState("orderDate");
   const [sortDir, setSortDir] = useState("desc");
 
-  const fetchAllQuotations = async () => {
+  const fetchAllOrders = async () => {
     try {
       setLoading(true);
-      const response = await salesQuotationService.getAllQuotations();
-      const list = Array.isArray(response)
-        ? response
-        : response?.content || response?.data || [];
-      setQuotations(list);
+      const response = await salesOrderService.getAllOrders({
+        keyword: searchTerm || undefined,
+        status: statusFilter || undefined,
+        approvalStatus: approvalStatusFilter || undefined,
+      });
+      const list = Array.isArray(response) ? response : response?.content || response?.data || [];
+      setOrders(list);
     } catch (error) {
-      console.error("Error fetching quotations:", error);
-      toast.error("Không thể tải danh sách báo giá");
+      console.error("Error fetching orders:", error);
+      toast.error("Không thể tải danh sách đơn bán hàng");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAllQuotations();
+    fetchAllOrders();
   }, []);
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return quotations.filter((quotation) => {
+    return orders.filter((order) => {
       const matchesKeyword =
         !term ||
-        (quotation.quotationNo || "")
-          .toLowerCase()
-          .includes(term) ||
-        (quotation.customerName || "")
-          .toLowerCase()
-          .includes(term);
-      const matchesStatus =
-        !statusFilter || quotation.status === statusFilter;
-      return matchesKeyword && matchesStatus;
+        (order.orderNo || "").toLowerCase().includes(term) ||
+        (order.customerName || "").toLowerCase().includes(term);
+      const matchesStatus = !statusFilter || order.status === statusFilter;
+      const matchesApprovalStatus =
+        !approvalStatusFilter || order.approvalStatus === approvalStatusFilter;
+      return matchesKeyword && matchesStatus && matchesApprovalStatus;
     });
-  }, [quotations, searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter, approvalStatusFilter]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -85,10 +135,8 @@ export default function SalesQuotationList() {
 
       if (valueA === valueB) return 0;
 
-      if (sortField === "quotationDate" || sortField === "validUntil") {
-        return (
-          (new Date(valueA || 0) - new Date(valueB || 0)) * direction
-        );
+      if (sortField === "orderDate" || sortField === "createdAt" || sortField === "updatedAt") {
+        return (new Date(valueA || 0) - new Date(valueB || 0)) * direction;
       }
 
       if (
@@ -120,18 +168,6 @@ export default function SalesQuotationList() {
     setCurrentPage(0);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa báo giá này?")) return;
-    try {
-      await salesQuotationService.deleteQuotation(id);
-      toast.success("Đã xóa báo giá");
-      fetchAllQuotations();
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể xóa báo giá");
-    }
-  };
-
   const changeSort = (field) => {
     if (sortField === field) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -142,9 +178,7 @@ export default function SalesQuotationList() {
   };
 
   const getSortIcon = (field) => {
-    if (sortField !== field) {
-      return <span className="text-gray-300">↕</span>;
-    }
+    if (sortField !== field) return <span className="text-gray-300">↕</span>;
     return sortDir === "asc" ? (
       <span className="text-blue-600">↑</span>
     ) : (
@@ -152,23 +186,31 @@ export default function SalesQuotationList() {
     );
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đơn bán hàng này?")) return;
+    try {
+      await salesOrderService.deleteOrder(id);
+      toast.success("Đã xóa đơn bán hàng");
+      fetchAllOrders();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể xóa đơn bán hàng");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Quản lý báo giá bán hàng
-            </h1>
-            <p className="text-gray-500">
-              Theo dõi và quản lý báo giá cho khách hàng
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn bán hàng</h1>
+            <p className="text-gray-500">Theo dõi đơn bán hàng và trạng thái thực hiện</p>
           </div>
           <button
-            onClick={() => navigate("/sales/quotations/new")}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            onClick={() => navigate("/sales/orders/new")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            + Tạo báo giá
+            + Tạo đơn bán hàng
           </button>
         </div>
       </div>
@@ -176,19 +218,16 @@ export default function SalesQuotationList() {
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <form
-              onSubmit={handleSearch}
-              className="flex flex-col md:flex-row gap-4 items-center"
-            >
+            <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <input
                 type="text"
-                placeholder="Tìm theo số báo giá, khách hàng..."
+                placeholder="Tìm theo số đơn, khách hàng..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(0);
                 }}
-                className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 flex-1"
               />
               <select
                 value={statusFilter}
@@ -199,6 +238,20 @@ export default function SalesQuotationList() {
                 className="px-3 py-2 border rounded-lg"
               >
                 {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={approvalStatusFilter}
+                onChange={(e) => {
+                  setApprovalStatusFilter(e.target.value);
+                  setCurrentPage(0);
+                }}
+                className="px-3 py-2 border rounded-lg"
+              >
+                {APPROVAL_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -215,23 +268,19 @@ export default function SalesQuotationList() {
 
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="py-12 text-center text-gray-500">
-                Đang tải dữ liệu...
-              </div>
+              <div className="py-12 text-center text-gray-500">Đang tải dữ liệu...</div>
             ) : sorted.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                Không có báo giá nào
-              </div>
+              <div className="py-12 text-center text-gray-500">Không có đơn bán hàng nào</div>
             ) : (
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       <button
-                        onClick={() => changeSort("quotationNo")}
+                        onClick={() => changeSort("orderNo")}
                         className="flex items-center gap-1"
                       >
-                        Số báo giá {getSortIcon("quotationNo")}
+                        Số đơn {getSortIcon("orderNo")}
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -246,15 +295,15 @@ export default function SalesQuotationList() {
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <button
-                        onClick={() => changeSort("quotationDate")}
-                        className="flex items-center gap-1"
-                      >
-                        Ngày báo giá {getSortIcon("quotationDate")}
-                      </button>
+                      Phê duyệt
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Hạn báo giá
+                      <button
+                        onClick={() => changeSort("orderDate")}
+                        className="flex items-center gap-1"
+                      >
+                        Ngày đơn {getSortIcon("orderDate")}
+                      </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Người tạo
@@ -271,49 +320,59 @@ export default function SalesQuotationList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-              {paginated.map((quotation) => (
-                    <tr key={quotation.quotationId} className="hover:bg-gray-50">
+                  {paginated.map((order) => (
+                    <tr key={order.orderId || order.soId} className="hover:bg-gray-50">
                       <td className="px-6 py-3 font-semibold text-sm text-gray-900">
-                        {quotation.quotationNo}
+                        {order.orderNo || order.soNo || "—"}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-700">
-                        {quotation.customerName || "—"}
+                        {order.customerName || "—"}
                       </td>
                       <td className="px-6 py-3">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
-                          {STATUS_LABELS[quotation.status] || quotation.status}
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                            order.status
+                          )}`}
+                        >
+                          {getStatusLabel(order.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getApprovalStatusColor(
+                            order.approvalStatus
+                          )}`}
+                        >
+                          {getApprovalStatusLabel(order.approvalStatus)}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-700">
-                        {formatDate(quotation.quotationDate)}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-gray-700">
-                        {formatDate(quotation.validUntil)}
+                        {formatDate(order.orderDate)}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
                         <div className="font-semibold">
-                          {quotation.createdByDisplay || "—"}
+                          {order.createdByDisplay || "—"}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.createdAt)}
+                          {formatDateTime(order.createdAt)}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
                         <div className="font-semibold">
-                          {quotation.updatedByDisplay || "—"}
+                          {order.updatedByDisplay || "—"}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.updatedAt)}
+                          {formatDateTime(order.updatedAt)}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">
-                        {formatCurrency(quotation.totalAmount)}
+                        {formatCurrency(order.totalAmount)}
                       </td>
                       <td className="px-6 py-3 text-sm">
                         <div className="flex items-center gap-3 justify-center">
                           <button
                             onClick={() =>
-                              navigate(`/sales/quotations/${quotation.quotationId}`)
+                              navigate(`/sales/orders/${order.orderId || order.soId}`)
                             }
                             className="text-blue-600 hover:underline"
                           >
@@ -321,14 +380,14 @@ export default function SalesQuotationList() {
                           </button>
                           <button
                             onClick={() =>
-                              navigate(`/sales/quotations/${quotation.quotationId}/edit`)
+                              navigate(`/sales/orders/${order.orderId || order.soId}/edit`)
                             }
                             className="text-green-600 hover:underline"
                           >
                             Sửa
                           </button>
                           <button
-                            onClick={() => handleDelete(quotation.quotationId)}
+                            onClick={() => handleDelete(order.orderId || order.soId)}
                             className="text-red-600 hover:underline"
                           >
                             Xóa
