@@ -27,6 +27,7 @@ import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisit
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
+import DebtManagementList from "./compnents/pages/DebtManagementList.jsx";
 import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
 import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
 import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
@@ -82,6 +83,7 @@ function App() {
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
+                <Route path="/debt-management" element={<DebtManagementList />} />
                 <Route path="/sales/quotations" element={<SalesQuotationList />} />
                 <Route path="/sales/quotations/new" element={<SalesQuotationForm />} />
                 <Route path="/sales/quotations/:id" element={<SalesQuotationDetail />} />
