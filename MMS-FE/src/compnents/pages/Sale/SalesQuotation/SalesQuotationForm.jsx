@@ -73,7 +73,6 @@ export default function SalesQuotationForm() {
     paymentTerms: "",
     deliveryTerms: "",
     notes: "",
-    headerDiscount: 0,
     taxRate: 0,
     items: [DEFAULT_ITEM],
   });
@@ -154,7 +153,6 @@ export default function SalesQuotationForm() {
         paymentTerms: quotation.paymentTerms || "",
         deliveryTerms: quotation.deliveryTerms || "",
         notes: quotation.notes || "",
-        headerDiscount: quotation.headerDiscount || 0,
         taxRate: quotation.taxRate || 0,
         items:
           quotation.items?.map((item) => ({
@@ -267,7 +265,7 @@ export default function SalesQuotationForm() {
       0
     );
 
-    const taxable = Math.max(subtotal - discount - Number(formData.headerDiscount || 0), 0);
+    const taxable = Math.max(subtotal - discount, 0);
     const taxRate = Number(formData.taxRate || 0);
     const taxAmount =
       formData.items.reduce((sum, item) => {
@@ -332,7 +330,7 @@ export default function SalesQuotationForm() {
     paymentTerms: formData.paymentTerms || null,
     deliveryTerms: formData.deliveryTerms || null,
     notes: formData.notes || null,
-    headerDiscount: Number(formData.headerDiscount || 0),
+    headerDiscount: 0,
     taxRate: Number(formData.taxRate || 0),
     subtotal: totals.subtotal,
     taxAmount: totals.taxAmount,
@@ -554,18 +552,6 @@ export default function SalesQuotationForm() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <div>
-                <label className="text-sm text-gray-600">Chiết khấu chung</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.headerDiscount}
-                  onChange={(e) =>
-                    handleInputChange("headerDiscount", e.target.value)
-                  }
-                  className="mt-1 w-full border rounded-lg px-3 py-2"
-                />
-              </div>
               <div>
                 <label className="text-sm text-gray-600">Thuế (%)</label>
                 <input

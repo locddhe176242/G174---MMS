@@ -158,7 +158,7 @@ export default function SalesQuotationList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Quản lý Sales Quotation
+              Quản lý báo giá bán hàng
             </h1>
             <p className="text-gray-500">
               Theo dõi và quản lý báo giá cho khách hàng
