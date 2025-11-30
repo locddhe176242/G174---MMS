@@ -35,7 +35,7 @@ export default function SalesQuotationList() {
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [sortField, setSortField] = useState("quotationDate");
+  const [sortField, setSortField] = useState("createdAt");
   const [sortDir, setSortDir] = useState("desc");
 
   const fetchAllQuotations = async () => {
@@ -85,7 +85,7 @@ export default function SalesQuotationList() {
 
       if (valueA === valueB) return 0;
 
-      if (sortField === "quotationDate" || sortField === "validUntil") {
+      if (sortField === "quotationDate" || sortField === "validUntil" || sortField === "createdAt" || sortField === "updatedAt") {
         return (
           (new Date(valueA || 0) - new Date(valueB || 0)) * direction
         );
