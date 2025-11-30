@@ -27,7 +27,7 @@ const DEFAULT_ITEM = {
   uom: "",
   quantity: 1,
   unitPrice: 0,
-  discountAmount: 0,
+  discountRate: 0,
   taxRate: 0,
 };
 
@@ -50,6 +50,13 @@ const normalizeNumberInput = (rawValue) => {
   }
   const cleaned = rawValue.toString().replace(/[^\d]/g, "");
   return cleaned ? Number(cleaned) : 0;
+};
+
+const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
+  if (itemTaxRate === null || itemTaxRate === undefined || itemTaxRate === "") {
+    return Number(commonTaxRate || 0);
+  }
+  return Number(itemTaxRate || 0);
 };
 
 export default function SalesQuotationForm() {
@@ -162,7 +169,9 @@ export default function SalesQuotationForm() {
             uom: item.uom || "",
             quantity: item.quantity || 1,
             unitPrice: item.unitPrice || item.price || 0,
-            discountAmount: item.discountAmount || 0,
+            discountRate: item.discountAmount && item.quantity && item.unitPrice
+              ? (Number(item.discountAmount) / (Number(item.quantity) * Number(item.unitPrice))) * 100
+              : 0,
             taxRate: item.taxRate || 0,
           })) || [DEFAULT_ITEM],
       });
@@ -260,22 +269,26 @@ export default function SalesQuotationForm() {
       return sum + qty * price;
     }, 0);
 
-    const discount = formData.items.reduce(
-      (sum, item) => sum + Number(item.discountAmount || 0),
-      0
-    );
+    const discount = formData.items.reduce((sum, item) => {
+      const qty = Number(item.quantity || 0);
+      const price = Number(item.unitPrice || 0);
+      const rate = Number(item.discountRate || 0);
+      const lineTotal = qty * price;
+      return sum + (lineTotal * rate) / 100;
+    }, 0);
 
     const taxable = Math.max(subtotal - discount, 0);
     const taxRate = Number(formData.taxRate || 0);
     const taxAmount =
       formData.items.reduce((sum, item) => {
-        const lineBase =
-          Math.max(
-            Number(item.quantity || 0) * Number(item.unitPrice || 0) -
-              Number(item.discountAmount || 0),
-            0
-          ) * (Number(item.taxRate ?? formData.taxRate) || 0);
-        return sum + lineBase / 100;
+        const qty = Number(item.quantity || 0);
+        const price = Number(item.unitPrice || 0);
+        const discountRate = Number(item.discountRate || 0);
+        const lineTotal = qty * price;
+        const lineDiscount = (lineTotal * discountRate) / 100;
+        const lineBase = Math.max(lineTotal - lineDiscount, 0);
+        const itemTaxRate = getEffectiveTaxRate(item.taxRate, formData.taxRate);
+        return sum + (lineBase * itemTaxRate) / 100;
       }, 0) || (taxable * taxRate) / 100;
     const total = taxable + Number(taxAmount || 0);
 
@@ -285,7 +298,7 @@ export default function SalesQuotationForm() {
       taxAmount,
       totalAmount: total,
     };
-  }, [formData.items, formData.headerDiscount, formData.taxRate]);
+  }, [formData.items, formData.taxRate]);
 
   const validateForm = () => {
     const errors = {};
@@ -342,8 +355,8 @@ export default function SalesQuotationForm() {
       uom: item.uom,
       quantity: Number(item.quantity || 0),
       unitPrice: Number(item.unitPrice || 0),
-      discountAmount: Number(item.discountAmount || 0),
-      taxRate: Number((item.taxRate ?? formData.taxRate) || 0),
+      discountPercent: Number(item.discountRate || 0),
+      taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
     })),
   });
 
@@ -608,7 +621,7 @@ export default function SalesQuotationForm() {
                     <th className="px-4 py-3 text-left">ĐVT</th>
                     <th className="px-4 py-3 text-right">Số lượng</th>
                     <th className="px-4 py-3 text-right">Đơn giá</th>
-                    <th className="px-4 py-3 text-right">Chiết khấu</th>
+                    <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
                     <th className="px-4 py-3 text-right">Thuế (%)</th>
                     <th className="px-4 py-3 text-right">Tạm tính</th>
                     <th className="px-4 py-3 text-center">#</th>
@@ -618,7 +631,8 @@ export default function SalesQuotationForm() {
                   {formData.items.map((item, index) => {
                     const baseTotal =
                       Number(item.quantity || 0) * Number(item.unitPrice || 0);
-                    const lineDiscount = Number(item.discountAmount || 0);
+                    const discountRate = Number(item.discountRate || 0);
+                    const lineDiscount = (baseTotal * discountRate) / 100;
                     const taxable = Math.max(baseTotal - lineDiscount, 0);
                     const lineTax =
                       (taxable * Number(item.taxRate || formData.taxRate || 0)) /
@@ -690,15 +704,18 @@ export default function SalesQuotationForm() {
                           <input
                             type="number"
                             min="0"
-                            value={item.discountAmount}
+                            max="100"
+                            step="0.01"
+                            value={item.discountRate}
                             onChange={(e) =>
                               handleItemChange(
                                 index,
-                                "discountAmount",
+                                "discountRate",
                                 e.target.value
                               )
                             }
                             className="w-28 border rounded px-2 py-1 text-right"
+                            placeholder="0"
                           />
                         </td>
                         <td className="px-4 py-3 text-right">

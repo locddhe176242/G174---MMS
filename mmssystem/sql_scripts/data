@@ -53,27 +53,37 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (15, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 18),
 (16, 'sales-orders', 'Đơn bán hàng', '/sales/orders', 'sales-orders', 19),
 (17, 'deliveries', 'Phiếu giao hàng', '/sales/deliveries', 'deliveries', 20);
+INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
+(18, 'return-orders', 'Đơn trả hàng', '/sales/return-orders', 'return', 21);
+
+-- Credit Note Menu
+INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
+(19, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 22);
+
+-- Invoice Menu
+INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, display_order) VALUES
+(20, 'invoices', 'Hóa đơn', '/sales/invoices', 'invoice', 23);
 
 -- ==================== 8. ROLE_MENUS ====================
--- MANAGER: Có tất cả menus (bao gồm RFQ, Sales Quotation, Sales Order, Delivery)
+-- MANAGER: Có tất cả menus (bao gồm RFQ, Sales Quotation, Sales Order, Delivery, Return Order, Credit Note, Invoice)
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17);
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20);
 
--- SALE: Dashboard, Sản phẩm, Xuất hàng, Khách hàng, Báo cáo, Sales Quotation, Sales Order, Delivery
+-- SALE: Dashboard, Sản phẩm, Xuất hàng, Khách hàng, Báo cáo, Sales Quotation, Sales Order, Delivery, Return Order, Credit Note, Invoice
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(2, 1), (2, 2), (2, 4), (2, 7), (2, 10), (2, 15), (2, 16), (2, 17);
+(2, 1), (2, 2), (2, 4), (2, 7), (2, 10), (2, 15), (2, 16), (2, 17), (2, 18), (2, 19), (2, 20);
 
 -- PURCHASE: Dashboard, Sản phẩm, Nhập hàng, Nhà cung cấp, Báo cáo, Danh mục
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (3, 1), (3, 3), (3, 4), (3, 6), (3, 10), (3, 13);
 
--- ACCOUNTING: Dashboard, Kế toán, Khách hàng, Nhà cung cấp, Phê duyệt, Báo cáo
+-- ACCOUNTING: Dashboard, Kế toán, Khách hàng, Nhà cung cấp, Phê duyệt, Báo cáo, Credit Note, Invoice
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(4, 1), (4, 2), (4, 3), (4, 8), (4, 9), (4, 10);
+(4, 1), (4, 2), (4, 3), (4, 8), (4, 9), (4, 10), (4, 19), (4, 20);
 
--- WAREHOUSE: Dashboard, Sản phẩm, Kho, Nhập hàng, Xuất hàng, Báo cáo, Delivery
+-- WAREHOUSE: Dashboard, Sản phẩm, Kho, Nhập hàng, Xuất hàng, Báo cáo, Delivery, Return Order
 INSERT INTO role_menus (role_id, menu_id) VALUES
-(5, 1), (5, 4), (5, 5), (5, 6), (5, 7), (5, 10), (5, 17);
+(5, 1), (5, 4), (5, 5), (5, 6), (5, 7), (5, 10), (5, 17), (5, 18);
 
 -- ==================== 9. PERMISSIONS ====================
 -- Customer permissions
@@ -132,8 +142,33 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 (34, 'delivery.delete', 'Xóa phiếu giao hàng', 'delivery', 'delete'),
 (35, 'delivery.status', 'Thay đổi trạng thái phiếu giao hàng', 'delivery', 'status');
 
+-- Return Order permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(36, 'return_order.view', 'Xem đơn trả hàng', 'return_order', 'view'),
+(37, 'return_order.create', 'Tạo đơn trả hàng', 'return_order', 'create'),
+(38, 'return_order.edit', 'Sửa đơn trả hàng', 'return_order', 'edit'),
+(39, 'return_order.delete', 'Xóa đơn trả hàng', 'return_order', 'delete'),
+(40, 'return_order.status', 'Thay đổi trạng thái đơn trả hàng', 'return_order', 'status');
+
+-- Credit Note permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(41, 'credit_note.view', 'Xem Credit Note', 'credit_note', 'view'),
+(42, 'credit_note.create', 'Tạo Credit Note', 'credit_note', 'create'),
+(43, 'credit_note.edit', 'Sửa Credit Note', 'credit_note', 'edit'),
+(44, 'credit_note.delete', 'Xóa Credit Note', 'credit_note', 'delete'),
+(45, 'credit_note.status', 'Thay đổi trạng thái Credit Note', 'credit_note', 'status');
+
+-- Invoice permissions
+INSERT INTO permissions (permission_id, permission_key, permission_name, resource, action) VALUES
+(46, 'invoice.view', 'Xem hóa đơn', 'invoice', 'view'),
+(47, 'invoice.create', 'Tạo hóa đơn', 'invoice', 'create'),
+(48, 'invoice.edit', 'Sửa hóa đơn', 'invoice', 'edit'),
+(49, 'invoice.delete', 'Xóa hóa đơn', 'invoice', 'delete'),
+(50, 'invoice.payment', 'Thêm thanh toán cho hóa đơn', 'invoice', 'payment');
+
 -- ==================== 10. ROLE_PERMISSIONS ====================
--- MANAGER: Tất cả permissions
+
+-- MANAGER: Tất cả permissions (1-50)
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5),
 (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
@@ -141,14 +176,20 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
 (1, 21), (1, 22), (1, 23), (1, 24), (1, 25),
 (1, 26), (1, 27), (1, 28), (1, 29), (1, 30),
-(1, 31), (1, 32), (1, 33), (1, 34), (1, 35);
+(1, 31), (1, 32), (1, 33), (1, 34), (1, 35),
+(1, 36), (1, 37), (1, 38), (1, 39), (1, 40),
+(1, 41), (1, 42), (1, 43), (1, 44), (1, 45),
+(1, 46), (1, 47), (1, 48), (1, 49), (1, 50);
 
--- SALE: Customer (view, create, edit, export), Product (view), Sales (view, create, edit), Delivery (view, create, edit, status)
+-- SALE: Customer (view, create, edit, export), Product (view), Sales (view, create, edit), Delivery (view, create, edit, status), Return Order, Credit Note, Invoice
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 (2, 1), (2, 2), (2, 3), (2, 5),      -- Customer
 (2, 11),                              -- Product view
 (2, 16), (2, 17), (2, 18),            -- Sales
-(2, 31), (2, 32), (2, 33), (2, 35);  -- Delivery
+(2, 31), (2, 32), (2, 33), (2, 35),  -- Delivery
+(2, 36), (2, 37), (2, 38), (2, 40),  -- Return Order
+(2, 41), (2, 42), (2, 43),            -- Credit Note
+(2, 46), (2, 47), (2, 48), (2, 50);  -- Invoice
 
 -- PURCHASE: Vendor (view, create, edit, export), Product (view), Purchase (view, create, edit)
 INSERT INTO role_permissions (role_id, permission_id) VALUES
@@ -156,11 +197,14 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (3, 11),                              -- Product view
 (3, 21), (3, 22), (3, 23);            -- Purchase
 
--- ACCOUNTING: Customer (view), Vendor (view), Sales (view, approve), Purchase (view, approve)
+-- ACCOUNTING: Customer (view), Vendor (view), Sales (view, approve), Purchase (view, approve), Return Order (view), Credit Note (all), Invoice (all)
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 (4, 1), (4, 6),                       -- Customer & Vendor view
 (4, 16), (4, 20),                     -- Sales view & approve
-(4, 21), (4, 25);                     -- Purchase view & approve
+(4, 21), (4, 25),                     -- Purchase view & approve
+(4, 36),                              -- Return Order view
+(4, 41), (4, 42), (4, 43), (4, 44), (4, 45),  -- Credit Note all
+(4, 46), (4, 47), (4, 48), (4, 49), (4, 50);  -- Invoice all
 
 -- WAREHOUSE: Product (view, edit), Warehouse (all), Sales (view), Purchase (view), Delivery (view, create, edit, status)
 INSERT INTO role_permissions (role_id, permission_id) VALUES

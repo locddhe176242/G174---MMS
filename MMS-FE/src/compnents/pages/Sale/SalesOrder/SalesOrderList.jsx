@@ -86,7 +86,7 @@ export default function SalesOrderList() {
   const [approvalStatusFilter, setApprovalStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [sortField, setSortField] = useState("orderDate");
+  const [sortField, setSortField] = useState("createdAt");
   const [sortDir, setSortDir] = useState("desc");
 
   const fetchAllOrders = async () => {
