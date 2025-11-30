@@ -41,6 +41,13 @@ const normalizeNumberInput = (rawValue) => {
   return cleaned ? Number(cleaned) : 0;
 };
 
+const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
+  if (itemTaxRate === null || itemTaxRate === undefined || itemTaxRate === "") {
+    return Number(commonTaxRate || 0);
+  }
+  return Number(itemTaxRate || 0);
+};
+
 export default function SalesOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -286,7 +293,7 @@ export default function SalesOrderForm() {
         const price = Number(item.unitPrice || 0);
         const gross = qty * price;
         const discountPercent = Number(item.discountPercent || 0);
-        const taxRate = Number(item.taxRate || 0);
+        const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
         const discount = Math.min((gross * discountPercent) / 100, gross);
         const taxable = Math.max(gross - discount, 0);
         const tax = taxable * (taxRate / 100);
@@ -298,7 +305,7 @@ export default function SalesOrderForm() {
       },
       { gross: 0, discount: 0, subtotal: 0, tax: 0 }
     );
-  }, [formData.items]);
+  }, [formData.items, globalTaxRate]);
 
   const totalValue = totals.subtotal + totals.tax;
 
@@ -440,7 +447,7 @@ export default function SalesOrderForm() {
         quantity: Number(item.quantity || 0),
         unitPrice: Number(item.unitPrice || 0),
         discountPercent: Number(item.discountPercent || 0),
-        taxRate: Number(item.taxRate || 0),
+        taxRate: getEffectiveTaxRate(item.taxRate, globalTaxRate),
         note: item.note || null,
       })),
     };
@@ -693,7 +700,7 @@ export default function SalesOrderForm() {
                     const qty = Number(item.quantity || 0);
                     const price = Number(item.unitPrice || 0);
                     const discountPercent = Number(item.discountPercent || 0);
-                    const taxRate = Number(item.taxRate || 0);
+                    const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
                     const discount = Math.min((qty * price * discountPercent) / 100, qty * price);
                     const base = Math.max(qty * price - discount, 0);
                     const tax = base * (taxRate / 100);
