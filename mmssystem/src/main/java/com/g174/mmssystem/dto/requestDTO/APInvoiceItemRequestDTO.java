@@ -13,8 +13,10 @@ public class APInvoiceItemRequestDTO {
     private Integer poiId;
     private Integer griId;
     private String description;
+    private String uom;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal taxRate;
     private BigDecimal lineTotal;
 }

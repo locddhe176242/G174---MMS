@@ -23,6 +23,7 @@ public class APInvoiceRequestDTO {
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private BigDecimal balanceAmount;
+    private BigDecimal headerDiscount;
     private APInvoice.APInvoiceStatus status;
     private String notes;
     private List<APInvoiceItemRequestDTO> items;

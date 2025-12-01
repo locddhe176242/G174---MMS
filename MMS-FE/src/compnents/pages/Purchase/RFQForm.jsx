@@ -16,8 +16,8 @@ export default function RFQForm() {
 
     const [formData, setFormData] = useState({
         rfqNo: "",
-        issueDate: new Date().toISOString().split('T')[0],
-        dueDate: "",
+        issueDate: new Date(),
+        dueDate: null,
         status: "Draft",
         selectedVendorIds: [],
         notes: "",
@@ -799,10 +799,10 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.issueDate}
-                                            onChange={(e) => handleInputChange("issueDate", e.target.value)}
+                                        <DatePicker
+                                            selected={formData.issueDate instanceof Date ? formData.issueDate : (formData.issueDate ? new Date(formData.issueDate) : new Date())}
+                                            onChange={(date) => handleInputChange("issueDate", date)}
+                                            dateFormat="dd/MM/yyyy"
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
                                         {validationErrors.issueDate && (
@@ -814,10 +814,12 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Hạn phản hồi <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.dueDate}
-                                            onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                        <DatePicker
+                                            selected={formData.dueDate instanceof Date ? formData.dueDate : (formData.dueDate ? new Date(formData.dueDate) : null)}
+                                            onChange={(date) => handleInputChange("dueDate", date)}
+                                            dateFormat="dd/MM/yyyy"
+                                            minDate={new Date()}
+                                            placeholderText="Chọn hạn phản hồi"
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.dueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
                                         <p className="mt-1 text-xs text-gray-500">Ngày cuối cùng nhà cung cấp phải gửi báo giá</p>

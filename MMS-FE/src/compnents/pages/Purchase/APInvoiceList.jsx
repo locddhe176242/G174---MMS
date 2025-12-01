@@ -2,9 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
-import { apPaymentService } from "../../../api/apPaymentService";
 
-export default function APaymentList() {
+export default function APInvoiceList() {
   const navigate = useNavigate();
 
   const [invoices, setInvoices] = useState([]);
@@ -54,11 +53,27 @@ export default function APaymentList() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
         </svg>
       );
+    } else {
+      return (
+        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+        </svg>
+      );
     }
+  };
+
+  const getStatusBadge = (status) => {
+    const map = {
+      Unpaid: { label: "Chưa thanh toán", color: "bg-red-100 text-red-800" },
+      "Partially Paid": { label: "Thanh toán một phần", color: "bg-yellow-100 text-yellow-800" },
+      Paid: { label: "Đã thanh toán", color: "bg-green-100 text-green-800" },
+      Cancelled: { label: "Đã hủy", color: "bg-gray-100 text-gray-800" },
+    };
+    const statusInfo = map[status] || { label: status || "Chưa thanh toán", color: "bg-gray-100 text-gray-800" };
     return (
-      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
-      </svg>
+      <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>
+        {statusInfo.label}
+      </span>
     );
   };
 
@@ -79,21 +94,6 @@ export default function APaymentList() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      Unpaid: { bg: "bg-red-100", text: "text-red-800", label: "Chưa thanh toán" },
-      Partially_Paid: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Thanh toán 1 phần" },
-      Paid: { bg: "bg-green-100", text: "text-green-800", label: "Đã thanh toán" },
-      Cancelled: { bg: "bg-gray-100", text: "text-gray-800", label: "Đã hủy" },
-    };
-    const config = statusConfig[status] || { bg: "bg-gray-100", text: "text-gray-800", label: status };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
-    );
-  };
-
   const fetchInvoices = async (page = 0, keyword = "", sortFieldValue = "createdAt", sortDirectionValue = "desc") => {
     try {
       setLoading(true);
@@ -101,7 +101,7 @@ export default function APaymentList() {
 
       let response;
       if (keyword.trim()) {
-        response = await apInvoiceService.searchInvoicesWithPagination(keyword, page, pageSize);
+        response = await apInvoiceService.searchInvoicesWithPagination(keyword, page, pageSize, sortFieldValue, sortDirectionValue);
       } else {
         response = await apInvoiceService.getInvoicesWithPagination(page, pageSize, sortFieldValue, sortDirectionValue);
       }
@@ -111,8 +111,8 @@ export default function APaymentList() {
       setTotalElements(response.totalElements || 0);
       setCurrentPage(page);
     } catch (err) {
-      console.error("Error fetching AP invoices:", err);
-      setError("Không thể tải danh sách hóa đơn phải trả");
+      setError("Không thể tải danh sách Hóa đơn phải trả");
+      console.error("Error fetching AP Invoices:", err);
     } finally {
       setLoading(false);
     }
@@ -137,22 +137,38 @@ export default function APaymentList() {
   };
 
   const handleDeleteClick = (invoice) => {
+    console.log("Delete click - invoice object:", invoice);
+    console.log("Available ID fields:", {
+      ap_invoice_id: invoice.ap_invoice_id,
+      apInvoiceId: invoice.apInvoiceId,
+      id: invoice.id
+    });
     setInvoiceToDelete(invoice);
     setShowDeleteModal(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!invoiceToDelete) return;
+
+    const invoiceId = invoiceToDelete.ap_invoice_id || invoiceToDelete.apInvoiceId || invoiceToDelete.id;
+    console.log("Delete confirm - invoiceToDelete:", invoiceToDelete);
+    console.log("Delete confirm - extracted invoiceId:", invoiceId);
+
+    if (!invoiceId) {
+      toast.error("Không tìm thấy ID hóa đơn để xóa");
+      return;
+    }
+
     try {
       setIsDeleting(true);
-      await apInvoiceService.deleteInvoice(invoiceToDelete.apInvoiceId);
-      toast.success("Đã xóa hóa đơn!");
+      await apInvoiceService.deleteInvoice(invoiceId);
+      toast.success("Xóa Hóa đơn phải trả thành công!");
       setShowDeleteModal(false);
       setInvoiceToDelete(null);
       fetchInvoices(currentPage, searchKeyword, sortField, sortDirection);
     } catch (err) {
-      console.error("Error deleting AP invoice:", err);
-      toast.error("Không thể xóa hóa đơn");
+      toast.error("Không thể xóa Hóa đơn phải trả");
+      console.error("Error deleting AP Invoice:", err);
     } finally {
       setIsDeleting(false);
     }
@@ -184,11 +200,7 @@ export default function APaymentList() {
     if (!invoices || invoices.length === 0) {
       return (
         <div className="text-center py-12 text-gray-500">
-          <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-lg font-medium">Chưa có hóa đơn nào</p>
-          <p className="text-sm mt-2">Hóa đơn sẽ được tự động tạo khi Phiếu nhập kho được duyệt</p>
+          Chưa có hóa đơn nào
         </div>
       );
     }
@@ -197,73 +209,92 @@ export default function APaymentList() {
       <table className="w-full">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left">
-              <input type="checkbox" className="rounded border-gray-300" />
-            </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              SỐ HÓA ĐƠN
+              <button onClick={() => handleSort("invoice_no")} className="flex items-center gap-1 hover:text-gray-700">
+                SỐ HÓA ĐƠN
+                {getSortIcon("invoice_no")}
+              </button>
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               NHÀ CUNG CẤP
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              NGÀY HÓA ĐƠN
+              <button onClick={() => handleSort("invoice_date")} className="flex items-center gap-1 hover:text-gray-700">
+                NGÀY HÓA ĐƠN
+                {getSortIcon("invoice_date")}
+              </button>
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              NGÀY ĐẾN HẠN
+              <button onClick={() => handleSort("due_date")} className="flex items-center gap-1 hover:text-gray-700">
+                NGÀY ĐẾN HẠN
+                {getSortIcon("due_date")}
+              </button>
             </th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              TỔNG TIỀN
+              <button onClick={() => handleSort("total_amount")} className="flex items-center gap-1 justify-end hover:text-gray-700">
+                TỔNG TIỀN
+                {getSortIcon("total_amount")}
+              </button>
             </th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              CÔNG NỢ
+              <button onClick={() => handleSort("balance_amount")} className="flex items-center gap-1 justify-end hover:text-gray-700">
+                CÒN NỢ
+                {getSortIcon("balance_amount")}
+              </button>
             </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              TRẠNG THÁI
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <button onClick={() => handleSort("status")} className="flex items-center gap-1 hover:text-gray-700">
+                TRẠNG THÁI
+                {getSortIcon("status")}
+              </button>
             </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              HÀNH ĐỘNG
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <button onClick={() => handleSort("createdAt")} className="flex items-center gap-1 hover:text-gray-700">
+                NGÀY TẠO
+                {getSortIcon("createdAt")}
+              </button>
             </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {invoices.map((invoice) => (
-            <tr key={invoice.apInvoiceId} className="hover:bg-gray-50">
-              <td className="px-6 py-4">
-                <input type="checkbox" className="rounded border-gray-300" />
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-900 cursor-pointer">
-                <button onClick={() => navigate(`/purchase/ap-invoices/${invoice.apInvoiceId}`)}>
-                  {invoice.invoiceNo}
-                </button>
+            <tr key={invoice.invoiceId || invoice.ap_invoice_id || invoice.id} className="hover:bg-gray-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                {invoice.invoice_no || invoice.invoiceNo}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                <div>
-                  <div className="font-medium">{invoice.vendorName}</div>
-                  <div className="text-gray-500 text-xs">{invoice.vendorCode}</div>
-                </div>
+                {invoice.vendor?.name || invoice.vendorName || "-"}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {formatDate(invoice.invoiceDate)}
+                {formatDate(invoice.invoice_date || invoice.invoiceDate)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {formatDate(invoice.dueDate)}
+                {formatDate(invoice.due_date || invoice.dueDate)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
-                {formatCurrency(invoice.totalAmount)}
+                {formatCurrency(invoice.total_amount || invoice.totalAmount || 0)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                <span className={invoice.balanceAmount > 0 ? "font-semibold text-red-600" : "text-gray-900"}>
-                  {formatCurrency(invoice.balanceAmount)}
-                </span>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                {formatCurrency(invoice.balance_amount || invoice.balanceAmount || 0)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-center">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {getStatusBadge(invoice.status)}
               </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {formatDate(invoice.created_at || invoice.createdAt)}
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/purchase/ap-invoices/${invoice.apInvoiceId}`)}
+                    onClick={() => {
+                      const invoiceId = invoice.invoiceId || invoice.ap_invoice_id || invoice.apInvoiceId || invoice.id;
+                      if (invoiceId) {
+                        navigate(`/purchase/ap-invoices/${invoiceId}`);
+                      } else {
+                        console.error("No valid invoice ID found for navigation");
+                      }
+                    }}
                     className="text-blue-600 hover:text-blue-900"
                     title="Xem chi tiết"
                   >
@@ -272,28 +303,24 @@ export default function APaymentList() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
-                  {invoice.status !== "Paid" && invoice.status !== "Cancelled" && (
-                    <button
-                      onClick={() => navigate(`/purchase/ap-invoices/${invoice.apInvoiceId}/payment`)}
-                      className="text-green-600 hover:text-green-900"
-                      title="Thanh toán"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </button>
-                  )}
-                  {invoice.status === "Unpaid" && (
-                    <button
-                      onClick={() => handleDeleteClick(invoice)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Xóa"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => navigate(`/purchase/ap-invoices/${invoice.invoiceId || invoice.ap_invoice_id || invoice.id}/edit`)}
+                    className="text-green-600 hover:text-green-900"
+                    title="Chỉnh sửa"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(invoice)}
+                    className="text-red-600 hover:text-red-900"
+                    title="Xóa"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -308,12 +335,12 @@ export default function APaymentList() {
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Hóa đơn phải trả (AP Invoice)</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Quản lý Hóa đơn phải trả</h1>
             <button
               onClick={() => navigate("/purchase/ap-invoices/new")}
               className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
             >
-              + Tạo hóa đơn
+              + Tạo mới
             </button>
           </div>
         </div>
@@ -322,7 +349,7 @@ export default function APaymentList() {
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Danh sách hóa đơn</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Danh sách hóa đơn phải trả</h2>
           </div>
 
           <div className="px-6 py-4 border-b border-gray-200">
@@ -357,9 +384,11 @@ export default function APaymentList() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">{renderTableBody()}</div>
+          <div className="overflow-x-auto">
+            {renderTableBody()}
+          </div>
 
-          {!loading && !error && invoices.length > 0 && (
+          {!loading && !error && invoices && invoices.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-700">
@@ -416,12 +445,10 @@ export default function APaymentList() {
 
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Xác nhận xóa hóa đơn
+                Xác nhận xóa Hóa đơn phải trả
               </h3>
               <p className="text-sm text-gray-500 mb-6">
-                Bạn có chắc chắn muốn xóa hóa đơn <strong>"{invoiceToDelete?.invoiceNo}"</strong> không? 
-                <br />
-                Chỉ hóa đơn chưa thanh toán mới có thể xóa.
+                Bạn có chắc chắn muốn xóa Hóa đơn phải trả <strong>"{invoiceToDelete?.invoice_no || invoiceToDelete?.invoiceNo}"</strong> không? Hành động này không thể hoàn tác.
               </p>
 
               <div className="flex items-center justify-center gap-3">

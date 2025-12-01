@@ -5,6 +5,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
+import { apPaymentService } from "../../../api/apPaymentService";
 
 export default function APaymentForm() {
   const { invoiceId } = useParams();
@@ -113,7 +114,7 @@ export default function APaymentForm() {
         notes: formData.notes || "",
       };
 
-      await apInvoiceService.addPayment(payload);
+      await apPaymentService.createPayment(payload);
       toast.success("Thêm thanh toán thành công!");
       navigate(`/purchase/ap-invoices/${invoiceId}`);
     } catch (err) {

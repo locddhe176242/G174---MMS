@@ -41,6 +41,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     private final PurchaseQuotationItemRepository quotationItemRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
     private final EmailService emailService;
+    private final GoodsReceiptRepository goodsReceiptRepository;
 
     @Override
     @Transactional
@@ -200,7 +201,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         log.info("Fetching purchase orders with pagination");
 
         Page<PurchaseOrder> orders = orderRepository.findAllActive(pageable);
-        return orders.map(orderMapper::toResponseDTO);
+        return orders.map(order -> {
+            PurchaseOrderResponseDTO dto = orderMapper.toResponseDTO(order);
+            // Check if PO has approved Goods Receipt
+            boolean hasApprovedGR = goodsReceiptRepository.findByOrderId(order.getOrderId()).stream()
+                    .anyMatch(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved && gr.getDeletedAt() == null);
+            dto.setHasGoodsReceipt(hasApprovedGR);
+            return dto;
+        });
     }
 
     @Override
@@ -429,13 +437,48 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         }
     }
 
+    private BigDecimal calculateTotalLineDiscount(PurchaseOrder order) {
+        return order.getItems().stream()
+                .map(item -> {
+                    BigDecimal subtotal = item.getQuantity().multiply(item.getUnitPrice());
+                    BigDecimal discountPercent = item.getDiscountPercent() != null ? item.getDiscountPercent() : BigDecimal.ZERO;
+                    return subtotal.multiply(discountPercent).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    private BigDecimal calculateTotalAfterLineDiscount(PurchaseOrder order) {
+        return order.getTotalBeforeTax().subtract(calculateTotalLineDiscount(order));
+    }
+
+    private String buildLineDiscountRow(PurchaseOrder order) {
+        BigDecimal totalLineDiscount = calculateTotalLineDiscount(order);
+        
+        if (totalLineDiscount.compareTo(BigDecimal.ZERO) <= 0) {
+            return "";
+        }
+        
+        return String.format("""
+                <tr style="background-color: #f8f9fa;">
+                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Chiết khấu sản phẩm:</td>
+                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: #dc3545;">-%,.0f ₫</td>
+                </tr>
+                """,
+                totalLineDiscount
+        );
+    }
+
     private String buildHeaderDiscountRow(PurchaseOrder order) {
         BigDecimal headerDiscount = order.getHeaderDiscount();
         if (headerDiscount == null || headerDiscount.compareTo(BigDecimal.ZERO) <= 0) {
             return "";
         }
         
-        BigDecimal discountAmount = (order.getTotalBeforeTax().add(order.getTaxAmount()))
+        // Calculate total after line discount
+        BigDecimal totalAfterLineDiscount = calculateTotalAfterLineDiscount(order);
+        
+        // Header discount applies to totalAfterLineDiscount (ERP standard)
+        BigDecimal headerDiscountAmount = totalAfterLineDiscount
                 .multiply(headerDiscount)
                 .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
         
@@ -446,7 +489,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 </tr>
                 """,
                 headerDiscount,
-                discountAmount
+                headerDiscountAmount
         );
     }
 
@@ -569,14 +612,19 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                             </tbody>
                             <tfoot>
                                 <tr style="background-color: #f8f9fa;">
-                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng trước thuế:</td>
-                                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
-                                </tr>
-                                <tr style="background-color: #f8f9fa;">
-                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng thuế:</td>
+                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng giá trị hàng:</td>
                                     <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
                                 </tr>
                                 %s
+                                <tr style="background-color: #f8f9fa;">
+                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Tổng sau chiết khấu sản phẩm:</td>
+                                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
+                                </tr>
+                                %s
+                                <tr style="background-color: #f8f9fa;">
+                                    <td colspan="8" style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Thuế VAT:</td>
+                                    <td style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">%,.0f ₫</td>
+                                </tr>
                                 <tr class="total-row">
                                     <td colspan="8" style="padding: 15px; text-align: right; border: 1px solid #ddd;">TỔNG CỘNG:</td>
                                     <td style="padding: 15px; text-align: right; color: #667eea; border: 1px solid #ddd;">%,.0f ₫</td>
@@ -615,8 +663,10 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             order.getShippingAddress() != null ? order.getShippingAddress() : "N/A",
             itemsHtml.toString(),
             order.getTotalBeforeTax(),
-            order.getTaxAmount(),
+            buildLineDiscountRow(order),
+            calculateTotalAfterLineDiscount(order),
             buildHeaderDiscountRow(order),
+            order.getTaxAmount(),
             order.getTotalAfterTax()
         );
     }

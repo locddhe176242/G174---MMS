@@ -19,5 +19,11 @@ public class GoodsReceiptItemResponseDTO {
     private BigDecimal receivedQty;
     private BigDecimal acceptedQty;
     private String remark;
+    
+    // Additional fields from PurchaseOrderItem for invoice creation
+    private String uom;
+    private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
+    private BigDecimal taxRate;
 }
 

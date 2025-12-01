@@ -36,6 +36,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final PurchaseOrderItemRepository orderItemRepository;
     private final WarehouseStockRepository warehouseStockRepository;
     private final IAPInvoiceService apInvoiceService;
+    private final APInvoiceRepository apInvoiceRepository;
 
     @Override
     @Transactional
@@ -46,6 +47,15 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         PurchaseOrder purchaseOrder = orderRepository.findById(dto.getOrderId())
                 .filter(o -> o.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + dto.getOrderId()));
+
+        // Check if PO already has an approved Goods Receipt
+        List<GoodsReceipt> existingReceipts = receiptRepository.findByOrderId(dto.getOrderId());
+        boolean hasApprovedReceipt = existingReceipts.stream()
+                .anyMatch(r -> r.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved && r.getDeletedAt() == null);
+        
+        if (hasApprovedReceipt) {
+            throw new IllegalStateException("Đơn hàng này đã có phiếu nhập kho được phê duyệt. Không thể tạo phiếu nhập mới.");
+        }
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + dto.getWarehouseId()));
@@ -108,10 +118,21 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     public GoodsReceiptResponseDTO getReceiptById(Integer receiptId) {
         log.info("Fetching goods receipt ID: {}", receiptId);
 
+        // First get basic info with relations
         GoodsReceipt receipt = receiptRepository.findByIdWithRelations(receiptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
 
-        return receiptMapper.toResponseDTO(receipt);
+        // Then fetch items separately
+        GoodsReceipt receiptWithItems = receiptRepository.findByIdWithItems(receiptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
+        
+        // Set items to the main receipt
+        receipt.setItems(receiptWithItems.getItems());
+
+        GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
+        dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
+        
+        return dto;
     }
 
     @Override
@@ -127,7 +148,15 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         log.info("Fetching goods receipts with pagination");
 
         Page<GoodsReceipt> receipts = receiptRepository.findAllActive(pageable);
-        return receipts.map(receiptMapper::toResponseDTO);
+        return receipts.map(receipt -> {
+            GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
+            dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
+            return dto;
+        });
+    }
+    
+    private boolean checkIfReceiptHasInvoice(Integer receiptId) {
+        return !apInvoiceRepository.findByReceiptId(receiptId).isEmpty();
     }
 
     @Override
@@ -337,6 +366,17 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         GoodsReceipt receipt = receiptRepository.findById(receiptId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
+
+        // Validate: Cannot delete approved receipt
+        if (receipt.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved) {
+            throw new IllegalStateException("Không thể xóa phiếu nhập kho đã được phê duyệt");
+        }
+
+        // Validate: Cannot delete if has invoice
+        boolean hasInvoice = !apInvoiceRepository.findByReceiptId(receiptId).isEmpty();
+        if (hasInvoice) {
+            throw new IllegalStateException("Không thể xóa phiếu nhập kho đã có hóa đơn");
+        }
 
         receipt.setDeletedAt(LocalDateTime.now());
         GoodsReceipt saved = receiptRepository.save(receipt);

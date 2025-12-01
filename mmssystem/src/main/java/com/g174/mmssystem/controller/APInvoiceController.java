@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ap-invoices")
@@ -123,8 +124,8 @@ public class APInvoiceController {
     }
 
     @GetMapping("/generate-invoice-no")
-    public ResponseEntity<String> generateInvoiceNo() {
+    public ResponseEntity<Map<String, String>> generateInvoiceNo() {
         String invoiceNo = apInvoiceService.generateInvoiceNo();
-        return ResponseEntity.ok(invoiceNo);
+        return ResponseEntity.ok(Map.of("invoiceNo", invoiceNo));
     }
 }

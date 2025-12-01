@@ -29,5 +29,6 @@ public class GoodsReceiptResponseDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<GoodsReceiptItemResponseDTO> items;
+    private Boolean hasInvoice; // Đánh dấu GR đã được tạo invoice
 }
 

@@ -8,6 +8,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
+
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -64,6 +68,10 @@ public class APInvoice {
     @Builder.Default
     private BigDecimal balanceAmount = BigDecimal.ZERO;
 
+    @Column(name = "header_discount", precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal headerDiscount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
     @Builder.Default
@@ -82,9 +90,11 @@ public class APInvoice {
     private LocalDateTime deletedAt;
 
     @OneToMany(mappedBy = "apInvoice", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Fetch(FetchMode.SUBSELECT)
     private List<APInvoiceItem> items;
 
     @OneToMany(mappedBy = "apInvoice", cascade = CascadeType.ALL)
+    @Fetch(FetchMode.SUBSELECT)
     private List<APPayment> payments;
 
     public enum APInvoiceStatus {

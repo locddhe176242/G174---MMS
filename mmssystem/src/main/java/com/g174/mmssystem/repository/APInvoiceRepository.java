@@ -56,7 +56,6 @@ public interface APInvoiceRepository extends JpaRepository<APInvoice, Integer> {
            "LEFT JOIN FETCH v.contact " +
            "LEFT JOIN FETCH ai.purchaseOrder po " +
            "LEFT JOIN FETCH ai.goodsReceipt gr " +
-           "LEFT JOIN FETCH ai.payments " +
            "WHERE ai.apInvoiceId = :id AND ai.deletedAt IS NULL")
     Optional<APInvoice> findByIdWithRelations(@Param("id") Integer id);
 

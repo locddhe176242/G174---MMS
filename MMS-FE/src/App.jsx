@@ -41,6 +41,9 @@ import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplie
 import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
 import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
 import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
+import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
+import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
+import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -115,9 +118,15 @@ function App() {
                 <Route path="/purchase/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
                 <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
 
-                <Route path="/purchase/ap-invoices" element={<APaymentList />} />
-                <Route path="/purchase/ap-invoices/:invoiceId/payment" element={<APaymentForm />} />
-                <Route path="/purchase/ap-invoices/:id" element={<APaymentDetail />} />
+                <Route path="/purchase/ap-payments" element={<APaymentList />} />
+                <Route path="/purchase/ap-payments/:id" element={<APaymentDetail />} />
+                <Route path="/purchase/ap-payments/new" element={<APaymentForm />} />
+
+                <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
+                <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
+                <Route path="/purchase/ap-invoices/:id" element={<APInvoiceDetail />} />
+                <Route path="/purchase/ap-invoices/:id/edit" element={<APInvoiceForm />} />
+                <Route path="/purchase/ap-invoices/:invoiceId/add-payment" element={<APaymentForm />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 

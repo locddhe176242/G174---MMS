@@ -20,6 +20,11 @@ export default function GoodsReceiptDetail() {
     const [rejectReason, setRejectReason] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Tạo hóa đơn - navigate to form
+    const handleCreateInvoice = () => {
+        navigate(`/purchase/ap-invoices/new`);
+    };
+
     useEffect(() => {
         loadCurrentUser();
     }, []);
@@ -234,6 +239,27 @@ export default function GoodsReceiptDetail() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
+                            {data.status === "Approved" && !data.hasInvoice && (
+                                <button
+                                    onClick={handleCreateInvoice}
+                                    className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? (
+                                        <span className="flex items-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            Đang tạo hóa đơn...
+                                        </span>
+                                    ) : (
+                                        "Tạo hóa đơn"
+                                    )}
+                                </button>
+                            )}
+                            {data.status === "Approved" && data.hasInvoice && (
+                                <div className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg">
+                                    ✓ Đã tạo hóa đơn
+                                </div>
+                            )}
                             {data.status === "Pending" && (
                                 <>
                                     <button

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
@@ -20,7 +20,7 @@ export default function PurchaseOrderForm() {
         po_no: "",
         vendor_id: null,
         pq_id: null,
-        order_date: new Date().toISOString().split('T')[0],
+        order_date: new Date(),
         status: "Pending",
         approval_status: "Pending",
         payment_terms: "",
@@ -71,43 +71,77 @@ export default function PurchaseOrderForm() {
     const [selectedQuotation, setSelectedQuotation] = useState(null);
 
     // Calculate totals
-    const calculateItemTotal = (item) => {
+    const calculateItemTotal = useCallback((item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unit_price || 0);
-        const taxRate = Number(item.tax_rate || 0) / 100;
+        const discountPercent = Number(item.discount_percent || 0) / 100;
+        
+        // Bước 1: Tính subtotal
         const subtotal = qty * price;
-        const tax = subtotal * taxRate;
+        
+        // Bước 2: Áp dụng chiết khấu dòng
+        const discountAmount = subtotal * discountPercent;
+        const amountAfterDiscount = subtotal - discountAmount;
+        
         return {
             subtotal,
-            tax,
-            total: subtotal + tax
+            discountAmount,
+            amountAfterDiscount
         };
-    };
+    }, []);
 
     const totalBeforeTax = useMemo(() => {
         if (!Array.isArray(formData.items)) return 0;
         return formData.items.reduce((sum, it) => {
-            const calc = calculateItemTotal(it);
-            return sum + calc.subtotal;
+            const qty = Number(it.quantity || 0);
+            const price = Number(it.unit_price || 0);
+            return sum + (qty * price);
         }, 0);
     }, [formData.items]);
 
-    const totalTax = useMemo(() => {
+    const totalDiscount = useMemo(() => {
         if (!Array.isArray(formData.items)) return 0;
         return formData.items.reduce((sum, it) => {
-            const calc = calculateItemTotal(it);
-            return sum + calc.tax;
+            const qty = Number(it.quantity || 0);
+            const price = Number(it.unit_price || 0);
+            const discountPercent = Number(it.discount_percent || 0) / 100;
+            const subtotal = qty * price;
+            return sum + (subtotal * discountPercent);
+        }, 0);
+    }, [formData.items]);
+
+    const totalAfterLineDiscount = useMemo(() => {
+        if (!Array.isArray(formData.items)) return 0;
+        return formData.items.reduce((sum, it) => {
+            const qty = Number(it.quantity || 0);
+            const price = Number(it.unit_price || 0);
+            const discountPercent = Number(it.discount_percent || 0) / 100;
+            const subtotal = qty * price;
+            const discountAmount = subtotal * discountPercent;
+            return sum + (subtotal - discountAmount);
         }, 0);
     }, [formData.items]);
 
     const headerDiscountAmount = useMemo(() => {
         const discountPercent = Number(formData.header_discount || 0);
-        return (totalBeforeTax + totalTax) * (discountPercent / 100);
-    }, [totalBeforeTax, totalTax, formData.header_discount]);
+        // Header discount áp dụng trên tổng sau khi trừ chiết khấu dòng
+        return totalAfterLineDiscount * (discountPercent / 100);
+    }, [totalAfterLineDiscount, formData.header_discount]);
+
+    const totalTax = useMemo(() => {
+        if (!Array.isArray(formData.items)) return 0;
+        // Thuế tính trên tổng sau khi trừ TẤT CẢ chiết khấu (line discount + header discount)
+        const baseAmount = totalAfterLineDiscount - headerDiscountAmount;
+        // Lấy tax rate trung bình hoặc tax rate của dòng đầu tiên
+        const taxRate = formData.items.length > 0 ? (Number(formData.items[0].tax_rate || 0) / 100) : 0;
+        return baseAmount * taxRate;
+    }, [formData.items, totalAfterLineDiscount, headerDiscountAmount]);
 
     const totalAfterTax = useMemo(() => {
-        return totalBeforeTax + totalTax - headerDiscountAmount;
-    }, [totalBeforeTax, totalTax, headerDiscountAmount]);
+        // Công thức: Tổng = (Tổng sau CK dòng - CK tổng đơn) + Thuế
+        // Thuế đã được tính trên số tiền sau tất cả chiết khấu
+        return totalAfterLineDiscount - headerDiscountAmount + totalTax;
+    }, [totalAfterLineDiscount, headerDiscountAmount, totalTax]);
 
     const selectedVendor = useMemo(() => {
         if (!formData.vendor_id || vendors.length === 0) return null;
@@ -160,19 +194,6 @@ export default function PurchaseOrderForm() {
 
         initializeForm();
     }, [id]);
-
-    // Debug: Log formData changes
-    useEffect(() => {
-        console.log("📋 FormData changed:", {
-            vendor_id: formData.vendor_id,
-            payment_terms: formData.payment_terms,
-            delivery_date: formData.delivery_date,
-            shipping_address: formData.shipping_address,
-            items_count: formData.items.length,
-            vendors_count: vendors.length,
-            selectedVendor: selectedVendor?.label || 'NULL'
-        });
-    }, [formData.vendor_id, formData.payment_terms, formData.delivery_date, formData.shipping_address, formData.items, vendors, selectedVendor]);
 
     const generatePONumber = async () => {
         try {
@@ -362,6 +383,7 @@ export default function PurchaseOrderForm() {
                 pq_id: quotationId,
                 header_discount: Number(data.headerDiscount || 0)
             }));
+            setIsImportedFromPQ(true); // Set readonly mode khi import từ PQ
             toast.success(`Đã tải ${mapped.length} sản phẩm từ báo giá`);
         } catch (err) {
             console.error("Load quotation data error:", err);
@@ -390,13 +412,13 @@ export default function PurchaseOrderForm() {
                 vendor_id: order.vendor_id || order.vendorId || null,
                 pq_id: order.pq_id || order.pqId || null,
                 order_date: order.order_date || order.orderDate
-                    ? new Date(order.order_date || order.orderDate).toISOString().split("T")[0]
-                    : new Date().toISOString().split("T")[0],
+                    ? new Date(order.order_date || order.orderDate)
+                    : new Date(),
                 status: normalizeEnum(order.status, "Pending"),
                 approval_status: normalizeEnum(order.approval_status || order.approvalStatus, "Pending"),
                 payment_terms: order.payment_terms || order.paymentTerms || "",
                 delivery_date: order.delivery_date || order.deliveryDate
-                    ? new Date(order.delivery_date || order.deliveryDate).toISOString().split("T")[0]
+                    ? new Date(order.delivery_date || order.deliveryDate)
                     : null,
                 shipping_address: order.shipping_address || order.shippingAddress || "",
                 items: itemsData.length > 0
@@ -412,7 +434,7 @@ export default function PurchaseOrderForm() {
                         tax_amount: Number(it.tax_amount || it.taxAmount || 0),
                         line_total: Number(it.line_total || it.lineTotal || 0),
                         delivery_date: it.delivery_date || it.deliveryDate
-                            ? new Date(it.delivery_date || it.deliveryDate).toISOString().split("T")[0]
+                            ? new Date(it.delivery_date || it.deliveryDate)
                             : null,
                         note: it.note || "",
                     }))
@@ -458,11 +480,10 @@ export default function PurchaseOrderForm() {
             const next = [...prev.items];
             next[index] = { ...next[index], [field]: value };
 
-            // Recalculate totals when quantity, price, or tax rate changes
-            if (field === "quantity" || field === "unit_price" || field === "tax_rate") {
+            // Recalculate totals when quantity, price, or discount changes
+            if (field === "quantity" || field === "unit_price" || field === "discount_percent") {
                 const calc = calculateItemTotal(next[index]);
-                next[index].tax_amount = calc.tax;
-                next[index].line_total = calc.total;
+                next[index].line_total = calc.amountAfterDiscount;
             }
 
             return { ...prev, items: next };
@@ -505,6 +526,7 @@ export default function PurchaseOrderForm() {
                     uom: "",
                     quantity: 1,
                     unit_price: 0,
+                    discount_percent: 0,
                     tax_rate: 0,
                     tax_amount: 0,
                     line_total: 0,
@@ -713,7 +735,7 @@ export default function PurchaseOrderForm() {
             if (leadTimeDays > 0) {
                 const today = new Date();
                 today.setDate(today.getDate() + leadTimeDays);
-                deliveryDate = today.toISOString().split('T')[0];
+                deliveryDate = today;
             }
             
             console.log("Importing from quotation - Vendor ID:", vendorId);
@@ -825,18 +847,14 @@ export default function PurchaseOrderForm() {
                 payment_terms: paymentTerms,
                 delivery_date: deliveryDate,
                 shipping_address: deliveryTerms,
+                header_discount: headerDiscount,
                 items_count: mapped.length,
                 items: mapped
             });
             
-            
-            // Verify formData was updated
-            setTimeout(() => {
-                console.log("🔄 FormData after setState:", {
-                    items_length: updatedFormData.items.length,
-                    first_item: updatedFormData.items[0]
-                });
-            }, 100);
+            // Update state with new data
+            setFormData(updatedFormData);
+            setIsImportedFromPQ(true);
             
             setShowImportModal(false);
             setSelectedQuotation(null);
@@ -866,11 +884,11 @@ export default function PurchaseOrderForm() {
                 poNo: formData.po_no,
                 vendorId: formData.vendor_id,
                 pqId: formData.pq_id || null,
-                orderDate: formData.order_date ? new Date(formData.order_date).toISOString() : new Date().toISOString(),
+                orderDate: formData.order_date instanceof Date ? formData.order_date.toISOString() : new Date(formData.order_date).toISOString(),
                 status: formData.status || "Pending",
                 approvalStatus: formData.approval_status || "Pending",
                 paymentTerms: formData.payment_terms || "",
-                deliveryDate: formData.delivery_date ? new Date(formData.delivery_date).toISOString() : null,
+                deliveryDate: formData.delivery_date ? (formData.delivery_date instanceof Date ? formData.delivery_date.toISOString() : new Date(formData.delivery_date).toISOString()) : null,
                 shippingAddress: formData.shipping_address || "",
                 headerDiscount: Number(formData.header_discount || 0),
                 totalBeforeTax,
@@ -886,7 +904,7 @@ export default function PurchaseOrderForm() {
                     taxRate: Number(it.tax_rate || 0),
                     taxAmount: Number(it.tax_amount || 0),
                     lineTotal: Number(it.line_total || 0),
-                    deliveryDate: it.delivery_date ? new Date(it.delivery_date).toISOString().split('T')[0] : null,
+                    deliveryDate: it.delivery_date ? (it.delivery_date instanceof Date ? it.delivery_date.toISOString().split('T')[0] : new Date(it.delivery_date).toISOString().split('T')[0]) : null,
                     note: it.note || "",
                 })),
             };
@@ -1031,10 +1049,10 @@ export default function PurchaseOrderForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày đặt hàng <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.order_date}
-                                            onChange={(e) => handleInputChange("order_date", e.target.value)}
+                                        <DatePicker
+                                            selected={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
+                                            onChange={(date) => handleInputChange("order_date", date)}
+                                            dateFormat="dd/MM/yyyy"
                                             className={
                                                 validationErrors.order_date
                                                     ? "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-red-500"
@@ -1052,10 +1070,12 @@ export default function PurchaseOrderForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày giao hàng
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.delivery_date || ""}
-                                            onChange={(e) => handleInputChange("delivery_date", e.target.value || null)}
+                                        <DatePicker
+                                            selected={formData.delivery_date instanceof Date ? formData.delivery_date : (formData.delivery_date ? new Date(formData.delivery_date) : null)}
+                                            onChange={(date) => handleInputChange("delivery_date", date)}
+                                            dateFormat="dd/MM/yyyy"
+                                            isClearable
+                                            placeholderText="Chọn ngày giao hàng"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         />
                                     </div>
@@ -1102,7 +1122,32 @@ export default function PurchaseOrderForm() {
                                         placeholder="VD: 2 (giảm 2%)"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
-                                        💡 Chiết khấu chung cho toàn bộ đơn hàng (Document Discount)
+                                        💡 Chiết khấu áp dụng trước khi tính thuế
+                                    </p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Thuế VAT (%)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={formData.items.length > 0 ? formData.items[0].tax_rate || 10 : 10}
+                                        onChange={(e) => {
+                                            const newTaxRate = parseFloat(e.target.value) || 0;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(item => ({ ...item, tax_rate: newTaxRate }))
+                                            }));
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        placeholder="10.00"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        💡 Thuế tính trên tổng sau tất cả chiết khấu
                                     </p>
                                 </div>
                             </div>
@@ -1142,12 +1187,6 @@ export default function PurchaseOrderForm() {
                                     <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
                                 )}
 
-                                {(() => {
-                                    console.log("🎨 RENDER CHECK - formData.items.length:", formData.items.length);
-                                    console.log("🎨 RENDER CHECK - formData.items:", formData.items);
-                                    return null;
-                                })()}
-
                                 {formData.items.length === 0 ? (
                                     <div className="text-center py-8 text-gray-500">
                                         <p>Chưa có sản phẩm nào. Nhấn "Thêm sản phẩm" để bắt đầu.</p>
@@ -1163,25 +1202,14 @@ export default function PurchaseOrderForm() {
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">CK (%)</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thuế (%)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                             </tr>
                                             </thead>
                                             <tbody>
                                             {formData.items.map((item, index) => {
-                                                console.log(`🎨 Rendering row ${index}:`, {
-                                                    productCode: item.productCode,
-                                                    productName: item.productName,
-                                                    product_id: item.product_id,
-                                                    quantity: item.quantity
-                                                });
-                                                
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 const selectedProduct = products.find((o) => o.value === item.product_id);
-                                                
-                                                console.log(`   selectedProduct:`, selectedProduct ? selectedProduct.label : 'NULL');
-                                                console.log(`   Will show: ${item.productCode ? 'readonly input' : 'Select dropdown'}`);
                                                 
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
@@ -1221,53 +1249,53 @@ export default function PurchaseOrderForm() {
                                                             />
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2">
-                                                            <input
-                                                                type="number"
-                                                                value={item.quantity}
-                                                                onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
-                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                min="1"
-                                                                step="1"
-                                                            />
+                                                            {isImportedFromPQ ? (
+                                                                <span className="px-2 py-1 text-sm">{item.quantity}</span>
+                                                            ) : (
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.quantity}
+                                                                    onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
+                                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    min="1"
+                                                                    step="1"
+                                                                />
+                                                            )}
                                                             {itemErr.quantity && (
                                                                 <p className="text-red-500 text-xs mt-1">{itemErr.quantity}</p>
                                                             )}
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2">
-                                                            <input
-                                                                type="number"
-                                                                value={item.unit_price}
-                                                                onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
-                                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                min="0"
-                                                                step="0.01"
-                                                            />
+                                                            {isImportedFromPQ ? (
+                                                                <span className="px-2 py-1 text-sm">{formatCurrency(item.unit_price)}</span>
+                                                            ) : (
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.unit_price}
+                                                                    onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
+                                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                />
+                                                            )}
                                                             {itemErr.unit_price && (
                                                                 <p className="text-red-500 text-xs mt-1">{itemErr.unit_price}</p>
                                                             )}
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2">
-                                                            <input
-                                                                type="number"
-                                                                value={item.discount_percent || 0}
-                                                                readOnly={!!item.pq_item_id}
-                                                                onChange={(e) => !item.pq_item_id && handleItemChange(index, "discount_percent", parseFloat(e.target.value) || 0)}
-                                                                className={`w-20 px-2 py-1 border border-gray-300 rounded text-sm ${item.pq_item_id ? 'bg-gray-50 text-green-600 font-medium' : ''}`}
-                                                                min="0"
-                                                                max="100"
-                                                                step="0.01"
-                                                            />
-                                                        </td>
-                                                        <td className="border border-gray-200 px-4 py-2">
-                                                            <input
-                                                                type="number"
-                                                                value={item.tax_rate}
-                                                                onChange={(e) => handleItemChange(index, "tax_rate", parseFloat(e.target.value) || 0)}
-                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                min="0"
-                                                                max="100"
-                                                                step="0.01"
-                                                            />
+                                                            {isImportedFromPQ ? (
+                                                                <span className="px-2 py-1 text-sm">{item.discount_percent}%</span>
+                                                            ) : (
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.discount_percent || 0}
+                                                                    onChange={(e) => handleItemChange(index, "discount_percent", parseFloat(e.target.value) || 0)}
+                                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    step="0.01"
+                                                                />
+                                                            )}
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2 text-sm font-medium">
                                                             {formatCurrency(item.line_total || 0)}
@@ -1276,7 +1304,9 @@ export default function PurchaseOrderForm() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => removeItem(index)}
-                                                                className="text-red-600 hover:text-red-800 text-sm"
+                                                                disabled={isImportedFromPQ}
+                                                                className={`text-sm ${isImportedFromPQ ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
+                                                                title={isImportedFromPQ ? 'Không thể xóa sản phẩm từ báo giá' : 'Xóa sản phẩm'}
                                                             >
                                                                 Xóa
                                                             </button>
@@ -1287,26 +1317,37 @@ export default function PurchaseOrderForm() {
                                             </tbody>
                                             <tfoot>
                                             <tr className="bg-gray-50">
-                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
-                                                    Tổng trước thuế:
+                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                    Tổng giá trị hàng:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
                                                     {formatCurrency(totalBeforeTax)}
                                                 </td>
                                                 <td className="border border-gray-200"></td>
                                             </tr>
+                                            {totalDiscount > 0 && (
+                                                <tr className="bg-gray-50">
+                                                    <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                        Chiết khấu sản phẩm:
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
+                                                        -{formatCurrency(totalDiscount)}
+                                                    </td>
+                                                    <td className="border border-gray-200"></td>
+                                                </tr>
+                                            )}
                                             <tr className="bg-gray-50">
-                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
-                                                    Tổng thuế:
+                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                    Tổng sau chiết khấu sản phẩm:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
-                                                    {formatCurrency(totalTax)}
+                                                    {formatCurrency(totalAfterLineDiscount)}
                                                 </td>
                                                 <td className="border border-gray-200"></td>
                                             </tr>
                                             {formData.header_discount > 0 && (
                                                 <tr className="bg-gray-50">
-                                                    <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                    <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
                                                         Chiết khấu tổng đơn ({formData.header_discount}%):
                                                     </td>
                                                     <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
@@ -1315,8 +1356,17 @@ export default function PurchaseOrderForm() {
                                                     <td className="border border-gray-200"></td>
                                                 </tr>
                                             )}
+                                            <tr className="bg-gray-50">
+                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                    Thuế VAT ({formData.items.length > 0 ? formData.items[0].tax_rate || 0 : 0}%):
+                                                </td>
+                                                <td className="border border-gray-200 px-4 py-2 font-semibold">
+                                                    {formatCurrency(totalTax)}
+                                                </td>
+                                                <td className="border border-gray-200"></td>
+                                            </tr>
                                             <tr className="bg-gray-100">
-                                                <td colSpan={7} className="border border-gray-200 px-4 py-2 text-right font-bold">
+                                                <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-bold">
                                                     Tổng cộng:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-bold">

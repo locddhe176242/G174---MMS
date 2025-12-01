@@ -41,5 +41,7 @@ public class PurchaseOrderResponseDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<PurchaseOrderItemResponseDTO> items;
+    private Boolean hasGoodsReceipt; // Đánh dấu PO đã có GR
+    private Boolean fullyReceived; // Đánh dấu PO đã nhận đủ hàng
 }
 

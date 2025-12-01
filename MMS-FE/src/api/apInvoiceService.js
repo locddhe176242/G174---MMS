@@ -36,9 +36,9 @@ export const apInvoiceService = {
     return response.data;
   },
 
-  searchInvoicesWithPagination: async (keyword, page = 0, size = 10) => {
+  searchInvoicesWithPagination: async (keyword, page = 0, size = 10, sortBy = "createdAt", sortDir = "desc") => {
     const response = await apiClient.get("/ap-invoices/search/paged", {
-      params: { keyword, page, size }
+      params: { keyword, page, size, sortBy, sortDir }
     });
     return response.data;
   },
@@ -87,16 +87,6 @@ export const apInvoiceService = {
     return response.data;
   },
 
-  // ===== Payments (Sub-resource) =====
-  addPayment: async (payload) => {
-    const response = await apiClient.post("/ap-invoices/payments", payload);
-    return response.data;
-  },
-
-  getPaymentsByInvoice: async (invoiceId) => {
-    const response = await apiClient.get(`/ap-invoices/${invoiceId}/payments`);
-    return response.data;
-  },
 };
 
 export default apInvoiceService;

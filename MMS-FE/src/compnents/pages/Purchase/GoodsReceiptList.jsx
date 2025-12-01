@@ -144,7 +144,8 @@ export default function GoodsReceiptList() {
             fetchReceipts(currentPage, searchKeyword, sortField, sortDirection);
         } catch (err) {
             console.error("Error deleting Goods Receipt:", err);
-            toast.error("Không thể xóa Phiếu nhập kho");
+            const errorMsg = err?.response?.data?.message || err?.message || "Không thể xóa Phiếu nhập kho";
+            toast.error(errorMsg);
         } finally {
             setIsDeleting(false);
         }
@@ -309,7 +310,7 @@ export default function GoodsReceiptList() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
-                                                {receipt.status === "Pending" && (
+                                                {receipt.status === "Pending" && !receipt.hasInvoice && (
                                                     <>
                                                         <button
                                                             onClick={() => navigate(`/purchase/goods-receipts/${receipt.receiptId || receipt.receipt_id || receipt.id}/edit`)}
@@ -330,6 +331,11 @@ export default function GoodsReceiptList() {
                                                             </svg>
                                                         </button>
                                                     </>
+                                                )}
+                                                {(receipt.status === "Approved" || receipt.hasInvoice) && (
+                                                    <span className="text-xs text-gray-500 italic">
+                                                        {receipt.hasInvoice ? "Đã có hóa đơn" : "Đã phê duyệt"}
+                                                    </span>
                                                 )}
                                             </div>
                                         </td>

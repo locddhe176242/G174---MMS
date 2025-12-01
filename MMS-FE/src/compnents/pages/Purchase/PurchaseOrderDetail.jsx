@@ -55,11 +55,11 @@ export default function PurchaseOrderDetail() {
         }).format(amount);
     };
 
-    const getProductName = (item) =>
-        item.productName ||
-        item.product_name ||
+    const getProductCode = (item) =>
         item.productCode ||
         item.product_code ||
+        item.productName ||
+        item.product_name ||
         "-";
 
     const lineValue = (item) => {
@@ -288,7 +288,9 @@ export default function PurchaseOrderDetail() {
     const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
     const canSend = normalizedApprovalStatus === "Approved" && normalizedStatus === "Approved";
-    const canCreateGR = normalizedApprovalStatus === "Approved" && (normalizedStatus === "Approved" || normalizedStatus === "Sent");
+    const canCreateGR = normalizedApprovalStatus === "Approved" && 
+                        (normalizedStatus === "Approved" || normalizedStatus === "Sent") &&
+                        !data?.hasGoodsReceipt;
     // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
     const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
     
@@ -352,6 +354,11 @@ export default function PurchaseOrderDetail() {
                                     Tạo phiếu nhập kho
                                 </button>
                             )}
+                            {normalizedApprovalStatus === "Approved" && data?.hasGoodsReceipt && (
+                                <div className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg">
+                                    ✓ Đã tạo phiếu nhập kho
+                                </div>
+                            )}
                             {canEdit && (
                                 <button
                                     onClick={() => navigate(`/purchase/purchase-orders/${id}/edit`)}
@@ -410,7 +417,7 @@ export default function PurchaseOrderDetail() {
                                             <thead>
                                             <tr className="text-left text-gray-500 border-b">
                                                 <th className="py-3 pr-4">#</th>
-                                                <th className="py-3 pr-4">Sản phẩm</th>
+                                                <th className="py-3 pr-4">Mã SP</th>
                                                 <th className="py-3 pr-4">ĐVT</th>
                                                 <th className="py-3 pr-4">Số lượng</th>
                                                 <th className="py-3 pr-4">Đơn giá</th>
@@ -427,7 +434,7 @@ export default function PurchaseOrderDetail() {
                                                     <tr key={item.poi_id || item.id || index} className="border-t hover:bg-gray-50">
                                                         <td className="py-3 pr-4">{index + 1}</td>
                                                         <td className="py-3 pr-4">
-                                        {getProductName(item)}
+                                        {getProductCode(item)}
                                                         </td>
                                                         <td className="py-3 pr-4">
                                                             {item.uom || "-"}

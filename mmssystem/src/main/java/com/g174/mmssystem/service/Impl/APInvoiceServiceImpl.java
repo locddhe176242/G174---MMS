@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -96,6 +97,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .taxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO)
                 .totalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : BigDecimal.ZERO)
                 .balanceAmount(dto.getBalanceAmount() != null ? dto.getBalanceAmount() : dto.getTotalAmount())
+                .headerDiscount(dto.getHeaderDiscount() != null ? dto.getHeaderDiscount() : BigDecimal.ZERO)
                 .status(dto.getStatus() != null ? dto.getStatus() : APInvoice.APInvoiceStatus.Unpaid)
                 .notes(dto.getNotes())
                 .createdAt(LocalDateTime.now())
@@ -123,8 +125,10 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                                 .purchaseOrderItem(poi)
                                 .goodsReceiptItem(gri)
                                 .description(itemDto.getDescription())
+                                .uom(itemDto.getUom())
                                 .quantity(itemDto.getQuantity())
                                 .unitPrice(itemDto.getUnitPrice())
+                                .discountPercent(itemDto.getDiscountPercent() != null ? itemDto.getDiscountPercent() : BigDecimal.ZERO)
                                 .taxRate(itemDto.getTaxRate())
                                 .lineTotal(itemDto.getLineTotal())
                                 .build();
@@ -151,8 +155,9 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .filter(gr -> gr.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
         
-        // Load items separately to avoid cartesian product
-        receiptRepository.findByIdWithItems(receiptId);
+        // Load items separately to avoid cartesian product - reassign to get items populated
+        goodsReceipt = receiptRepository.findByIdWithItems(receiptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt items not found with ID: " + receiptId));
         
         log.info("GR Status: {}, Items count: {}", goodsReceipt.getStatus(), 
                  goodsReceipt.getItems() != null ? goodsReceipt.getItems().size() : "NULL");
@@ -177,24 +182,24 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("Vendor not found for Purchase Order ID: " + purchaseOrder.getOrderId());
         }
 
-        // Calculate totals from GR items
-        BigDecimal subtotal = BigDecimal.ZERO;
-        BigDecimal taxAmount = BigDecimal.ZERO;
-
-        for (GoodsReceiptItem grItem : goodsReceipt.getItems()) {
-            PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
-            BigDecimal acceptedQty = grItem.getAcceptedQty();
-            BigDecimal unitPrice = poItem.getUnitPrice();
-            BigDecimal itemSubtotal = acceptedQty.multiply(unitPrice);
-            subtotal = subtotal.add(itemSubtotal);
-
-            if (poItem.getTaxRate() != null && poItem.getTaxRate().compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal itemTax = itemSubtotal.multiply(poItem.getTaxRate()).divide(new BigDecimal("100"));
-                taxAmount = taxAmount.add(itemTax);
-            }
-        }
-
-        BigDecimal totalAmount = subtotal.add(taxAmount);
+        // Calculate totals from PO totals based on accepted quantities
+        BigDecimal totalOrderedQty = goodsReceipt.getItems().stream()
+                .map(grItem -> grItem.getPurchaseOrderItem().getQuantity())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal totalAcceptedQty = goodsReceipt.getItems().stream()
+                .map(GoodsReceiptItem::getAcceptedQty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Calculate ratio of accepted vs ordered
+        BigDecimal ratio = totalOrderedQty.compareTo(BigDecimal.ZERO) > 0 
+                ? totalAcceptedQty.divide(totalOrderedQty, 10, RoundingMode.HALF_UP)
+                : BigDecimal.ONE;
+        
+        // Use PO totals (which already include all discounts and taxes)
+        BigDecimal subtotal = purchaseOrder.getTotalBeforeTax().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal taxAmount = purchaseOrder.getTaxAmount().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = purchaseOrder.getTotalAfterTax().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
 
         // Generate invoice number
         String invoiceNo = generateInvoiceNo();
@@ -222,15 +227,12 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .map(grItem -> {
                     PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
                     BigDecimal acceptedQty = grItem.getAcceptedQty();
+                    BigDecimal orderedQty = poItem.getQuantity();
                     BigDecimal unitPrice = poItem.getUnitPrice();
-                    BigDecimal itemSubtotal = acceptedQty.multiply(unitPrice);
-                    BigDecimal itemTax = BigDecimal.ZERO;
-
-                    if (poItem.getTaxRate() != null && poItem.getTaxRate().compareTo(BigDecimal.ZERO) > 0) {
-                        itemTax = itemSubtotal.multiply(poItem.getTaxRate()).divide(new BigDecimal("100"));
-                    }
-
-                    BigDecimal lineTotal = itemSubtotal.add(itemTax);
+                    
+                    // Calculate proportional amount from PO lineTotal (includes discount and tax)
+                    BigDecimal itemRatio = acceptedQty.divide(orderedQty, 10, RoundingMode.HALF_UP);
+                    BigDecimal lineTotal = poItem.getLineTotal().multiply(itemRatio).setScale(2, RoundingMode.HALF_UP);
 
                     return APInvoiceItem.builder()
                             .apInvoice(invoice)
@@ -350,6 +352,9 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         if (dto.getBalanceAmount() != null) {
             invoice.setBalanceAmount(dto.getBalanceAmount());
         }
+        if (dto.getHeaderDiscount() != null) {
+            invoice.setHeaderDiscount(dto.getHeaderDiscount());
+        }
         if (dto.getStatus() != null) {
             invoice.setStatus(dto.getStatus());
         }
@@ -409,14 +414,27 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         BigDecimal newBalance = invoice.getBalanceAmount().subtract(dto.getAmount());
         invoice.setBalanceAmount(newBalance);
 
+        boolean invoiceFullyPaid = false;
         if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
             invoice.setStatus(APInvoice.APInvoiceStatus.Paid);
+            invoiceFullyPaid = true;
         } else if (newBalance.compareTo(invoice.getTotalAmount()) < 0) {
             invoice.setStatus(APInvoice.APInvoiceStatus.Partially_Paid);
         }
 
         invoice.setUpdatedAt(LocalDateTime.now());
         invoiceRepository.save(invoice);
+
+        // Update Purchase Order status to Completed if invoice is fully paid
+        if (invoiceFullyPaid && invoice.getPurchaseOrder() != null) {
+            PurchaseOrder po = invoice.getPurchaseOrder();
+            if (po.getStatus() != com.g174.mmssystem.enums.PurchaseOrderStatus.Completed) {
+                po.setStatus(com.g174.mmssystem.enums.PurchaseOrderStatus.Completed);
+                po.setUpdatedAt(LocalDateTime.now());
+                orderRepository.save(po);
+                log.info("Purchase Order ID {} status updated to Completed", po.getOrderId());
+            }
+        }
 
         log.info("Payment added successfully. New balance: {}", newBalance);
         return invoiceMapper.toPaymentResponseDTO(saved);

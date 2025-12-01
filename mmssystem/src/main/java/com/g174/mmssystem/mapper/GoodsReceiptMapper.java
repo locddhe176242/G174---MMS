@@ -55,7 +55,7 @@ public class GoodsReceiptMapper {
             return null;
         }
 
-        return GoodsReceiptItemResponseDTO.builder()
+        GoodsReceiptItemResponseDTO.GoodsReceiptItemResponseDTOBuilder builder = GoodsReceiptItemResponseDTO.builder()
                 .griId(item.getGriId())
                 .receiptId(item.getGoodsReceipt() != null ? item.getGoodsReceipt().getReceiptId() : null)
                 .poiId(item.getPurchaseOrderItem() != null ? item.getPurchaseOrderItem().getPoiId() : null)
@@ -64,8 +64,17 @@ public class GoodsReceiptMapper {
                 .productCode(item.getProduct() != null ? item.getProduct().getSku() : null)
                 .receivedQty(item.getReceivedQty())
                 .acceptedQty(item.getAcceptedQty())
-                .remark(item.getRemark())
-                .build();
+                .remark(item.getRemark());
+
+        // Get additional info from PurchaseOrderItem if available
+        if (item.getPurchaseOrderItem() != null) {
+            builder.uom(item.getPurchaseOrderItem().getUom())
+                   .unitPrice(item.getPurchaseOrderItem().getUnitPrice())
+                   .discountPercent(item.getPurchaseOrderItem().getDiscountPercent())
+                   .taxRate(item.getPurchaseOrderItem().getTaxRate());
+        }
+
+        return builder.build();
     }
 
     public List<GoodsReceiptItemResponseDTO> toItemResponseDTOList(List<GoodsReceiptItem> items) {
