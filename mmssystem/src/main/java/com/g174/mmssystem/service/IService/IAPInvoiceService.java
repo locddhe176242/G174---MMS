@@ -41,6 +41,8 @@ public interface IAPInvoiceService {
     
     List<APPaymentResponseDTO> getPaymentsByInvoiceId(Integer invoiceId);
     
+    Page<APPaymentResponseDTO> getAllPayments(String keyword, Pageable pageable);
+    
     boolean existsByInvoiceNo(String invoiceNo);
     
     String generateInvoiceNo();

@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
 import { apPaymentService } from "../../../api/apPaymentService";
+import { formatCurrency, formatNumberInput, parseNumberInput } from "../../../utils/formatters";
 
 export default function APaymentForm() {
   const { invoiceId } = useParams();
@@ -63,12 +64,19 @@ export default function APaymentForm() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    if (amount === undefined || amount === null) return "0 ₫";
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(amount);
+  const generateReferenceNo = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    const refNo = `TXN${year}${month}${day}${hours}${minutes}${seconds}${random}`;
+    handleInputChange('referenceNo', refNo);
+    toast.success('Đã tạo mã tham chiếu tự động');
   };
 
 
@@ -82,11 +90,28 @@ export default function APaymentForm() {
 
   const validate = () => {
     const errors = {};
-    if (!formData.paymentDate) errors.paymentDate = "Chọn ngày thanh toán";
-    if (!formData.amount || Number(formData.amount) <= 0) errors.amount = "Số tiền phải > 0";
+    
+    // Common validations
+    if (!formData.paymentDate) {
+      errors.paymentDate = "Chọn ngày thanh toán";
+    }
+    
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      errors.amount = "Số tiền phải > 0";
+    }
+    
     if (invoice && Number(formData.amount) > Number(invoice.balanceAmount)) {
       errors.amount = `Số tiền không thể lớn hơn công nợ còn lại (${formatCurrency(invoice.balanceAmount)})`;
     }
+
+    // Payment method specific validations
+    if (formData.method === "Bank Transfer") {
+      // Bank Transfer requires reference number for reconciliation
+      if (!formData.referenceNo || formData.referenceNo.trim() === "") {
+        errors.referenceNo = "Mã tham chiếu bắt buộc cho chuyển khoản (nhập mã giao dịch ngân hàng)";
+      }
+    }
+    
     return errors;
   };
 
@@ -197,38 +222,79 @@ export default function APaymentForm() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ngày thanh toán <span className="text-red-500">*</span>
-                    </label>
-                    <DatePicker
-                      selected={paymentDate}
-                      onChange={(date) => handleInputChange("paymentDate", date)}
-                      dateFormat="dd/MM/yyyy"
-                      className={`w-full px-3 py-2 border rounded-lg ${validationErrors.paymentDate ? "border-red-500" : "border-gray-300"}`}
-                    />
-                    {validationErrors.paymentDate && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.paymentDate}</p>
-                    )}
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ngày thanh toán <span className="text-red-500">*</span>
+                  </label>
+                  <DatePicker
+                    selected={paymentDate}
+                    onChange={(date) => handleInputChange("paymentDate", date)}
+                    dateFormat="dd/MM/yyyy"
+                    className={`w-full px-3 py-2 border rounded-lg ${validationErrors.paymentDate ? "border-red-500" : "border-gray-300"}`}
+                  />
+                  {validationErrors.paymentDate && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.paymentDate}</p>
+                  )}
+                </div>
 
+                {invoice && invoice.balanceAmount > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Số tiền <span className="text-red-500">*</span>
+                      Thanh toán nhanh
                     </label>
-                    <input
-                      type="number"
-                      value={formData.amount}
-                      onChange={(e) => handleInputChange("amount", parseFloat(e.target.value) || 0)}
-                      className={`w-full px-3 py-2 border rounded-lg text-right ${validationErrors.amount ? "border-red-500" : "border-gray-300"}`}
-                      min="0"
-                      step="0.01"
-                    />
-                    {validationErrors.amount && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.amount}</p>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange("amount", invoice.balanceAmount)}
+                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                      >
+                        Trả toàn bộ ({formatCurrency(invoice.balanceAmount)})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.5))}
+                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                      >
+                        50% ({formatCurrency(Math.round(invoice.balanceAmount * 0.5))})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.3))}
+                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                      >
+                        30% ({formatCurrency(Math.round(invoice.balanceAmount * 0.3))})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.25))}
+                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                      >
+                        25% ({formatCurrency(Math.round(invoice.balanceAmount * 0.25))})
+                      </button>
+                    </div>
                   </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Số tiền <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formatNumberInput(formData.amount)}
+                      onChange={(e) => handleInputChange("amount", parseNumberInput(e.target.value))}
+                      className={`w-full px-3 py-2 pr-8 border rounded-lg text-right ${validationErrors.amount ? "border-red-500" : "border-gray-300"}`}
+                      placeholder="0"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">₫</span>
+                  </div>
+                  {validationErrors.amount && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.amount}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Nhập số tiền hoặc chọn từ các nút thanh toán nhanh bên trên
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -252,14 +318,41 @@ export default function APaymentForm() {
   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Mã tham chiếu
+                      {formData.method === "Bank Transfer" && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                     </label>
-                    <input
-                      type="text"
-                      value={formData.referenceNo}
-                      onChange={(e) => handleInputChange("referenceNo", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="VD: TT001, HD123..."
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={formData.referenceNo}
+                        onChange={(e) => handleInputChange("referenceNo", e.target.value)}
+                        className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          validationErrors.referenceNo ? "border-red-500" : "border-gray-300"
+                        }`}
+                        placeholder={formData.method === "Bank Transfer" ? "Nhập mã giao dịch ngân hàng" : "VD: TT001, HD123..."}
+                      />
+                      <button
+                        type="button"
+                        onClick={generateReferenceNo}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 whitespace-nowrap"
+                        title="Tự động tạo mã"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Tự động tạo
+                      </button>
+                    </div>
+                    {validationErrors.referenceNo && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.referenceNo}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.method === "Bank Transfer" 
+                        ? "Bắt buộc nhập mã giao dịch ngân hàng để đối soát"
+                        : "Nhấn \"Tự động tạo\" để tạo mã hoặc nhập mã giao dịch ngân hàng"
+                      }
+                    </p>
                   </div>
                 </div>
 

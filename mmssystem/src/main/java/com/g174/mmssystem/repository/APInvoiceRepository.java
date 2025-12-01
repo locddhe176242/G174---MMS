@@ -22,6 +22,9 @@ public interface APInvoiceRepository extends JpaRepository<APInvoice, Integer> {
     List<APInvoice> findAllActive();
 
     @Query("SELECT ai FROM APInvoice ai WHERE ai.deletedAt IS NULL")
+    List<APInvoice> findAllActiveInvoices();
+
+    @Query("SELECT ai FROM APInvoice ai WHERE ai.deletedAt IS NULL")
     Page<APInvoice> findAllActive(Pageable pageable);
 
     @Query("SELECT ai FROM APInvoice ai WHERE " +

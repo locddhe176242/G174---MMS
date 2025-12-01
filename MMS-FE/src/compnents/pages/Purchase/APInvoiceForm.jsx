@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
 import apiClient from "../../../api/apiClient";
+import { formatCurrency, formatNumberInput, parseNumberInput } from "../../../utils/formatters";
 
 export default function APInvoiceForm() {
   const { id } = useParams();
@@ -649,16 +650,20 @@ export default function APInvoiceForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ngày đến hạn
+                      Ngày đến hạn thanh toán <span className="text-red-500">*</span>
                     </label>
                     <DatePicker
                       selected={formData.due_date instanceof Date ? formData.due_date : (formData.due_date ? new Date(formData.due_date) : null)}
                       onChange={(date) => handleInputChange("due_date", date)}
                       dateFormat="dd/MM/yyyy"
                       isClearable
-                      placeholderText="Chọn ngày đến hạn"
+                      placeholderText="Chọn hạn thanh toán cho vendor"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      minDate={new Date()}
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 Ngày phải trả tiền cho nhà cung cấp. Hệ thống sẽ nhắc khi đến hạn.
+                    </p>
                   </div>
                 </div>
 
@@ -814,12 +819,11 @@ export default function APInvoiceForm() {
                                 ) : (
                                   <>
                                     <input
-                                      type="number"
-                                      value={item.unit_price}
-                                      onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
+                                      type="text"
+                                      value={formatNumberInput(item.unit_price)}
+                                      onChange={(e) => handleItemChange(index, "unit_price", parseNumberInput(e.target.value))}
                                       className={`w-32 px-2 py-1 border rounded text-sm text-right ${itemErr.unit_price ? "border-red-500" : "border-gray-300"}`}
-                                      min="0"
-                                      step="0.01"
+                                      placeholder="0"
                                     />
                                     {itemErr.unit_price && (
                                       <p className="text-red-500 text-xs mt-1">{itemErr.unit_price}</p>

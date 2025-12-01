@@ -11,6 +11,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -39,6 +41,10 @@ public class ARInvoice {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "so_id")
     private SalesOrder salesOrder;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_id")
+    private Delivery delivery;
 
     @Column(name = "invoice_date")
     private LocalDate invoiceDate;
@@ -73,6 +79,14 @@ public class ARInvoice {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -81,6 +95,12 @@ public class ARInvoice {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @OneToMany(mappedBy = "invoice", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<ARInvoiceItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "invoice", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<ARPayment> payments = new ArrayList<>();
 
     public enum InvoiceStatus {
         Unpaid, PartiallyPaid, Paid, Cancelled

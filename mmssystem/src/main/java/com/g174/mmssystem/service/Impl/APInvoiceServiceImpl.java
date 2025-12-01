@@ -38,6 +38,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     private final GoodsReceiptRepository receiptRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
     private final GoodsReceiptItemRepository receiptItemRepository;
+    private final com.g174.mmssystem.service.IService.IVendorBalanceService vendorBalanceService;
 
     @Override
     @Transactional
@@ -140,6 +141,13 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         APInvoice saved = invoiceRepository.save(invoice);
         APInvoice savedWithRelations = invoiceRepository.findByIdWithRelations(saved.getApInvoiceId())
                 .orElse(saved);
+
+        // Update vendor balance
+        try {
+            vendorBalanceService.updateOnInvoiceCreated(vendor.getVendorId(), saved.getTotalAmount());
+        } catch (Exception e) {
+            log.error("Failed to update vendor balance for vendor {}: {}", vendor.getVendorId(), e.getMessage());
+        }
 
         log.info("AP Invoice created successfully with ID: {} and number: {}", saved.getApInvoiceId(), saved.getInvoiceNo());
         return invoiceMapper.toResponseDTO(savedWithRelations);
@@ -252,6 +260,13 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         APInvoice saved = invoiceRepository.save(invoice);
         APInvoice savedWithRelations = invoiceRepository.findByIdWithRelations(saved.getApInvoiceId())
                 .orElse(saved);
+
+        // Update vendor balance
+        try {
+            vendorBalanceService.updateOnInvoiceCreated(vendor.getVendorId(), saved.getTotalAmount());
+        } catch (Exception e) {
+            log.error("Failed to update vendor balance for vendor {}: {}", vendor.getVendorId(), e.getMessage());
+        }
 
         log.info("AP Invoice auto-created from GR: {} with invoice number: {}", goodsReceipt.getReceiptNo(), invoiceNo);
         return invoiceMapper.toResponseDTO(savedWithRelations);
@@ -381,8 +396,19 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .filter(inv -> inv.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
 
+        // Store values before delete for balance update
+        Integer vendorId = invoice.getVendor().getVendorId();
+        BigDecimal totalAmount = invoice.getTotalAmount();
+
         invoice.setDeletedAt(LocalDateTime.now());
         APInvoice saved = invoiceRepository.save(invoice);
+
+        // Update vendor balance
+        try {
+            vendorBalanceService.updateOnInvoiceDeleted(vendorId, totalAmount);
+        } catch (Exception e) {
+            log.error("Failed to update vendor balance for vendor {}: {}", vendorId, e.getMessage());
+        }
 
         log.info("AP Invoice deleted successfully");
         return invoiceMapper.toResponseDTO(saved);
@@ -397,13 +423,20 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .filter(inv -> inv.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + dto.getApInvoiceId()));
 
+        // Auto-generate reference number if not provided
+        String referenceNo = dto.getReferenceNo();
+        if (referenceNo == null || referenceNo.trim().isEmpty()) {
+            referenceNo = generatePaymentReferenceNo();
+            log.info("Auto-generated reference number: {}", referenceNo);
+        }
+
         // Create payment
         APPayment payment = APPayment.builder()
                 .apInvoice(invoice)
                 .paymentDate(dto.getPaymentDate() != null ? dto.getPaymentDate() : LocalDateTime.now())
                 .amount(dto.getAmount())
                 .method(dto.getMethod())
-                .referenceNo(dto.getReferenceNo())
+                .referenceNo(referenceNo)
                 .notes(dto.getNotes())
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -424,6 +457,13 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
 
         invoice.setUpdatedAt(LocalDateTime.now());
         invoiceRepository.save(invoice);
+
+        // Update vendor balance
+        try {
+            vendorBalanceService.updateOnPaymentAdded(invoice.getVendor().getVendorId(), dto.getAmount());
+        } catch (Exception e) {
+            log.error("Failed to update vendor balance: {}", e.getMessage());
+        }
 
         // Update Purchase Order status to Completed if invoice is fully paid
         if (invoiceFullyPaid && invoice.getPurchaseOrder() != null) {
@@ -449,6 +489,31 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<APPaymentResponseDTO> getAllPayments(String keyword, Pageable pageable) {
+        log.info("Getting all payments with keyword: {}", keyword);
+        
+        Page<APPayment> payments = paymentRepository.findAllWithSearch(keyword, pageable);
+        
+        return payments.map(payment -> {
+            APPaymentResponseDTO dto = new APPaymentResponseDTO();
+            dto.setApPaymentId(payment.getApPaymentId());
+            dto.setApInvoiceId(payment.getApInvoice().getApInvoiceId());
+            dto.setInvoiceNo(payment.getApInvoice().getInvoiceNo());
+            dto.setVendorId(payment.getApInvoice().getVendor().getVendorId());
+            dto.setVendorName(payment.getApInvoice().getVendor().getName());
+            dto.setVendorCode(payment.getApInvoice().getVendor().getVendorCode());
+            dto.setPaymentDate(payment.getPaymentDate());
+            dto.setAmount(payment.getAmount());
+            dto.setMethod(payment.getMethod());
+            dto.setReferenceNo(payment.getReferenceNo());
+            dto.setNotes(payment.getNotes());
+            dto.setCreatedAt(payment.getCreatedAt());
+            return dto;
+        });
+    }
+
+    @Override
     public boolean existsByInvoiceNo(String invoiceNo) {
         return invoiceRepository.existsByInvoiceNo(invoiceNo);
     }
@@ -470,5 +535,16 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         }
 
         return String.format("%s%04d", prefix, nextNumber);
+    }
+
+    /**
+     * Generate unique payment reference number
+     * Format: TXN{YYYYMMDDHHMMSS}{random3digits}
+     */
+    private String generatePaymentReferenceNo() {
+        LocalDateTime now = LocalDateTime.now();
+        String timestamp = now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        int random = (int) (Math.random() * 1000);
+        return String.format("TXN%s%03d", timestamp, random);
     }
 }

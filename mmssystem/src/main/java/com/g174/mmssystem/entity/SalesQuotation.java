@@ -11,6 +11,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -92,6 +94,9 @@ public class SalesQuotation {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @OneToMany(mappedBy = "salesQuotation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SalesQuotationItem> items = new ArrayList<>();
 
     public enum QuotationStatus {
         Draft, Active, Converted, Cancelled, Expired

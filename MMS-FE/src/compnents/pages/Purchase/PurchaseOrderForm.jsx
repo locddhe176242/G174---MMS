@@ -8,6 +8,7 @@ import { purchaseOrderService } from "../../../api/purchaseOrderService";
 import { purchaseRequisitionService } from "../../../api/purchaseRequisitionService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
+import { formatCurrency, formatNumberInput, parseNumberInput } from "../../../utils/formatters";
 
 export default function PurchaseOrderForm() {
     const { id } = useParams();
@@ -1270,12 +1271,11 @@ export default function PurchaseOrderForm() {
                                                                 <span className="px-2 py-1 text-sm">{formatCurrency(item.unit_price)}</span>
                                                             ) : (
                                                                 <input
-                                                                    type="number"
-                                                                    value={item.unit_price}
-                                                                    onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
-                                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                    min="0"
-                                                                    step="0.01"
+                                                                    type="text"
+                                                                    value={formatNumberInput(item.unit_price)}
+                                                                    onChange={(e) => handleItemChange(index, "unit_price", parseNumberInput(e.target.value))}
+                                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                                                    placeholder="0"
                                                                 />
                                                             )}
                                                             {itemErr.unit_price && (

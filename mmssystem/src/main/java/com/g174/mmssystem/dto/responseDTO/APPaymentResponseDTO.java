@@ -14,6 +14,9 @@ public class APPaymentResponseDTO {
     private Integer apPaymentId;
     private Integer apInvoiceId;
     private String invoiceNo;
+    private Integer vendorId;
+    private String vendorName;
+    private String vendorCode;
     private LocalDateTime paymentDate;
     private BigDecimal amount;
     private String method;

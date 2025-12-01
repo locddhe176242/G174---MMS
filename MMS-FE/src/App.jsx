@@ -22,6 +22,7 @@ import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
 
+//page for purchase module
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
@@ -38,12 +39,32 @@ import GoodsReceiptDetail from "./compnents/pages/Purchase/GoodsReceiptDetail.js
 import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm.jsx";
 import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.jsx";
 import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
-import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
-import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
 import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
+import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
 import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
 import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
 import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
+
+//pages for sales module
+import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
+import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
+import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
+import SalesOrderList from "./compnents/pages/Sale/SalesOrder/SalesOrderList.jsx";
+import SalesOrderForm from "./compnents/pages/Sale/SalesOrder/SalesOrderForm.jsx";
+import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail.jsx";
+import DeliveryList from "./compnents/pages/Sale/Delivery/DeliveryList.jsx";
+import DeliveryForm from "./compnents/pages/Sale/Delivery/DeliveryForm.jsx";
+import DeliveryDetail from "./compnents/pages/Sale/Delivery/DeliveryDetail.jsx";
+import ReturnOrderList from "./compnents/pages/Sale/ReturnOrder/ReturnOrderList.jsx";
+import ReturnOrderForm from "./compnents/pages/Sale/ReturnOrder/ReturnOrderForm.jsx";
+import ReturnOrderDetail from "./compnents/pages/Sale/ReturnOrder/ReturnOrderDetail.jsx";
+import CreditNoteList from "./compnents/pages/Sale/CreditNote/CreditNoteList.jsx";
+import CreditNoteForm from "./compnents/pages/Sale/CreditNote/CreditNoteForm.jsx";
+import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail.jsx";
+import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
+import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
+import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -92,6 +113,8 @@ function App() {
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
 
+
+                {/**Purchase Module Routes */}
                 <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
@@ -119,14 +142,39 @@ function App() {
                 <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
 
                 <Route path="/purchase/ap-payments" element={<APaymentList />} />
-                <Route path="/purchase/ap-payments/:id" element={<APaymentDetail />} />
-                <Route path="/purchase/ap-payments/new" element={<APaymentForm />} />
 
                 <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
                 <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
                 <Route path="/purchase/ap-invoices/:id" element={<APInvoiceDetail />} />
                 <Route path="/purchase/ap-invoices/:id/edit" element={<APInvoiceForm />} />
                 <Route path="/purchase/ap-invoices/:invoiceId/add-payment" element={<APaymentForm />} />
+
+                {/**Sales Module Routes */}
+                <Route path="/sales/quotations" element={<SalesQuotationList />} />
+                <Route path="/sales/quotations/new" element={<SalesQuotationForm />} />
+                <Route path="/sales/quotations/:id" element={<SalesQuotationDetail />} />
+                <Route path="/sales/quotations/:id/edit" element={<SalesQuotationForm />} />
+                <Route path="/sales/orders" element={<SalesOrderList />} />
+                <Route path="/sales/orders/new" element={<SalesOrderForm />} />
+                <Route path="/sales/orders/:id" element={<SalesOrderDetail />} />
+                <Route path="/sales/orders/:id/edit" element={<SalesOrderForm />} />
+                <Route path="/sales/deliveries" element={<DeliveryList />} />
+                <Route path="/sales/deliveries/new" element={<DeliveryForm />} />
+                <Route path="/sales/deliveries/:id" element={<DeliveryDetail />} />
+                <Route path="/sales/deliveries/:id/edit" element={<DeliveryForm />} />
+                <Route path="/sales/return-orders" element={<ReturnOrderList />} />
+                <Route path="/sales/return-orders/new" element={<ReturnOrderForm />} />
+                <Route path="/sales/return-orders/:id" element={<ReturnOrderDetail />} />
+                <Route path="/sales/return-orders/:id/edit" element={<ReturnOrderForm />} />
+                <Route path="/sales/credit-notes" element={<CreditNoteList />} />
+                <Route path="/sales/credit-notes/new" element={<CreditNoteForm />} />
+                <Route path="/sales/credit-notes/:id" element={<CreditNoteDetail />} />
+                <Route path="/sales/credit-notes/:id/edit" element={<CreditNoteForm />} />
+                <Route path="/sales/invoices" element={<InvoiceList />} />
+                <Route path="/sales/invoices/new" element={<InvoiceForm />} />
+                <Route path="/sales/invoices/:id" element={<InvoiceDetail />} />
+                <Route path="/sales/invoices/:id/edit" element={<InvoiceForm />} />
+
 
                 <Route path="/approval" element={<ApprovalList />} />
 
@@ -136,7 +184,6 @@ function App() {
                 <Route path="/admin/permissions" element={<PermissionManagement />} />
                 <Route path="/admin/user-permissions" element={<UserPermissionManagement />} />
                 <Route path="/admin/users" element={<UserManagement />} />
-                <Route path="/admin/user" element={<UserManagement />} />
                 <Route path="/admin/departments" element={<DepartmentManagement />} />
             </Route>
 

@@ -92,7 +92,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (16, 'purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 19),
 (17, 'purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 20),
 (18, 'goods-receipt', 'Phiếu nhập kho', '/purchase/goods-receipts', 'receipt', 21),
-(19, 'ap-invoices', 'Hóa đơn phải trả', '/purchase/ap-invoices', 'accounting', 22),
+(19, 'ap-invoices', 'Hóa đơn mua hàng', '/purchase/ap-invoices', 'accounting', 22),
 
 -- Menu con của Sales (Xuất hàng)
 (20, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 23),

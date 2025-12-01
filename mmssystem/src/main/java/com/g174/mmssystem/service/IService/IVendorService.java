@@ -4,6 +4,7 @@ import com.g174.mmssystem.dto.responseDTO.VendorResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.util.List;
+import java.util.Map;
 public interface IVendorService {
     VendorResponseDTO createVendor(VendorRequestDTO vendorRequestDTO);
     VendorResponseDTO getVendorById(Integer vendorId);
@@ -17,4 +18,6 @@ public interface IVendorService {
     void restoreVendor(Integer vendorId);
     boolean existsByVendorCode(String vendorCode);
     String generateNextVendorCode();
+    Map<String, Object> getVendorBalance(Integer vendorId);
+    Map<String, Object> getVendorDocuments(Integer vendorId);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
@@ -8,14 +8,17 @@ import { rfqService } from '../../../api/rfqService';
 import { purchaseQuotationService } from '../../../api/purchaseQuotationService';
 import apiClient from '../../../api/apiClient';
 import { getCurrentUser } from '../../../api/authService';
+import { formatCurrency, formatNumberInput, parseNumberInput } from '../../../utils/formatters';
 
 const VendorQuotationForm = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const { id: quotationId } = useParams(); // Get quotation ID from URL params
     const rfqId = searchParams.get('rfq_id');
     const vendorId = searchParams.get('vendor_id');
+    const isViewMode = !!quotationId; // If quotationId exists, we're in view/edit mode
 
-    // Form data state - using camelCase to match backend DTO
+    // Form data state 
     const [formData, setFormData] = useState({
         pqNo: '',
         rfqId: rfqId ? parseInt(rfqId) : null,
@@ -73,23 +76,7 @@ const VendorQuotationForm = () => {
         return true;
     };
 
-    // Format currency
-    const formatCurrency = (n) =>
-        new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n || 0));
-
-    // Format number with thousand separator (for input display)
-    const formatNumber = (value) => {
-        if (!value && value !== 0) return '';
-        const num = value.toString().replace(/\./g, ''); // Remove existing dots
-        return num.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); // Add dots every 3 digits
-    };
-
-    // Parse formatted number back to number
-    const parseFormattedNumber = (value) => {
-        if (!value) return 0;
-        const cleaned = value.toString().replace(/\./g, ''); // Remove dots
-        return parseFloat(cleaned) || 0;
-    };
+    // Note: formatCurrency, formatNumberInput, parseNumberInput now imported from utils/formatters.js
 
     // Calculate item total with proper formula
     const calculateItemTotal = (item) => {
@@ -276,13 +263,74 @@ const VendorQuotationForm = () => {
             }
         };
 
-        if (rfqId && vendorId) {
+        // Load existing quotation for view/edit mode
+        const loadExistingQuotation = async () => {
+            try {
+                setLoading(true);
+                
+                // Fetch quotation by ID
+                const quotationData = await purchaseQuotationService.getQuotationById(quotationId);
+                
+                // Fetch related RFQ and Vendor data
+                const [rfqDataRes, vendorDataRes, productsRes, userRes] = await Promise.all([
+                    quotationData.rfqId ? rfqService.getRFQById(quotationData.rfqId) : Promise.resolve(null),
+                    apiClient.get(`/vendors/${quotationData.vendorId}`),
+                    apiClient.get('/product', { params: { page: 0, size: 100 } }),
+                    getCurrentUser()
+                ]);
+                
+                setRfqData(rfqDataRes);
+                setVendorData(vendorDataRes.data);
+                setProducts(productsRes.data?.content || productsRes.data || []);
+                setCurrentUser(userRes);
+                
+                // Populate form with quotation data
+                setFormData({
+                    pqNo: quotationData.pqNo || quotationData.quotation_no || '',
+                    rfqId: quotationData.rfqId || quotationData.rfq_id || null,
+                    vendorId: quotationData.vendorId || quotationData.vendor_id || null,
+                    pqDate: quotationData.pqDate ? new Date(quotationData.pqDate) : new Date(),
+                    validUntil: quotationData.validUntil ? new Date(quotationData.validUntil) : null,
+                    isTaxIncluded: quotationData.isTaxIncluded || false,
+                    deliveryTerms: quotationData.deliveryTerms || '',
+                    paymentTerms: quotationData.paymentTerms || '',
+                    leadTimeDays: quotationData.leadTimeDays || null,
+                    warrantyMonths: quotationData.warrantyMonths || null,
+                    headerDiscount: quotationData.headerDiscount || 0,
+                    shippingCost: quotationData.shippingCost || 0,
+                    totalAmount: quotationData.totalAmount || 0,
+                    status: quotationData.status || 'Pending',
+                    notes: quotationData.notes || '',
+                    items: quotationData.items?.map(item => ({
+                        productId: item.productId || item.product_id,
+                        productName: item.productName || item.product_name || '',
+                        quantity: item.quantity || 0,
+                        unitPrice: item.unitPrice || item.unit_price || 0,
+                        taxRate: item.taxRate || item.tax_rate || 0,
+                        discountPercent: item.discountPercent || item.discount_percent || 0,
+                        lineTotal: item.lineTotal || item.line_total || 0
+                    })) || []
+                });
+            } catch (error) {
+                console.error('Error loading quotation:', error);
+                toast.error('Không thể tải thông tin báo giá');
+                navigate('/purchase/rfqs');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (quotationId) {
+            // View/Edit mode - load existing quotation
+            loadExistingQuotation();
+        } else if (rfqId && vendorId) {
+            // Create mode - load RFQ and Vendor
             loadInitialData();
         } else {
             toast.error('Thiếu thông tin RFQ hoặc Vendor');
             navigate('/purchase/rfqs');
         }
-    }, [rfqId, vendorId, navigate]);
+    }, [rfqId, vendorId, quotationId, navigate]);
 
     // Update line totals when items change
     useEffect(() => {
@@ -688,18 +736,16 @@ const VendorQuotationForm = () => {
                                 Phí vận chuyển
                             </label>
                             <input
-                                type="number"
-                                value={formData.shippingCost}
-                                onChange={(e) => handleInputChange('shippingCost', parseFloat(e.target.value) || 0)}
+                                type="text"
+                                value={formatNumberInput(formData.shippingCost)}
+                                onChange={(e) => handleInputChange('shippingCost', parseNumberInput(e.target.value))}
                                 disabled={!requiresShippingCost(formData.deliveryTerms)}
-                                className={`w-full px-3 py-2 border rounded-md ${
+                                className={`w-full px-3 py-2 border rounded-md text-right ${
                                     !requiresShippingCost(formData.deliveryTerms)
                                         ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
                                         : 'border-gray-300'
                                 }`}
-                                min="0"
-                                step="0.01"
-                                placeholder={!requiresShippingCost(formData.deliveryTerms) ? "Không áp dụng (FOB/EXW)" : "Nhập phí vận chuyển"}
+                                placeholder={!requiresShippingCost(formData.deliveryTerms) ? "Không áp dụng (FOB/EXW)" : "0"}
                             />
                             {!requiresShippingCost(formData.deliveryTerms) && (
                                 <p className="text-xs text-gray-500 mt-1">
@@ -776,14 +822,9 @@ const VendorQuotationForm = () => {
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
                                                 type="text"
-                                                value={formatNumber(item.unitPrice)}
+                                                value={formatNumberInput(item.unitPrice)}
                                                 onChange={(e) => {
-                                                    const rawValue = parseFormattedNumber(e.target.value);
-                                                    handleItemChange(index, 'unitPrice', rawValue);
-                                                }}
-                                                onBlur={(e) => {
-                                                    // Re-format on blur to ensure proper display
-                                                    const rawValue = parseFormattedNumber(e.target.value);
+                                                    const rawValue = parseNumberInput(e.target.value);
                                                     handleItemChange(index, 'unitPrice', rawValue);
                                                 }}
                                                 className="w-32 px-1.5 py-0.5 border border-gray-300 rounded text-xs text-right"

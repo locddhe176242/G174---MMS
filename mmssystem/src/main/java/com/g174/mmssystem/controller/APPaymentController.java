@@ -42,4 +42,25 @@ public class APPaymentController {
         List<APPaymentResponseDTO> response = apInvoiceService.getPaymentsByInvoiceId(invoiceId);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Lấy tất cả payments với pagination và search
+     */
+    @GetMapping
+    public ResponseEntity<org.springframework.data.domain.Page<APPaymentResponseDTO>> getAllPayments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "paymentDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String keyword
+    ) {
+        org.springframework.data.domain.Sort sort = sortDir.equalsIgnoreCase("asc") 
+            ? org.springframework.data.domain.Sort.by(sortBy).ascending()
+            : org.springframework.data.domain.Sort.by(sortBy).descending();
+        
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, sort);
+        org.springframework.data.domain.Page<APPaymentResponseDTO> response = apInvoiceService.getAllPayments(keyword, pageable);
+        
+        return ResponseEntity.ok(response);
+    }
 }

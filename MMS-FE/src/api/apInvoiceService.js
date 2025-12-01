@@ -17,8 +17,8 @@ export const apInvoiceService = {
     return response.data;
   },
 
-  getAllInvoices: async () => {
-    const response = await apiClient.get("/ap-invoices");
+  getAllInvoices: async (params = {}) => {
+    const response = await apiClient.get("/ap-invoices", { params });
     return response.data;
   },
 
@@ -84,6 +84,21 @@ export const apInvoiceService = {
 
   generateInvoiceNo: async () => {
     const response = await apiClient.get("/ap-invoices/generate-invoice-no");
+    return response.data;
+  },
+
+  // ===== Invoice Approval =====
+  approveInvoice: async (invoiceId, approverId) => {
+    const response = await apiClient.put(`/ap-invoices/${invoiceId}/approve`, null, {
+      params: { approverId }
+    });
+    return response.data;
+  },
+
+  rejectInvoice: async (invoiceId, approverId, reason) => {
+    const response = await apiClient.put(`/ap-invoices/${invoiceId}/reject`, null, {
+      params: { approverId, reason }
+    });
     return response.data;
   },
 
