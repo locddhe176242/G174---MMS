@@ -432,9 +432,12 @@ CREATE TABLE Purchase_Quotation_Items (
     tax_amount DECIMAL(18, 2),
     line_total DECIMAL(18, 2) NOT NULL,
     remark TEXT,
-    FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
-    FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
+    CONSTRAINT fk_pqi_pq
+      FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_rfq_item
+      FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
     INDEX idx_pqi_pq (pq_id),
     INDEX idx_pqi_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -489,9 +492,12 @@ CREATE TABLE Purchase_Order_Items (
     line_total DECIMAL(18, 2) NOT NULL,
     delivery_date DATE,
     note TEXT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_poi_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_poi_pq_item
+      FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
+    CONSTRAINT fk_poi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_poi_order (order_id),
     INDEX idx_poi_product (product_id),
     INDEX idx_poi_qty_tracking (order_id, received_qty, invoiced_qty)
@@ -510,10 +516,14 @@ CREATE TABLE Goods_Receipts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gr_warehouse
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gr_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_approved_by
+      FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_gr_no (receipt_no),
     INDEX idx_gr_status (status, deleted_at),
     INDEX idx_gr_order (order_id),
@@ -528,9 +538,12 @@ CREATE TABLE Goods_Receipt_Items (
     received_qty DECIMAL(18, 2) NOT NULL,
     accepted_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
     remark TEXT,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gri_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gri_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gri_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_gri_receipt (receipt_id),
     INDEX idx_gri_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -554,9 +567,12 @@ CREATE TABLE AP_Invoices (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_api_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
     INDEX idx_ap_invoice_no (invoice_no),
     INDEX idx_ap_status (status, deleted_at),
     INDEX idx_ap_vendor (vendor_id),
@@ -575,9 +591,12 @@ CREATE TABLE AP_Invoice_Items (
     discount_percent DECIMAL(5, 2) DEFAULT 0,
     tax_rate DECIMAL(5, 2),
     line_total DECIMAL(18, 2),
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
-    FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_apii_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_gri
+      FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
     INDEX idx_api_invoice (ap_invoice_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -590,7 +609,8 @@ CREATE TABLE AP_Payments (
     reference_no VARCHAR(100),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_app_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
     INDEX idx_app_invoice (ap_invoice_id),
     INDEX idx_app_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
