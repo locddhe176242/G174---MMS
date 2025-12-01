@@ -89,16 +89,17 @@ public class DepartmentServiceImpl implements IDepartmentService {
     @Override
     @Transactional
     public void deleteDepartment(Integer departmentId) {
-        log.info("Dừng hoạt động phòng ban ID: {}", departmentId);
+        log.info("Xóa phòng ban ID: {}", departmentId);
 
         Department department = departmentRepository.findById(departmentId)
                 .filter(d -> d.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng ban ID: " + departmentId));
 
-        department.setStatus(Department.DepartmentStatus.INACTIVE);
+        // Soft delete
+        department.setDeletedAt(Instant.now());
         departmentRepository.save(department);
 
-        log.info("Dừng hoạt động phòng ban thành công ID: {}", departmentId);
+        log.info("Xóa phòng ban thành công ID: {}", departmentId);
     }
 
     @Override
@@ -107,10 +108,10 @@ public class DepartmentServiceImpl implements IDepartmentService {
         log.info("Khôi phục phòng ban ID: {}", departmentId);
 
         Department department = departmentRepository.findById(departmentId)
-                .filter(d -> d.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng ban ID: " + departmentId));
 
-        department.setStatus(Department.DepartmentStatus.ACTIVE);
+        // Restore by clearing deletedAt
+        department.setDeletedAt(null);
         departmentRepository.save(department);
 
         log.info("Khôi phục phòng ban thành công ID: {}", departmentId);

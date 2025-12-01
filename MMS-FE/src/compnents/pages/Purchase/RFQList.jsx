@@ -115,7 +115,7 @@ export default function RFQList() {
 
     try {
       setIsDeleting(true);
-      await rfqService.deleteRFQ(rfqToDelete.rfqId || rfqToDelete.id);
+      await rfqService.deleteRFQ(rfqToDelete.rfqId || rfqToDelete.id || rfqToDelete.rfq_id);
       toast.success("Xóa Yêu cầu báo giá thành công!");
       setShowDeleteModal(false);
       setRfqToDelete(null);
@@ -137,6 +137,26 @@ export default function RFQList() {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("vi-VN");
+  };
+
+  const getStatusBadge = (status) => {
+    // Handle both string and enum object formats
+    const statusStr = typeof status === 'string' ? status : (status?.name || status?.toString() || 'Draft');
+    
+    const map = {
+      Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
+      Pending: { label: "Chờ phản hồi", color: "bg-yellow-100 text-yellow-800" },
+      Sent: { label: "Đã gửi", color: "bg-blue-100 text-blue-800" },
+      Closed: { label: "Đã đóng", color: "bg-gray-200 text-gray-800" },
+      Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
+    };
+
+    const statusInfo = map[statusStr] || { label: statusStr || "Draft", color: "bg-gray-100 text-gray-800" };
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+        {statusInfo.label}
+      </span>
+    );
   };
 
   return (
@@ -211,43 +231,25 @@ export default function RFQList() {
                       <input type="checkbox" className="rounded border-gray-300" />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("rfqId")} className="flex items-center gap-1 hover:text-gray-700">
-                        ID
-                        {getSortIcon("rfqId")}
-                      </button>
+                      ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("rfqNo")} className="flex items-center gap-1 hover:text-gray-700">
-                        SỐ YÊU CẦU BÁO GIÁ
-                        {getSortIcon("rfqNo")}
-                      </button>
+                      SỐ YÊU CẦU BÁO GIÁ
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("status")} className="flex items-center gap-1 hover:text-gray-700">
-                        TRẠNG THÁI
-                        {getSortIcon("status")}
-                      </button>
+                      TRẠNG THÁI
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("issueDate")} className="flex items-center gap-1 hover:text-gray-700">
-                        NGÀY PHÁT HÀNH
-                        {getSortIcon("issueDate")}
-                      </button>
+                      NGÀY PHÁT HÀNH
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("dueDate")} className="flex items-center gap-1 hover:text-gray-700">
-                        HẠN PHẢN HỒI
-                        {getSortIcon("dueDate")}
-                      </button>
+                      HẠN PHẢN HỒI
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       NCC ĐƯỢC CHỌN
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <button onClick={() => handleSort("createdAt")} className="flex items-center gap-1 hover:text-gray-700">
-                        NGÀY TẠO
-                        {getSortIcon("createdAt")}
-                      </button>
+                      NGÀY TẠO
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GHI CHÚ</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
@@ -265,10 +267,8 @@ export default function RFQList() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {rfq.rfqNo}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                          {rfq.status}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {getStatusBadge(rfq.status)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(rfq.issueDate)}
@@ -277,7 +277,11 @@ export default function RFQList() {
                         {formatDate(rfq.dueDate)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {rfq.selectedVendorName || rfq.selectedVendor?.name || ""}
+                        {rfq.selectedVendorName || 
+                         (Array.isArray(rfq.selectedVendors) && rfq.selectedVendors.length > 0
+                           ? rfq.selectedVendors.map(v => v.vendorName || v.name).join(", ")
+                           : "") || 
+                         "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(rfq.createdAt)}
@@ -297,24 +301,36 @@ export default function RFQList() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => navigate(`/purchase/rfqs/${rfq.rfqId || rfq.id}/edit`)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Chỉnh sửa"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(rfq)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Xóa"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {/* Chỉ hiển thị nút edit khi status là Draft */}
+                          {(() => {
+                            const statusStr = typeof rfq.status === 'string' ? rfq.status : (rfq.status?.name || rfq.status?.toString() || 'Draft');
+                            return statusStr === 'Draft' && (
+                              <button
+                                onClick={() => navigate(`/purchase/rfqs/${rfq.rfqId || rfq.id}/edit`)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Chỉnh sửa"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            );
+                          })()}
+                          {/* Chỉ hiển thị nút delete khi status là Draft */}
+                          {(() => {
+                            const statusStr = typeof rfq.status === 'string' ? rfq.status : (rfq.status?.name || rfq.status?.toString() || 'Draft');
+                            return statusStr === 'Draft' && (
+                              <button
+                                onClick={() => handleDeleteClick(rfq)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Xóa"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>

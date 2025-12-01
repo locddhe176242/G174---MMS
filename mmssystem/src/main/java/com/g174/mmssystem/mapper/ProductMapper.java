@@ -61,7 +61,6 @@ public class ProductMapper {
                 .imageUrl(entity.getImageUrl())
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getCategoryId() : null)
                 .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : null)
-                .totalQuantity(null)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .deletedAt(entity.getDeletedAt())

@@ -33,6 +33,11 @@ public class VendorServiceImpl implements IVendorService {
     private final VendorRepository vendorRepository;
     private final AddressRepository addressRepository;
     private final ContactRepository contactRepository;
+    private final com.g174.mmssystem.service.IService.IVendorBalanceService vendorBalanceService;
+    private final com.g174.mmssystem.repository.PurchaseOrderRepository purchaseOrderRepository;
+    private final com.g174.mmssystem.repository.APInvoiceRepository apInvoiceRepository;
+    private final com.g174.mmssystem.repository.APPaymentRepository apPaymentRepository;
+    private final com.g174.mmssystem.repository.PurchaseQuotationRepository purchaseQuotationRepository;
 
     @Override
     @Transactional
@@ -360,5 +365,64 @@ public class VendorServiceImpl implements IVendorService {
         }
 
         return responseDTO;
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> getVendorBalance(Integer vendorId) {
+        log.info("Getting balance for vendor ID: {}", vendorId);
+
+        // Verify vendor exists
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .filter(v -> v.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + vendorId));
+
+        // Get balance from VendorBalance table (may create if doesn't exist)
+        com.g174.mmssystem.entity.VendorBalance balance = vendorBalanceService.getOrCreateBalance(vendorId);
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("vendorId", vendorId);
+        result.put("vendorName", vendor.getName());
+        result.put("vendorCode", vendor.getVendorCode());
+        result.put("totalInvoiced", balance.getTotalInvoiced());
+        result.put("totalPaid", balance.getTotalPaid());
+        result.put("outstandingBalance", balance.getOutstandingBalance());
+        result.put("lastUpdatedAt", balance.getLastUpdatedAt());
+
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getVendorDocuments(Integer vendorId) {
+        log.info("Getting documents for vendor ID: {}", vendorId);
+
+        // Verify vendor exists
+        vendorRepository.findById(vendorId)
+                .filter(v -> v.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + vendorId));
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+
+        // Get document counts only (avoid serialization issues)
+        int quotationsCount = purchaseQuotationRepository.findByVendorId(vendorId).size();
+        result.put("quotationsCount", quotationsCount);
+
+        int purchaseOrdersCount = purchaseOrderRepository.findByVendorId(vendorId).size();
+        result.put("purchaseOrdersCount", purchaseOrdersCount);
+
+        int invoicesCount = apInvoiceRepository.findByVendorId(vendorId).size();
+        result.put("invoicesCount", invoicesCount);
+
+        // Calculate payments count
+        java.util.List<com.g174.mmssystem.entity.APInvoice> invoices = 
+                apInvoiceRepository.findByVendorId(vendorId);
+        int paymentsCount = 0;
+        for (com.g174.mmssystem.entity.APInvoice invoice : invoices) {
+            paymentsCount += apPaymentRepository.findByInvoiceId(invoice.getApInvoiceId()).size();
+        }
+        result.put("paymentsCount", paymentsCount);
+
+        return result;
     }
 }

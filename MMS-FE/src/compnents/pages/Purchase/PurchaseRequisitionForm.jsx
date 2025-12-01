@@ -9,7 +9,7 @@ import { getCurrentUser } from '../../../api/authService';
 import { getProducts } from '../../../api/productService';
 import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
 import { getCurrentUserProfile } from '../../../api/userProfileService';
-//import * as ExcelJS from 'exceljs';
+import * as ExcelJS from 'exceljs';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();
@@ -59,7 +59,7 @@ const PurchaseRequisitionForm = () => {
     // Auto-generate requisition number from backend service
     const generateRequisitionNumber = async () => {
         try {
-            const requisitionNo = await purchaseRequisitionService.generateRequisitionNumber();
+            const requisitionNo = await purchaseRequisitionService.generateRequisitionNo();
             return requisitionNo;
         } catch (error) {
             console.error('Error generating requisition number:', error);
@@ -176,7 +176,7 @@ const PurchaseRequisitionForm = () => {
                     const status = data.status || 'Draft';
                     if (status !== 'Draft') {
                         toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${status}". Chỉ có thể chỉnh sửa khi trạng thái là "Draft".`);
-                        navigate(`/purchase-requisitions/${id}`);
+                        navigate(`/purchase/purchase-requisitions/${id}`);
                         return;
                     }
 
@@ -225,37 +225,6 @@ const PurchaseRequisitionForm = () => {
         }
     }, [formData, isEdit]);
 
-    // Save draft to backend
-    const saveDraftToBackend = async () => {
-        try {
-            // Format data to match DTO (camelCase)
-            const draftData = {
-                requisitionNo: formData.requisition_no,
-                requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                requesterId: formData.requester_id,
-                purpose: formData.purpose,
-                status: 'Draft',
-                approverId: formData.approver_id,
-                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
-                items: formData.items.map(item => ({
-                    productId: item.product_id,
-                    productName: item.product_name || '',
-                    requestedQty: parseFloat(item.requested_qty) || 1,
-                    unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                    note: item.note || ''
-                }))
-            };
-
-            // Use service - apiClient handles auth automatically
-            const data = await purchaseRequisitionService.createRequisition(draftData);
-            toast.success('Đã lưu bản nháp vào hệ thống');
-            return data?.requisitionId || data?.requisition_id || data?.id || null;
-        } catch (error) {
-            console.error('Error saving draft to backend:', error);
-            toast.error('Lỗi khi lưu bản nháp: ' + error.message);
-        }
-    };
 
     // Handle navigation with unsaved changes check
     const handleNavigate = (path) => {
@@ -274,7 +243,36 @@ const PurchaseRequisitionForm = () => {
 
     // Handle save draft and navigate
     const handleSaveDraftAndNavigate = async () => {
-        await saveDraftToBackend();
+        try {
+            setLoading(true);
+            // Format data to match DTO (camelCase)
+            const draftData = {
+                requisitionNo: formData.requisition_no,
+                requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                requesterId: formData.requester_id,
+                purpose: formData.purpose || '',
+                status: 'Draft', // Luôn là Draft khi lưu bản nháp
+                approverId: formData.approver_id,
+                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
+                items: (formData.items || []).map(item => ({
+                    productId: item.product_id,
+                    productName: item.product_name || '',
+                    requestedQty: parseFloat(item.requested_qty) || 1,
+                    unit: item.unit || '',
+                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                    note: item.note || ''
+                }))
+            };
+
+            // Use service - apiClient handles auth automatically
+            await purchaseRequisitionService.createRequisition(draftData);
+            toast.success('Đã lưu bản nháp vào hệ thống');
+        } catch (error) {
+            console.error('Error saving draft to backend:', error);
+            toast.error('Lỗi khi lưu bản nháp: ' + (error.message || 'Lỗi không xác định'));
+        } finally {
+            setLoading(false);
+        }
         setHasUnsavedChanges(false);
         setShowSaveDraftDialog(false);
         if (pendingNavigation) {
@@ -753,10 +751,11 @@ const PurchaseRequisitionForm = () => {
         return errors;
     };
 
-    // Handle form submission
+    // Handle form submission (Tạo mới/Cập nhật với status Pending hoặc giữ nguyên)
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Validate đầy đủ khi submit (tạo mới hoặc cập nhật)
         const errors = validateAllFields();
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
@@ -767,8 +766,6 @@ const PurchaseRequisitionForm = () => {
 
         try {
             setLoading(true);
-            const url = isEdit ? `/api/purchase-requisitions/${id}` : '/api/purchase-requisitions';
-            const method = isEdit ? 'PUT' : 'POST';
 
             // Format data to match DTO (camelCase)
             const submitData = {
@@ -776,7 +773,8 @@ const PurchaseRequisitionForm = () => {
                 requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 requesterId: formData.requester_id,
                 purpose: formData.purpose,
-                status: formData.status,
+                // Khi tạo mới: gửi status 'Pending', khi edit: giữ nguyên status hiện tại
+                status: isEdit ? formData.status : 'Pending',
                 approverId: formData.approver_id,
                 approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
                 items: formData.items.map(item => ({
@@ -798,10 +796,58 @@ const PurchaseRequisitionForm = () => {
                 toast.success('Tạo phiếu yêu cầu thành công!');
             }
             setHasUnsavedChanges(false);
-            navigate('/purchase-requisitions');
+            navigate('/purchase/purchase-requisitions');
         } catch (error) {
             console.error('Error submitting form:', error);
             const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra khi gửi dữ liệu';
+            toast.error(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle save draft (không validate, status = Draft)
+    const handleSaveDraft = async () => {
+        try {
+            setLoading(true);
+
+            // Format data to match DTO (camelCase)
+            const draftData = {
+                requisitionNo: formData.requisition_no,
+                requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                requesterId: formData.requester_id,
+                purpose: formData.purpose || '',
+                status: 'Draft', // Luôn là Draft khi lưu bản nháp
+                approverId: formData.approver_id,
+                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
+                items: (formData.items || []).map(item => ({
+                    productId: item.product_id,
+                    productName: item.product_name || '',
+                    requestedQty: parseFloat(item.requested_qty) || 1,
+                    unit: item.unit || '',
+                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                    note: item.note || ''
+                }))
+            };
+
+            // Use service - apiClient handles auth automatically
+            if (isEdit) {
+                await purchaseRequisitionService.updateRequisition(id, draftData);
+                toast.success('Đã lưu bản nháp thành công!');
+            } else {
+                const data = await purchaseRequisitionService.createRequisition(draftData);
+                toast.success('Đã lưu bản nháp thành công!');
+                // Nếu tạo mới, cập nhật ID để có thể edit sau
+                const savedId = data?.requisitionId || data?.requisition_id || data?.id;
+                if (savedId) {
+                    // Có thể navigate đến edit page hoặc giữ nguyên
+                    setHasUnsavedChanges(false);
+                }
+            }
+            setHasUnsavedChanges(false);
+        } catch (error) {
+            console.error('Error saving draft:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Lỗi khi lưu bản nháp';
             toast.error(errorMessage);
         } finally {
             setLoading(false);
@@ -822,7 +868,7 @@ const PurchaseRequisitionForm = () => {
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
                     <button
-                        onClick={() => handleNavigate('/purchase-requisitions')}
+                        onClick={() => handleNavigate('/purchase/purchase-requisitions')}
                         className="text-gray-600 hover:text-gray-800"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1041,13 +1087,13 @@ const PurchaseRequisitionForm = () => {
                                                 onBlur={(e) => {
                                                     const value = e.target.value;
                                                     const numValue = parseFloat(value);
-                                                    // Auto-set to 0.01 if empty or < 0.01 (match backend @DecimalMin(0.01))
-                                                    if (value === '' || value === null || isNaN(numValue) || numValue < 0.01) {
+                                                    // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
+                                                    if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
                                                         setFormData(prev => {
                                                             const newItems = [...prev.items];
                                                             newItems[index] = {
                                                                 ...newItems[index],
-                                                                requested_qty: 0.01
+                                                                requested_qty: 1
                                                             };
                                                             return {
                                                                 ...prev,
@@ -1057,8 +1103,8 @@ const PurchaseRequisitionForm = () => {
                                                     }
                                                 }}
                                                 className={`w-16 px-1.5 py-0.5 border rounded text-xs ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                step="0.01"
-                                                min="0.01"
+                                                step="1"
+                                                min="1"
                                             />
                                             {validationErrors[`item_${index}_qty`] && (
                                                 <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_qty`]}</p>
@@ -1119,10 +1165,18 @@ const PurchaseRequisitionForm = () => {
                 <div className="flex justify-end gap-4">
                     <button
                         type="button"
-                        onClick={() => handleNavigate('/purchase-requisitions')}
+                        onClick={() => handleNavigate('/purchase/purchase-requisitions')}
                         className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition"
                     >
                         Hủy
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSaveDraft}
+                        disabled={loading}
+                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
+                    >
+                        {loading ? 'Đang xử lý...' : 'Lưu bản nháp'}
                     </button>
                     <button
                         type="submit"

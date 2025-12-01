@@ -8,20 +8,26 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
-@Entity
-@Table(name = "Purchase_Requisitions")
-@NoArgsConstructor
-@AllArgsConstructor
 @Getter
 @Setter
-@ToString
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
+@Entity
+@Table(name = "Purchase_Requisitions",
+        indexes = {
+                @Index(name = "idx_pr_no", columnList = "requisition_no"),
+                @Index(name = "idx_pr_status", columnList = "status, deleted_at"),
+                @Index(name = "idx_pr_requester", columnList = "requester_id"),
+                @Index(name = "idx_pr_approver", columnList = "approver_id"),
+                @Index(name = "idx_pr_created_at", columnList = "created_at"),
+                @Index(name = "idx_pr_date", columnList = "requisition_date")
+        })
 public class PurchaseRequisition {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "requisition_id")
-    private Integer requisitionId;
+    private Long requisitionId;
 
     @Column(name = "requisition_no", length = 30, unique = true, nullable = false)
     private String requisitionNo;
@@ -33,12 +39,12 @@ public class PurchaseRequisition {
     @JoinColumn(name = "requester_id", nullable = false)
     private User requester;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "purpose", columnDefinition = "TEXT")
     private String purpose;
 
-    @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(name = "status", length = 20)
+    @Builder.Default
     private RequisitionStatus status = RequisitionStatus.Draft;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -56,13 +62,11 @@ public class PurchaseRequisition {
     @JoinColumn(name = "updated_by")
     private User updatedBy;
 
-    @Builder.Default
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
-    @Builder.Default
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -70,3 +74,4 @@ public class PurchaseRequisition {
     @OneToMany(mappedBy = "purchaseRequisition", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PurchaseRequisitionItem> items;
 }
+

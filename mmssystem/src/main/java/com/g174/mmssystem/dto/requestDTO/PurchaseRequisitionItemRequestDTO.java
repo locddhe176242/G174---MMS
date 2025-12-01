@@ -1,6 +1,5 @@
 package com.g174.mmssystem.dto.requestDTO;
 
-import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -12,21 +11,20 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class PurchaseRequisitionItemRequestDTO {
-
-    private Long productId;
-
-    @Size(max = 255)
+    private Integer priId;
+    private Integer productId;
     private String productName;
-
-    @NotNull(message = "Số lượng yêu cầu không được để trống")
-    @DecimalMin(value = "0.01", message = "Số lượng yêu cầu phải lớn hơn 0")
+    
+    // Validation được xử lý ở service level dựa trên status của PR
+    // Nếu PR status = Draft: cho phép requestedQty và deliveryDate null
+    // Nếu PR status != Draft: bắt buộc phải có requestedQty > 0 và deliveryDate
     private BigDecimal requestedQty;
-
-    @Size(max = 50)
+    
     private String unit;
-
-    @NotNull(message = "Ngày giao hàng là bắt buộc")
+    
+    // Validation được xử lý ở service level dựa trên status của PR
     private LocalDate deliveryDate;
-
+    
     private String note;
 }
+

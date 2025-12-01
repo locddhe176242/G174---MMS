@@ -47,6 +47,20 @@ export const invoiceService = {
     const response = await apiClient.get(`${BASE_PATH}/${invoiceId}/payments`);
     return response.data;
   },
+
+  approveInvoice: async (invoiceId, approverId) => {
+    const response = await apiClient.put(`${BASE_PATH}/${invoiceId}/approve`, null, {
+      params: { approverId }
+    });
+    return response.data;
+  },
+
+  rejectInvoice: async (invoiceId, approverId, reason) => {
+    const response = await apiClient.put(`${BASE_PATH}/${invoiceId}/reject`, null, {
+      params: { approverId, reason }
+    });
+    return response.data;
+  },
 };
 
 export default invoiceService;

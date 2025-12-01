@@ -21,7 +21,6 @@ public class DepartmentMapper {
         dto.setDepartmentName(department.getDepartmentName());
         dto.setDepartmentCode(department.getDepartmentCode());
         dto.setDescription(department.getDescription());
-        dto.setStatus(department.getStatus() != null ? department.getStatus().name() : "ACTIVE");
 
         return dto;
     }

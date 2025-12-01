@@ -10,27 +10,33 @@ import java.util.List;
 public interface IPurchaseRequisitionService {
     PurchaseRequisitionResponseDTO createRequisition(PurchaseRequisitionRequestDTO dto, Integer requesterId);
 
-    PurchaseRequisitionResponseDTO getRequisitionById(Integer requisitionId);
+    PurchaseRequisitionResponseDTO getRequisitionById(Long requisitionId);
 
     List<PurchaseRequisitionResponseDTO> getAllRequisitions();
 
     Page<PurchaseRequisitionResponseDTO> getAllRequisitions(Pageable pageable);
 
+    Page<PurchaseRequisitionResponseDTO> getAllRequisitionsByStatus(com.g174.mmssystem.enums.RequisitionStatus status, Pageable pageable);
+
     List<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword);
 
     Page<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword, Pageable pageable);
 
-    PurchaseRequisitionResponseDTO updateRequisition(Integer requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById);
+    PurchaseRequisitionResponseDTO updateRequisition(Long requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById);
 
-    PurchaseRequisitionResponseDTO approveRequisition(Integer requisitionId, Integer approverId);
+    PurchaseRequisitionResponseDTO approveRequisition(Long requisitionId, Integer approverId);
 
-    PurchaseRequisitionResponseDTO rejectRequisition(Integer requisitionId, Integer approverId, String reason);
+    PurchaseRequisitionResponseDTO rejectRequisition(Long requisitionId, Integer approverId, String reason);
 
-    PurchaseRequisitionResponseDTO closeRequisition(Integer requisitionId);
+    PurchaseRequisitionResponseDTO submitRequisition(Long requisitionId, Integer requesterId);
 
-    PurchaseRequisitionResponseDTO restoreRequisition(Integer requisitionId);
+    PurchaseRequisitionResponseDTO closeRequisition(Long requisitionId);
 
-    PurchaseRequisitionResponseDTO deleteRequisition(Integer requisitionId);
+    PurchaseRequisitionResponseDTO convertRequisition(Long requisitionId);
+
+    PurchaseRequisitionResponseDTO restoreRequisition(Long requisitionId);
+
+    PurchaseRequisitionResponseDTO deleteRequisition(Long requisitionId);
 
     boolean existsByRequisitionNo(String requisitionNo);
     

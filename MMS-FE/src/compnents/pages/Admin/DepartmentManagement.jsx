@@ -58,11 +58,11 @@ export default function DepartmentManagement() {
       );
     }
     
-    // Apply status filter
+    // Apply status filter (dựa trên deletedAt: null = active, có giá trị = inactive)
     if (statusFilter === 'active') {
-      filtered = filtered.filter(d => d.status === 'ACTIVE');
+      filtered = filtered.filter(d => !d.deletedAt);
     } else if (statusFilter === 'inactive') {
-      filtered = filtered.filter(d => d.status === 'INACTIVE');
+      filtered = filtered.filter(d => d.deletedAt);
     }
     // 'all' shows all departments regardless of status
     
@@ -287,9 +287,9 @@ export default function DepartmentManagement() {
                   <td className="px-4 py-3 text-sm text-slate-600">{d.description || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      d.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      !d.deletedAt ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
-                      {d.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã dừng hoạt động'}
+                      {!d.deletedAt ? 'Đang hoạt động' : 'Đã dừng hoạt động'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -313,7 +313,7 @@ export default function DepartmentManagement() {
                       </button>
                       
                       {/* Nút Dừng hoạt động/Khôi phục */}
-                      {d.status === 'ACTIVE' ? (
+                      {!d.deletedAt ? (
                         <button
                           onClick={() => handleDelete(d.departmentId)}
                           title="Dừng hoạt động phòng ban"

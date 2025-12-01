@@ -5,6 +5,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
+import { purchaseRequisitionService } from "../../../api/purchaseRequisitionService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 
@@ -15,13 +16,14 @@ export default function RFQForm() {
 
     const [formData, setFormData] = useState({
         rfqNo: "",
-        issueDate: "",
-        dueDate: "",
+        issueDate: new Date(),
+        dueDate: null,
         status: "Draft",
         selectedVendorIds: [],
         notes: "",
         items: [
             {
+                rfqItemId: null,
                 productId: null,
                 productCode: "",
                 productName: "",
@@ -39,6 +41,7 @@ export default function RFQForm() {
     const [loadingVendors, setLoadingVendors] = useState(false);
     const [products, setProducts] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [importedPrId, setImportedPrId] = useState(null); // Track single PR ID (1 RFQ = 1 PR)
 
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -142,13 +145,10 @@ export default function RFQForm() {
 
     const generateRFQNo = async () => {
         try {
-            if (typeof rfqService.generateRFQNo === "function") {
-                const res = await rfqService.generateRFQNo();
-                const rfqNo = res?.rfqNo || res?.number || res?.code || "";
-                if (rfqNo) {
-                    setFormData((prev) => ({ ...prev, rfqNo }));
-                    return;
-                }
+            const rfqNo = await rfqService.generateRFQNo();
+            if (rfqNo) {
+                setFormData((prev) => ({ ...prev, rfqNo }));
+                return;
             }
             // Fallback
             const ts = Date.now().toString().slice(-6);
@@ -163,17 +163,28 @@ export default function RFQForm() {
     const loadProducts = async () => {
         try {
             const res = await apiClient.get("/product", {
-                params: { page: 0, size: 100, sortBy: "createdAt", sortOrder: "desc" },
+                params: { page: 0, size: 1000, sortBy: "createdAt", sortOrder: "desc" },
             });
             const list = Array.isArray(res.data) ? res.data : (res.data.content || []);
-            console.log("Products loaded:", list.length); // expect 10
-            setProducts(
-                list.map((p) => ({
-                    value: p.id ?? p.product_id,
-                    label: `${p.sku || p.productCode} - ${p.name}`,
+            console.log("Products loaded:", list.length);
+            console.log("RAW product sample:", list.length > 0 ? list[0] : 'EMPTY');
+            const mapped = list.map((p) => {
+                // Try all possible field names for product ID
+                const productId = p.product_id || p.productId || p.id || p.ID;
+                console.log("Mapping product:", { 
+                    raw: { product_id: p.product_id, productId: p.productId, id: p.id, sku: p.sku, name: p.name },
+                    final_productId: productId 
+                });
+                return {
+                    value: productId,
+                    label: `${p.sku || p.productCode || ''} - ${p.name || ''}`.trim(),
                     product: p,
-                }))
-            );
+                    normalizedCode: (p.sku || p.productCode || "").trim().toLowerCase(),
+                    normalizedName: (p.name || "").trim().toLowerCase(),
+                };
+            });
+            console.log("Products mapped sample:", mapped.slice(0, 3).map(p => ({ value: p.value, label: p.label })));
+            setProducts(mapped);
         } catch (err) {
             console.error("Error loading products:", err);
             toast.error("Không thể tải danh sách sản phẩm");
@@ -184,17 +195,36 @@ export default function RFQForm() {
         try {
             setLoading(true);
             const rfq = await rfqService.getRFQById(id);
+            
+            // Handle status enum (can be string or object)
+            const statusValue = typeof rfq.status === 'string' 
+                ? rfq.status 
+                : (rfq.status?.name || rfq.status?.toString() || 'Draft');
+            
+            // Load imported PR ID from RFQ
+            const prId = rfq.requisitionId || rfq.requisition?.requisitionId || rfq.requisition?.id || null;
+            if (prId) {
+                setImportedPrId(Number(prId));
+                console.log("Loaded RFQ from PR ID:", prId);
+            }
+            
             setFormData({
                 rfqNo: rfq.rfqNo || "",
-                issueDate: rfq.issueDate ? rfq.issueDate.slice(0, 10) : "",
-                dueDate: rfq.dueDate ? rfq.dueDate.slice(0, 10) : "",
-                status: rfq.status || "Draft",
-                selectedVendorIds: rfq.selectedVendorIds || (Array.isArray(rfq.selectedVendors) ? rfq.selectedVendors.map((v) => v.vendorId || v.id) : (rfq.selectedVendorId ? [rfq.selectedVendorId] : [])),
+                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? rfq.issueDate.slice(0, 10) : rfq.issueDate) : "",
+                dueDate: rfq.dueDate ? (typeof rfq.dueDate === 'string' ? rfq.dueDate.slice(0, 10) : rfq.dueDate) : "",
+                status: statusValue,
+                selectedVendorIds: rfq.selectedVendorIds || 
+                    (Array.isArray(rfq.selectedVendors) 
+                        ? rfq.selectedVendors.map((v) => v.vendorId || v.id) 
+                        : (rfq.selectedVendorId ? [rfq.selectedVendorId] : [])),
                 notes: rfq.notes || rfq.note || "",
                 items: (rfq.items || []).map((it) => ({
+                    rfqItemId: it.rfqItemId || it.itemId || null, // Keep existing item ID for update
+                    priId: it.priId || null,
                     productId: it.productId || null,
                     productCode: it.productCode || "",
                     productName: it.productName || "",
+                    spec: it.spec || "",
                     uom: it.uom || "",
                     quantity: it.quantity ?? it.requestedQty ?? 0,
                     deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
@@ -229,20 +259,30 @@ export default function RFQForm() {
     };
 
     const addItem = () => {
+        const currentStatus = formData.status || 'Draft';
+        if (['Completed', 'Rejected', 'Cancelled'].includes(currentStatus)) {
+            toast.warning(`Không thể thêm sản phẩm khi RFQ đã ${currentStatus}`);
+            return;
+        }
         setFormData((prev) => ({
             ...prev,
             items: [
                 ...prev.items,
-                { productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" },
+                { rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" },
             ],
         }));
     };
 
     const removeItem = (index) => {
+        const currentStatus = formData.status || 'Draft';
+        if (['Completed', 'Rejected', 'Cancelled'].includes(currentStatus)) {
+            toast.warning(`Không thể xóa sản phẩm khi RFQ đã ${currentStatus}`);
+            return;
+        }
         setFormData((prev) => {
             const next = [...prev.items];
             next.splice(index, 1);
-            return { ...prev, items: next.length ? next : [{ productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" }] };
+            return { ...prev, items: next.length ? next : [{ rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" }] };
         });
     };
 
@@ -304,50 +344,157 @@ export default function RFQForm() {
 
     // Mở modal và tải danh sách PR
     const openImportModal = async () => {
+        // Validate status
+        const currentStatus = formData.status || 'Draft';
+        if (['Completed', 'Rejected', 'Cancelled'].includes(currentStatus)) {
+            toast.warning(`Không thể nhập từ PR khi RFQ đã ${currentStatus}`);
+            return;
+        }
         setShowImportModal(true);
         try {
-            // Sử dụng apiClient để đảm bảo có interceptors và error handling
-            const url = `/api/purchase-requisitions?page=0&size=50&sort=createdAt,desc`;
-            const response = await apiClient.get(url);
+            // Chỉ lấy PR đã Approved để import vào RFQ
+            const response = await apiClient.get("/purchase-requisitions/page", {
+                params: { 
+                    page: 0, 
+                    size: 100, 
+                    sort: "createdAt,desc",
+                    status: "Approved" // Chỉ lấy PR đã approved
+                }
+            });
             
-            const data = response.data || {};
-            const list = Array.isArray(data) ? data : (data?.content || []);
+            // Backend trả về Page object
+            const pageData = response.data || {};
+            const list = pageData.content || [];
             
             if (list.length === 0) {
                 toast.info("Không có phiếu yêu cầu nào");
                 setPrList([]);
                 return;
             }
+
+            // Load all RFQs to check which PRs are already used
+            const rfqResponse = await apiClient.get("/rfqs/page", {
+                params: { page: 0, size: 1000, sort: "createdAt,desc" }
+            });
             
-            setPrList(
-                list.map((pr) => ({
-                    value: pr.id ?? pr.requisition_id ?? pr.requisitionId,
-                    label: `${pr.requisition_no || pr.requisitionNo || pr.prNo || "PR"}${pr.purpose ? ` - ${pr.purpose}` : ""}`,
+            // Backend may wrap response in {success, message, data}
+            const rfqData = rfqResponse.data?.data || rfqResponse.data;
+            const allRfqs = rfqData?.content || [];
+            
+            console.log("All RFQs loaded:", allRfqs.length);
+            
+            // Get set of PR IDs that are already converted to RFQ
+            // Now we can check directly using requisitionId in RFQ (proper relationship)
+            const usedPrIds = new Set();
+            
+            // Method 1: Check PR status (if backend updates it)
+            list.forEach(pr => {
+                const prId = pr.id ?? pr.requisition_id ?? pr.requisitionId;
+                const prStatus = pr.status?.toString?.() || pr.status;
+                
+                // If PR status is "Converted", mark as used
+                if (['Converted', 'Closed', 'Completed'].includes(prStatus)) {
+                    usedPrIds.add(Number(prId));
+                }
+            });
+            
+            // Method 2: Check if any RFQ has requisitionId matching this PR
+            // This is the most accurate method now that we have proper relationship
+            for (const rfq of allRfqs) {
+                const rfqPrId = rfq.requisitionId || rfq.requisition?.requisitionId || rfq.requisition?.id;
+                if (rfqPrId) {
+                    usedPrIds.add(Number(rfqPrId));
+                    console.log(`PR ${rfqPrId} is linked to RFQ ${rfq.rfqNo || rfq.rfqId}`);
+                }
+            }
+
+            console.log("Used PR IDs:", Array.from(usedPrIds));
+            console.log("Total PRs:", list.length, "Used PRs:", usedPrIds.size);
+            
+            // Mark PRs that are already used
+            const mappedPrList = list.map((pr) => {
+                const prId = pr.id ?? pr.requisition_id ?? pr.requisitionId;
+                const isUsed = usedPrIds.has(Number(prId));
+                return {
+                    value: prId,
+                    label: `${pr.requisition_no || pr.requisitionNo || pr.prNo || "PR"}${pr.purpose ? ` - ${pr.purpose}` : ""}${isUsed ? " ✓ Đã sử dụng" : ""}`,
                     pr,
-                }))
-            );
+                    isUsed,
+                    isDisabled: isUsed, // Disable selection for used PRs
+                };
+            });
+
+            setPrList(mappedPrList);
+            
         } catch (err) {
             console.error("Load PR list error:", err);
             const errorMessage = err?.response?.data?.message || err?.message || 'Lỗi không xác định';
-            
-            // Kiểm tra nếu là lỗi 404 hoặc 500 do endpoint không tồn tại
-            if (err?.response?.status === 404 || err?.response?.status === 500) {
-                toast.error("Backend chưa có endpoint cho danh sách phiếu yêu cầu. Vui lòng liên hệ admin.");
-            } else {
-                toast.error(`Không thể tải danh sách phiếu yêu cầu: ${errorMessage}`);
-            }
+            toast.error(`Không thể tải danh sách phiếu yêu cầu: ${errorMessage}`);
             setPrList([]);
         }
     };
 
     // Import dòng sản phẩm từ PR đã chọn
+    const findMatchingProduct = (prItem) => {
+        if (!products || products.length === 0) {
+            console.warn("Products not loaded yet");
+            return null;
+        }
+
+        const rawId =
+            prItem.productId ||
+            prItem.product_id ||
+            prItem.product?.id ||
+            prItem.product?.product_id ||
+            null;
+        if (rawId) {
+            // So sánh với type coercion để tránh lỗi string vs number
+            const matchById = products.find((p) => String(p.value) === String(rawId) || Number(p.value) === Number(rawId));
+            if (matchById) {
+                console.log("Matched product by ID:", rawId, matchById);
+                return matchById;
+            }
+        }
+
+        const normalizedCode = (prItem.productCode || prItem.product?.sku || prItem.product?.productCode || "").trim().toLowerCase();
+        if (normalizedCode) {
+            const matchByCode = products.find((p) => p.normalizedCode === normalizedCode);
+            if (matchByCode) {
+                console.log("Matched product by code:", normalizedCode, matchByCode);
+                return matchByCode;
+            }
+        }
+
+        const normalizedName = (prItem.productName || prItem.product?.name || "").trim().toLowerCase();
+        if (normalizedName) {
+            const matchByName = products.find((p) => p.normalizedName === normalizedName);
+            if (matchByName) {
+                console.log("Matched product by name:", normalizedName, matchByName);
+                return matchByName;
+            }
+        }
+
+        console.warn("No product match found for:", prItem);
+        return null;
+    };
+
     const importFromSelectedPr = async () => {
         if (!selectedPr?.value) {
             toast.warn("Chọn một phiếu yêu cầu để nhập");
             return;
         }
+
+        // Đảm bảo products đã được load
+        if (!products || products.length === 0) {
+            toast.warn("Đang tải danh sách sản phẩm, vui lòng đợi...");
+            await loadProducts();
+            // Đợi một chút để state được cập nhật
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
         try {
-            const res = await apiClient.get(`/purchase-requisitions/${selectedPr.value}`);
+            const prId = selectedPr.value; // Store PR document ID
+            const res = await apiClient.get(`/purchase-requisitions/${prId}`);
             const data = res.data || {};
             const prItems = data.items || data.prItems || [];
 
@@ -356,34 +503,99 @@ export default function RFQForm() {
                 return;
             }
 
+            console.log("Importing PR items:", prItems);
+            console.log("Available products:", products.length);
+
             // Map về đúng shape item của form hiện tại
-            const mapped = prItems.map((it) => {
-                const productId = it.productId || it.product_id || it.product?.id || it.product?.product_id || null;
-                return {
-                    productId,
-                    productCode: it.productCode || it.product?.sku || "",
-                    productName: it.productName || it.product?.name || "",
-                    uom: it.uom || it.product?.uom || "",
-                    quantity: it.quantity ?? it.requestedQty ?? 1,
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
-                    targetPrice: it.targetPrice ?? it.valuation_price ?? 0,
-                    priceUnit: it.priceUnit ?? 1,
-                    note: it.note || it.remark || "",
-                };
-            }).filter(m => m.productId);
+            const mapped = prItems
+                .map((it) => {
+                    const matchedProduct = findMatchingProduct(it);
+                    const fallbackId =
+                        it.productId ||
+                        it.product_id ||
+                        it.product?.id ||
+                        it.product?.product_id ||
+                        null;
+
+                    // CRITICAL FIX: Ưu tiên productId từ PR item, sau đó mới dùng matched product
+                    // Đảm bảo convert sang Number để so sánh đúng
+                    const productId = fallbackId ? Number(fallbackId) : (matchedProduct?.value ? Number(matchedProduct.value) : null);
+
+                    // Tìm product object để lấy thông tin đầy đủ
+                    const productObj = productId
+                        ? products.find(p => Number(p.value) === productId)?.product
+                        : matchedProduct?.product;
+
+                    console.log("Mapping PR item:", {
+                        prItem: it,
+                        matchedProduct: matchedProduct ? { value: matchedProduct.value, label: matchedProduct.label } : null,
+                        fallbackId,
+                        finalProductId: productId,
+                        foundProduct: productObj ? productObj.name : 'NOT FOUND'
+                    });
+
+                    return {
+                        rfqItemId: null, // New item from PR import
+                        priId: it.priId || it.pri_id || it.id || null, // Purchase Requisition Item ID
+                        productId,
+                        productCode:
+                            productObj?.sku ||
+                            productObj?.productCode ||
+                            it.productCode ||
+                            it.product?.sku ||
+                            "",
+                        productName: productObj?.name || it.productName || it.product?.name || "",
+                        spec: it.spec || "",
+                        uom: productObj?.uom || productObj?.unit || it.uom || it.product?.uom || "",
+                        quantity: it.quantity ?? it.requestedQty ?? 1,
+                        deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
+                        targetPrice: it.targetPrice ?? it.valuation_price ?? it.estimatedUnitPrice ?? productObj?.purchase_price ?? 0,
+                        priceUnit: it.priceUnit ?? 1,
+                        note: it.note || it.remark || "",
+                    };
+                })
+                .filter((item) => {
+                    const hasProductId = !!item.productId && !isNaN(item.productId);
+                    if (!hasProductId) {
+                        console.warn("Filtered out item without valid productId:", item);
+                    }
+                    return hasProductId;
+                });
+
+            console.log("Mapped items after filtering:", mapped);
 
             if (mapped.length === 0) {
-                toast.info("Không có sản phẩm hợp lệ để nhập");
+                toast.warn("Không có sản phẩm hợp lệ để nhập. Các sản phẩm trong PR có thể đã bị xóa hoặc không tồn tại trong danh sách sản phẩm.");
                 return;
             }
 
-            setFormData((prev) => ({ ...prev, items: [...prev.items, ...mapped] }));
+            // Check if already imported from different PR
+            if (importedPrId && importedPrId !== prId) {
+                toast.error("RFQ chỉ có thể import từ 1 PR duy nhất. Vui lòng xóa items hiện tại trước khi import PR khác.");
+                return;
+            }
+            
+            setFormData((prev) => {
+                // Replace existing items instead of appending
+                // Remove empty default item if exists
+                const hasOnlyEmptyItem = prev.items.length === 1 && 
+                    !prev.items[0].productId && 
+                    !prev.items[0].productName;
+                
+                const newItems = hasOnlyEmptyItem ? mapped : [...prev.items, ...mapped];
+                console.log("Setting formData items:", newItems);
+                return { ...prev, items: newItems };
+            });
+            
+            // Track PR ID for status update after RFQ creation
+            setImportedPrId(prId);
+            
             setShowImportModal(false);
             setSelectedPr(null);
-            toast.success("Đã nhập sản phẩm từ phiếu yêu cầu");
+            toast.success(`Đã nhập ${mapped.length} sản phẩm từ phiếu yêu cầu`);
         } catch (err) {
             console.error("Import PR items error:", err);
-            toast.error("Không thể nhập từ phiếu yêu cầu");
+            toast.error("Không thể nhập từ phiếu yêu cầu: " + (err.message || "Lỗi không xác định"));
         }
     };
 
@@ -402,32 +614,67 @@ export default function RFQForm() {
         }
 
         try {
+            // Format dates to YYYY-MM-DD for LocalDate
+            const formatDateForBackend = (date) => {
+                if (!date) return null;
+                if (typeof date === 'string') {
+                    // If already in YYYY-MM-DD format, return as is
+                    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+                    // Otherwise parse and format
+                    const d = new Date(date);
+                    return d.toISOString().split('T')[0];
+                }
+                if (date instanceof Date) {
+                    return date.toISOString().split('T')[0];
+                }
+                return null;
+            };
+
             const payload = {
                 rfqNo: formData.rfqNo,
-                issueDate: formData.issueDate,
-                dueDate: formData.dueDate,
-                status: formData.status,
-                selectedVendorIds: formData.selectedVendorIds,
-                notes: formData.notes,
-                items: formData.items.map((it) => ({
-                    productId: it.productId,
-                    productCode: it.productCode,
-                    productName: it.productName,
-                    uom: it.uom,
-                    quantity: Number(it.quantity),
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate).toISOString() : null,
-                    targetPrice: Number(it.targetPrice || 0),
-                    priceUnit: Number(it.priceUnit || 1),
-                    note: it.note,
-                })),
+                requisitionId: importedPrId || null, // Link to source PR
+                issueDate: formatDateForBackend(formData.issueDate),
+                dueDate: formatDateForBackend(formData.dueDate),
+                status: formData.status || "Draft",
+                selectedVendorIds: formData.selectedVendorIds || [],
+                notes: formData.notes || "",
+                items: formData.items
+                    .filter(it => it.productId || it.productName || it.productCode) // Filter out empty items
+                    .map((it) => ({
+                        rfqItemId: it.rfqItemId || null, // Keep existing item ID for update
+                        priId: it.priId || null, // Purchase Requisition Item ID if imported from PR
+                        productId: it.productId || null,
+                        productCode: it.productCode || "",
+                        productName: it.productName || "",
+                        spec: it.spec || "",
+                        uom: it.uom || "",
+                        quantity: Number(it.quantity) || 1,
+                        deliveryDate: formatDateForBackend(it.deliveryDate),
+                        targetPrice: Number(it.targetPrice || 0),
+                        priceUnit: Number(it.priceUnit || 1),
+                        note: it.note || "",
+                    })),
             };
 
             if (isEdit) {
                 await rfqService.updateRFQ(id, payload);
                 toast.success("Cập nhật Yêu cầu báo giá thành công!");
             } else {
-                await rfqService.createRFQ(payload);
+                const createdRfq = await rfqService.createRFQ(payload);
                 toast.success("Tạo Yêu cầu báo giá thành công!");
+                
+                // Update PR status to "Converted" after creating RFQ
+                if (importedPrId) {
+                    console.log("Converting PR that was imported into this RFQ:", importedPrId);
+                    
+                    try {
+                        await apiClient.put(`/purchase-requisitions/${importedPrId}/convert`);
+                        console.log(`Converted PR ${importedPrId} to RFQ`);
+                    } catch (convertErr) {
+                        console.error(`Failed to convert PR ${importedPrId}:`, convertErr);
+                        toast.warning("RFQ đã tạo thành công nhưng không thể cập nhật trạng thái PR");
+                    }
+                }
             }
             navigate("/purchase/rfqs");
         } catch (err) {
@@ -550,12 +797,12 @@ export default function RFQForm() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Ngày phát hành <span className="text-red-500">*</span>
+                                            Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.issueDate}
-                                            onChange={(e) => handleInputChange("issueDate", e.target.value)}
+                                        <DatePicker
+                                            selected={formData.issueDate instanceof Date ? formData.issueDate : (formData.issueDate ? new Date(formData.issueDate) : new Date())}
+                                            onChange={(date) => handleInputChange("issueDate", date)}
+                                            dateFormat="dd/MM/yyyy"
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
                                         {validationErrors.issueDate && (
@@ -567,12 +814,15 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Hạn phản hồi <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="date"
-                                            value={formData.dueDate}
-                                            onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                        <DatePicker
+                                            selected={formData.dueDate instanceof Date ? formData.dueDate : (formData.dueDate ? new Date(formData.dueDate) : null)}
+                                            onChange={(date) => handleInputChange("dueDate", date)}
+                                            dateFormat="dd/MM/yyyy"
+                                            minDate={new Date()}
+                                            placeholderText="Chọn hạn phản hồi"
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.dueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
+                                        <p className="mt-1 text-xs text-gray-500">Ngày cuối cùng nhà cung cấp phải gửi báo giá</p>
                                         {validationErrors.dueDate && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.dueDate}</p>
                                         )}
@@ -587,14 +837,16 @@ export default function RFQForm() {
                                         <button
                                             type="button"
                                             onClick={addItem}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                                         >
                                             Thêm sản phẩm
                                         </button>
                                         <button
                                             type="button"
                                             onClick={openImportModal}
-                                            className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition"
+                                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                            className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                                         >
                                             Nhập từ PR
                                         </button>
@@ -618,8 +870,6 @@ export default function RFQForm() {
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Ngày cần</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Giá mục tiêu</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                                 </tr>
                                             </thead>
@@ -631,9 +881,18 @@ export default function RFQForm() {
                                                             <td className="border border-gray-200 px-4 py-2 text-sm text-gray-700">{index + 1}</td>
                                                             <td className="border border-gray-200 px-4 py-2">
                                                                 <Select
-                                                                    value={products.find((o) => o.value === item.productId) || null}
+                                                                    value={(() => {
+                                                                        if (!item.productId) return null;
+                                                                        const found = products.find((o) => 
+                                                                            String(o.value) === String(item.productId) || 
+                                                                            Number(o.value) === Number(item.productId)
+                                                                        );
+                                                                        console.log(`Row ${index + 1} - productId:`, item.productId, 'found:', found ? found.label : 'NULL', 'products count:', products.length);
+                                                                        return found || null;
+                                                                    })()}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
                                                                     options={products}
+                                                                    isDisabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
                                                                     placeholder="Chọn sản phẩm"
                                                                     menuPortalTarget={document.body}
                                                                     menuPosition="fixed"
@@ -652,7 +911,8 @@ export default function RFQForm() {
                                                                     type="number"
                                                                     value={item.quantity}
                                                                     onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
-                                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                                                                     min="1"
                                                                     step="1"
                                                                 />
@@ -664,8 +924,9 @@ export default function RFQForm() {
                                                                 <DatePicker
                                                                     selected={item.deliveryDate}
                                                                     onChange={(date) => handleItemChange(index, "deliveryDate", date)}
+                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
                                                                     dateFormat="dd/MM/yyyy"
-                                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                                                                     placeholderText="Chọn ngày"
                                                                 />
                                                                 {itemErr.deliveryDate && (
@@ -673,23 +934,11 @@ export default function RFQForm() {
                                                                 )}
                                                             </td>
                                                             <td className="border border-gray-200 px-4 py-2">
-                                                                <input
-                                                                    type="number"
-                                                                    value={item.targetPrice}
-                                                                    onChange={(e) => handleItemChange(index, "targetPrice", parseFloat(e.target.value) || 0)}
-                                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                    min="0"
-                                                                    step="0.01"
-                                                                />
-                                                            </td>
-                                                            <td className="border border-gray-200 px-4 py-2 text-sm">
-                                                                {formatCurrency((Number(item.quantity || 0) * Number(item.targetPrice || 0)))}
-                                                            </td>
-                                                            <td className="border border-gray-200 px-4 py-2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeItem(index)}
-                                                                    className="text-red-600 hover:text-red-800 text-sm"
+                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                                                    className="text-red-600 hover:text-red-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
                                                                 >
                                                                     Xóa
                                                                 </button>
@@ -701,8 +950,8 @@ export default function RFQForm() {
                                         </table>
                                         <div className="flex justify-end mt-3">
                                             <div className="text-right">
-                                                <div className="text-sm text-gray-600">Tổng giá trị</div>
-                                                <div className="text-lg font-semibold">{formatCurrency(totalValue)}</div>
+                                                <div className="text-sm text-gray-600">Tổng số lượng</div>
+                                                <div className="text-lg font-semibold">{formData.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0).toLocaleString()}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -757,6 +1006,7 @@ export default function RFQForm() {
                                 value={selectedPr}
                                 onChange={setSelectedPr}
                                 options={prList}
+                                isOptionDisabled={(option) => option.isDisabled}
                                 placeholder="Chọn PR..."
                                 menuPortalTarget={document.body}
                                 menuPosition="fixed"
@@ -764,6 +1014,19 @@ export default function RFQForm() {
                                 styles={{
                                     menuPortal: (b) => ({ ...b, zIndex: 10001 }),
                                     menu: (b) => ({ ...b, zIndex: 10001 }),
+                                    option: (base, state) => ({
+                                        ...base,
+                                        backgroundColor: state.isDisabled 
+                                            ? '#f3f4f6' 
+                                            : state.isSelected 
+                                            ? '#3b82f6' 
+                                            : state.isFocused 
+                                            ? '#dbeafe' 
+                                            : 'white',
+                                        color: state.isDisabled ? '#9ca3af' : base.color,
+                                        textDecoration: state.isDisabled ? 'line-through' : 'none',
+                                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                    }),
                                 }}
                             />
                         </div>

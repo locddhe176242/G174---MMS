@@ -70,6 +70,24 @@ export const vendorService = {
   generateVendorCode: async () => {
     const response = await apiClient.get("/vendors/generate-code");
     return response.data;
+  },
+
+  // Get vendor balance
+  getVendorBalance: async (vendorId) => {
+    const response = await apiClient.get(`/vendors/${vendorId}/balance`);
+    return response.data;
+  },
+
+  // Get vendor documents
+  getVendorDocuments: async (vendorId) => {
+    const response = await apiClient.get(`/vendors/${vendorId}/documents`);
+    return response.data;
+  },
+
+  // Get purchase orders by vendor ID
+  getPurchaseOrdersByVendor: async (vendorId) => {
+    const response = await apiClient.get(`/purchase-orders/vendor/${vendorId}`);
+    return response.data;
   }
 };
 

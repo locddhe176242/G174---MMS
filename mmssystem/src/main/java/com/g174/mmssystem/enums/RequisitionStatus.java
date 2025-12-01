@@ -5,5 +5,7 @@ public enum RequisitionStatus {
     Pending,
     Approved,
     Rejected,
-    Cancelled
+    Cancelled,
+    Converted  // PR đã được chuyển thành RFQ
 }
+

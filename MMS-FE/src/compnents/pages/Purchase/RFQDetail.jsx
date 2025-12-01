@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
+import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
 import apiClient from "../../../api/apiClient";
 
 const Stat = ({ label, value }) => (
@@ -17,6 +19,7 @@ export default function RFQDetail() {
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [quotations, setQuotations] = useState([]); // Danh sách báo giá của RFQ
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
@@ -64,6 +67,38 @@ export default function RFQDetail() {
     return v ? v.name : "-";
   };
 
+  // Get quotation for vendor
+  const getVendorQuotation = (vendorId) => {
+    if (!vendorId || !quotations || quotations.length === 0) return null;
+    const quotation = quotations.find(q => 
+      (q.vendorId || q.vendor_id) === vendorId
+    );
+    if (quotation) {
+      console.log('Found quotation for vendor', vendorId, ':', quotation);
+    }
+    return quotation;
+  };
+
+  // Handle view quotation with validation
+  const handleViewQuotation = (vendorQuotation) => {
+    // Try multiple possible ID fields from backend
+    const quotationId = vendorQuotation.pqId || 
+                       vendorQuotation.pq_id || 
+                       vendorQuotation.quotationId || 
+                       vendorQuotation.quotation_id || 
+                       vendorQuotation.id;
+    
+    console.log('Viewing quotation:', vendorQuotation, 'ID:', quotationId);
+    
+    if (!quotationId) {
+      console.error('Cannot find quotation ID in:', Object.keys(vendorQuotation));
+      toast.error('Không tìm thấy ID báo giá');
+      return;
+    }
+    
+    navigate(`/purchase/purchase-quotations/${quotationId}`);
+  };
+
   const lineValue = (item) => {
     const price = Number(item?.targetPrice || item?.target_price || 0);
     const qty = Number(item?.quantity || 0);
@@ -75,7 +110,15 @@ export default function RFQDetail() {
     return data.items.reduce((sum, item) => sum + lineValue(item), 0);
   }, [data]);
 
+  const totalQuantity = useMemo(() => {
+    if (!data || !Array.isArray(data.items)) return 0;
+    return data.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  }, [data]);
+
   const getStatusBadge = (status) => {
+    // Handle both string and enum object formats
+    const statusStr = typeof status === 'string' ? status : (status?.name || status?.toString() || 'Draft');
+    
     const map = {
       Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
       Pending: { label: "Chờ phản hồi", color: "bg-yellow-100 text-yellow-800" },
@@ -84,7 +127,7 @@ export default function RFQDetail() {
       Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
     };
 
-    const statusInfo = map[status] || { label: status || "Draft", color: "bg-gray-100 text-gray-800" };
+    const statusInfo = map[statusStr] || { label: statusStr || "Draft", color: "bg-gray-100 text-gray-800" };
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -116,10 +159,23 @@ export default function RFQDetail() {
           ? resVendors.data 
           : resVendors.data?.content || [];
 
+        // Fetch quotations for this RFQ
+        let quotationsData = [];
+        try {
+          quotationsData = await purchaseQuotationService.getQuotationsByRfqId(id);
+          if (!Array.isArray(quotationsData)) {
+            quotationsData = [];
+          }
+        } catch (quotErr) {
+          console.warn("Could not load quotations for RFQ:", quotErr);
+          quotationsData = [];
+        }
+
         if (mounted) {
           setData(rfqData);
           setProducts(prodData);
           setVendors(vendorData);
+          setQuotations(quotationsData);
         }
       } catch (e) {
         console.error("Error loading RFQ detail:", e);
@@ -184,6 +240,8 @@ export default function RFQDetail() {
       : data.selectedVendorId 
         ? [data.selectedVendorId]
         : []);
+  
+  const selectedVendors = data.selectedVendors || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -201,12 +259,30 @@ export default function RFQDetail() {
                 Yêu cầu báo giá: {data.rfqNo || data.rfq_no || `#${id}`}
               </h1>
             </div>
-            <button
-              onClick={() => navigate(`/purchase/rfqs/${id}/edit`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Chỉnh sửa
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Chỉ hiển thị nút edit khi status là Draft */}
+              {(() => {
+                const statusStr = typeof data.status === 'string' 
+                  ? data.status 
+                  : (data.status?.name || data.status?.toString() || 'Draft');
+                return statusStr === 'Draft' && (
+                  <button
+                    onClick={() => navigate(`/purchase/rfqs/${id}/edit`)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Chỉnh sửa
+                  </button>
+                );
+              })()}
+              {/* Nút so sánh báo giá - chỉ hiển thị khi RFQ đã có báo giá */}
+              <button
+                onClick={() => navigate(`/purchase/rfqs/${id}/compare-quotations`)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="So sánh báo giá từ các nhà cung cấp"
+              >
+                So sánh báo giá
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -219,12 +295,9 @@ export default function RFQDetail() {
             {/* Summary */}
             <div className="bg-white border rounded-lg p-6">
               <div className="flex flex-col md:flex-row md:items-center gap-4">
-                <Stat
-                  label="Tổng giá trị"
-                  value={formatCurrency(totalValue)}
-                />
-                <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <Stat label="Số sản phẩm" value={totalItems} />
+                <div className="hidden md:block w-px bg-gray-200 self-stretch" />
+                <Stat label="Tổng số lượng" value={totalQuantity.toLocaleString()} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <Stat label="Số nhà cung cấp" value={selectedVendorIds.length} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
@@ -254,8 +327,6 @@ export default function RFQDetail() {
                           <th className="py-3 pr-4">Sản phẩm</th>
                           <th className="py-3 pr-4">Số lượng</th>
                           <th className="py-3 pr-4">Ngày cần</th>
-                          <th className="py-3 pr-4">Giá mục tiêu</th>
-                          <th className="py-3 pr-4 text-right">Thành tiền</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -275,27 +346,15 @@ export default function RFQDetail() {
                                   ? formatDate(item.deliveryDate || item.delivery_date)
                                   : "-"}
                               </td>
-                              <td className="py-3 pr-4">
-                                {formatCurrency(item.targetPrice || item.target_price || 0)}
-                              </td>
-                              <td className="py-3 pr-0 text-right font-medium">
-                                {formatCurrency(itemTotal)}
-                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 font-semibold bg-gray-50">
-                          <td
-                            colSpan={5}
-                            className="py-3 pr-4 text-right whitespace-nowrap"
-                          >
-                            Tổng cộng:
-                          </td>
-                          <td className="py-3 pr-0 text-right">
-                            {formatCurrency(totalValue)}
-                          </td>
+                          <td colSpan={2} className="py-3 pr-4 text-right">Tổng cộng:</td>
+                          <td className="py-3 pr-4">{totalQuantity.toLocaleString()}</td>
+                          <td className="py-3 pr-4"></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -368,18 +427,124 @@ export default function RFQDetail() {
                 Nhà cung cấp
               </div>
               <div className="p-6">
-                {selectedVendorIds.length === 0 ? (
+                {selectedVendors.length === 0 && selectedVendorIds.length === 0 ? (
                   <div className="text-sm text-gray-500">Chưa chọn nhà cung cấp</div>
                 ) : (
-                  <div className="space-y-2">
-                    {selectedVendorIds.map((vendorId, index) => (
-                      <div key={vendorId || index} className="text-sm">
-                        <span className="text-gray-500">{index + 1}. </span>
-                        <span className="font-medium">
-                          {getVendorName(vendorId)}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {selectedVendors.length > 0
+                      ? selectedVendors.map((vendor, index) => {
+                          const vendorId = vendor.vendorId || vendor.id;
+                          const vendorQuotation = getVendorQuotation(vendorId);
+                          
+                          return (
+                            <div key={vendorId || index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm">
+                                  <span className="text-gray-500">{index + 1}. </span>
+                                  <span className="font-medium">
+                                    {vendor.vendorName || vendor.name || getVendorName(vendorId)}
+                                  </span>
+                                </div>
+                                {vendorQuotation ? (
+                                  <button
+                                    onClick={() => handleViewQuotation(vendorQuotation)}
+                                    className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                    title="Xem báo giá"
+                                  >
+                                    Xem báo giá
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => navigate(`/purchase/purchase-quotations/new?rfq_id=${id}&vendor_id=${vendorId}`)}
+                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                    title="Tạo báo giá cho nhà cung cấp này"
+                                  >
+                                    Tạo báo giá
+                                  </button>
+                                )}
+                              </div>
+                              {vendorQuotation && (
+                                <div className="text-xs text-gray-600 space-y-1">
+                                  <div>
+                                    <span className="font-medium">Số BG: </span>
+                                    <button
+                                      onClick={() => handleViewQuotation(vendorQuotation)}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
+                                    </button>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Giá trị: </span>
+                                    <span className="text-green-600 font-semibold">
+                                      {formatCurrency(vendorQuotation.totalAmount || vendorQuotation.total_amount || 0)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Trạng thái: </span>
+                                    {getStatusBadge(vendorQuotation.status)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      : selectedVendorIds.map((vendorId, index) => {
+                          const vendorQuotation = getVendorQuotation(vendorId);
+                          
+                          return (
+                            <div key={vendorId || index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm">
+                                  <span className="text-gray-500">{index + 1}. </span>
+                                  <span className="font-medium">
+                                    {getVendorName(vendorId)}
+                                  </span>
+                                </div>
+                                {vendorQuotation ? (
+                                  <button
+                                    onClick={() => handleViewQuotation(vendorQuotation)}
+                                    className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                    title="Xem báo giá"
+                                  >
+                                    Xem báo giá
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => navigate(`/purchase/purchase-quotations/new?rfq_id=${id}&vendor_id=${vendorId}`)}
+                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                    title="Tạo báo giá cho nhà cung cấp này"
+                                  >
+                                    Tạo báo giá
+                                  </button>
+                                )}
+                              </div>
+                              {vendorQuotation && (
+                                <div className="text-xs text-gray-600 space-y-1">
+                                  <div>
+                                    <span className="font-medium">Số BG: </span>
+                                    <button
+                                      onClick={() => handleViewQuotation(vendorQuotation)}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
+                                    </button>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Giá trị: </span>
+                                    <span className="text-green-600 font-semibold">
+                                      {formatCurrency(vendorQuotation.totalAmount || vendorQuotation.total_amount || 0)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Trạng thái: </span>
+                                    {getStatusBadge(vendorQuotation.status)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                   </div>
                 )}
               </div>

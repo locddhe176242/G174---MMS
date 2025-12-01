@@ -2,20 +2,23 @@ package com.g174.mmssystem.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@NoArgsConstructor
-@AllArgsConstructor
 @Getter
 @Setter
-@ToString
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "Purchase_Requisition_Items")
+@Table(name = "Purchase_Requisition_Items",
+        indexes = {
+                @Index(name = "idx_pri_requisition", columnList = "requisition_id"),
+                @Index(name = "idx_pri_product", columnList = "product_id")
+        })
 public class PurchaseRequisitionItem {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "pri_id")
@@ -32,16 +35,16 @@ public class PurchaseRequisitionItem {
     @Column(name = "product_name", length = 255)
     private String productName;
 
-    @Column(name = "requested_qty", precision = 18, scale = 2, nullable = false)
+    @Column(name = "requested_qty", precision = 18, scale = 2)
     private BigDecimal requestedQty;
 
     @Column(name = "unit", length = 50)
     private String unit;
 
-    @Column(name = "delivery_date", nullable = false)
+    @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -52,14 +55,10 @@ public class PurchaseRequisitionItem {
     @JoinColumn(name = "updated_by")
     private User updatedBy;
 
-    @Builder.Default
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
-    @Builder.Default
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    private LocalDateTime updatedAt;
 }
+

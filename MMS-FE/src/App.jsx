@@ -21,6 +21,8 @@ import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
 import CategoryList from "./compnents/pages/Category/CategoryList";
+
+//page for purchase module
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
 import PurchaseRequisitionDetail from "./compnents/pages/Purchase/PurchaseRequisitionDetail";
 import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisitionList";
@@ -46,6 +48,41 @@ import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
+import PurchaseOrderList from "./compnents/pages/Purchase/PurchaseOrderList.jsx";
+import PurchaseOrderForm from "./compnents/pages/Purchase/PurchaseOrderForm.jsx";
+import PurchaseOrderDetail from "./compnents/pages/Purchase/PurchaseOrderDetail.jsx";
+import GoodsReceiptList from "./compnents/pages/Purchase/GoodsReceiptList.jsx";
+import GoodsReceiptForm from "./compnents/pages/Purchase/GoodsReceiptForm.jsx";
+import GoodsReceiptDetail from "./compnents/pages/Purchase/GoodsReceiptDetail.jsx";
+import VendorQuotationForm from "./compnents/pages/Purchase/VendorQuotationForm.jsx";
+import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.jsx";
+import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
+import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
+import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
+import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
+import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
+import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
+
+//pages for sales module
+import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
+import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
+import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
+import SalesOrderList from "./compnents/pages/Sale/SalesOrder/SalesOrderList.jsx";
+import SalesOrderForm from "./compnents/pages/Sale/SalesOrder/SalesOrderForm.jsx";
+import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail.jsx";
+import DeliveryList from "./compnents/pages/Sale/Delivery/DeliveryList.jsx";
+import DeliveryForm from "./compnents/pages/Sale/Delivery/DeliveryForm.jsx";
+import DeliveryDetail from "./compnents/pages/Sale/Delivery/DeliveryDetail.jsx";
+import ReturnOrderList from "./compnents/pages/Sale/ReturnOrder/ReturnOrderList.jsx";
+import ReturnOrderForm from "./compnents/pages/Sale/ReturnOrder/ReturnOrderForm.jsx";
+import ReturnOrderDetail from "./compnents/pages/Sale/ReturnOrder/ReturnOrderDetail.jsx";
+import CreditNoteList from "./compnents/pages/Sale/CreditNote/CreditNoteList.jsx";
+import CreditNoteForm from "./compnents/pages/Sale/CreditNote/CreditNoteForm.jsx";
+import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail.jsx";
+import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
+import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
+import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -54,6 +91,8 @@ import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
 import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
 import UserManagement from "./compnents/pages/Admin/UserManagement";
 import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.jsx";
+
+
 
 function App() {
     return (
@@ -72,28 +111,63 @@ function App() {
                 }
             >
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/categories" element={<CategoryList />} />
                 <Route path="/profile" element={<UserProfile />} />
+
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/new" element={<CustomerForm />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
                 <Route path="/customers/:id/edit" element={<CustomerForm />} />
+
                 <Route path="/products" element={<ProductList />} />
-                <Route path="/categories" element={<CategoryList />} />
+
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/vendors/new" element={<VendorForm />} />
                 <Route path="/vendors/:id/edit" element={<VendorForm />} />
                 <Route path="/vendors/:id" element={<VendorDetail />} />
+
                 <Route path="/warehouse" element={<WarehouseList />} />
                 <Route path="/warehouse/new" element={<AddWarehouse />} />
                 <Route path="/warehouse/:id/edit" element={<EditWarehouse />} />
                 <Route path="/warehouse/:id" element={<WarehouseDetail />} />
+
+
+                {/**Purchase Module Routes */}
                 <Route path="/purchase/purchase-requisitions/new" element={<PurchaseRequisitionForm />} />
+                <Route path="/purchase/purchase-requisitions/:id/edit" element={<PurchaseRequisitionForm />} />
                 <Route path="/purchase/purchase-requisitions/:id" element={<PurchaseRequisitionDetail />} />
                 <Route path="/purchase/purchase-requisitions" element={<PurchaseRequisitionList />} />
+
                 <Route path="/purchase/rfqs" element={<RFQList />} />
                 <Route path="/purchase/rfqs/new" element={<RFQForm />} />
                 <Route path="/purchase/rfqs/:id" element={<RFQDetail />} />
                 <Route path="/purchase/rfqs/:id/edit" element={<RFQForm />} />
+                <Route path="/purchase/rfqs/:id/compare-quotations" element={<CompareSupplierQuotations />} />
+
+                <Route path="/purchase/purchase-quotations" element={<VendorQuotationList />} />
+                <Route path="/purchase/purchase-quotations/new" element={<VendorQuotationForm />} />
+                <Route path="/purchase/purchase-quotations/:id" element={<VendorQuotationForm />} />
+                <Route path="/purchase/purchase-quotations/:rfqId/:vendorId" element={<VendorQuotationForm />} />
+                
+                <Route path="/purchase/purchase-orders" element={<PurchaseOrderList />} />
+                <Route path="/purchase/purchase-orders/new" element={<PurchaseOrderForm />} />
+                <Route path="/purchase/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+                <Route path="/purchase/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+
+                <Route path="/purchase/goods-receipts" element={<GoodsReceiptList />} />
+                <Route path="/purchase/goods-receipts/new" element={<GoodsReceiptForm />} />
+                <Route path="/purchase/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
+                <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
+
+                <Route path="/purchase/ap-payments" element={<APaymentList />} />
+
+                <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
+                <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
+                <Route path="/purchase/ap-invoices/:id" element={<APInvoiceDetail />} />
+                <Route path="/purchase/ap-invoices/:id/edit" element={<APInvoiceForm />} />
+                <Route path="/purchase/ap-invoices/:invoiceId/add-payment" element={<APaymentForm />} />
+
+                {/**Sales Module Routes */}
                 <Route path="/sales/quotations" element={<SalesQuotationList />} />
                 <Route path="/sales/quotations/new" element={<SalesQuotationForm />} />
                 <Route path="/sales/quotations/:id" element={<SalesQuotationDetail />} />
@@ -118,7 +192,9 @@ function App() {
                 <Route path="/sales/invoices/new" element={<InvoiceForm />} />
                 <Route path="/sales/invoices/:id" element={<InvoiceDetail />} />
                 <Route path="/sales/invoices/:id/edit" element={<InvoiceForm />} />
-                <Route path="/approvals" element={<ApprovalList />} />
+
+
+                <Route path="/approval" element={<ApprovalList />} />
 
                 <Route path="/admin/roles" element={<RoleManagement />} />
                 <Route path="/admin/roles/:roleId" element={<RoleDetail />} />

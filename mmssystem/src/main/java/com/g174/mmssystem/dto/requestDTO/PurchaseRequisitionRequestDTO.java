@@ -1,7 +1,6 @@
 package com.g174.mmssystem.dto.requestDTO;
 
 import com.g174.mmssystem.enums.RequisitionStatus;
-import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -14,23 +13,18 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class PurchaseRequisitionRequestDTO {
-
     private String requisitionNo;
-
     private LocalDate requisitionDate;
-
-    private Long requesterId;
-
-    @NotBlank(message = "Mục đích sử dụng là bắt buộc")
+    private Integer requesterId;
+    
+    // Validation được xử lý ở service level dựa trên status
+    // Nếu status = Draft: cho phép purpose và items rỗng
+    // Nếu status != Draft: bắt buộc phải có purpose và items
     private String purpose;
-
-    @Builder.Default
-    private RequisitionStatus status = RequisitionStatus.Draft;
-
+    
+    private RequisitionStatus status;
     private Integer approverId;
-
     private LocalDateTime approvedAt;
-
-    @NotEmpty(message = "Danh sách sản phẩm không được để trống")
     private List<PurchaseRequisitionItemRequestDTO> items;
 }
+

@@ -128,35 +128,72 @@ export default function Sidebar({isCollapsed = false}) {
                 setLoading(true);
                 setError(null);
 
-                const data = await getMenuForCurrentUser();
+  useEffect(() => {
+    const loadMenu = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const data = await getMenuForCurrentUser();
+        
+        const transformMenu = (menuItems) => {
+          const transformed = menuItems.map((item) => {
+            const absolutePath = item.menuPath?.startsWith("/")
+                ? item.menuPath
+                : `/${item.menuPath}`;
+            return {
+              ...item,
+              id: item.menuKey,
+              path: absolutePath,
+              label: item.menuLabel,
+              icon: getIcon(item.iconName),
+            };
+          });
 
-                const transformMenu = (menuItems) => {
-                    return menuItems.map((item) => {
+          const menuMap = new Map();
+          const rootMenus = [];
+          const processedChildren = new Set();
 
-                        const absolutePath = item.menuPath?.startsWith("/")
-                            ? item.menuPath
-                            : `/${item.menuPath}`;
-                        return {
-                            ...item,
-                            id: item.menuKey,
-                            path: absolutePath,
-                            label: item.menuLabel,
-                            icon: getIcon(item.iconName),
-                        };
-                    });
-                };
+          // First pass: identify parent menus and their children
+          transformed.forEach((item) => {
+            if (!item.path) return;
+            
+            // Find parent menu (e.g., "/purchase")
+            const parentPath = item.path.split('/').slice(0, 2).join('/'); // Get "/purchase" from "/purchase/xxx"
+            
+            if (item.path === parentPath) {
+              // This is a potential parent menu
+              const children = transformed.filter((child) => 
+                child.id !== item.id && 
+                child.path && 
+                child.path.startsWith(item.path + "/") &&
+                !processedChildren.has(child.id)
+              );
 
-                setMenuConfig({
-                    mainMenu: data.mainMenu ? transformMenu(data.mainMenu) : [],
-                    operationMenu: data.operationMenu ? transformMenu(data.operationMenu) : [],
-                    managementMenu: data.managementMenu ? transformMenu(data.managementMenu) : [],
-                });
-            } catch (err) {
-                console.error('Error loading menu:', err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
+              if (children.length > 0) {
+                children.forEach(child => processedChildren.add(child.id));
+                item.children = children;
+              }
+              rootMenus.push(item);
             }
+          });
+
+          // Second pass: add remaining items that are not children
+          transformed.forEach((item) => {
+            if (!processedChildren.has(item.id) && !rootMenus.some(m => m.id === item.id)) {
+              rootMenus.push(item);
+            }
+          });
+
+          // Sort by display order
+          rootMenus.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+          rootMenus.forEach(menu => {
+            if (menu.children) {
+              menu.children.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+            }
+          });
+
+          return rootMenus;
         };
 
         loadMenu();

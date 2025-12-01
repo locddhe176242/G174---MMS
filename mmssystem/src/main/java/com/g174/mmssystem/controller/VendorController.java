@@ -146,4 +146,20 @@ public class VendorController {
         response.put("vendorCode", vendorCode);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{vendorId}/balance")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    public ResponseEntity<Map<String, Object>> getVendorBalance(@PathVariable Integer vendorId) {
+        log.info("REST: Fetching balance for vendor ID: {}", vendorId);
+        Map<String, Object> balance = vendorService.getVendorBalance(vendorId);
+        return ResponseEntity.ok(balance);
+    }
+
+    @GetMapping("/{vendorId}/documents")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    public ResponseEntity<Map<String, Object>> getVendorDocuments(@PathVariable Integer vendorId) {
+        log.info("REST: Fetching documents for vendor ID: {}", vendorId);
+        Map<String, Object> documents = vendorService.getVendorDocuments(vendorId);
+        return ResponseEntity.ok(documents);
+    }
 }
