@@ -44,13 +44,6 @@ public class ReturnOrderController {
         return ResponseEntity.ok(returnOrderService.createReturnOrder(request));
     }
 
-    @PostMapping("/convert/{deliveryId}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
-    @LogActivity(action = "CREATE_RETURN_ORDER_FROM_DELIVERY", activityType = "SALES_MANAGEMENT", description = "Tạo đơn trả hàng từ Delivery")
-    public ResponseEntity<ReturnOrderResponseDTO> createFromDelivery(@PathVariable Integer deliveryId) {
-        return ResponseEntity.ok(returnOrderService.createFromDelivery(deliveryId));
-    }
-
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     @LogActivity(action = "UPDATE_RETURN_ORDER", activityType = "SALES_MANAGEMENT", description = "Cập nhật đơn trả hàng")

@@ -14,7 +14,8 @@ import java.math.BigDecimal;
 @Table(name = "Goods_Receipt_Items",
         indexes = {
                 @Index(name = "idx_gri_receipt", columnList = "receipt_id"),
-                @Index(name = "idx_gri_product", columnList = "product_id")
+                @Index(name = "idx_gri_product", columnList = "product_id"),
+                @Index(name = "idx_gri_return_item", columnList = "roi_id")
         })
 public class GoodsReceiptItem {
     @Id
@@ -29,6 +30,11 @@ public class GoodsReceiptItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "poi_id", nullable = false)
     private PurchaseOrderItem purchaseOrderItem;
+
+    // Dùng khi phiếu nhập là từ Đơn trả hàng (SalesReturn)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "roi_id")
+    private ReturnOrderItem returnOrderItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)

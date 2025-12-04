@@ -29,24 +29,6 @@ import PurchaseRequisitionList from "./compnents/pages/Purchase/PurchaseRequisit
 import RFQList from "./compnents/pages/Purchase/RFQList.jsx";
 import RFQDetail from "./compnents/pages/Purchase/RFQDetail.jsx";
 import RFQForm from "./compnents/pages/Purchase/RFQForm.jsx";
-import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
-import SalesQuotationForm from "./compnents/pages/Sale/SalesQuotation/SalesQuotationForm.jsx";
-import SalesQuotationDetail from "./compnents/pages/Sale/SalesQuotation/SalesQuotationDetail.jsx";
-import SalesOrderList from "./compnents/pages/Sale/SalesOrder/SalesOrderList.jsx";
-import SalesOrderForm from "./compnents/pages/Sale/SalesOrder/SalesOrderForm.jsx";
-import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail.jsx";
-import DeliveryList from "./compnents/pages/Sale/Delivery/DeliveryList.jsx";
-import DeliveryForm from "./compnents/pages/Sale/Delivery/DeliveryForm.jsx";
-import DeliveryDetail from "./compnents/pages/Sale/Delivery/DeliveryDetail.jsx";
-import ReturnOrderList from "./compnents/pages/Sale/ReturnOrder/ReturnOrderList.jsx";
-import ReturnOrderForm from "./compnents/pages/Sale/ReturnOrder/ReturnOrderForm.jsx";
-import ReturnOrderDetail from "./compnents/pages/Sale/ReturnOrder/ReturnOrderDetail.jsx";
-import CreditNoteList from "./compnents/pages/Sale/CreditNote/CreditNoteList.jsx";
-import CreditNoteForm from "./compnents/pages/Sale/CreditNote/CreditNoteForm.jsx";
-import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail.jsx";
-import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
-import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
-import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
 import ApprovalList from "./compnents/pages/Admin/ApprovalList.jsx";
 import PurchaseOrderList from "./compnents/pages/Purchase/PurchaseOrderList.jsx";
 import PurchaseOrderForm from "./compnents/pages/Purchase/PurchaseOrderForm.jsx";
@@ -82,6 +64,9 @@ import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail
 import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+import SalesReturnInboundOrderList from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderList.jsx";
+import SalesReturnInboundOrderDetail from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderDetail.jsx";
+import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderForm.jsx";
 
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
@@ -113,7 +98,6 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/categories" element={<CategoryList />} />
                 <Route path="/profile" element={<UserProfile />} />
-
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/new" element={<CustomerForm />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
@@ -192,6 +176,9 @@ function App() {
                 <Route path="/sales/invoices/new" element={<InvoiceForm />} />
                 <Route path="/sales/invoices/:id" element={<InvoiceDetail />} />
                 <Route path="/sales/invoices/:id/edit" element={<InvoiceForm />} />
+                <Route path="/sales/return-inbound-orders" element={<SalesReturnInboundOrderList />} />
+                <Route path="/sales/return-inbound-orders/new" element={<SalesReturnInboundOrderForm />} />
+                <Route path="/sales/return-inbound-orders/:id" element={<SalesReturnInboundOrderDetail />} />
 
 
                 <Route path="/approval" element={<ApprovalList />} />
