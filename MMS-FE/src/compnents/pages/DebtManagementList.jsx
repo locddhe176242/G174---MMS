@@ -241,7 +241,7 @@ export default function DebtManagementList() {
           </div>
 
           {/* ==================== DEBT SUMMARY SECTION ==================== */}
-          {!loading && !error && debtSummary.length > 0 && (
+          {searchKeyword.trim() && !loading && !error && debtSummary.length > 0 && (
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
               <h2 className="text-lg font-semibold text-gray-900 mb-3">Tổng hợp công nợ (từ AP và AR)</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
