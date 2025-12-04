@@ -9,7 +9,6 @@ import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.ReturnOrderMapper;
 import com.g174.mmssystem.repository.*;
 import com.g174.mmssystem.service.IService.IReturnOrderService;
-import com.g174.mmssystem.service.IService.IWarehouseStockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -43,7 +42,6 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     private final WarehouseRepository warehouseRepository;
     private final UserRepository userRepository;
     private final ReturnOrderMapper returnOrderMapper;
-    private final IWarehouseStockService warehouseStockService;
 
     @Override
     public ReturnOrderResponseDTO createReturnOrder(ReturnOrderRequestDTO request) {
@@ -161,66 +159,9 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
 
         returnOrder.setStatus(newStatus);
 
-        // Khi chuyển sang Completed, hoàn lại kho
-        if (newStatus == ReturnOrder.ReturnStatus.Completed) {
-            restoreStockForReturnOrder(returnOrder);
-        }
-
         ReturnOrder saved = returnOrderRepository.save(returnOrder);
         List<ReturnOrderItem> items = returnOrderItemRepository.findByReturnOrder_RoId(id);
         return returnOrderMapper.toResponse(saved, items);
-    }
-
-    @Override
-    public ReturnOrderResponseDTO createFromDelivery(Integer deliveryId) {
-        Delivery delivery = getDelivery(deliveryId);
-        validateDeliveryForReturn(delivery);
-
-        // Tự động tìm Invoice từ Delivery
-        Integer invoiceId = null;
-        SalesOrder salesOrder = delivery.getSalesOrder();
-        if (salesOrder != null) {
-            List<ARInvoice> invoices = arInvoiceRepository.findByCustomerIdAndNotDeleted(
-                    salesOrder.getCustomer().getCustomerId());
-            // Tìm Invoice có liên kết với Delivery này hoặc SalesOrder này
-            ARInvoice invoice = invoices.stream()
-                    .filter(inv -> inv.getDelivery() != null && inv.getDelivery().getDeliveryId().equals(deliveryId))
-                    .findFirst()
-                    .orElse(invoices.stream()
-                            .filter(inv -> inv.getSalesOrder() != null && inv.getSalesOrder().getSoId().equals(salesOrder.getSoId()))
-                            .findFirst()
-                            .orElse(null));
-            if (invoice != null) {
-                invoiceId = invoice.getArInvoiceId();
-            }
-        }
-
-        // Tạo Return Order với các items từ Delivery
-        ReturnOrderRequestDTO request = new ReturnOrderRequestDTO();
-        request.setDeliveryId(deliveryId);
-        request.setInvoiceId(invoiceId); // Tự động liên kết Invoice nếu tìm thấy
-        request.setWarehouseId(delivery.getWarehouse().getWarehouseId());
-        request.setReturnDate(LocalDate.now());
-
-        List<ReturnOrderItemRequestDTO> items = new ArrayList<>();
-        for (DeliveryItem deliveryItem : delivery.getItems()) {
-            if (deliveryItem.getDeliveredQty().compareTo(BigDecimal.ZERO) > 0) {
-                ReturnOrderItemRequestDTO item = new ReturnOrderItemRequestDTO();
-                item.setDeliveryItemId(deliveryItem.getDiId());
-                item.setProductId(deliveryItem.getProduct().getProductId());
-                item.setWarehouseId(deliveryItem.getWarehouse() != null ?
-                        deliveryItem.getWarehouse().getWarehouseId() : delivery.getWarehouse().getWarehouseId());
-                item.setReturnedQty(BigDecimal.ZERO); // Mặc định 0, user sẽ nhập
-                items.add(item);
-            }
-        }
-
-        if (items.isEmpty()) {
-            throw new IllegalStateException("Không có sản phẩm nào đã giao để tạo đơn trả hàng");
-        }
-
-        request.setItems(items);
-        return createReturnOrder(request);
     }
 
     private List<ReturnOrderItem> buildItems(ReturnOrder returnOrder, List<ReturnOrderItemRequestDTO> requestItems, Delivery delivery) {
@@ -259,23 +200,6 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private void restoreStockForReturnOrder(ReturnOrder returnOrder) {
-        for (ReturnOrderItem item : returnOrder.getItems()) {
-            try {
-                warehouseStockService.increaseStock(
-                        item.getWarehouse().getWarehouseId(),
-                        item.getProduct().getProductId(),
-                        item.getReturnedQty()
-                );
-                log.info("Đã hoàn lại {} sản phẩm ID {} vào kho ID {}",
-                        item.getReturnedQty(), item.getProduct().getProductId(), item.getWarehouse().getWarehouseId());
-            } catch (Exception e) {
-                log.error("Lỗi khi hoàn lại kho cho Return Order Item ID {}: {}", item.getRoiId(), e.getMessage());
-                throw new IllegalStateException("Không thể hoàn lại kho: " + e.getMessage());
-            }
-        }
-    }
-
     private void validateStatusTransition(ReturnOrder.ReturnStatus currentStatus, ReturnOrder.ReturnStatus newStatus) {
         if (currentStatus == ReturnOrder.ReturnStatus.Cancelled) {
             throw new IllegalStateException("Không thể thay đổi trạng thái của đơn trả hàng đã hủy");
@@ -292,8 +216,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
                 }
                 break;
             case Approved:
-                if (newStatus != ReturnOrder.ReturnStatus.Completed && newStatus != ReturnOrder.ReturnStatus.Rejected && newStatus != ReturnOrder.ReturnStatus.Cancelled) {
-                    throw new IllegalStateException("Chỉ có thể chuyển từ Approved sang Completed, Rejected hoặc Cancelled");
+                if (newStatus != ReturnOrder.ReturnStatus.Cancelled) {
+                    throw new IllegalStateException("Đơn trả hàng đã được duyệt, chỉ có thể hủy");
                 }
                 break;
             case Rejected:

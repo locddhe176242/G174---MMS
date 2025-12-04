@@ -16,7 +16,9 @@ import java.util.List;
         indexes = {
                 @Index(name = "idx_return_order_status", columnList = "status, deleted_at"),
                 @Index(name = "idx_return_order_delivery", columnList = "delivery_id"),
-                @Index(name = "idx_return_order_invoice", columnList = "invoice_id")
+                @Index(name = "idx_return_order_invoice", columnList = "invoice_id"),
+                @Index(name = "idx_return_order_receipt", columnList = "receipt_id"),
+                @Index(name = "idx_return_order_gr_status", columnList = "goods_receipt_status")
         })
 public class ReturnOrder {
 
@@ -54,6 +56,14 @@ public class ReturnOrder {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "goods_receipt_status")
+    private GoodsReceiptStatus goodsReceiptStatus = GoodsReceiptStatus.None;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "receipt_id")
+    private GoodsReceipt goodsReceipt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;
@@ -80,6 +90,12 @@ public class ReturnOrder {
         Rejected,   
         Completed, 
         Cancelled  
+    }
+
+    public enum GoodsReceiptStatus {
+        None,
+        Pending,
+        Completed
     }
 
     @PrePersist
