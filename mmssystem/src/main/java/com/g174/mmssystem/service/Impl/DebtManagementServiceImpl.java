@@ -46,6 +46,9 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
         // Sort
         allTransactions = sortTransactions(allTransactions, pageable.getSort());
 
+        // Assign ID tăng dần sau khi sort
+        assignSequentialIds(allTransactions);
+
         // Paginate manually
         return paginateTransactions(allTransactions, pageable);
     }
@@ -60,6 +63,9 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
 
         // Sort
         allTransactions = sortTransactions(allTransactions, pageable.getSort());
+
+        // Assign ID tăng dần sau khi sort
+        assignSequentialIds(allTransactions);
 
         // Paginate manually
         return paginateTransactions(allTransactions, pageable);
@@ -77,7 +83,7 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
             if (invoice.getVendor() == null) continue;
 
             DebtTransactionResponseDTO dto = DebtTransactionResponseDTO.builder()
-                    .id(invoice.getApInvoiceId().longValue())
+                    .id(null) // ID sẽ được assign sau khi sort
                     .customerVendorCode(invoice.getVendor().getVendorCode())
                     .customerVendorType("Vendor")
                     .customerVendorName(invoice.getVendor().getName())
@@ -104,7 +110,7 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
             LocalDate paymentDate = convertToLocalDate(payment.getPaymentDate());
 
             DebtTransactionResponseDTO dto = DebtTransactionResponseDTO.builder()
-                    .id(payment.getApPaymentId().longValue())
+                    .id(null) // ID sẽ được assign sau khi sort
                     .customerVendorCode(payment.getApInvoice().getVendor().getVendorCode())
                     .customerVendorType("Vendor")
                     .customerVendorName(payment.getApInvoice().getVendor().getName())
@@ -129,7 +135,7 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
             if (invoice.getCustomer() == null) continue;
 
             DebtTransactionResponseDTO dto = DebtTransactionResponseDTO.builder()
-                    .id(invoice.getArInvoiceId().longValue())
+                    .id(null) // ID sẽ được assign sau khi sort
                     .customerVendorCode(invoice.getCustomer().getCustomerCode())
                     .customerVendorType("Customer")
                     .customerVendorName(invoice.getCustomer().getFirstName() + " " + invoice.getCustomer().getLastName())
@@ -156,7 +162,7 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
             LocalDate paymentDate = convertInstantToLocalDate(payment.getPaymentDate());
 
             DebtTransactionResponseDTO dto = DebtTransactionResponseDTO.builder()
-                    .id(payment.getArPaymentId().longValue())
+                    .id(null) // ID sẽ được assign sau khi sort
                     .customerVendorCode(payment.getInvoice().getCustomer().getCustomerCode())
                     .customerVendorType("Customer")
                     .customerVendorName(payment.getInvoice().getCustomer().getFirstName() + " " +
@@ -177,6 +183,15 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
         }
 
         return transactions;
+    }
+
+    /**
+     * Assign ID tăng dần (1, 2, 3, 4...) cho các transactions sau khi đã sort
+     */
+    private void assignSequentialIds(List<DebtTransactionResponseDTO> transactions) {
+        for (int i = 0; i < transactions.size(); i++) {
+            transactions.get(i).setId((long) (i + 1));
+        }
     }
 
     /**
