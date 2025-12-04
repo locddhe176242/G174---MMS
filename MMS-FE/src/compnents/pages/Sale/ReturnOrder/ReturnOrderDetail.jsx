@@ -35,8 +35,6 @@ const getNextStatus = (currentStatus) => {
   switch (currentStatus) {
     case "Draft":
       return "Approved";
-    case "Approved":
-      return "Completed";
     default:
       return null;
   }
@@ -102,7 +100,8 @@ export default function ReturnOrderDetail() {
   }
 
   const nextStatus = getNextStatus(data.status);
-  const canChangeStatus = nextStatus && data.status !== "Cancelled" && data.status !== "Completed";
+  const canChangeStatus =
+    nextStatus && data.status !== "Cancelled" && data.status !== "Approved";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -185,42 +184,44 @@ export default function ReturnOrderDetail() {
         </div>
 
         {canChangeStatus && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
               <h3 className="text-lg font-semibold text-gray-900">Thay đổi trạng thái</h3>
-              <span className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(data.status)}`}>
-                {getStatusLabel(data.status)}
-              </span>
+              <p className="text-sm text-gray-500">
+                Quy trình: Draft → Approved. Hủy trong trường hợp đơn không còn hiệu lực.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {nextStatus && (
-                <button
-                  onClick={() => handleStatusChange(nextStatus)}
-                  disabled={statusLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {statusLoading ? "Đang xử lý..." : `Chuyển sang ${getStatusLabel(nextStatus)}`}
-                </button>
-              )}
-              {data.status !== "Cancelled" && (
-                <button
-                  onClick={() => handleStatusChange("Cancelled")}
-                  disabled={statusLoading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {statusLoading ? "Đang xử lý..." : "Hủy đơn trả hàng"}
-                </button>
-              )}
-            </div>
-            <div className="mt-4 text-sm text-gray-600">
-              <p>Quy trình: Draft → Approved → Completed</p>
-              {data.status === "Approved" && (
-                <p className="text-yellow-600 mt-1">
-                  ⚠️ Khi chuyển sang "Completed", hệ thống sẽ tự động hoàn lại hàng vào kho
-                </p>
-              )}
-            </div>
+            <span
+              className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
+                data.status
+              )}`}
+            >
+              {getStatusLabel(data.status)}
+            </span>
           </div>
+
+          <div className="flex flex-wrap gap-3">
+            {nextStatus && (
+              <button
+                onClick={() => handleStatusChange(nextStatus)}
+                disabled={statusLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {statusLoading ? "Đang xử lý..." : `Chuyển sang ${getStatusLabel(nextStatus)}`}
+              </button>
+            )}
+            {data.status !== "Cancelled" && (
+              <button
+                onClick={() => handleStatusChange("Cancelled")}
+                disabled={statusLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {statusLoading ? "Đang xử lý..." : "Hủy đơn trả hàng"}
+              </button>
+            )}
+          </div>
+        </div>
         )}
 
         <div className="bg-white rounded-lg shadow-sm">
