@@ -17,7 +17,9 @@ import java.util.List;
                 @Index(name = "idx_gr_no", columnList = "receipt_no"),
                 @Index(name = "idx_gr_status", columnList = "status, deleted_at"),
                 @Index(name = "idx_gr_order", columnList = "order_id"),
-                @Index(name = "idx_gr_warehouse", columnList = "warehouse_id")
+                @Index(name = "idx_gr_warehouse", columnList = "warehouse_id"),
+                @Index(name = "idx_gr_return_order", columnList = "ro_id"),
+                @Index(name = "idx_gr_source_type", columnList = "source_type")
         })
 public class GoodsReceipt {
     @Id
@@ -44,6 +46,15 @@ public class GoodsReceipt {
     @Builder.Default
     private GoodsReceiptStatus status = GoodsReceiptStatus.Pending;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type")
+    @Builder.Default
+    private SourceType sourceType = SourceType.Purchase;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ro_id")
+    private ReturnOrder returnOrder;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;
@@ -69,6 +80,11 @@ public class GoodsReceipt {
 
     public enum GoodsReceiptStatus {
         Pending, Approved, Rejected
+    }
+
+    public enum SourceType {
+        Purchase,
+        SalesReturn
     }
 
     @PrePersist
