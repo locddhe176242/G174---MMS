@@ -59,6 +59,36 @@ const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
   return Number(itemTaxRate || 0);
 };
 
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "40px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const compactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "36px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
 export default function SalesQuotationForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -409,34 +439,31 @@ export default function SalesQuotationForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-          <div>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-5 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
             </h1>
-            <p className="text-gray-500">
-              Nhập thông tin chung và danh sách sản phẩm báo giá
-            </p>
+            <button
+              onClick={() => navigate("/sales/quotations")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              ← Quay lại
+            </button>
           </div>
-          <button
-            onClick={() => navigate("/sales/quotations")}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-          >
-            ← Quay lại
-          </button>
+          <div className="border-t border-gray-200" />
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Thông tin báo giá */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Thông tin báo giá
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-sm text-gray-600">Số báo giá</label>
                   <input
                     type="text"
@@ -444,11 +471,11 @@ export default function SalesQuotationForm() {
                     onChange={(e) =>
                       handleInputChange("quotationNo", e.target.value)
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Ví dụ: SQ-20231125-0001"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-sm text-gray-600">
                     Khách hàng <span className="text-red-500">*</span>
                   </label>
@@ -463,6 +490,12 @@ export default function SalesQuotationForm() {
                     }
                     options={customers}
                     isClearable
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
+                    menuShouldScrollIntoView={false}
+                    styles={selectStyles}
                   />
                   {validationErrors.customerId && (
                     <p className="text-sm text-red-600 mt-1">
@@ -471,7 +504,7 @@ export default function SalesQuotationForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Ngày báo giá <span className="text-red-500">*</span>
                   </label>
                   <DatePicker
@@ -482,7 +515,7 @@ export default function SalesQuotationForm() {
                     }
                     onChange={(date) => handleDateChange("quotationDate", date)}
                     dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   {validationErrors.quotationDate && (
                     <p className="text-sm text-red-600 mt-1">
@@ -491,14 +524,14 @@ export default function SalesQuotationForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Hạn báo giá</label>
+                  <label className="block text-sm text-gray-600 mb-1">Hạn báo giá</label>
                   <DatePicker
                     selected={
                       formData.validUntil ? new Date(formData.validUntil) : null
                     }
                     onChange={(date) => handleDateChange("validUntil", date)}
                     dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     minDate={
                       formData.quotationDate
                         ? new Date(formData.quotationDate)
@@ -518,7 +551,7 @@ export default function SalesQuotationForm() {
                     onChange={(e) =>
                       handleInputChange("status", e.target.value)
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {STATUS_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -535,7 +568,7 @@ export default function SalesQuotationForm() {
                     onChange={(e) =>
                       handleInputChange("paymentTerms", e.target.value)
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="VD: Thanh toán trong 30 ngày"
                   />
                 </div>
@@ -547,7 +580,7 @@ export default function SalesQuotationForm() {
                     onChange={(e) =>
                       handleInputChange("deliveryTerms", e.target.value)
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="VD: Giao tại kho khách hàng"
                   />
                 </div>
@@ -557,49 +590,15 @@ export default function SalesQuotationForm() {
                     rows={3}
                     value={formData.notes}
                     onChange={(e) => handleInputChange("notes", e.target.value)}
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Thông tin bổ sung cho báo giá"
                   />
                 </div>
               </div>
             </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <div>
-                <label className="text-sm text-gray-600">Thuế (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.taxRate}
-                  onChange={(e) =>
-                    handleInputChange("taxRate", e.target.value)
-                  }
-                  className="mt-1 w-full border rounded-lg px-3 py-2"
-                />
-              </div>
-              <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
-                <div className="flex justify-between">
-                  <span>Tạm tính</span>
-                  <span className="font-semibold">
-                    {currencyFormatter(totals.subtotal)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Chiết khấu dòng</span>
-                  <span>{currencyFormatter(totals.discountTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Thuế</span>
-                  <span>{currencyFormatter(totals.taxAmount)}</span>
-                </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900">
-                  <span>Tổng cộng</span>
-                  <span>{currencyFormatter(totals.totalAmount)}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
+          {/* Danh sách sản phẩm */}
           <div className="bg-white rounded-lg shadow-sm">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -627,7 +626,7 @@ export default function SalesQuotationForm() {
                     <th className="px-4 py-3 text-center">#</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {formData.items.map((item, index) => {
                     const baseTotal =
                       Number(item.quantity || 0) * Number(item.unitPrice || 0);
@@ -652,6 +651,10 @@ export default function SalesQuotationForm() {
                             }
                             options={products}
                             isClearable
+                            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                            menuPosition="fixed"
+                            menuShouldScrollIntoView={false}
+                            styles={compactSelectStyles}
                           />
                           {validationErrors.itemDetails?.[index]?.productId && (
                             <p className="text-xs text-red-600 mt-1">
@@ -666,7 +669,7 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "uom", e.target.value)
                             }
-                            className="w-24 border rounded px-2 py-1"
+                            className="w-24 border border-gray-300 rounded px-2 py-1"
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -677,7 +680,7 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "quantity", e.target.value)
                             }
-                            className="w-24 border rounded px-2 py-1 text-right"
+                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
                           />
                           {validationErrors.itemDetails?.[index]?.quantity && (
                             <p className="text-xs text-red-600 mt-1">
@@ -697,7 +700,7 @@ export default function SalesQuotationForm() {
                                 normalizeNumberInput(e.target.value)
                               )
                             }
-                            className="w-32 border rounded px-3 py-1 text-right tracking-wide"
+                            className="w-32 border border-gray-300 rounded px-3 py-1 text-right tracking-wide"
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -714,7 +717,7 @@ export default function SalesQuotationForm() {
                                 e.target.value
                               )
                             }
-                            className="w-28 border rounded px-2 py-1 text-right"
+                            className="w-28 border border-gray-300 rounded px-2 py-1 text-right"
                             placeholder="0"
                           />
                         </td>
@@ -726,7 +729,7 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", e.target.value)
                             }
-                            className="w-24 border rounded px-2 py-1 text-right"
+                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
                           />
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
@@ -756,7 +759,43 @@ export default function SalesQuotationForm() {
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3">
+          {/* Thuế và tổng cộng */}
+          <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+            <div>
+              <label className="text-sm text-gray-600">Thuế (%)</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.taxRate}
+                onChange={(e) =>
+                  handleInputChange("taxRate", e.target.value)
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Tạm tính</span>
+                <span className="font-semibold">
+                  {currencyFormatter(totals.subtotal)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Chiết khấu dòng</span>
+                <span>{currencyFormatter(totals.discountTotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Thuế</span>
+                <span>{currencyFormatter(totals.taxAmount)}</span>
+              </div>
+              <div className="flex justify-between text-base font-semibold text-gray-900">
+                <span>Tổng cộng</span>
+                <span>{currencyFormatter(totals.totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate("/sales/quotations")}
