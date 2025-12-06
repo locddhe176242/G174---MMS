@@ -370,7 +370,26 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
             }
         }
         
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String pqNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            pqNo = String.format("%s%04d", prefix, nextNumber);
+            if (!quotationRepository.existsByPqNo(pqNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique PQ number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã báo giá duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return pqNo;
     }
 }
 

@@ -129,7 +129,7 @@ export default function WarehouseList() {
             open: true,
             action,
             warehouseId,
-            message: action === "deactivate" ? "Ngưng hoạt động kho này?" : "Khôi phục kho này?",
+            message: action === "deactivate" ? "Ngừng hoạt động kho này?" : "Khôi phục kho này?",
         });
     };
 
@@ -187,7 +187,7 @@ export default function WarehouseList() {
                     <div className="flex items-center justify-between">
                         <h1 className="text-2xl font-bold text-gray-900">Quản lý kho hàng</h1>
                         <Link to="/warehouse/new"
-                              className="bg-black text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors">
+                              className="bg-brand-blue text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
                             </svg>
@@ -265,8 +265,8 @@ export default function WarehouseList() {
                                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                                             className="px-3 py-2 border border-gray-300 rounded-lg">
                                         <option value="All">Tất cả trạng thái</option>
-                                        <option value="Active">Active</option>
-                                        <option value="Inactive">Inactive</option>
+                                        <option value="Active">Hoạt động</option>
+                                        <option value="Inactive">Không hoạt động</option>
                                     </select>
                                     <button onClick={handleApplyFilters}
                                             className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -392,23 +392,14 @@ export default function WarehouseList() {
                     </div>
 
                     {!loading && !error && warehouses.length > 0 && (
-                        <div className="px-6 py-4 border-t border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-gray-700">
-
-                                </div>f
-                                <div>
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        pageSize={pageSize}
-                                        totalElements={totalElements}
-                                        onPageChange={handlePageChange}
-                                        onPageSizeChange={handlePageSizeChange}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalElements={totalElements}
+                            onPageChange={handlePageChange}
+                            onPageSizeChange={handlePageSizeChange}
+                        />
                     )}
                 </div>
             </div>

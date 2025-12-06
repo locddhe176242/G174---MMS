@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
 import { apPaymentService } from "../../../api/apPaymentService";
 import apiClient from "../../../api/apiClient";
+import APInvoiceAttachments from "./APInvoiceAttachments";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">
@@ -168,29 +169,31 @@ export default function APInvoiceDetail() {
                 Hóa đơn phải trả: {data.invoice_no || data.invoiceNo || `#${id}`}
               </h1>
             </div>
-            {(data.status === "Unpaid" || data.status === "Chưa thanh toán") && balanceAmount === totalAmount && id ? (
-              <button
-                onClick={() => navigate(`/purchase/ap-invoices/${id}/edit`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Chỉnh sửa
-              </button>
-            ) : (
-              <button
-                disabled
-                className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
-                title={!id ? "ID không hợp lệ" : "Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã có payment"}
-              >
-                Chỉnh sửa
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {(data.status === "Unpaid" || data.status === "Chưa thanh toán") && balanceAmount === totalAmount && id ? (
+                <button
+                  onClick={() => navigate(`/purchase/ap-invoices/${id}/edit`)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Chỉnh sửa
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
+                  title={!id ? "ID không hợp lệ" : "Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã có payment"}
+                >
+                  Chỉnh sửa
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-8 space-y-6">
             <div className="bg-white border rounded-lg p-6">
               <div className="flex flex-col md:flex-row md:items-center gap-4">
                 <Stat label="Tổng tiền" value={formatCurrency(totalAmount)} />
@@ -258,10 +261,11 @@ export default function APInvoiceDetail() {
                           </td>
                         </tr>
                         {(() => {
+                          const round = (v) => Math.round(v * 100) / 100;
                           const totalLineDiscount = items.reduce((sum, item) => {
-                            const itemSubtotal = (item.quantity || 0) * (item.unit_price || item.unitPrice || 0);
+                            const itemSubtotal = round((item.quantity || 0) * (item.unit_price || item.unitPrice || 0));
                             const discountPercent = item.discount_percent || item.discountPercent || 0;
-                            const discountAmount = itemSubtotal * (discountPercent / 100);
+                            const discountAmount = round(itemSubtotal * (discountPercent / 100));
                             return sum + discountAmount;
                           }, 0);
                           return totalLineDiscount > 0 && (
@@ -280,19 +284,26 @@ export default function APInvoiceDetail() {
                             Tổng sau chiết khấu sản phẩm:
                           </td>
                           <td className="py-3 pr-4 text-right">
-                            {formatCurrency(subtotal - items.reduce((sum, item) => {
-                              const itemSubtotal = (item.quantity || 0) * (item.unit_price || item.unitPrice || 0);
-                              const discountPercent = item.discount_percent || item.discountPercent || 0;
-                              return sum + itemSubtotal * (discountPercent / 100);
-                            }, 0))}
+                            {(() => {
+                              const round = (v) => Math.round(v * 100) / 100;
+                              const totalAfterLineDiscount = items.reduce((sum, item) => {
+                                const itemSubtotal = round((item.quantity || 0) * (item.unit_price || item.unitPrice || 0));
+                                const discountPercent = item.discount_percent || item.discountPercent || 0;
+                                const discountAmount = round(itemSubtotal * (discountPercent / 100));
+                                return sum + round(itemSubtotal - discountAmount);
+                              }, 0);
+                              return formatCurrency(totalAfterLineDiscount);
+                            })()}
                           </td>
                         </tr>
                         {(() => {
+                          const round = (v) => Math.round(v * 100) / 100;
                           const headerDiscount = data.header_discount || data.headerDiscount || 0;
-                          const totalAfterLineDiscount = subtotal - items.reduce((sum, item) => {
-                            const itemSubtotal = (item.quantity || 0) * (item.unit_price || item.unitPrice || 0);
+                          const totalAfterLineDiscount = items.reduce((sum, item) => {
+                            const itemSubtotal = round((item.quantity || 0) * (item.unit_price || item.unitPrice || 0));
                             const discountPercent = item.discount_percent || item.discountPercent || 0;
-                            return sum + itemSubtotal * (discountPercent / 100);
+                            const discountAmount = round(itemSubtotal * (discountPercent / 100));
+                            return sum + round(itemSubtotal - discountAmount);
                           }, 0);
                           return headerDiscount > 0 && (
                             <tr className="border-t font-semibold bg-gray-50">
@@ -300,7 +311,7 @@ export default function APInvoiceDetail() {
                                 Chiết khấu tổng đơn ({headerDiscount}%):
                               </td>
                               <td className="py-3 pr-4 text-right text-red-600">
-                                -{formatCurrency(totalAfterLineDiscount * (headerDiscount / 100))}
+                                -{formatCurrency(round(totalAfterLineDiscount * (headerDiscount / 100)))}
                               </td>
                             </tr>
                           );
@@ -327,9 +338,19 @@ export default function APInvoiceDetail() {
                 )}
               </div>
             </div>
+
+            {/* File đính kèm section */}
+            <div className="bg-white border rounded-lg">
+              <div className="p-6">
+                <APInvoiceAttachments 
+                  invoiceId={id} 
+                  readonly={data.status === "Cancelled"}
+                />
+              </div>
+            </div>
           </div>
 
-          <aside className="space-y-6 lg:sticky lg:top-6">
+          <aside className="xl:col-span-4 space-y-6">
             <div className="bg-white border rounded-lg">
               <div className="px-6 py-4 border-b font-medium">Thông tin cơ bản</div>
               <div className="p-6 space-y-3 text-sm">

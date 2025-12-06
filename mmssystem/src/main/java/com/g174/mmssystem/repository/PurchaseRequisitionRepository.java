@@ -56,5 +56,8 @@ public interface PurchaseRequisitionRepository extends JpaRepository<PurchaseReq
 
     @Query(value = "SELECT * FROM Purchase_Requisitions WHERE requisition_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY requisition_no DESC LIMIT 1", nativeQuery = true)
     Optional<PurchaseRequisition> findTopByRequisitionNoStartingWithOrderByRequisitionNoDesc(@Param("prefix") String prefix);
+
+    @Query("SELECT COUNT(pr) FROM PurchaseRequisition pr WHERE pr.status = :status AND pr.deletedAt IS NULL")
+    Long countByStatus(@Param("status") RequisitionStatus status);
 }
 

@@ -314,15 +314,20 @@ export default function PurchaseRequisitionList() {
         <div className="min-h-screen bg-gray-50">
             {/* ==================== HEADER ==================== */}
             <div className="bg-white shadow-sm">
-                <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý phiếu yêu cầu mua hàng</h1>
-                    <button
-                        onClick={() => navigate("/purchase/purchase-requisitions/new")}
-                        className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                        title="Tạo phiếu yêu cầu mua hàng mới"
-                    >
-                        + Tạo phiếu yêu cầu
-                    </button>
+                <div className="container mx-auto px-4 py-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Quản lý phiếu yêu cầu mua hàng</h1>
+                            <p className="text-sm text-gray-600 mt-1">Quản lý các yêu cầu mua hàng từ các bộ phận trong công ty</p>
+                        </div>
+                        <button
+                            onClick={() => navigate("/purchase/purchase-requisitions/new")}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            title="Tạo phiếu yêu cầu mua hàng mới"
+                        >
+                            + Tạo phiếu yêu cầu
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -141,13 +141,13 @@ export default function GoodsReceiptDetail() {
         setIsSubmitting(true);
         try {
             await goodsReceiptService.approveGoodsReceipt(id, currentUser.userId);
-            toast.success("Đã phê duyệt Phiếu nhập kho!");
+            toast.success("Đã xác nhận Phiếu nhập kho!");
             const updated = await goodsReceiptService.getGoodsReceiptById(id);
             setData(updated);
             setShowApproveModal(false);
         } catch (error) {
             console.error("Approve Goods Receipt failed:", error);
-            toast.error(error?.response?.data?.message || "Không thể phê duyệt Phiếu nhập kho");
+            toast.error(error?.response?.data?.message || "Không thể xác nhận Phiếu nhập kho");
         } finally {
             setIsSubmitting(false);
         }
@@ -266,7 +266,7 @@ export default function GoodsReceiptDetail() {
                                         onClick={handleApproveClick}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                     >
-                                        Phê duyệt
+                                        Xác nhận
                                     </button>
                                     <button
                                         onClick={handleRejectClick}
@@ -436,7 +436,7 @@ export default function GoodsReceiptDetail() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="px-6 py-4 border-b">
-                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận phê duyệt</h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận nhập kho</h3>
                         </div>
                         <div className="px-6 py-4">
                             <div className="flex items-start gap-3">
@@ -447,10 +447,10 @@ export default function GoodsReceiptDetail() {
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-sm text-gray-700">
-                                        Bạn có chắc chắn muốn phê duyệt Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong> không?
+                                        Bạn có chắc chắn muốn xác nhận Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong> không?
                                     </p>
                                     <p className="text-sm text-gray-500 mt-2">
-                                        Sau khi phê duyệt, hàng hóa sẽ được cập nhật vào kho.
+                                        Sau khi xác nhận, hàng hóa sẽ được cập nhật vào kho.
                                     </p>
                                 </div>
                             </div>
@@ -471,7 +471,7 @@ export default function GoodsReceiptDetail() {
                                 {isSubmitting && (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 )}
-                                Phê duyệt
+                                Xác nhận
                             </button>
                         </div>
                     </div>

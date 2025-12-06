@@ -40,34 +40,38 @@ export default function VendorForm() {
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
 
-  // Load provinces on mount
+  // Load provinces on mount, sau đó mới load vendor data
   useEffect(() => {
-    loadProvinces();
-  }, []);
-
-  // Load vendor data for edit
-  useEffect(() => {
-    if (isEdit && id) {
-      loadVendorData();
-    } else if (!isEdit) {
-      // Auto generate vendor code for new vendor
-      generateVendorCode();
-    }
+    const initializeForm = async () => {
+      await loadProvinces();
+      
+      if (isEdit && id) {
+        loadVendorData();
+      } else if (!isEdit) {
+        generateVendorCode();
+      }
+    };
+    
+    initializeForm();
   }, [isEdit, id]);
 
-  // Load wards khi chọn province HOẶC khi provinces load xong
+  // Load wards khi có provinceCode (bao gồm cả khi edit mode load vendor data)
   useEffect(() => {
-    if (formData.address.provinceCode && provinces.length > 0) {
+    if (formData.address.provinceCode) {
       loadWards(formData.address.provinceCode);
     } else {
       setWards([]);
     }
-  }, [formData.address.provinceCode, provinces]);
+  }, [formData.address.provinceCode]);
 
   const loadVendorData = async () => {
     try {
       setLoading(true);
       const vendor = await vendorService.getVendorById(id);
+      
+      console.log("Loaded vendor data:", vendor);
+      console.log("Province code:", vendor.address?.provinceCode);
+      console.log("Ward code:", vendor.address?.wardCode);
 
       setFormData({
         name: vendor.name || "",
@@ -122,10 +126,13 @@ export default function VendorForm() {
         value: province.code,
         label: province.name
       }));
+      console.log("Loaded provinces:", formattedProvinces.length);
       setProvinces(formattedProvinces);
+      return formattedProvinces;
     } catch (err) {
       console.error('Error loading provinces:', err);
       toast.error('Không thể tải danh sách tỉnh/thành phố');
+      return [];
     } finally {
       setLoadingProvinces(false);
     }
@@ -318,7 +325,7 @@ export default function VendorForm() {
     navigate("/vendors");
   };
 
-  if (loading && !isEdit) {
+  if (loading || (isEdit && loadingProvinces)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -442,7 +449,10 @@ export default function VendorForm() {
                     Tỉnh/Thành phố <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    value={provinces.find(p => p.value === formData.address.provinceCode)}
+                    value={provinces.find(p => 
+                      String(p.value) === String(formData.address.provinceCode) || 
+                      p.label === formData.address.provinceName
+                    )}
                     onChange={handleProvinceChange}
                     options={provinces}
                     placeholder="Chọn tỉnh/thành phố"
@@ -470,7 +480,10 @@ export default function VendorForm() {
                     Phường/Xã <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    value={wards.find(w => w.value === formData.address.wardCode)}
+                    value={wards.find(w => 
+                      String(w.value) === String(formData.address.wardCode) ||
+                      w.label === formData.address.wardName
+                    )}
                     onChange={handleWardChange}
                     options={wards}
                     placeholder={loadingWards ? "Đang tải..." : "Chọn phường/xã"}

@@ -681,7 +681,26 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             }
         }
 
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String requisitionNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            requisitionNo = String.format("%s%04d", prefix, nextNumber);
+            if (!requisitionRepository.existsByRequisitionNo(requisitionNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique Requisition number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã phiếu yêu cầu duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return requisitionNo;
     }
 }
 

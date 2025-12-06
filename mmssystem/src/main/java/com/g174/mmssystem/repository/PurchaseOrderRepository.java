@@ -59,5 +59,8 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, In
 
     @Query(value = "SELECT * FROM Purchase_Orders WHERE po_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY po_no DESC LIMIT 1", nativeQuery = true)
     Optional<PurchaseOrder> findTopByPoNoStartingWithOrderByPoNoDesc(@Param("prefix") String prefix);
+
+    @Query("SELECT COUNT(po) FROM PurchaseOrder po WHERE po.status = :status AND po.deletedAt IS NULL")
+    Long countByStatus(@Param("status") com.g174.mmssystem.enums.PurchaseOrderStatus status);
 }
 

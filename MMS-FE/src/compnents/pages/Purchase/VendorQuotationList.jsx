@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
+import Pagination from "../../common/Pagination";
 
 const STATUS_OPTIONS = [
     { value: "ALL", label: "Tất cả" },
@@ -12,8 +13,6 @@ const STATUS_OPTIONS = [
     { value: "Rejected", label: "Đã từ chối" },
     { value: "Expired", label: "Hết hạn" },
 ];
-
-const PAGE_SIZE = 10;
 
 const getSafeString = (value, fallback = "-") => {
     if (!value) return fallback;
@@ -60,6 +59,7 @@ const VendorQuotationList = () => {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
     const [statusFilter, setStatusFilter] = useState("ALL");
 
     const [sortField, setSortField] = useState("createdAt");
@@ -118,9 +118,9 @@ const VendorQuotationList = () => {
             let response;
 
             if (keyword.trim()) {
-                response = await purchaseQuotationService.searchQuotationsWithPagination(keyword.trim(), page, PAGE_SIZE, sort);
+                response = await purchaseQuotationService.searchQuotationsWithPagination(keyword.trim(), page, pageSize, sort);
             } else {
-                response = await purchaseQuotationService.getQuotationsWithPagination(page, PAGE_SIZE, sort);
+                response = await purchaseQuotationService.getQuotationsWithPagination(page, pageSize, sort);
             }
 
             const content = Array.isArray(response?.content) ? response.content : [];
@@ -316,18 +316,15 @@ const VendorQuotationList = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 py-6">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="container mx-auto px-4 py-6">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Mua hàng</p>
                             <h1 className="text-2xl font-bold text-gray-900">Báo giá nhà cung cấp</h1>
-                            <p className="text-sm text-gray-600">
-                                Theo dõi và đối chiếu tất cả báo giá đã nhận từ nhà cung cấp.
-                            </p>
+                            <p className="text-sm text-gray-600 mt-1">Theo dõi và đối chiếu tất cả báo giá đã nhận từ nhà cung cấp</p>
                         </div>
                         <button
                             onClick={navigateToCreate}
-                            className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
                             + Tạo báo giá mới
                         </button>
@@ -335,7 +332,7 @@ const VendorQuotationList = () => {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-6">
+            <div className="container mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-100">
                     <div className="px-6 py-4 border-b border-gray-100">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -430,44 +427,17 @@ const VendorQuotationList = () => {
                     </div>
 
                     {!loading && !error && quotations.length > 0 && (
-                        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <p className="text-sm text-gray-600">
-                                Hiển thị {currentPage * PAGE_SIZE + 1}-{Math.min((currentPage + 1) * PAGE_SIZE, totalElements)} / {totalElements} báo giá
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => fetchQuotations(currentPage - 1)}
-                                    disabled={currentPage === 0}
-                                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
-                                {Array.from({ length: totalPages }, (_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => fetchQuotations(i)}
-                                        className={`px-3 py-1 border rounded-md ${
-                                            i === currentPage
-                                                ? "bg-black text-white border-black"
-                                                : "border-gray-300 hover:bg-gray-50"
-                                        }`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => fetchQuotations(currentPage + 1)}
-                                    disabled={currentPage >= totalPages - 1}
-                                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalElements={totalElements}
+                            onPageChange={(page) => fetchQuotations(page)}
+                            onPageSizeChange={(newSize) => {
+                                setPageSize(newSize);
+                                fetchQuotations(0);
+                            }}
+                        />
                     )}
                 </div>
             </div>

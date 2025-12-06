@@ -15,6 +15,8 @@ export default function CompareSupplierQuotations() {
     const [selectedQuotations, setSelectedQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [isManager, setIsManager] = useState(false);
 
     // Helpers
     const formatDate = (dateString, format = "MM/DD/YYYY") => {
@@ -107,7 +109,9 @@ export default function CompareSupplierQuotations() {
                 quotationDate: quoteDate.toISOString(),
                 fullyQuotedItems: 1,
                 totalItems: 1,
-                bestPricedItems: 1,
+                deliveryLeadTime: "7 ngày",
+                paymentTerms: "Net 30",
+                deliveryTerms: "FOB",
                 isBest: true,
             },
             {
@@ -121,7 +125,9 @@ export default function CompareSupplierQuotations() {
                 quotationDate: quoteDate.toISOString(),
                 fullyQuotedItems: 1,
                 totalItems: 1,
-                bestPricedItems: 0,
+                deliveryLeadTime: "10 ngày",
+                paymentTerms: "Thanh toán sau khi nhận và giao hàng",
+                deliveryTerms: "CIF",
                 isBest: false,
             },
             {
@@ -135,7 +141,9 @@ export default function CompareSupplierQuotations() {
                 quotationDate: quoteDate.toISOString(),
                 fullyQuotedItems: 1,
                 totalItems: 1,
-                bestPricedItems: 0,
+                deliveryLeadTime: "14 ngày",
+                paymentTerms: "Net 60",
+                deliveryTerms: "FOB",
                 isBest: false,
             },
         ];
@@ -151,6 +159,17 @@ export default function CompareSupplierQuotations() {
             return best;
         }, null);
     }, [quotations]);
+
+    // Get current user and check if MANAGER
+    useEffect(() => {
+        const user = getCurrentUser();
+        setCurrentUser(user);
+        const userRoles = user?.roles || [];
+        const hasManagerRole = userRoles.some(role => 
+            role === 'MANAGER' || role === 'ROLE_MANAGER' || role?.name === 'MANAGER'
+        );
+        setIsManager(hasManagerRole);
+    }, []);
 
     // Fetch data from backend
     useEffect(() => {
@@ -214,7 +233,9 @@ export default function CompareSupplierQuotations() {
                         quotationDate: q.pqDate || q.pq_date || q.createdAt || q.created_at,
                         fullyQuotedItems: q.items?.length || 0,
                         totalItems: rfq?.items?.length || 0,
-                        bestPricedItems: 0, // TODO: Calculate based on item comparison
+                        deliveryLeadTime: q.deliveryLeadTime || q.delivery_lead_time || '-',
+                        paymentTerms: q.paymentTerms || q.payment_terms || '-',
+                        deliveryTerms: q.deliveryTerms || q.delivery_terms || '-',
                         isBest: (q.pqId || q.pq_id) === (best?.pqId || best?.pq_id)
                     }));
                 }
@@ -267,11 +288,27 @@ export default function CompareSupplierQuotations() {
             toast.warning("Vui lòng chọn ít nhất một báo giá để so sánh");
             return;
         }
-        if (selectedQuotations.length !== 1) {
-            toast.warn("Vui lòng chọn 1 báo giá để tạo PO");
-            return;
+
+        // If multiple quotations selected, automatically choose the one with best price
+        let selectedId;
+        if (selectedQuotations.length > 1) {
+            const selectedQuotationsList = quotations.filter(q => 
+                selectedQuotations.includes(q.pqId || q.pq_id)
+            );
+            const bestSelected = selectedQuotationsList.reduce((best, current) => {
+                const currentAmount = Number(current.totalAmount || 0);
+                const bestAmount = best ? Number(best.totalAmount || 0) : Infinity;
+                if (!best || currentAmount < bestAmount) {
+                    return current;
+                }
+                return best;
+            }, null);
+            selectedId = bestSelected?.pqId || bestSelected?.pq_id;
+            toast.info(`Đã tự động chọn báo giá tốt nhất: ${bestSelected?.pqNo || bestSelected?.pq_no} (${new Intl.NumberFormat("vi-VN").format(bestSelected?.totalAmount || 0)} ₫)`);
+        } else {
+            selectedId = selectedQuotations[0];
         }
-        const selectedId = selectedQuotations[0];
+
         const selectedQuotation = quotations.find(q => (q.pqId || q.pq_id) === selectedId);
         if (!selectedQuotation) {
             toast.error("Không tìm thấy báo giá được chọn");
@@ -500,18 +537,22 @@ export default function CompareSupplierQuotations() {
                         <div className="font-semibold text-lg">
                             Báo giá ({quotations.length})
                         </div>
-                        <button
-                            onClick={handleCompareAward}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                            </svg>
-                            So sánh và trao thầu
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => navigate(`/purchase/rfqs/${id}`)}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                Quay lại
+                            </button>
+                            {isManager && (
+                                <button
+                                    onClick={handleCompareAward}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                >
+                                    Phê duyệt và tạo đơn mua hàng
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="p-6">
@@ -534,12 +575,13 @@ export default function CompareSupplierQuotations() {
                                         </th>
                                         <th className="py-3 pr-4 font-medium">Báo giá nhà cung cấp</th>
                                         <th className="py-3 pr-4 font-medium">Nhà cung cấp</th>
-                                        <th className="py-3 pr-4 font-medium">Địa chỉ</th>
                                         <th className="py-3 pr-4 font-medium">Trạng thái</th>
-                                        <th className="py-3 pr-4 text-right font-medium">Tổng giá trị báo giá (ròng)</th>
+                                        <th className="py-3 pr-4 text-right font-medium">Tổng giá trị báo giá</th>
                                         <th className="py-3 pr-4 font-medium">Ngày báo giá</th>
                                         <th className="py-3 pr-4 text-center font-medium">Số mặt hàng đã báo giá đầy đủ</th>
-                                        <th className="py-3 pr-4 text-center font-medium">Số mặt hàng có giá tốt nhất</th>
+                                        <th className="py-3 pr-4 text-center font-medium">Ngày nhận hàng dự kiến</th>
+                                        <th className="py-3 pr-4 text-center font-medium">Điều khoản thanh toán</th>
+                                        <th className="py-3 pr-4 text-center font-medium">Điều khoản giao hàng</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -579,9 +621,6 @@ export default function CompareSupplierQuotations() {
                                                         {quotation.vendorName || ''}
                                                     </button>
                                                 </td>
-                                                <td className="py-3 pr-4 text-gray-600">
-                                                    {quotation.vendorAddress || '-'}
-                                                </td>
                                                 <td className="py-3 pr-4">
                                                     {getStatusBadge(quotation.status)}
                                                 </td>
@@ -597,7 +636,13 @@ export default function CompareSupplierQuotations() {
                                                     {quotation.fullyQuotedItems || 0}/{quotation.totalItems || 0}
                                                 </td>
                                                 <td className="py-3 pr-4 text-center">
-                                                    {quotation.bestPricedItems || 0}/{quotation.totalItems || 0}
+                                                    {quotation.deliveryLeadTime || '-'}
+                                                </td>
+                                                <td className="py-3 pr-4 text-center">
+                                                    {quotation.paymentTerms || '-'}
+                                                </td>
+                                                <td className="py-3 pr-4 text-center">
+                                                    {quotation.deliveryTerms || '-'}
                                                 </td>
                                             </tr>
                                         );

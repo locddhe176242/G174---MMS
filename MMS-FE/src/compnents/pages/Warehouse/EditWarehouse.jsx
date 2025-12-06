@@ -134,8 +134,8 @@ export default function EditWarehouse() {
 							<div>
 								<label className="block text-sm font-medium text-gray-700">Trạng thái</label>
 								<select name="status" value={form.status} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-									<option value="Active">Active</option>
-									<option value="Inactive">Inactive</option>
+									<option value="Active">Hoạt động</option>
+									<option value="Inactive">Không hoạt động</option>
 								</select>
 							</div>
 							<div>

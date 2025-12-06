@@ -1,50 +1,91 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShield, faBars, faKey, faUsers } from "@fortawesome/free-solid-svg-icons";
 import useAuthStore from "../../../store/authStore";
+import { dashboardService } from "../../../api/dashboardService";
+import { toast } from "react-toastify";
 
 export default function Dashboard() {
   const { roles } = useAuthStore();
   const isManager = roles && roles.includes('MANAGER');
-  const stats = [
+  
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const data = await dashboardService.getDashboardStats();
+      setDashboardData(data);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Không thể tải dữ liệu dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatNumber = (num) => {
+    if (!num) return "0";
+    return num.toLocaleString('vi-VN');
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return "0 đ";
+    return `${(amount / 1000000000).toFixed(1)} tỷ đ`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  const stats = dashboardData ? [
     {
       label: "Tổng giá trị kho",
-      value: "2.4 tỷ đ",
-      change: "+12.5%",
+      value: formatCurrency(dashboardData.inventorySummary?.totalValue || 0),
+      change: `${formatNumber(dashboardData.inventorySummary?.totalProducts || 0)} sản phẩm`,
       icon: "💰",
       bgColor: "bg-green-50",
       iconColor: "text-green-600",
-      changeColor: "text-green-600"
+      changeColor: "text-slate-600"
     },
     {
-      label: "Tổng sản phẩm",
-      value: "8,524",
-      change: "+3.2%",
+      label: "Tổng tồn kho",
+      value: formatNumber(dashboardData.inventorySummary?.totalQuantity || 0),
+      change: "Sản phẩm",
       icon: "📦",
       bgColor: "bg-blue-50",
       iconColor: "text-blue-600",
-      changeColor: "text-blue-600"
+      changeColor: "text-slate-600"
     },
     {
-      label: "Đơn nhập hàng",
-      value: "145",
-      change: "Tháng này",
+      label: "Đơn mua hàng",
+      value: formatNumber(dashboardData.purchaseSummary?.totalOrders || 0),
+      change: `${formatNumber(dashboardData.purchaseSummary?.pendingOrders || 0)} chờ xử lý`,
       icon: "🛒",
       bgColor: "bg-purple-50",
       iconColor: "text-purple-600",
       changeColor: "text-slate-600"
     },
     {
-      label: "Sản xuất hàng",
-      value: "23",
-      change: "+2 đơn hôm nay",
-      icon: "⚠️",
+      label: "Đơn bán hàng",
+      value: formatNumber(dashboardData.salesSummary?.totalOrders || 0),
+      change: `${formatNumber(dashboardData.salesSummary?.deliveredOrders || 0)} đã giao`,
+      icon: "📋",
       bgColor: "bg-orange-50",
       iconColor: "text-orange-600",
       changeColor: "text-slate-600"
     }
-  ];
+  ] : [];
 
   const recentActivities = [
     {
@@ -81,43 +122,7 @@ export default function Dashboard() {
     }
   ];
 
-  const lowStockProducts = [
-    {
-      id: 1,
-      name: "iPhone 15 Pro Max 256GB",
-      category: "Điện tử",
-      current: 8,
-      target: 75,
-      status: "Cực thấp",
-      statusColor: "bg-red-100 text-red-700"
-    },
-    {
-      id: 2,
-      name: "Samsung Galaxy S24 Ultra",
-      category: "Điện tử",
-      current: 12,
-      target: 80,
-      status: "Cần bổ sung",
-      statusColor: "bg-orange-100 text-orange-700"
-    },
-    {
-      id: 3,
-      name: "Áo sơ mi nam công sở",
-      category: "Thời trang",
-      current: 18,
-      target: 100,
-      statusColor: "bg-orange-100 text-orange-700"
-    },
-    {
-      id: 4,
-      name: "Bàn làm việc gỗ cao cấp",
-      category: "Nội thất",
-      current: 5,
-      target: 20,
-      status: "Cực thấp",
-      statusColor: "bg-red-100 text-red-700"
-    }
-  ];
+  const lowStockProducts = dashboardData?.lowStockProducts || [];
 
   return (
     <div className="space-y-6">
@@ -237,54 +242,65 @@ export default function Dashboard() {
             <h2 className="text-lg font-bold text-slate-800">
               Sản phẩm sắp hết hàng
             </h2>
-            <button className="px-3 py-1 text-sm font-medium text-brand-blue bg-blue-50 rounded hover:bg-blue-100 transition">
+            <Link 
+              to="/products" 
+              className="px-3 py-1 text-sm font-medium text-brand-blue bg-blue-50 rounded hover:bg-blue-100 transition"
+            >
               Xem tất cả
-            </button>
+            </Link>
           </div>
           <div className="space-y-4">
-            {lowStockProducts.map((product) => (
-              <div key={product.id} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-800 text-sm truncate">
-                      {product.name}
-                    </p>
-                    <p className="text-slate-600 text-xs mt-0.5">
-                      {product.category}
-                    </p>
+            {lowStockProducts.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">Không có sản phẩm sắp hết hàng</p>
+            ) : (
+              lowStockProducts.map((product) => {
+                const percentage = product.stockPercentage || 0;
+                const statusColor = 
+                  product.status === "Cực thấp" 
+                    ? "bg-red-100 text-red-700" 
+                    : product.status === "Cần bổ sung" 
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-blue-100 text-blue-700";
+                
+                const barColor = percentage < 30 ? "bg-red-500" : "bg-orange-500";
+                
+                return (
+                  <div key={product.productId} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-800 text-sm truncate">
+                          {product.productName}
+                        </p>
+                        <p className="text-slate-600 text-xs mt-0.5">
+                          {product.categoryName}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded ${statusColor} whitespace-nowrap ml-2`}
+                      >
+                        {product.status}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-600">
+                          Tồn kho: <span className="font-semibold text-slate-800">{product.currentStock}</span>
+                        </span>
+                        <span className="text-slate-600">
+                          Tối thiểu: <span className="font-semibold text-slate-800">{product.minStock}</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${barColor}`}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  {product.status && (
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${product.statusColor} whitespace-nowrap ml-2`}
-                    >
-                      {product.status}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-600">
-                      Tồn kho: <span className="font-semibold text-slate-800">{product.current}</span>
-                    </span>
-                    <span className="text-slate-600">
-                      Tối thiểu: <span className="font-semibold text-slate-800">{product.target}</span>
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        (product.current / product.target) * 100 < 30
-                          ? "bg-red-500"
-                          : "bg-orange-500"
-                      }`}
-                      style={{
-                        width: `${Math.min((product.current / product.target) * 100, 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

@@ -6,10 +6,14 @@ import com.g174.mmssystem.dto.responseDTO.APPaymentResponseDTO;
 import com.g174.mmssystem.service.IService.IAPInvoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 @RestController
@@ -23,6 +27,7 @@ public class APPaymentController {
      * Tạo payment mới cho AP Invoice
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
     @LogActivity(
             action = "CREATE_AP_PAYMENT",
             activityType = "PAYMENT_MANAGEMENT",
@@ -38,6 +43,7 @@ public class APPaymentController {
      * Lấy danh sách payments của một invoice
      */
     @GetMapping("/invoice/{invoiceId}")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
     public ResponseEntity<List<APPaymentResponseDTO>> getPaymentsByInvoiceId(@PathVariable Integer invoiceId) {
         List<APPaymentResponseDTO> response = apInvoiceService.getPaymentsByInvoiceId(invoiceId);
         return ResponseEntity.ok(response);
@@ -47,6 +53,7 @@ public class APPaymentController {
      * Lấy tất cả payments với pagination và search
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
     public ResponseEntity<org.springframework.data.domain.Page<APPaymentResponseDTO>> getAllPayments(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

@@ -122,7 +122,7 @@ public class PurchaseQuotationController {
     }
 
     @PutMapping("/{pqId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER')")
+    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
     public ResponseEntity<PurchaseQuotationResponseDTO> approveQuotation(
             @PathVariable Integer pqId,
             @RequestParam Integer approverId) {
@@ -133,7 +133,7 @@ public class PurchaseQuotationController {
     }
 
     @PutMapping("/{pqId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER')")
+    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
     public ResponseEntity<PurchaseQuotationResponseDTO> rejectQuotation(
             @PathVariable Integer pqId,
             @RequestParam Integer approverId,

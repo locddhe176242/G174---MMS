@@ -120,23 +120,76 @@ export default function GoodsReceiptForm() {
                 return isApproved && isValidStatus;
             });
 
-            // Check xem PO nào đã có Goods Receipt
+            // Check xem PO nào đã có Goods Receipt và tính tiến độ
             const ordersWithGRStatus = await Promise.all(
                 eligibleOrders.map(async (order) => {
                     try {
                         const orderId = order.orderId || order.order_id || order.id;
+                        const poNo = order.poNo || order.po_no;
+                        const status = order.status?.toString() || "";
+                        
+                        console.log(`Checking PO ${poNo} (ID: ${orderId}), Status: ${status}`);
+                        
+                        // Nếu PO đã Completed thì không cho chọn
+                        if (status.toUpperCase() === "COMPLETED") {
+                            console.log(`  -> PO ${poNo} is COMPLETED`);
+                            return {
+                                ...order,
+                                isCompleted: true,
+                                statusLabel: "✅ Hoàn tất"
+                            };
+                        }
+                        
+                        // Check có GR chưa và tính tổng đã nhận
                         const grResponse = await apiClient.get(`/goods-receipts/po/${orderId}`);
                         const receipts = grResponse.data || [];
                         const hasReceipt = Array.isArray(receipts) && receipts.length > 0;
+                        console.log(`  -> PO ${poNo} has ${receipts.length} GR(s)`);
+                        
+                        if (hasReceipt) {
+                            // Lấy items để tính tổng ordered vs received
+                            const itemsResponse = await apiClient.get(`/purchase-orders/${orderId}/items`);
+                            const items = itemsResponse.data || [];
+                            
+                            const totalOrdered = items.reduce((sum, item) => 
+                                sum + Number(item.quantity || 0), 0);
+                            const totalReceived = items.reduce((sum, item) => 
+                                sum + Number(item.receivedQty || 0), 0);
+                            
+                            console.log(`  -> PO ${poNo}: Ordered=${totalOrdered}, Received=${totalReceived}, Status=${status}`);
+                            
+                            // Chỉ hiển thị status nếu đã nhập một phần (received > 0 nhưng < ordered)
+                            let statusLabel = "";
+                            if (totalReceived > 0 && totalReceived < totalOrdered) {
+                                statusLabel = `⚠️ Nhập thiếu (${totalReceived}/${totalOrdered})`;
+                            } else if (totalReceived >= totalOrdered) {
+                                statusLabel = "✅ Hoàn tất";
+                            }
+                            
+                            return {
+                                ...order,
+                                hasReceipt: true,
+                                totalOrdered,
+                                totalReceived,
+                                isPartial: totalReceived < totalOrdered && totalReceived > 0,
+                                isCompleted: totalReceived >= totalOrdered,
+                                statusLabel
+                            };
+                        }
+                        
+                        console.log(`  -> PO ${poNo} has no GR yet`);
                         return {
                             ...order,
-                            hasReceipt
+                            hasReceipt: false,
+                            statusLabel: ""
                         };
                     } catch (err) {
+                        console.error(`  -> Error checking PO ${order.poNo || order.po_no}:`, err.message);
                         // Nếu 404 = chưa có GR
                         return {
                             ...order,
-                            hasReceipt: false
+                            hasReceipt: false,
+                            statusLabel: ""
                         };
                     }
                 })
@@ -146,13 +199,13 @@ export default function GoodsReceiptForm() {
                 ordersWithGRStatus.map((order) => {
                     const poNo = order.poNo || order.po_no;
                     const vendorName = order.vendorName || order.vendor?.name || "N/A";
-                    const suffix = order.hasReceipt ? " (Đã nhập kho)" : "";
+                    const suffix = order.statusLabel ? ` ${order.statusLabel}` : "";
                     
                     return {
                         value: order.orderId || order.order_id || order.id,
                         label: `${poNo} - ${vendorName}${suffix}`,
                         order,
-                        isDisabled: order.hasReceipt 
+                        isDisabled: order.isCompleted || order.status?.toUpperCase() === 'COMPLETED' // Disable PO đã hoàn tất
                     };
                 })
             );
@@ -191,18 +244,23 @@ export default function GoodsReceiptForm() {
             } else {
                 const mapped = data.map((poItem, index) => {
                     console.log(`Mapping item ${index}:`, poItem);
+                    const orderedQty = Number(poItem.quantity || poItem.order_qty || 0);
+                    const previouslyReceived = Number(poItem.receivedQty || poItem.received_qty || 0);
+                    const remainingQty = Math.max(0, orderedQty - previouslyReceived);
+                    
                     const mapped = {
                         poi_id: poItem.poiId || poItem.poi_id || poItem.id,
                         product_id: poItem.productId || poItem.product_id || poItem.product?.id,
                         productName: poItem.productName || poItem.product_name || poItem.product?.name || "-",
                         productCode: poItem.productCode || poItem.product?.sku || "",
-                        ordered_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                        received_qty: Number(poItem.quantity || poItem.order_qty || 0),
-                        accepted_qty: Number(poItem.quantity || poItem.order_qty || 0), // Will be auto-set to received_qty
+                        ordered_qty: orderedQty,
+                        previously_received_qty: previouslyReceived,
+                        received_qty: remainingQty, // Default to remaining quantity
+                        accepted_qty: remainingQty, // Will be auto-set to received_qty
                         remark: "",
                     };
                     console.log(`Mapped result ${index}:`, mapped);
-                    console.log(`  -> poi_id: ${mapped.poi_id}, product_id: ${mapped.product_id}`);
+                    console.log(`  -> poi_id: ${mapped.poi_id}, product_id: ${mapped.product_id}, ordered: ${orderedQty}, prev received: ${previouslyReceived}, remaining: ${remainingQty}`);
                     return mapped;
                 });
                 console.log("=== FINAL MAPPED ITEMS ===", mapped);
@@ -304,10 +362,16 @@ export default function GoodsReceiptForm() {
         } else {
             const itemErrors = formData.items.map((item) => {
                 const err = {};
-                if (!item.received_qty || Number(item.received_qty) <= 0) {
+                const receivedQty = Number(item.received_qty || 0);
+                const orderedQty = Number(item.ordered_qty || 0);
+                const previouslyReceived = Number(item.previously_received_qty || 0);
+                const remainingQty = orderedQty - previouslyReceived;
+                
+                if (!item.received_qty || receivedQty <= 0) {
                     err.received_qty = "SL nhận > 0";
+                } else if (receivedQty > remainingQty) {
+                    err.received_qty = `Vượt quá SL còn lại (${remainingQty})`;
                 }
-                // Accepted qty validation removed - no longer needed
                 return err;
             });
             if (itemErrors.some((e) => Object.keys(e).length > 0)) {
@@ -517,6 +581,22 @@ export default function GoodsReceiptForm() {
                                     </div>
                                 </div>
 
+                                {formData.items.some(item => Number(item.previously_received_qty || 0) > 0) && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <div className="flex items-start gap-3">
+                                            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div>
+                                                <p className="text-sm font-medium text-blue-800">Nhập hàng bổ sung (Partial Delivery)</p>
+                                                <p className="text-sm text-blue-700 mt-1">
+                                                    Đơn hàng này đã có lần nhập kho trước đó. Vui lòng kiểm tra cột "Đã nhận" và nhập số lượng nhận thêm vào cột "SL nhận lần này".
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -555,8 +635,9 @@ export default function GoodsReceiptForm() {
                                             <tr className="bg-gray-50">
                                                 <th className="border border-gray-200 px-2 py-1 text-center text-xs font-medium text-gray-700 w-12">#</th>
                                                 <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-28">SL đặt</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-32">SL nhận</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-24">SL đặt</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-24">Đã nhận</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-32">SL nhận lần này</th>
                                                 <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700 w-48">Ghi chú</th>
                                             </tr>
                                             </thead>
@@ -576,6 +657,11 @@ export default function GoodsReceiptForm() {
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1 text-right text-sm text-gray-700">
                                                             {Number(item.ordered_qty || 0).toLocaleString()}
+                                                        </td>
+                                                        <td className="border border-gray-200 px-2 py-1 text-right text-sm">
+                                                            <span className={Number(item.previously_received_qty || 0) > 0 ? "text-blue-600 font-medium" : "text-gray-400"}>
+                                                                {Number(item.previously_received_qty || 0).toLocaleString()}
+                                                            </span>
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1">
                                                             <input

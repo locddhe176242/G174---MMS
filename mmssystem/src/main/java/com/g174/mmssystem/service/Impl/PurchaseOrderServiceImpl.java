@@ -340,14 +340,23 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         order.setApprovalStatus(PurchaseOrderApprovalStatus.Approved);
         order.setApprover(approver);
         order.setApprovedAt(LocalDateTime.now());
-        order.setStatus(PurchaseOrderStatus.Approved);
+        order.setStatus(PurchaseOrderStatus.Sent); // Change to Sent immediately after approval
         order.setUpdatedAt(LocalDateTime.now());
 
         PurchaseOrder saved = orderRepository.save(order);
         PurchaseOrder savedWithRelations = orderRepository.findByIdWithRelations(saved.getOrderId())
                 .orElse(saved);
 
-        log.info("Purchase order approved successfully");
+        // Send email notification to vendor after approval
+        try {
+            emailService.sendPurchaseOrderEmail(savedWithRelations);
+            log.info("Purchase order email sent to vendor for PO: {}", saved.getPoNo());
+        } catch (Exception e) {
+            log.error("Failed to send PO email for {}: {}", saved.getPoNo(), e.getMessage(), e);
+            // Don't fail the approval if email sending fails
+        }
+
+        log.info("Purchase order approved successfully and sent to vendor");
         return orderMapper.toResponseDTO(savedWithRelations);
     }
 
@@ -728,6 +737,13 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 .filter(o -> o.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
 
+        // Clear quotation reference to allow quotation to be reused
+        // Only if PO has not been approved yet
+        if (order.getPurchaseQuotation() != null && order.getApprovalStatus() != PurchaseOrderApprovalStatus.Approved) {
+            log.info("Clearing quotation reference from deleted PO (not approved yet)");
+            order.setPurchaseQuotation(null);
+        }
+
         order.setDeletedAt(LocalDateTime.now());
         PurchaseOrder saved = orderRepository.save(order);
 
@@ -756,7 +772,26 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             }
         }
         
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String poNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            poNo = String.format("%s%04d", prefix, nextNumber);
+            if (!orderRepository.existsByPoNo(poNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique PO number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã PO duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return poNo;
     }
 }
 

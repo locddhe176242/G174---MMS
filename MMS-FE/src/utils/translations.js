@@ -6,6 +6,8 @@
 export const translatePOStatus = (status) => {
   const statusMap = {
     'Pending': 'Chờ xử lý',
+    'Approved': 'Đã duyệt',
+    'Sent': 'Đã gửi',
     'Processing': 'Đang xử lý',
     'Completed': 'Hoàn thành',
     'Cancelled': 'Đã hủy',
@@ -105,6 +107,8 @@ export const getStatusColor = (status) => {
     'Hoàn thành': 'bg-green-100 text-green-800',
     'Approved': 'bg-green-100 text-green-800',
     'Đã duyệt': 'bg-green-100 text-green-800',
+    'Sent': 'bg-blue-100 text-blue-800',
+    'Đã gửi': 'bg-blue-100 text-blue-800',
     'Paid': 'bg-green-100 text-green-800',
     'Đã thanh toán': 'bg-green-100 text-green-800',
     

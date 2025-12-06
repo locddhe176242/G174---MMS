@@ -39,7 +39,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{customerId}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerResponseDTO> getCustomerById(@PathVariable Integer customerId) {
         log.info("REST: Fetching customer with ID: {}", customerId);
 
@@ -48,7 +48,7 @@ public class CustomerController {
     }
 
     @GetMapping("/code/{customerCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerResponseDTO> getCustomerByCode(@PathVariable String customerCode) {
         log.info("REST: Fetching customer with code: {}", customerCode);
 
@@ -57,7 +57,7 @@ public class CustomerController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<List<CustomerResponseDTO>> getAllCustomers() {
         log.info("REST: Fetching all customers");
 
@@ -66,7 +66,7 @@ public class CustomerController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Page<CustomerResponseDTO>> getAllCustomersWithPagination(Pageable pageable) {
         log.info("REST: Fetching customers with pagination - page: {}, size: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
@@ -76,7 +76,7 @@ public class CustomerController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<List<CustomerResponseDTO>> searchCustomers(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("REST: Searching customers with keyword: '{}'", keyword);
@@ -86,7 +86,7 @@ public class CustomerController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Page<CustomerResponseDTO>> searchCustomersWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -130,7 +130,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{customerId}/detail")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerDetailResponseDTO> getCustomerDetailById(@PathVariable Integer customerId) {
         log.info("REST: Fetching customer detail with ID: {}", customerId);
 
@@ -139,7 +139,7 @@ public class CustomerController {
     }
 
     @GetMapping("/exists/{customerCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Map<String, Boolean>> checkCustomerCodeExists(@PathVariable String customerCode) {
         log.info("REST: Checking if customer code exists: {}", customerCode);
 

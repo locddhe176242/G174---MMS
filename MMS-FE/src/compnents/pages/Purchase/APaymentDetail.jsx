@@ -185,7 +185,7 @@ export default function APaymentDetail() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày thanh toán</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phương thức</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã tham chiếu</th>

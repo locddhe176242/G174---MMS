@@ -61,6 +61,48 @@ export const formatDateTime = (dateString) => {
 };
 
 /**
+ * Round number to 2 decimal places (for financial calculations)
+ * @param {number} value - Number to round
+ * @returns {number} Rounded number
+ */
+export const roundMoney = (value) => {
+  return Math.round(value * 100) / 100;
+};
+
+/**
+ * Calculate item line total with standardized rounding
+ * @param {object} item - Item with quantity, unitPrice, discountPercent, taxRate
+ * @returns {object} Calculation breakdown
+ */
+export const calculateItemTotal = (item) => {
+  const qty = Number(item.quantity || 0);
+  const price = Number(item.unitPrice || item.unit_price || 0);
+  const discountPercent = Number(item.discountPercent || item.discount_percent || 0) / 100;
+  const taxRate = Number(item.taxRate || item.tax_rate || 0) / 100;
+
+  // 1. Subtotal
+  const subtotal = roundMoney(qty * price);
+
+  // 2. Discount
+  const discountAmount = roundMoney(subtotal * discountPercent);
+  const amountAfterDiscount = roundMoney(subtotal - discountAmount);
+
+  // 3. Tax (Exclusive VAT)
+  const tax = roundMoney(amountAfterDiscount * taxRate);
+
+  // 4. Total
+  const lineTotal = roundMoney(amountAfterDiscount + tax);
+
+  return {
+    subtotal,
+    discountAmount,
+    amountAfterDiscount,
+    tax,
+    total: lineTotal
+  };
+};
+
+/**
  * Create a formatted number input component props
  * @param {number} value - Current value
  * @param {function} onChange - Change handler that receives number

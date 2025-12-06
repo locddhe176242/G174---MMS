@@ -13,6 +13,9 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 
+import com.g174.mmssystem.entity.RFQ;
+import com.g174.mmssystem.entity.Vendor;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -145,5 +148,375 @@ public class EmailService {
             log.error("Failed to send HTML email to: {}", toEmail, e);
             throw new EmailSendingException("Gửi email HTML thất bại. Vui lòng thử lại sau.", e);
         }
+    }
+
+    /**
+     * Send RFQ invitation email to vendor
+     * Note: Vendor email is validated in RFQService before calling this method
+     */
+    public void sendRFQInvitation(RFQ rfq, Vendor vendor) {
+        try {
+            String toEmail = vendor.getContact().getEmail().trim();
+            String subject = String.format("[RFQ %s] Request for Quotation - %s", 
+                rfq.getRfqNo(), 
+                rfq.getIssueDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            
+            String htmlContent = buildRFQEmailTemplate(rfq, vendor);
+            sendHtmlEmail(toEmail, subject, htmlContent);
+            
+            log.info("RFQ invitation email sent successfully to vendor {} at {}", vendor.getName(), toEmail);
+            
+        } catch (Exception e) {
+            log.error("Failed to send RFQ email to vendor {}: {}", vendor.getName(), e.getMessage(), e);
+            throw new RuntimeException("Failed to send email to vendor: " + vendor.getName(), e);
+        }
+    }
+
+    /**
+     * Send RFQ invitation emails to multiple vendors
+     * Note: All vendors are validated to have email addresses before calling this method
+     */
+    public void sendRFQInvitationsToVendors(com.g174.mmssystem.entity.RFQ rfq, java.util.List<com.g174.mmssystem.entity.Vendor> vendors) {
+        if (vendors == null || vendors.isEmpty()) {
+            log.warn("No vendors provided for RFQ {} email invitations", rfq.getRfqNo());
+            return;
+        }
+
+        int successCount = 0;
+        int failedCount = 0;
+        java.util.List<String> failedVendors = new java.util.ArrayList<>();
+        
+        for (com.g174.mmssystem.entity.Vendor vendor : vendors) {
+            try {
+                sendRFQInvitation(rfq, vendor);
+                successCount++;
+            } catch (Exception e) {
+                failedCount++;
+                failedVendors.add(vendor.getName());
+                log.error("Error sending email to vendor {}: {}", vendor.getName(), e.getMessage());
+                // Continue with remaining vendors even if one fails
+            }
+        }
+        
+        log.info("Sent {} out of {} RFQ invitation emails for RFQ {}", successCount, vendors.size(), rfq.getRfqNo());
+        
+        if (failedCount > 0) {
+            log.warn("Failed to send emails to {} vendors: {}", failedCount, String.join(", ", failedVendors));
+        }
+    }
+
+    private String buildRFQEmailTemplate(com.g174.mmssystem.entity.RFQ rfq, com.g174.mmssystem.entity.Vendor vendor) {
+        StringBuilder html = new StringBuilder();
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        
+        html.append("<!DOCTYPE html>");
+        html.append("<html lang='vi'>");
+        html.append("<head>");
+        html.append("<meta charset='UTF-8'>");
+        html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        html.append("<style>");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }");
+        html.append(".container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
+        html.append(".header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; }");
+        html.append(".header h1 { margin: 0; font-size: 24px; }");
+        html.append(".header p { margin: 5px 0 0 0; opacity: 0.9; }");
+        html.append(".info-section { margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px; }");
+        html.append(".info-row { display: flex; margin: 8px 0; }");
+        html.append(".info-label { font-weight: 600; min-width: 150px; color: #495057; }");
+        html.append(".info-value { color: #212529; }");
+        html.append(".table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }");
+        html.append("table { width: 100%; border-collapse: collapse; margin: 20px 0; min-width: 600px; }");
+        html.append("th { background-color: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; white-space: nowrap; }");
+        html.append("td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; }");
+        html.append("tr:hover { background-color: #f8f9fa; }");
+        html.append(".cta-button { display: inline-block; background-color: #667eea; color: white !important; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 10px 0; box-shadow: 0 2px 4px rgba(102,126,234,0.3); }");
+        html.append(".cta-button:hover { background-color: #5568d3; }");
+        html.append(".company-info { background-color: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #2196F3; }");
+        html.append(".footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e9ecef; font-size: 14px; color: #6c757d; }");
+        html.append(".highlight { background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; }");
+        html.append("@media only screen and (max-width: 600px) { ");
+        html.append("  .info-row { flex-direction: column; }");
+        html.append("  .info-label { min-width: auto; margin-bottom: 4px; }");
+        html.append("  table { font-size: 12px; }");
+        html.append("  th, td { padding: 8px 6px; }");
+        html.append("}");
+        html.append("</style>");
+        html.append("</head>");
+        html.append("<body>");
+        html.append("<div class='container'>");
+        
+        // Header
+        html.append("<div class='header'>");
+        html.append("<h1>🔔 Request for Quotation</h1>");
+        html.append("<p>Material Management System</p>");
+        html.append("</div>");
+        
+        // Greeting
+        html.append("<p>Kính gửi <strong>").append(vendor.getName()).append("</strong>,</p>");
+        html.append("<p>Chúng tôi trân trọng gửi đến Quý công ty yêu cầu báo giá cho các sản phẩm/dịch vụ sau:</p>");
+        
+        // RFQ Info
+        html.append("<div class='info-section'>");
+        html.append("<h3 style='margin-top: 0; color: #667eea;'>📋 Thông tin RFQ</h3>");
+        html.append("<div class='info-row'>");
+        html.append("<div class='info-label'>Số RFQ:</div>");
+        html.append("<div class='info-value'><strong>").append(rfq.getRfqNo()).append("</strong></div>");
+        html.append("</div>");
+        html.append("<div class='info-row'>");
+        html.append("<div class='info-label'>Ngày phát hành:</div>");
+        html.append("<div class='info-value'>").append(rfq.getIssueDate().format(dateFormatter)).append("</div>");
+        html.append("</div>");
+        if (rfq.getDueDate() != null) {
+            html.append("<div class='info-row'>");
+            html.append("<div class='info-label'>Hạn chót báo giá:</div>");
+            html.append("<div class='info-value'><span class='highlight'>").append(rfq.getDueDate().format(dateFormatter)).append("</span></div>");
+            html.append("</div>");
+        }
+        if (rfq.getCreatedBy() != null) {
+            html.append("<div class='info-row'>");
+            html.append("<div class='info-label'>Người tạo RFQ:</div>");
+            html.append("<div class='info-value'><strong>").append(rfq.getCreatedBy().getEmployeeCode() != null ? rfq.getCreatedBy().getEmployeeCode() : rfq.getCreatedBy().getEmployeeCode()).append("</strong></div>");
+            html.append("</div>");
+        }
+        html.append("</div>");
+        
+        // Items Table
+        html.append("<h3 style='color: #667eea;'>📦 Danh sách sản phẩm yêu cầu báo giá</h3>");
+        html.append("<div class='table-responsive'>");
+        html.append("<table>");
+        html.append("<thead>");
+        html.append("<tr>");
+        html.append("<th style='width: 40px;'>STT</th>");
+        html.append("<th>Mã SP</th>");
+        html.append("<th>Tên sản phẩm</th>");
+        html.append("<th>Thông số kỹ thuật</th>");
+        html.append("<th>ĐVT</th>");
+        html.append("<th style='text-align: right;'>Số lượng</th>");
+        html.append("<th style='text-align: center;'>Ngày cần hàng</th>");
+        html.append("</tr>");
+        html.append("</thead>");
+        html.append("<tbody>");
+        
+        if (rfq.getItems() != null && !rfq.getItems().isEmpty()) {
+            int index = 1;
+            for (com.g174.mmssystem.entity.RFQItem item : rfq.getItems()) {
+                html.append("<tr>");
+                html.append("<td>").append(index++).append("</td>");
+                html.append("<td>").append(item.getProductCode() != null ? item.getProductCode() : "-").append("</td>");
+                html.append("<td><strong>").append(item.getProductName()).append("</strong></td>");
+                html.append("<td>").append(item.getSpec() != null ? item.getSpec() : "-").append("</td>");
+                html.append("<td>").append(item.getUom() != null ? item.getUom() : "-").append("</td>");
+                html.append("<td style='text-align: right;'><strong>").append(item.getQuantity()).append("</strong></td>");
+                html.append("<td style='text-align: center;'>");
+                if (item.getDeliveryDate() != null) {
+                    html.append(item.getDeliveryDate().format(dateFormatter));
+                } else {
+                    html.append("-");
+                }
+                html.append("</td>");
+                html.append("</tr>");
+            }
+        }
+        
+        html.append("</tbody>");
+        html.append("</table>");
+        html.append("</div>");
+        
+        // Notes
+        if (rfq.getNotes() != null && !rfq.getNotes().trim().isEmpty()) {
+            html.append("<div class='info-section'>");
+            html.append("<h3 style='margin-top: 0; color: #667eea;'>📝 Ghi chú</h3>");
+            html.append("<p style='margin: 0;'>").append(rfq.getNotes().replace("\n", "<br>")).append("</p>");
+            html.append("</div>");
+        }
+        
+        // Company Info
+        html.append("<div class='company-info'>");
+        html.append("<h3 style='margin-top: 0; color: #2196F3;'>🏢 Thông tin bên yêu cầu báo giá</h3>");
+        html.append("<p style='margin: 5px 0;'><strong>Công ty:</strong> Material Management System Co., Ltd</p>");
+        html.append("<p style='margin: 5px 0;'><strong>Địa chỉ:</strong> Trường ĐH FPT, TP Hà Nội</p>");
+        html.append("<p style='margin: 5px 0;'><strong>MST:</strong> 0123456789</p>");
+        html.append("<p style='margin: 5px 0;'><strong>Email:</strong> purchasing@mmssystem.com</p>");
+        html.append("<p style='margin: 5px 0;'><strong>Hotline:</strong> 1900-xxxx</p>");
+        html.append("</div>");
+        
+        // CTA
+        html.append("<div style='text-align: center; margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px;'>");
+        html.append("<p style='font-size: 16px; margin: 0; color: #333;'>Vui lòng gửi báo giá của Quý công ty trước ngày <strong style='color: #667eea;'>");
+        if (rfq.getDueDate() != null) {
+            html.append(rfq.getDueDate().format(dateFormatter));
+        } else {
+            html.append("sớm nhất có thể");
+        }
+        html.append("</strong></p>");
+        html.append("<p style='font-size: 14px; color: #6c757d; margin: 15px 0 0 0;'>Liên hệ trực tiếp: <strong>purchasing@mmssystem.com</strong> | <strong>Hotline: 1900-xxxx</strong></p>");
+        html.append("</div>");
+        
+        // Footer
+        html.append("<div class='footer'>");
+        html.append("<p><strong>Trân trọng,</strong></p>");
+        html.append("<p style='margin: 5px 0;'><strong>Material Management System</strong></p>");
+        html.append("<p style='margin: 5px 0;'>📧 Email: support@mmssystem.com</p>");
+        html.append("<p style='margin: 5px 0;'>📞 Hotline: 1900-xxxx</p>");
+        html.append("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dee2e6;'>");
+        html.append("<p style='font-size: 12px; color: #868e96; margin: 10px 0;'>");
+        html.append("⚠️ Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
+        html.append("</p>");
+        html.append("</div>");
+        
+        html.append("</div>");
+        html.append("</body>");
+        html.append("</html>");
+        
+        return html.toString();
+    }
+
+    /**
+     * Send Purchase Order confirmation email to vendor
+     */
+    public void sendPurchaseOrderEmail(com.g174.mmssystem.entity.PurchaseOrder purchaseOrder) {
+        try {
+            if (purchaseOrder.getVendor() == null || purchaseOrder.getVendor().getContact() == null) {
+                log.warn("Cannot send PO email for {} - vendor or contact is null", purchaseOrder.getPoNo());
+                return;
+            }
+
+            String vendorEmail = purchaseOrder.getVendor().getContact().getEmail();
+            if (vendorEmail == null || vendorEmail.trim().isEmpty()) {
+                log.warn("Cannot send PO email for {} - vendor email is missing", purchaseOrder.getPoNo());
+                return;
+            }
+
+            String toEmail = vendorEmail.trim();
+            String subject = String.format("[Purchase Order %s] Order Confirmation - %s", 
+                purchaseOrder.getPoNo(),
+                purchaseOrder.getOrderDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            
+            String htmlContent = buildPurchaseOrderEmailTemplate(purchaseOrder);
+            sendHtmlEmail(toEmail, subject, htmlContent);
+            
+            log.info("Purchase Order email sent successfully to vendor {} at {}", 
+                    purchaseOrder.getVendor().getName(), toEmail);
+            
+        } catch (Exception e) {
+            log.error("Failed to send PO email for {}: {}", purchaseOrder.getPoNo(), e.getMessage(), e);
+            // Don't throw exception - email failure shouldn't block PO approval
+        }
+    }
+
+    private String buildPurchaseOrderEmailTemplate(com.g174.mmssystem.entity.PurchaseOrder po) {
+        StringBuilder html = new StringBuilder();
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        
+        html.append("<!DOCTYPE html>");
+        html.append("<html lang='vi'>");
+        html.append("<head>");
+        html.append("<meta charset='UTF-8'>");
+        html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        html.append("<style>");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }");
+        html.append(".container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
+        html.append(".header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; }");
+        html.append(".info-box { background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #10b981; }");
+        html.append(".footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e9ecef; }");
+        html.append("table { width: 100%; border-collapse: collapse; margin: 15px 0; }");
+        html.append("th { background-color: #10b981; color: white; padding: 10px; text-align: left; }");
+        html.append("td { padding: 10px; border-bottom: 1px solid #dee2e6; }");
+        html.append("</style>");
+        html.append("</head>");
+        html.append("<body>");
+        html.append("<div class='container'>");
+        
+        // Header
+        html.append("<div class='header'>");
+        html.append("<h1 style='margin: 0; font-size: 24px;'>✅ Purchase Order Confirmation</h1>");
+        html.append("<p style='margin: 10px 0 0 0; opacity: 0.9;'>Xác nhận đơn đặt hàng</p>");
+        html.append("</div>");
+        
+        // Greeting
+        html.append("<p>Kính gửi <strong>").append(po.getVendor().getName()).append("</strong>,</p>");
+        html.append("<p>Chúng tôi xin gửi đến Quý công ty <strong>Đơn đặt hàng</strong> với thông tin chi tiết như sau:</p>");
+        
+        // PO Info
+        html.append("<div class='info-box'>");
+        html.append("<p style='margin: 5px 0;'><strong>📋 Số đơn hàng:</strong> ").append(po.getPoNo()).append("</p>");
+        html.append("<p style='margin: 5px 0;'><strong>📅 Ngày đặt hàng:</strong> ").append(po.getOrderDate().format(dateFormatter)).append("</p>");
+        if (po.getDeliveryDate() != null) {
+            html.append("<p style='margin: 5px 0;'><strong>🚚 Ngày giao hàng:</strong> ").append(po.getDeliveryDate().format(dateFormatter)).append("</p>");
+        }
+        if (po.getPaymentTerms() != null && !po.getPaymentTerms().isEmpty()) {
+            html.append("<p style='margin: 5px 0;'><strong>💳 Điều khoản thanh toán:</strong> ").append(po.getPaymentTerms()).append("</p>");
+        }
+        html.append("</div>");
+        
+        // Items table
+        html.append("<h3 style='color: #10b981; margin: 20px 0 10px 0;'>Chi tiết sản phẩm</h3>");
+        html.append("<table>");
+        html.append("<thead>");
+        html.append("<tr>");
+        html.append("<th>STT</th>");
+        html.append("<th>Sản phẩm</th>");
+        html.append("<th>Số lượng</th>");
+        html.append("<th>Đơn giá</th>");
+        html.append("<th>Thành tiền</th>");
+        html.append("</tr>");
+        html.append("</thead>");
+        html.append("<tbody>");
+        
+        int index = 1;
+        for (com.g174.mmssystem.entity.PurchaseOrderItem item : po.getItems()) {
+            html.append("<tr>");
+            html.append("<td>").append(index++).append("</td>");
+            html.append("<td>").append(item.getProduct().getName()).append("</td>");
+            html.append("<td>").append(item.getQuantity()).append(" ").append(item.getUom() != null ? item.getUom() : "").append("</td>");
+            html.append("<td>").append(String.format("%,.0f VNĐ", item.getUnitPrice())).append("</td>");
+            html.append("<td>").append(String.format("%,.0f VNĐ", item.getLineTotal())).append("</td>");
+            html.append("</tr>");
+        }
+        
+        html.append("</tbody>");
+        html.append("</table>");
+        
+        // Total
+        html.append("<div style='text-align: right; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 6px;'>");
+        html.append("<p style='margin: 5px 0; font-size: 18px;'><strong>Tổng giá trị đơn hàng: </strong>");
+        html.append("<span style='color: #10b981; font-size: 22px;'>").append(String.format("%,.0f VNĐ", po.getTotalAfterTax())).append("</span></p>");
+        html.append("</div>");
+        
+        // Instructions
+        html.append("<div class='info-box' style='border-left-color: #fbbf24; background-color: #fffbeb;'>");
+        html.append("<p style='margin: 5px 0;'><strong>📌 Yêu cầu:</strong></p>");
+        html.append("<ul style='margin: 10px 0; padding-left: 20px;'>");
+        html.append("<li>Vui lòng xác nhận đơn hàng trong vòng <strong>24 giờ</strong></li>");
+        html.append("<li>Chuẩn bị và giao hàng đúng thời gian đã thỏa thuận</li>");
+        html.append("<li>Đảm bảo chất lượng sản phẩm theo yêu cầu</li>");
+        html.append("</ul>");
+        html.append("</div>");
+        
+        if (po.getShippingAddress() != null && !po.getShippingAddress().isEmpty()) {
+            html.append("<p style='margin: 15px 0;'><strong>📍 Địa chỉ giao hàng:</strong></p>");
+            html.append("<p style='margin: 5px 0; padding: 10px; background-color: #f8f9fa; border-radius: 4px;'>")
+                .append(po.getShippingAddress()).append("</p>");
+        }
+        
+        html.append("<p style='margin: 20px 0;'>Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ bộ phận mua hàng của chúng tôi.</p>");
+        
+        // Footer
+        html.append("<div class='footer'>");
+        html.append("<p><strong>Trân trọng,</strong></p>");
+        html.append("<p style='margin: 5px 0;'><strong>Material Management System</strong></p>");
+        html.append("<p style='margin: 5px 0;'>📧 Email: purchasing@mmssystem.com</p>");
+        html.append("<p style='margin: 5px 0;'>📞 Hotline: 1900-xxxx</p>");
+        html.append("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dee2e6;'>");
+        html.append("<p style='font-size: 12px; color: #868e96; margin: 10px 0;'>");
+        html.append("⚠️ Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
+        html.append("</p>");
+        html.append("</div>");
+        
+        html.append("</div>");
+        html.append("</body>");
+        html.append("</html>");
+        
+        return html.toString();
     }
 }

@@ -48,35 +48,23 @@ const VendorQuotationForm = () => {
 
     // Common options for delivery and payment terms
     const deliveryTermsOptions = [
-        { value: 'FOB - Giao tại kho người bán', label: 'FOB - Giao tại kho người bán' },
+        { value: 'FOB - Giao tại kho nhà cung cấp', label: 'FOB - Giao tại kho nhà cung cấp' },
         { value: 'CIF - Bao gồm phí vận chuyển và bảo hiểm', label: 'CIF - Bao gồm phí vận chuyển và bảo hiểm' },
-        { value: 'EXW - Lấy tại kho nhà máy', label: 'EXW - Lấy tại kho nhà máy' },
-        { value: 'DDP - Giao tận nơi, đã bao gồm thuế', label: 'DDP - Giao tận nơi, đã bao gồm thuế' },
-        { value: 'Giao hàng miễn phí trong nội thành', label: 'Giao hàng miễn phí trong nội thành' },
-        { value: 'Giao hàng trong 7-10 ngày làm việc', label: 'Giao hàng trong 7-10 ngày làm việc' },
     ];
 
     const paymentTermsOptions = [
-        { value: 'COD - Thanh toán khi nhận hàng', label: 'COD - Thanh toán khi nhận hàng' },
+        { value: 'COD - Thanh toán sau khi nhận hàng và giao hàng', label: 'COD - Thanh toán sau khi nhận hàng và giao hàng' },
         { value: 'Net 30 - Thanh toán trong 30 ngày', label: 'Net 30 - Thanh toán trong 30 ngày' },
-        { value: 'Net 60 - Thanh toán trong 60 ngày', label: 'Net 60 - Thanh toán trong 60 ngày' },
-        { value: '50% trả trước, 50% trước khi giao', label: '50% trả trước, 50% trước khi giao' },
-        { value: '100% trả trước', label: '100% trả trước' },
-        { value: 'Chuyển khoản trong 7 ngày', label: 'Chuyển khoản trong 7 ngày' },
-        { value: 'LC 90 ngày', label: 'LC 90 ngày (Letter of Credit)' },
     ];
 
     // Check if delivery terms requires shipping cost
     const requiresShippingCost = (deliveryTerms) => {
         if (!deliveryTerms) return true; // Default allow shipping cost
         const term = deliveryTerms.toUpperCase();
-        // FOB and EXW means buyer handles shipping - no shipping cost from vendor
-        if (term.includes('FOB') || term.includes('EXW')) return false;
-        // CIF, DDP, or custom delivery means vendor handles shipping - has shipping cost
+        // FOB means buyer handles shipping - no shipping cost from vendor
+        if (term.includes('FOB')) return false;
         return true;
     };
-
-    // Note: formatCurrency, formatNumberInput, parseNumberInput now imported from utils/formatters.js
 
     // Calculate item total with proper formula
     const calculateItemTotal = (item) => {
@@ -84,20 +72,22 @@ const VendorQuotationForm = () => {
         const price = Number(item.unitPrice || 0);
         const discountPercent = Number(item.discountPercent || 0) / 100;
         const taxRate = Number(item.taxRate || 0) / 100;
-        
-        // Bước 1: Tính subtotal
-        const subtotal = qty * price;
-        
-        // Bước 2: Áp dụng chiết khấu dòng
-        const discountAmount = subtotal * discountPercent;
-        const amountAfterDiscount = subtotal - discountAmount;
-        
-        // Bước 3: Tính thuế trên số tiền sau chiết khấu
-        const tax = amountAfterDiscount * taxRate;
-        
-        // Bước 4: Tổng dòng
-        const lineTotal = amountAfterDiscount + tax;
-        
+
+        const round = (v) => Math.round(v * 100) / 100;
+
+        // 1. Tính tổng tiền Subtotal
+        const subtotal = round(qty * price);
+
+        // 2. Discount
+        const discountAmount = round(subtotal * discountPercent);
+        const amountAfterDiscount = round(subtotal - discountAmount);
+
+        // 3. Tax (Exclusive VAT)
+        const tax = round(amountAfterDiscount * taxRate);
+
+        // 4. Total
+        const lineTotal = round(amountAfterDiscount + tax);
+
         return {
             subtotal,
             discountAmount,
@@ -131,11 +121,13 @@ const VendorQuotationForm = () => {
             return sum + calc.tax;
         }, 0);
 
-        const headerDiscountPercent = Number(formData.headerDiscount || 0);
-        const headerDiscountAmount = totalAfterLineDiscount * (headerDiscountPercent / 100);
+        const round = (v) => Math.round(v * 100) / 100;
         
-        const shipping = Number(formData.shippingCost || 0);
-        const total = totalAfterLineDiscount - headerDiscountAmount + tax + shipping;
+        const headerDiscountPercent = Number(formData.headerDiscount || 0);
+        const headerDiscountAmount = round(totalAfterLineDiscount * (headerDiscountPercent / 100));
+        
+        const shipping = round(Number(formData.shippingCost || 0));
+        const total = round(totalAfterLineDiscount - headerDiscountAmount + tax + shipping);
 
         return { 
             subtotal, 
@@ -688,7 +680,7 @@ const VendorQuotationForm = () => {
                                 className="react-select-container"
                                 classNamePrefix="react-select"
                             />
-                            <p className="text-xs text-gray-500 mt-1">VD: FOB, CIF, EXW, DDP, giao trong X ngày</p>
+                            <p className="text-xs text-gray-500 mt-1">VD: FOB, CIF</p>
                         </div>
 
                         {/* Payment Terms */}
@@ -707,7 +699,7 @@ const VendorQuotationForm = () => {
                                 className="react-select-container"
                                 classNamePrefix="react-select"
                             />
-                            <p className="text-xs text-gray-500 mt-1">VD: COD, Net 30, 50% trả trước, LC 90 ngày</p>
+                            <p className="text-xs text-gray-500 mt-1">VD: COD, Net 30</p>
                         </div>
 
                         {/* Header Discount */}
@@ -726,7 +718,7 @@ const VendorQuotationForm = () => {
                                 placeholder="VD: 2 (giảm 2%)"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                💡 Chiết khấu chung cho toàn bộ đơn hàng (Document Discount)
+                                💡 Chiết khấu chung cho toàn bộ đơn HÀNG
                             </p>
                         </div>
 

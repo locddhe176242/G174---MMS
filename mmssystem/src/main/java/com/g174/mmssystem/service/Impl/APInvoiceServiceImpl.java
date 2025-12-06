@@ -348,6 +348,14 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .filter(inv -> inv.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
 
+        // Validate invoice can be edited
+        if (!"Unpaid".equals(invoice.getStatus()) && !"Chưa thanh toán".equals(invoice.getStatus())) {
+            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn có trạng thái: " + invoice.getStatus());
+        }
+        if (invoice.getBalanceAmount().compareTo(invoice.getTotalAmount()) != 0) {
+            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn đã có thanh toán một phần");
+        }
+
         // Update fields
         if (dto.getInvoiceDate() != null) {
             invoice.setInvoiceDate(dto.getInvoiceDate());
@@ -534,7 +542,26 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             }
         }
 
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String invoiceNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            invoiceNo = String.format("%s%04d", prefix, nextNumber);
+            if (!invoiceRepository.existsByInvoiceNo(invoiceNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique Invoice number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã hóa đơn duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return invoiceNo;
     }
 
     /**

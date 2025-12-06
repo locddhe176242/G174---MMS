@@ -83,7 +83,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (9, 'accounting', 'Kế toán', '/accounting', 'accounting', 16),
 (10, 'approval', 'Phê duyệt', '/approval', 'approval', 100),
 (11, 'reports', 'Báo cáo', '/reports', 'reports', 101),
-(12, 'staff', 'Nhân sự', '/admin/user', 'staff', 102),
+(12, 'staff', 'Nhân sự', '/admin/users', 'staff', 102),
 (13, 'admin.departments', 'Quản lý Phòng ban', '/admin/departments', 'building', 103),
 
 -- Menu con của Purchase (Nhập hàng)

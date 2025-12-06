@@ -89,7 +89,7 @@ export default function PurchaseRequisitionDetail() {
     const lineValue = (item) => {
         const qty = Number(item?.requestedQty || 0);
         const estimatedUnitPrice = Number(item?.estimatedUnitPrice || 0);
-        return qty * estimatedUnitPrice;
+        return Math.round(qty * estimatedUnitPrice * 100) / 100;
     };
 
     /**
@@ -109,10 +109,16 @@ export default function PurchaseRequisitionDetail() {
      */
     const getStatusBadge = (status) => {
         const statusMap = {
+            // RequisitionStatus
             Open: { label: "Đang mở", color: "bg-blue-100 text-blue-800" },
             Closed: { label: "Đã đóng", color: "bg-gray-100 text-gray-800" },
             Converted: { label: "Đã chuyển đổi", color: "bg-green-100 text-green-800" },
             Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
+            // ApprovalStatus (fallback nếu backend trả nhầm)
+            Draft: { label: "Bản nháp", color: "bg-gray-100 text-gray-800" },
+            Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
+            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
+            Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
 
         const statusInfo = statusMap[status] || { label: status || "Đang mở", color: "bg-gray-100 text-gray-800" };

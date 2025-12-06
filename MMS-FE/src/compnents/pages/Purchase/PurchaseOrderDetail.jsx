@@ -24,7 +24,6 @@ export default function PurchaseOrderDetail() {
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
-    const [showSendConfirm, setShowSendConfirm] = useState(false);
 
     // Helpers
     const formatDate = (dateString) => {
@@ -63,7 +62,7 @@ export default function PurchaseOrderDetail() {
         "-";
 
     const lineValue = (item) => {
-        return Number(item?.line_total || item?.lineTotal || 0);
+        return Math.round((Number(item?.line_total || item?.lineTotal || 0)) * 100) / 100;
     };
 
     const totalValue = useMemo(() => {
@@ -213,36 +212,7 @@ export default function PurchaseOrderDetail() {
         }
     };
 
-    const handleSend = async () => {   
-        // Validate vendor email before sending
-        const vendorEmail = data.vendorEmail || data.vendor_email || data.vendor?.email || data.vendor?.contact?.email || data.vendorContact?.email;
-        console.log("🔍 Check vendor email:", {
-            vendorEmail,
-            vendorData: data.vendor,
-            vendorContact: data.vendorContact,
-            rawVendorEmail: data.vendor_email,
-            rawVendorEmail2: data.vendorEmail,
-            fullData: data
-        });
-        
-        if (!vendorEmail || vendorEmail.trim() === '') {
-            toast.warning("Nhà cung cấp chưa có email. Vui lòng cập nhật thông tin liên hệ của nhà cung cấp trước khi gửi đơn hàng.");
-            setShowSendConfirm(false);
-            return;
-        } 
-        try {
-            setActionLoading(true);
-            await purchaseOrderService.sendPurchaseOrder(id);
-            toast.success("Đã gửi đơn hàng thành công!");
-            setShowSendConfirm(false);
-            await loadOrder();
-        } catch (e) {
-            toast.error(e?.response?.data?.message || "Không thể gửi đơn hàng");
-            console.error("Error sending order:", e);
-        } finally {
-            setActionLoading(false);
-        }
-    };
+
 
     // Render
     if (loading) {
@@ -287,16 +257,9 @@ export default function PurchaseOrderDetail() {
     const normalizedStatus = getStatusString(data.status, "Pending");
     const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
-    const canSend = normalizedApprovalStatus === "Approved" && normalizedStatus === "Approved";
-    const canCreateGR = normalizedApprovalStatus === "Approved" && 
-                        (normalizedStatus === "Approved" || normalizedStatus === "Sent") &&
-                        !data?.hasGoodsReceipt;
+    const canCreateGR = normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent" && !data?.hasGoodsReceipt;
     // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
     const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
-    
-    // Check if vendor has email
-    const vendorEmail = data.vendorEmail || data.vendor_email || data.vendor?.email || data.vendor?.contact?.email || data.vendorContact?.email;
-    const hasVendorEmail = vendorEmail && vendorEmail.trim() !== '';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -335,16 +298,6 @@ export default function PurchaseOrderDetail() {
                                         Từ chối
                                     </button>
                                 </>
-                            )}
-                            {canSend && (
-                                <button
-                                    onClick={() => setShowSendConfirm(true)}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                    disabled={actionLoading}
-                                    title="Gửi đơn hàng cho nhà cung cấp"
-                                >
-                                    Gửi đơn hàng
-                                </button>
                             )}
                             {canCreateGR && (
                                 <button
@@ -486,7 +439,7 @@ export default function PurchaseOrderDetail() {
                                                         Chiết khấu tổng đơn ({data.headerDiscount}%):
                                                     </td>
                                                     <td className="py-3 pr-0 text-right text-red-600">
-                                                        -{formatCurrency(totalBeforeTax * (data.headerDiscount / 100))}
+                                                        -{formatCurrency(Math.round(totalBeforeTax * (data.headerDiscount / 100) * 100) / 100)}
                                                     </td>
                                                 </tr>
                                             )}
@@ -684,86 +637,7 @@ export default function PurchaseOrderDetail() {
                 </div>
             )}
 
-            {/* Send confirmation */}
-            {showSendConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-                        <div className="flex items-center mb-4">
-                            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <h3 className="ml-3 text-lg font-semibold">Gửi đơn hàng cho nhà cung cấp</h3>
-                        </div>
-                        <div className="space-y-3">
-                            <p className="text-sm text-gray-700">
-                                Xác nhận gửi đơn hàng <strong>{data.poNo || data.po_no}</strong> cho nhà cung cấp <strong>{data.vendorName || data.vendor_name}</strong>?
-                            </p>
-                            
-                            {hasVendorEmail ? (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <p className="text-sm text-blue-800">
-                                        <strong>📧 Hệ thống sẽ:</strong>
-                                    </p>
-                                    <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
-                                        <li>Gửi email thông báo đơn hàng đến: <strong>{vendorEmail}</strong></li>
-                                        <li>Chuyển trạng thái đơn hàng sang <strong>Đã gửi</strong></li>
-                                    </ul>
-                                </div>
-                            ) : (
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                    <p className="text-sm text-yellow-800">
-                                        <strong>⚠️ Cảnh báo:</strong>
-                                    </p>
-                                    <p className="text-sm text-yellow-700 mt-2">
-                                        Nhà cung cấp <strong>{data.vendorName || data.vendor_name}</strong> chưa có email. 
-                                        Hệ thống sẽ cập nhật trạng thái nhưng không gửi được email thông báo.
-                                    </p>
-                                    <p className="text-sm text-yellow-700 mt-2">
-                                        💡 Vui lòng cập nhật email cho nhà cung cấp để gửi thông báo tự động.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => setShowSendConfirm(false)}
-                                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
-                                disabled={actionLoading}
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={handleSend}
-                                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                                    hasVendorEmail 
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                }`}
-                                disabled={actionLoading || !hasVendorEmail}
-                            >
-                                {actionLoading ? (
-                                    <>
-                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Đang gửi...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                        </svg>
-                                        {hasVendorEmail ? 'Gửi email & cập nhật' : 'Không thể gửi (thiếu email)'}
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 }

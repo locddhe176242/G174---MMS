@@ -3,6 +3,8 @@ package com.g174.mmssystem.service.Impl;
 import com.g174.mmssystem.dto.requestDTO.GoodsReceiptRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.GoodsReceiptResponseDTO;
 import com.g174.mmssystem.entity.*;
+import com.g174.mmssystem.enums.PurchaseOrderApprovalStatus;
+import com.g174.mmssystem.enums.PurchaseOrderStatus;
 import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.GoodsReceiptMapper;
@@ -48,14 +50,8 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 .filter(o -> o.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + dto.getOrderId()));
 
-        // Check if PO already has an approved Goods Receipt
-        List<GoodsReceipt> existingReceipts = receiptRepository.findByOrderId(dto.getOrderId());
-        boolean hasApprovedReceipt = existingReceipts.stream()
-                .anyMatch(r -> r.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved && r.getDeletedAt() == null);
-        
-        if (hasApprovedReceipt) {
-            throw new IllegalStateException("Đơn hàng này đã có phiếu nhập kho được phê duyệt. Không thể tạo phiếu nhập mới.");
-        }
+        // Allow multiple GRs for partial deliveries - removed the single GR restriction
+        log.info("Allowing multiple goods receipts for PO {} to support partial deliveries", dto.getOrderId());
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + dto.getWarehouseId()));
@@ -145,10 +141,17 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
 
     @Override
     public Page<GoodsReceiptResponseDTO> getAllReceipts(Pageable pageable) {
-        log.info("Fetching goods receipts with pagination");
+        log.info("Fetching goods receipts with pagination and relations");
 
-        Page<GoodsReceipt> receipts = receiptRepository.findAllActive(pageable);
+        Page<GoodsReceipt> receipts = receiptRepository.findAllActiveWithRelations(pageable);
         return receipts.map(receipt -> {
+            // Ensure PO items are loaded for progress calculation
+            if (receipt.getPurchaseOrder() != null && receipt.getPurchaseOrder().getOrderId() != null) {
+                PurchaseOrder po = orderRepository.findByIdWithRelations(receipt.getPurchaseOrder().getOrderId())
+                    .orElse(receipt.getPurchaseOrder());
+                receipt.setPurchaseOrder(po);
+            }
+            
             GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
             dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
             return dto;
@@ -242,7 +245,8 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     public GoodsReceiptResponseDTO approveReceipt(Integer receiptId, Integer approverId) {
         log.info("Approving goods receipt ID: {} by approver ID: {}", receiptId, approverId);
 
-        GoodsReceipt receipt = receiptRepository.findById(receiptId)
+        // Load GR with items to update PO item received quantities
+        GoodsReceipt receipt = receiptRepository.findByIdWithItems(receiptId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
 
@@ -306,6 +310,33 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             } else {
                 log.info("Updated stock: warehouse {} product {} +{}", warehouseId, productId, acceptedQty);
             }
+        }
+        
+        // Check PO completion status after receiving items
+        PurchaseOrder purchaseOrder = saved.getPurchaseOrder();
+        boolean allItemsFullyReceived = true;
+        boolean anyItemPartiallyReceived = false;
+        
+        for (PurchaseOrderItem poItem : purchaseOrder.getItems()) {
+            BigDecimal orderedQty = poItem.getQuantity();
+            BigDecimal receivedQty = poItem.getReceivedQty() != null ? poItem.getReceivedQty() : BigDecimal.ZERO;
+            
+            if (receivedQty.compareTo(orderedQty) < 0) {
+                allItemsFullyReceived = false;
+                if (receivedQty.compareTo(BigDecimal.ZERO) > 0) {
+                    anyItemPartiallyReceived = true;
+                }
+            }
+        }
+        
+        // Update PO status based on received quantities
+        if (allItemsFullyReceived) {
+            log.info("All items fully received. Updating PO {} status to Completed", purchaseOrder.getOrderId());
+            purchaseOrder.setStatus(PurchaseOrderStatus.Completed);
+            orderRepository.save(purchaseOrder);
+        } else if (anyItemPartiallyReceived) {
+            log.info("Partial delivery detected for PO {}. Status remains Sent (partially received)", purchaseOrder.getOrderId());
+            // Keep status as Sent - indicates delivery in progress
         }
         
         log.info("Goods receipt approved successfully, PO items and warehouse stock updated");
@@ -406,7 +437,26 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             }
         }
         
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String receiptNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            receiptNo = String.format("%s%04d", prefix, nextNumber);
+            if (!receiptRepository.existsByReceiptNo(receiptNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique Receipt number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã phiếu nhập kho duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return receiptNo;
     }
 }
 

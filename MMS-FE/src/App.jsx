@@ -65,6 +65,10 @@ import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
 
+//pages for Report module
+import ReportList from "./compnents/pages/Report/ReportList.jsx";
+import ReportDetail from "./compnents/pages/Report/ReportDetail.jsx";
+import GenerateReport from "./compnents/pages/Report/GenerateReport.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -175,6 +179,10 @@ function App() {
                 <Route path="/sales/invoices/:id" element={<InvoiceDetail />} />
                 <Route path="/sales/invoices/:id/edit" element={<InvoiceForm />} />
 
+                {/**Report Module Routes */}
+                <Route path="/reports" element={<ReportList />} />
+                <Route path="/reports/generate" element={<GenerateReport />} />
+                <Route path="/reports/:id" element={<ReportDetail />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 
