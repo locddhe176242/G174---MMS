@@ -12,7 +12,10 @@ import java.math.BigDecimal;
 public class GoodsReceiptItemResponseDTO {
     private Integer griId;
     private Integer receiptId;
+
     private Integer poiId;
+    private Integer roiId;
+    
     private Integer productId;
     private String productName;
     private String productCode;
