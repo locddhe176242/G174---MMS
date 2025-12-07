@@ -99,6 +99,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, dis
 (21, 'sales-orders', 'Đơn bán hàng', '/sales/orders', 'sales-orders', 24),
 (22, 'deliveries', 'Phiếu giao hàng', '/sales/deliveries', 'deliveries', 25),
 (23, 'return-orders', 'Đơn trả hàng', '/sales/return-orders', 'return', 26),
+(26, 'sales-return-inbound-orders', 'Đơn nhập hàng lại', '/sales/return-inbound-orders', 'inbound', 26.5),
 (24, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 27),
 (25, 'invoices', 'Hóa đơn bán hàng', '/sales/invoices', 'invoice', 28)
 AS new_menu
@@ -113,7 +114,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
 (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19),
-(1, 20), (1, 21), (1, 22), (1, 23), (1, 24), (1, 25)
+(1, 20), (1, 21), (1, 22), (1, 23), (1, 26), (1, 24), (1, 25)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
@@ -129,6 +130,7 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 21),  -- Sales Orders
 (2, 22),  -- Deliveries
 (2, 23),  -- Return Orders
+(2, 26),  -- Sales Return Inbound Orders
 (2, 24),  -- Credit Notes
 (2, 25)   -- Invoices
 AS new_rm
@@ -172,7 +174,7 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- WAREHOUSE (role_id = 5): Dashboard, Sản phẩm, Kho, Nhập hàng, Xuất hàng, Báo cáo, Nhân sự, Goods Receipt, Deliveries, Return Orders
+-- WAREHOUSE (role_id = 5): Dashboard, Sản phẩm, Kho, Nhập hàng, Xuất hàng, Báo cáo, Nhân sự, Goods Receipt, Deliveries, Return Orders, Sales Return Inbound Orders
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 1),   -- Dashboard
 (5, 5),   -- Products
@@ -184,7 +186,8 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 18),  -- Goods Receipt
 (5, 21),  -- Sales Orders (view)
 (5, 22),  -- Deliveries
-(5, 23)   -- Return Orders
+(5, 23),  -- Return Orders
+(5, 26)   -- Sales Return Inbound Orders
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
@@ -247,6 +250,13 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 (39, 'return_order.delete', 'Xóa đơn trả hàng', 'return_order', 'delete'),
 (40, 'return_order.status', 'Thay đổi trạng thái đơn trả hàng', 'return_order', 'status'),
 
+-- Sales Return Inbound Order permissions (51-55)
+(51, 'sales_return_inbound_order.view', 'Xem đơn nhập hàng lại', 'sales_return_inbound_order', 'view'),
+(52, 'sales_return_inbound_order.create', 'Tạo đơn nhập hàng lại', 'sales_return_inbound_order', 'create'),
+(53, 'sales_return_inbound_order.edit', 'Sửa đơn nhập hàng lại', 'sales_return_inbound_order', 'edit'),
+(54, 'sales_return_inbound_order.delete', 'Xóa đơn nhập hàng lại', 'sales_return_inbound_order', 'delete'),
+(55, 'sales_return_inbound_order.status', 'Thay đổi trạng thái đơn nhập hàng lại', 'sales_return_inbound_order', 'status'),
+
 -- Credit Note permissions (41-45)
 (41, 'credit_note.view', 'Xem Credit Note', 'credit_note', 'view'),
 (42, 'credit_note.create', 'Tạo Credit Note', 'credit_note', 'create'),
@@ -288,6 +298,8 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (1, 31), (1, 32), (1, 33), (1, 34), (1, 35),
 -- Return Order permissions (36-40)
 (1, 36), (1, 37), (1, 38), (1, 39), (1, 40),
+-- Sales Return Inbound Order permissions (51-55)
+(1, 51), (1, 52), (1, 53), (1, 54), (1, 55),
 -- Credit Note permissions (41-45)
 (1, 41), (1, 42), (1, 43), (1, 44), (1, 45),
 -- Invoice permissions (46-50)
@@ -312,6 +324,8 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (2, 31), (2, 32), (2, 33), (2, 35),
 -- Return Order permissions: view, create, edit, status
 (2, 36), (2, 37), (2, 38), (2, 40),
+-- Sales Return Inbound Order permissions: view, create, edit
+(2, 51), (2, 52), (2, 53),
 -- Credit Note permissions: view, create, edit
 (2, 41), (2, 42), (2, 43),
 -- Invoice permissions: view, create, edit
@@ -377,7 +391,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Delivery permissions: view, create, edit, status
 (5, 31), (5, 32), (5, 33), (5, 35),
 -- Return Order permissions: view, create, edit, status
-(5, 36), (5, 37), (5, 38), (5, 40)
+(5, 36), (5, 37), (5, 38), (5, 40),
+-- Sales Return Inbound Order permissions: view, create, edit
+(5, 51), (5, 52), (5, 53)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
