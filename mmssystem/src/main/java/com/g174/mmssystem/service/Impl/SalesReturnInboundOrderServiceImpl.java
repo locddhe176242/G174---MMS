@@ -64,6 +64,8 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
         User createdBy = getCurrentUser();
 
         // Tạo entity chính
+        // Khi tạo mới: mặc định là Draft
+        // Khi lưu form (đủ thông tin): tự động chuyển sang SentToWarehouse (không cần duyệt)
         final Warehouse baseWarehouse = warehouse; // dùng trong lambda (effectively final)
         final SalesReturnInboundOrder inboundOrder = SalesReturnInboundOrder.builder()
                 .sriNo(generateSriNo())
@@ -72,7 +74,7 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
                 .expectedReceiptDate(request.getExpectedReceiptDate() != null
                         ? request.getExpectedReceiptDate()
                         : LocalDateTime.now())
-                .status(SalesReturnInboundOrder.Status.Draft)
+                .status(SalesReturnInboundOrder.Status.Draft) // Mặc định Draft khi tạo
                 .notes(request.getNotes())
                 .createdBy(createdBy)
                 .build();
@@ -113,6 +115,16 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
         inboundOrder.setItems(items);
 
         SalesReturnInboundOrder saved = inboundOrderRepository.save(inboundOrder);
+
+        // Tự động chuyển sang SentToWarehouse khi đã có đủ thông tin (không cần duyệt)
+        // Điều kiện: có warehouse, có items, có expectedReceiptDate
+        if (saved.getWarehouse() != null && 
+            saved.getItems() != null && !saved.getItems().isEmpty() &&
+            saved.getExpectedReceiptDate() != null) {
+            saved.setStatus(SalesReturnInboundOrder.Status.SentToWarehouse);
+            saved = inboundOrderRepository.save(saved);
+            log.info("Đã tự động chuyển Đơn nhập hàng lại {} sang trạng thái SentToWarehouse", saved.getSriNo());
+        }
 
         // Cập nhật trạng thái liên quan trên ReturnOrder (mới chỉ đánh dấu là đã có yêu cầu nhập lại)
         returnOrder.setGoodsReceiptStatus(ReturnOrder.GoodsReceiptStatus.Pending);
