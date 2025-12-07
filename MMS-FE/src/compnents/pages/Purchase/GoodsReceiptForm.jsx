@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
 import { getCurrentUser } from "../../../api/authService";
+import { salesReturnInboundOrderService } from "../../../api/salesReturnInboundOrderService";
 import apiClient from "../../../api/apiClient";
 
 export default function GoodsReceiptForm() {
@@ -14,7 +15,14 @@ export default function GoodsReceiptForm() {
     const navigate = useNavigate();
     const isEdit = Boolean(id);
     const poIdFromQuery = searchParams.get("po_id");
-
+    const sriIdFromQuery = searchParams.get("sriId");
+    
+    // Source type selection: 'purchase' or 'salesReturn'
+    const [sourceType, setSourceType] = useState(sriIdFromQuery ? 'salesReturn' : 'purchase');
+    
+    // Determine if in Sales Return mode (from URL or user selection)
+    const isSalesReturnMode = sourceType === 'salesReturn' || Boolean(sriIdFromQuery);
+    
     const [formData, setFormData] = useState({
         receipt_no: "",
         order_id: null,
@@ -28,6 +36,13 @@ export default function GoodsReceiptForm() {
     const [warehouses, setWarehouses] = useState([]);
     const [poReferenceItems, setPoReferenceItems] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [salesReturnInboundOrder, setSalesReturnInboundOrder] = useState(null);
+    
+    // Picker modal states
+    const [showSriPicker, setShowSriPicker] = useState(false);
+    const [sriList, setSriList] = useState([]);
+    const [sriSearchTerm, setSriSearchTerm] = useState("");
+    const [loadingSriList, setLoadingSriList] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,6 +57,19 @@ export default function GoodsReceiptForm() {
         return new Date(formData.received_date);
     }, [formData.received_date]);
 
+    // Debug: Log search params changes
+    useEffect(() => {
+        console.log("=== GoodsReceiptForm - Search Params Changed ===", {
+            id,
+            isEdit,
+            poIdFromQuery,
+            sriIdFromQuery,
+            isSalesReturnMode,
+            allSearchParams: Object.fromEntries(searchParams.entries()),
+            currentURL: window.location.href
+        });
+    }, [searchParams, id, isEdit, poIdFromQuery, sriIdFromQuery, isSalesReturnMode]);
+
     useEffect(() => {
         const loadUser = async () => {
             try {
@@ -54,18 +82,23 @@ export default function GoodsReceiptForm() {
         
         loadUser();
         loadWarehouses();
-        loadPurchaseOrders();
+        if (!isSalesReturnMode) {
+            loadPurchaseOrders();
+        }
         if (isEdit) {
             loadReceipt();
         } else {
             generateReceiptNumber();
-            if (poIdFromQuery) {
+            if (isSalesReturnMode && sriIdFromQuery) {
+                console.log("=== Sales Return Mode detected ===", { sriIdFromQuery, isSalesReturnMode });
+                loadSalesReturnInboundOrder(sriIdFromQuery);
+            } else if (poIdFromQuery) {
                 console.log("Auto-loading PO from query:", poIdFromQuery);
                 loadPurchaseOrderItems(poIdFromQuery);
                 setFormData((prev) => ({ ...prev, order_id: parseInt(poIdFromQuery) }));
             }
         }
-    }, [isEdit, id, poIdFromQuery]);
+    }, [isEdit, id, poIdFromQuery, sriIdFromQuery]);
 
     const generateReceiptNumber = async () => {
         try {
@@ -159,6 +192,118 @@ export default function GoodsReceiptForm() {
         } catch (err) {
             console.error("Error loading purchase orders:", err);
             toast.error("Không thể tải danh sách đơn hàng");
+        }
+    };
+
+    const loadSalesReturnInboundOrderList = async () => {
+        try {
+            setLoadingSriList(true);
+            const response = await salesReturnInboundOrderService.getAll();
+            console.log("=== Sales Return Inbound Order List Response ===", response);
+            
+            // Handle different response formats (same as SalesReturnInboundOrderList)
+            let list = [];
+            if (Array.isArray(response)) {
+                list = response;
+            } else if (response?.content && Array.isArray(response.content)) {
+                list = response.content;
+            } else if (response?.data && Array.isArray(response.data)) {
+                list = response.data;
+            }
+            
+            console.log("=== Parsed List ===", list);
+            console.log("=== List length ===", list.length);
+            
+            // Filter: Cho phép Draft hoặc SentToWarehouse (không cần Approved)
+            const filtered = list.filter(sri => {
+                const status = sri.status || sri.Status;
+                const isMatch = status === 'Draft' || status === 'SentToWarehouse';
+                console.log(`SRI ${sri.sriId || sri.sri_id}: status=${status}, match=${isMatch}`);
+                return isMatch;
+            });
+            
+            console.log("=== Filtered List ===", filtered);
+            console.log("=== Filtered length ===", filtered.length);
+            
+            setSriList(filtered);
+            
+            if (filtered.length === 0 && list.length > 0) {
+                toast.warning(`Có ${list.length} đơn nhập hàng lại nhưng không có đơn nào ở trạng thái "Approved" hoặc "SentToWarehouse"`);
+            }
+        } catch (err) {
+            console.error("Error loading Sales Return Inbound Order list:", err);
+            console.error("Error details:", err.response?.data);
+            toast.error("Không thể tải danh sách Đơn nhập hàng lại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setLoadingSriList(false);
+        }
+    };
+
+    const handleSourceTypeChange = (type) => {
+        setSourceType(type);
+        if (type === 'purchase') {
+            setSalesReturnInboundOrder(null);
+            setFormData(prev => ({ ...prev, items: [], order_id: null }));
+        } else {
+            setFormData(prev => ({ ...prev, items: [], order_id: null }));
+            loadSalesReturnInboundOrderList();
+        }
+    };
+
+    const handleSelectSri = (sri) => {
+        setSalesReturnInboundOrder(sri);
+        setShowSriPicker(false);
+        loadSalesReturnInboundOrder(sri.sriId);
+    };
+
+    const loadSalesReturnInboundOrder = async (sriId) => {
+        try {
+            setLoading(true);
+            console.log("=== Loading Sales Return Inbound Order ===", sriId);
+            const sriIdParsed = parseInt(sriId);
+            if (isNaN(sriIdParsed)) {
+                throw new Error("Invalid sriId: " + sriId);
+            }
+            
+            const sri = await salesReturnInboundOrderService.getById(sriIdParsed);
+            console.log("=== Sales Return Inbound Order loaded ===", sri);
+            setSalesReturnInboundOrder(sri);
+            
+            // Set warehouse from Sales Return Inbound Order
+            if (sri.warehouseId) {
+                console.log("Setting warehouse:", sri.warehouseId);
+                setFormData((prev) => ({ ...prev, warehouse_id: sri.warehouseId }));
+            }
+            
+            // Map items from Sales Return Inbound Order
+            console.log("=== Mapping items ===", sri.items);
+            if (sri.items && sri.items.length > 0) {
+                const mapped = sri.items.map((item, index) => {
+                    const mappedItem = {
+                        roi_id: item.roiId || item.roi_id,
+                        product_id: item.productId || item.product_id,
+                        productName: item.productName || item.product_name || "-",
+                        productCode: item.productCode || item.product_code || "",
+                        planned_qty: Number(item.plannedQty || item.planned_qty || 0),
+                        received_qty: Number(item.plannedQty || item.planned_qty || 0),
+                        accepted_qty: Number(item.plannedQty || item.planned_qty || 0), // Mặc định accepted = received
+                        remark: item.note || "",
+                    };
+                    console.log(`Mapped item ${index}:`, mappedItem);
+                    return mappedItem;
+                });
+                console.log("=== Final mapped items ===", mapped);
+                setFormData((prev) => ({ ...prev, items: mapped }));
+            } else {
+                console.warn("No items found in Sales Return Inbound Order");
+                toast.warning("Đơn nhập hàng lại không có sản phẩm nào");
+            }
+        } catch (err) {
+            console.error("Error loading Sales Return Inbound Order:", err);
+            console.error("Error details:", err.response?.data);
+            toast.error("Không thể tải Đơn nhập hàng lại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -293,8 +438,11 @@ export default function GoodsReceiptForm() {
         if (!formData.receipt_no) {
             errors.receipt_no = "Số phiếu là bắt buộc";
         }
-        if (!formData.order_id) {
+        if (!isSalesReturnMode && !formData.order_id) {
             errors.order_id = "Chọn đơn hàng";
+        }
+        if (isSalesReturnMode && !sriIdFromQuery && !salesReturnInboundOrder) {
+            errors.sriId = "Chọn Đơn nhập hàng lại";
         }
         if (!formData.warehouse_id) {
             errors.warehouse_id = "Chọn kho nhận";
@@ -342,54 +490,182 @@ export default function GoodsReceiptForm() {
         console.log("=== VALIDATION PASSED, BUILDING PAYLOAD ===");
 
         try {
-            const payload = {
-                receiptNo: formData.receipt_no,
-                orderId: formData.order_id,
-                warehouseId: formData.warehouse_id,
-                receivedDate: formData.received_date instanceof Date ? formData.received_date.toISOString() : formData.received_date,
-                status: formData.status,
-                items: formData.items.map((item, index) => {
-                    console.log(`Item ${index}:`, item);
-                    return {
-                        poiId: item.poi_id,
-                        productId: item.product_id,
-                        receivedQty: Number(item.received_qty || 0),
-                        acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
-                        remark: item.remark || "",
-                    };
-                }),
-            };
-
-            console.log("=== SUBMITTING PAYLOAD ===", payload);
-            console.log("Items detail:", payload.items);
-
             const userId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1; // Fallback to 1 for testing
             console.log("Current user:", currentUser);
             console.log("User ID:", userId);
-            
-            if (isEdit) {
-                console.log("Updating with userId:", userId);
-                await goodsReceiptService.updateGoodsReceipt(id, payload, userId);
-                toast.success("Cập nhật Phiếu nhập kho thành công!");
+
+            if (isSalesReturnMode) {
+                // Sales Return mode
+                const sriId = sriIdFromQuery || salesReturnInboundOrder?.sriId;
+                if (!sriId) {
+                    toast.error("Không tìm thấy ID của Đơn nhập hàng lại");
+                    return;
+                }
+
+                // Format date properly for Spring Boot LocalDateTime
+                let formattedDate = null;
+                if (formData.received_date) {
+                    if (formData.received_date instanceof Date) {
+                        // Format as yyyy-MM-ddTHH:mm:ss (Spring Boot default format)
+                        const year = formData.received_date.getFullYear();
+                        const month = String(formData.received_date.getMonth() + 1).padStart(2, '0');
+                        const day = String(formData.received_date.getDate()).padStart(2, '0');
+                        const hours = String(formData.received_date.getHours()).padStart(2, '0');
+                        const minutes = String(formData.received_date.getMinutes()).padStart(2, '0');
+                        const seconds = String(formData.received_date.getSeconds()).padStart(2, '0');
+                        formattedDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+                    } else {
+                        formattedDate = formData.received_date;
+                    }
+                }
+
+                // Validate items before mapping
+                if (!formData.items || formData.items.length === 0) {
+                    toast.error("Danh sách sản phẩm không được để trống");
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                const payload = {
+                    receiptNo: formData.receipt_no,
+                    warehouseId: formData.warehouse_id,
+                    receivedDate: formattedDate,
+                    sourceType: "SalesReturn",
+                    items: formData.items.map((item, index) => {
+                        console.log(`Item ${index}:`, item);
+                        
+                        // Validate required fields
+                        if (!item.roi_id) {
+                            throw new Error(`Item ${index + 1}: Thiếu roi_id`);
+                        }
+                        if (!item.product_id) {
+                            throw new Error(`Item ${index + 1}: Thiếu product_id`);
+                        }
+                        if (!item.received_qty || Number(item.received_qty) <= 0) {
+                            throw new Error(`Item ${index + 1}: Số lượng nhận phải > 0`);
+                        }
+                        
+                        // Ensure receivedQty is a valid number > 0
+                        const receivedQty = Number(item.received_qty);
+                        if (isNaN(receivedQty) || receivedQty <= 0) {
+                            throw new Error(`Item ${index + 1}: Số lượng nhận phải > 0 (hiện tại: ${item.received_qty})`);
+                        }
+                        
+                        // Ensure acceptedQty is valid, default to receivedQty if not set or 0
+                        const acceptedQty = item.accepted_qty && Number(item.accepted_qty) > 0 
+                            ? Number(item.accepted_qty) 
+                            : receivedQty; // Default to receivedQty if not set or 0
+                        
+                        const mappedItem = {
+                            roiId: item.roi_id,
+                            productId: item.product_id,
+                            receivedQty: receivedQty, // Send as number, Spring Boot will convert to BigDecimal
+                            acceptedQty: acceptedQty, // Use receivedQty as default if not set
+                            remark: item.remark || null,
+                        };
+                        console.log(`Mapped item ${index}:`, mappedItem);
+                        return mappedItem;
+                    }),
+                };
+
+                console.log("=== SUBMITTING PAYLOAD (SalesReturn) ===", JSON.stringify(payload, null, 2));
+                console.log("Items detail:", payload.items);
+                console.log("sriId:", sriId, "parsed:", parseInt(sriId));
+                console.log("userId:", userId);
+                
+                // Validate payload before sending
+                if (!payload.warehouseId) {
+                    throw new Error("Warehouse ID is required");
+                }
+                if (!payload.items || payload.items.length === 0) {
+                    throw new Error("Items list is required");
+                }
+                payload.items.forEach((item, idx) => {
+                    if (!item.roiId) {
+                        throw new Error(`Item ${idx + 1}: roiId is required`);
+                    }
+                    if (!item.productId) {
+                        throw new Error(`Item ${idx + 1}: productId is required`);
+                    }
+                    if (!item.receivedQty || item.receivedQty <= 0) {
+                        throw new Error(`Item ${idx + 1}: receivedQty must be > 0`);
+                    }
+                });
+                
+                try {
+                    await goodsReceiptService.createGoodsReceiptFromSalesReturnInboundOrder(
+                        parseInt(sriId),
+                        payload,
+                        userId
+                    );
+                    toast.success("Tạo Phiếu nhập kho từ Đơn nhập hàng lại thành công!");
+                } catch (apiError) {
+                    console.error("=== API ERROR DETAILS ===", apiError);
+                    console.error("Response data:", apiError.response?.data);
+                    console.error("Response status:", apiError.response?.status);
+                    console.error("Response headers:", apiError.response?.headers);
+                    console.error("Full error:", JSON.stringify(apiError.response?.data, null, 2));
+                    throw apiError; // Re-throw để xử lý ở catch block bên ngoài
+                }
             } else {
-                console.log("Creating with userId:", userId);
-                await goodsReceiptService.createGoodsReceipt(payload, userId);
-                toast.success("Tạo Phiếu nhập kho thành công!");
+                // Purchase mode
+                const payload = {
+                    receiptNo: formData.receipt_no,
+                    orderId: formData.order_id,
+                    warehouseId: formData.warehouse_id,
+                    receivedDate: formData.received_date instanceof Date ? formData.received_date.toISOString() : formData.received_date,
+                    status: formData.status,
+                    items: formData.items.map((item, index) => {
+                        console.log(`Item ${index}:`, item);
+                        return {
+                            poiId: item.poi_id,
+                            productId: item.product_id,
+                            receivedQty: Number(item.received_qty || 0),
+                            acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
+                            remark: item.remark || "",
+                        };
+                    }),
+                };
+
+                console.log("=== SUBMITTING PAYLOAD (Purchase) ===", payload);
+                console.log("Items detail:", payload.items);
+            
+                if (isEdit) {
+                    console.log("Updating with userId:", userId);
+                    await goodsReceiptService.updateGoodsReceipt(id, payload, userId);
+                    toast.success("Cập nhật Phiếu nhập kho thành công!");
+                } else {
+                    console.log("Creating with userId:", userId);
+                    await goodsReceiptService.createGoodsReceipt(payload, userId);
+                    toast.success("Tạo Phiếu nhập kho thành công!");
+                }
             }
             navigate("/purchase/goods-receipts");
         } catch (err) {
             console.error("Error saving Goods Receipt:", err);
             console.error("Error response:", err.response?.data);
+            console.error("Error response stringified:", JSON.stringify(err.response?.data, null, 2));
             console.error("Validation errors from backend:", err.response?.data?.errors);
+            console.error("Error message:", err.response?.data?.message);
             
             const backendErrors = err.response?.data?.errors;
+            const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+            
+            console.error("=== FINAL ERROR MESSAGE ===", errorMessage);
+            
             if (backendErrors && typeof backendErrors === 'object') {
                 const errorMessages = Object.entries(backendErrors)
                     .map(([field, msg]) => `${field}: ${msg}`)
                     .join(', ');
                 setError(`Lỗi validate: ${errorMessages}`);
+                toast.error(`Lỗi validate: ${errorMessages}`);
+            } else if (errorMessage) {
+                setError(errorMessage);
+                toast.error(errorMessage);
             } else {
-                setError(err?.response?.data?.message || (isEdit ? "Không thể cập nhật Phiếu nhập kho" : "Không thể tạo Phiếu nhập kho"));
+                const defaultMsg = isEdit ? "Không thể cập nhật Phiếu nhập kho" : "Không thể tạo Phiếu nhập kho";
+                setError(defaultMsg);
+                toast.error(defaultMsg);
             }
         } finally {
             setIsSubmitting(false);
@@ -437,6 +713,39 @@ export default function GoodsReceiptForm() {
                             )}
 
                             <div className="space-y-4">
+                                {/* Source Type Selection */}
+                                {!isEdit && !sriIdFromQuery && (
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                            Loại phiếu nhập kho <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="sourceType"
+                                                    value="purchase"
+                                                    checked={sourceType === 'purchase'}
+                                                    onChange={(e) => handleSourceTypeChange('purchase')}
+                                                    className="mr-2"
+                                                />
+                                                <span className="text-sm text-gray-700">Từ Đơn mua hàng (Purchase Order)</span>
+                                            </label>
+                                            <label className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="sourceType"
+                                                    value="salesReturn"
+                                                    checked={sourceType === 'salesReturn'}
+                                                    onChange={(e) => handleSourceTypeChange('salesReturn')}
+                                                    className="mr-2"
+                                                />
+                                                <span className="text-sm text-gray-700">Từ Đơn nhập hàng lại (Sales Return)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -468,36 +777,103 @@ export default function GoodsReceiptForm() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Đơn hàng <span className="text-red-500">*</span>
-                                        </label>
-                                        <Select
-                                            value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
-                                            onChange={handleOrderChange}
-                                            options={purchaseOrders}
-                                            placeholder="Chọn đơn hàng (chỉ hiện PO đã duyệt)"
-                                            isClearable
-                                            classNamePrefix="react-select"
-                                            isOptionDisabled={(option) => option.isDisabled}
-                                            styles={{
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    color: state.isDisabled ? '#9ca3af' : provided.color,
-                                                    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
-                                                    fontStyle: state.isDisabled ? 'italic' : 'normal',
-                                                    backgroundColor: state.isDisabled 
-                                                        ? '#f3f4f6' 
-                                                        : state.isFocused 
-                                                        ? '#e5e7eb' 
-                                                        : provided.backgroundColor
-                                                })
-                                            }}
-                                        />
-                                        {validationErrors.order_id && (
-                                            <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
-                                        )}
-                                    </div>
+                                    {isSalesReturnMode ? (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Đơn nhập hàng lại <span className="text-red-500">*</span>
+                                            </label>
+                                            {sriIdFromQuery ? (
+                                                // Auto-loaded from URL
+                                                <>
+                                                    {loading ? (
+                                                        <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 border-gray-300 flex items-center gap-2">
+                                                            <svg className="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            <span className="text-sm text-gray-600">Đang tải...</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <input
+                                                                type="text"
+                                                                value={salesReturnInboundOrder ? `${salesReturnInboundOrder.sriNo || `SRI-${salesReturnInboundOrder.sriId}`} - ${salesReturnInboundOrder.returnNo || ""}` : `Đang tải Đơn nhập hàng lại #${sriIdFromQuery}...`}
+                                                                readOnly
+                                                                className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
+                                                            />
+                                                            {salesReturnInboundOrder && (
+                                                                <p className="mt-1 text-xs text-gray-500">
+                                                                    Từ Đơn trả hàng: {salesReturnInboundOrder.returnNo || "—"}
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                // Manual selection via picker
+                                                <>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={salesReturnInboundOrder ? `${salesReturnInboundOrder.sriNo || `SRI-${salesReturnInboundOrder.sriId}`} - ${salesReturnInboundOrder.returnNo || ""}` : ""}
+                                                            readOnly
+                                                            placeholder="Chọn Đơn nhập hàng lại"
+                                                            className="flex-1 px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                loadSalesReturnInboundOrderList();
+                                                                setShowSriPicker(true);
+                                                            }}
+                                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                        >
+                                                            Chọn
+                                                        </button>
+                                                    </div>
+                                                    {salesReturnInboundOrder && (
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            Từ Đơn trả hàng: {salesReturnInboundOrder.returnNo || "—"}
+                                                        </p>
+                                                    )}
+                                                    {validationErrors.sriId && (
+                                                        <p className="mt-1 text-sm text-red-600">{validationErrors.sriId}</p>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Đơn hàng <span className="text-red-500">*</span>
+                                            </label>
+                                            <Select
+                                                value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
+                                                onChange={handleOrderChange}
+                                                options={purchaseOrders}
+                                                placeholder="Chọn đơn hàng (chỉ hiện PO đã duyệt)"
+                                                isClearable
+                                                classNamePrefix="react-select"
+                                                isOptionDisabled={(option) => option.isDisabled}
+                                                styles={{
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        color: state.isDisabled ? '#9ca3af' : provided.color,
+                                                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                                        fontStyle: state.isDisabled ? 'italic' : 'normal',
+                                                        backgroundColor: state.isDisabled 
+                                                            ? '#f3f4f6' 
+                                                            : state.isFocused 
+                                                            ? '#e5e7eb' 
+                                                            : provided.backgroundColor
+                                                    })
+                                                }}
+                                            />
+                                            {validationErrors.order_id && (
+                                                <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -536,7 +912,9 @@ export default function GoodsReceiptForm() {
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
                                     <p className="text-sm text-gray-500">
-                                        Hệ thống tự động lấy sản phẩm từ đơn hàng đã chọn
+                                        {isSalesReturnMode 
+                                            ? "Hệ thống tự động lấy sản phẩm từ Đơn nhập hàng lại"
+                                            : "Hệ thống tự động lấy sản phẩm từ đơn hàng đã chọn"}
                                     </p>
                                 </div>
 
@@ -544,9 +922,21 @@ export default function GoodsReceiptForm() {
                                     <p className="text-red-500 text-sm">{validationErrors.items}</p>
                                 )}
 
-                                {formData.items.length === 0 ? (
+                                {loading ? (
                                     <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
-                                        Vui lòng chọn đơn hàng để hiển thị danh sách sản phẩm
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Đang tải dữ liệu...
+                                        </div>
+                                    </div>
+                                ) : formData.items.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
+                                        {isSalesReturnMode 
+                                            ? "Đơn nhập hàng lại không có sản phẩm nào hoặc đang tải dữ liệu..."
+                                            : "Vui lòng chọn đơn hàng để hiển thị danh sách sản phẩm"}
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -555,7 +945,9 @@ export default function GoodsReceiptForm() {
                                             <tr className="bg-gray-50">
                                                 <th className="border border-gray-200 px-2 py-1 text-center text-xs font-medium text-gray-700 w-12">#</th>
                                                 <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm</th>
-                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-28">SL đặt</th>
+                                                <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-28">
+                                                    {isSalesReturnMode ? "SL kế hoạch" : "SL đặt"}
+                                                </th>
                                                 <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-32">SL nhận</th>
                                                 <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700 w-48">Ghi chú</th>
                                             </tr>
@@ -564,7 +956,7 @@ export default function GoodsReceiptForm() {
                                             {formData.items.map((item, index) => {
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 return (
-                                                    <tr key={item.poi_id || index} className="hover:bg-gray-50">
+                                                    <tr key={item.poi_id || item.roi_id || index} className="hover:bg-gray-50">
                                                         <td className="border border-gray-200 px-2 py-1 text-xs text-gray-700 text-center">
                                                             {index + 1}
                                                         </td>
@@ -575,7 +967,7 @@ export default function GoodsReceiptForm() {
                                                             </div>
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1 text-right text-sm text-gray-700">
-                                                            {Number(item.ordered_qty || 0).toLocaleString()}
+                                                            {Number(item.ordered_qty || item.planned_qty || 0).toLocaleString()}
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1">
                                                             <input
@@ -639,7 +1031,145 @@ export default function GoodsReceiptForm() {
                     </div>
                 </div>
             </div>
+
+            {/* Sales Return Inbound Order Picker Modal */}
+            <SalesReturnInboundOrderPickerModal
+                isOpen={showSriPicker}
+                onClose={() => setShowSriPicker(false)}
+                salesReturnInboundOrders={sriList.filter(sri => 
+                    !sriSearchTerm || 
+                    (sri.sriNo && sri.sriNo.toLowerCase().includes(sriSearchTerm.toLowerCase())) ||
+                    (sri.returnNo && sri.returnNo.toLowerCase().includes(sriSearchTerm.toLowerCase()))
+                )}
+                loading={loadingSriList}
+                onSelect={handleSelectSri}
+                searchTerm={sriSearchTerm}
+                onSearchChange={setSriSearchTerm}
+            />
         </div>
     );
 }
+
+// Sales Return Inbound Order Picker Modal Component
+const SalesReturnInboundOrderPickerModal = ({
+    isOpen,
+    onClose,
+    salesReturnInboundOrders,
+    loading,
+    onSelect,
+    searchTerm,
+    onSearchChange,
+}) => {
+    if (!isOpen) return null;
+
+    const formatDate = (value) =>
+        value ? new Date(value).toLocaleDateString("vi-VN") : "—";
+
+    const getStatusLabel = (status) => {
+        const statusMap = {
+            Draft: "Nháp",
+            Approved: "Đã duyệt",
+            SentToWarehouse: "Đã gửi kho",
+            Completed: "Hoàn thành",
+            Cancelled: "Đã hủy",
+        };
+        return statusMap[status] || status;
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                <div className="px-6 py-4 border-b flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                            Chọn Đơn nhập hàng lại
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                            Hiển thị đơn ở trạng thái &quot;Nháp&quot; hoặc &quot;Đã gửi kho&quot;
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        ✕
+                    </button>
+                </div>
+                <div className="p-6 border-b">
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        placeholder="Tìm theo số Đơn nhập lại, Đơn trả hàng..."
+                        className="w-full border rounded-lg px-3 py-2"
+                    />
+                </div>
+                <div className="flex-1 overflow-auto">
+                    {loading ? (
+                        <div className="py-12 text-center text-gray-500">
+                            Đang tải danh sách Đơn nhập hàng lại...
+                        </div>
+                    ) : salesReturnInboundOrders.length === 0 ? (
+                        <div className="py-12 text-center text-gray-500">
+                            Không có Đơn nhập hàng lại phù hợp
+                        </div>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Đơn nhập lại
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Đơn trả hàng
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Kho
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Trạng thái
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Ngày dự kiến
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {salesReturnInboundOrders.map((sri) => (
+                                    <tr
+                                        key={sri.sriId}
+                                        className="hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => onSelect(sri)}
+                                    >
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                            {sri.sriNo || `SRI-${sri.sriId}`}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                            {sri.returnNo || "—"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                            {sri.warehouseName || "—"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                            {getStatusLabel(sri.status)}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                            {formatDate(sri.expectedReceiptDate)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t flex justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                    >
+                        Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
