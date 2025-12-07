@@ -57,7 +57,7 @@ public interface WarehouseStockRepository extends JpaRepository<WarehouseStock, 
      * Update stock quantity (add to existing quantity)
      * If record doesn't exist, it will be handled by the service layer
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WarehouseStock ws SET ws.quantity = ws.quantity + :quantityChange " +
            "WHERE ws.warehouseId = :warehouseId AND ws.productId = :productId")
     int updateStockQuantity(@Param("warehouseId") Integer warehouseId,
