@@ -88,9 +88,9 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     public ReturnOrderResponseDTO updateReturnOrder(Integer id, ReturnOrderRequestDTO request) {
         ReturnOrder returnOrder = getReturnOrderEntity(id);
 
-        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Completed ||
+        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Approved ||
                 returnOrder.getStatus() == ReturnOrder.ReturnStatus.Cancelled) {
-            throw new IllegalStateException("Không thể chỉnh sửa đơn trả hàng đã hoàn thành hoặc đã hủy");
+            throw new IllegalStateException("Không thể chỉnh sửa đơn trả hàng đã được duyệt hoặc đã hủy");
         }
 
         Warehouse warehouse = getWarehouse(request.getWarehouseId());
@@ -137,8 +137,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     public void deleteReturnOrder(Integer id) {
         ReturnOrder returnOrder = getReturnOrderEntity(id);
 
-        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Completed) {
-            throw new IllegalStateException("Không thể xóa đơn trả hàng đã hoàn thành");
+        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Approved) {
+            throw new IllegalStateException("Không thể xóa đơn trả hàng đã được duyệt");
         }
 
         returnOrder.setDeletedAt(Instant.now());
@@ -195,7 +195,7 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
 
     private BigDecimal getAlreadyReturnedQty(Integer deliveryItemId) {
         return returnOrderItemRepository.findByDeliveryItem_DiId(deliveryItemId).stream()
-                .filter(item -> item.getReturnOrder().getStatus() == ReturnOrder.ReturnStatus.Completed)
+                .filter(item -> item.getReturnOrder().getStatus() == ReturnOrder.ReturnStatus.Approved)
                 .map(ReturnOrderItem::getReturnedQty)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -203,10 +203,6 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     private void validateStatusTransition(ReturnOrder.ReturnStatus currentStatus, ReturnOrder.ReturnStatus newStatus) {
         if (currentStatus == ReturnOrder.ReturnStatus.Cancelled) {
             throw new IllegalStateException("Không thể thay đổi trạng thái của đơn trả hàng đã hủy");
-        }
-
-        if (currentStatus == ReturnOrder.ReturnStatus.Completed) {
-            throw new IllegalStateException("Không thể thay đổi trạng thái của đơn trả hàng đã hoàn thành");
         }
 
         switch (currentStatus) {
@@ -220,11 +216,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
                     throw new IllegalStateException("Đơn trả hàng đã được duyệt, chỉ có thể hủy");
                 }
                 break;
-            case Rejected:
-                if (newStatus != ReturnOrder.ReturnStatus.Cancelled) {
-                    throw new IllegalStateException("Chỉ có thể hủy đơn trả hàng đã bị từ chối");
-                }
-                break;
+            default:
+                throw new IllegalStateException("Không thể thay đổi trạng thái từ " + currentStatus);
         }
     }
 
