@@ -478,7 +478,7 @@ CREATE TABLE Purchase_Orders (
 
 CREATE TABLE Purchase_Order_Items (
     poi_id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
+    order_id INT NULL,
     pq_item_id INT,
     product_id INT NOT NULL,
     uom VARCHAR(50),
@@ -506,7 +506,7 @@ CREATE TABLE Purchase_Order_Items (
 CREATE TABLE Goods_Receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_no VARCHAR(30) UNIQUE NOT NULL,
-    order_id INT NOT NULL,
+    order_id INT NULL,
     warehouse_id INT NOT NULL,
     received_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
@@ -521,7 +521,7 @@ CREATE TABLE Goods_Receipts (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
     CONSTRAINT fk_gr_order
-      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
     CONSTRAINT fk_gr_warehouse
       FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
     CONSTRAINT fk_gr_created_by
@@ -540,7 +540,7 @@ CREATE TABLE Goods_Receipt_Items (
     gri_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_id INT NOT NULL,
     -- Dùng cho trường hợp nhập mua (purchase)
-    poi_id INT NOT NULL,
+    poi_id INT NULL,
     -- Dùng cho trường hợp nhập hàng trả bán (sales return)
     roi_id INT NULL,
     product_id INT NOT NULL,
@@ -550,7 +550,7 @@ CREATE TABLE Goods_Receipt_Items (
     CONSTRAINT fk_gri_receipt
       FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
     CONSTRAINT fk_gri_poi
-      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
     CONSTRAINT fk_gri_product
       FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_gri_receipt (receipt_id),
@@ -906,6 +906,7 @@ ALTER TABLE Goods_Receipts
   ADD CONSTRAINT fk_gr_return_order
   FOREIGN KEY (ro_id) REFERENCES return_orders(ro_id) ON DELETE SET NULL;
 
+
 -- =====================================================
 -- SALES RETURN INBOUND (ĐƠN NHẬP HÀNG LẠI TỪ ĐƠN TRẢ HÀNG)
 -- =====================================================
@@ -1159,3 +1160,27 @@ CREATE INDEX idx_stock_transfers_product_date ON Stock_Transfers(product_id, tra
 -- Activity logging indexes for audit trails
 CREATE INDEX idx_activity_logs_user_date ON Activity_Logs(user_id, log_date);
 CREATE INDEX idx_activity_logs_entity_type ON Activity_Logs(entity_id, activity_type);
+
+-- Sửa order_id để cho phép NULL (vì khi source_type = SalesReturn, order_id sẽ là NULL)
+ALTER TABLE Goods_Receipts
+  MODIFY COLUMN order_id INT NULL;
+
+-- Sửa foreign key constraint để phù hợp với nullable
+ALTER TABLE Goods_Receipts
+  DROP FOREIGN KEY fk_gr_order;
+
+ALTER TABLE Goods_Receipts
+  ADD CONSTRAINT fk_gr_order
+  FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL;
+
+  -- Sửa poi_id để cho phép NULL (vì khi source_type = SalesReturn, poi_id sẽ là NULL)
+ALTER TABLE Goods_Receipt_Items
+  MODIFY COLUMN poi_id INT NULL;
+
+-- Sửa foreign key constraint để phù hợp với nullable
+ALTER TABLE Goods_Receipt_Items
+  DROP FOREIGN KEY fk_gri_poi;
+
+ALTER TABLE Goods_Receipt_Items
+  ADD CONSTRAINT fk_gri_poi
+  FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL;

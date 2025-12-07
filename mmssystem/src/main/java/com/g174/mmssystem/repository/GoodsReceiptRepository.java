@@ -37,12 +37,17 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.purchaseOrder.orderId = :orderId AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findByOrderId(@Param("orderId") Integer orderId);
 
+    @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.returnOrder.roId = :roId AND gr.deletedAt IS NULL")
+    List<GoodsReceipt> findByReturnOrderId(@Param("roId") Integer roId);
+
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.warehouse.warehouseId = :warehouseId AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findByWarehouseId(@Param("warehouseId") Integer warehouseId);
 
     @Query("SELECT gr FROM GoodsReceipt gr " +
            "LEFT JOIN FETCH gr.purchaseOrder po " +
            "LEFT JOIN FETCH po.vendor " +
+           "LEFT JOIN FETCH gr.returnOrder ro " +
+           "LEFT JOIN FETCH ro.delivery " +
            "LEFT JOIN FETCH gr.warehouse " +
            "LEFT JOIN FETCH gr.createdBy cb " +
            "LEFT JOIN FETCH cb.profile " +
@@ -55,6 +60,7 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
            "LEFT JOIN FETCH gr.items i " +
            "LEFT JOIN FETCH i.product " +
            "LEFT JOIN FETCH i.purchaseOrderItem " +
+           "LEFT JOIN FETCH i.returnOrderItem " +
            "WHERE gr.receiptId = :id AND gr.deletedAt IS NULL")
     Optional<GoodsReceipt> findByIdWithItems(@Param("id") Integer id);
 

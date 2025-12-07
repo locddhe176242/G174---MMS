@@ -105,13 +105,34 @@ export default function SalesReturnInboundOrderDetail() {
               </p>
             </div>
           </div>
-          <span
-            className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
-              data.status
-            )}`}
-          >
-            {getStatusLabel(data.status)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span
+              className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
+                data.status
+              )}`}
+            >
+              {getStatusLabel(data.status)}
+            </span>
+            {(data.status === "Draft" || data.status === "SentToWarehouse") && (
+              <button
+                onClick={() => {
+                  console.log("=== Creating Goods Receipt from Sales Return Inbound Order ===", {
+                    sriId: data.sriId,
+                    sriNo: data.sriNo,
+                    status: data.status
+                  });
+                  if (!data.sriId) {
+                    toast.error("Không tìm thấy ID của Đơn nhập hàng lại");
+                    return;
+                  }
+                  navigate(`/purchase/goods-receipts/new?sriId=${data.sriId}`);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+              >
+                Tạo Phiếu nhập kho
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

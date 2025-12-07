@@ -281,7 +281,12 @@ export default function GoodsReceiptList() {
                                             {receipt.receipt_no || receipt.receiptNo}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {receipt.purchaseOrder?.po_no || receipt.order?.po_no || receipt.order?.poNo || receipt.order_id || "-"}
+                                            {receipt.sourceType === "SalesReturn" 
+                                                ? (receipt.returnNo || receipt.return_no ? `RO: ${receipt.returnNo || receipt.return_no}` : "-")
+                                                : (receipt.poNo || receipt.po_no || receipt.purchaseOrder?.po_no || receipt.order?.po_no || receipt.order?.poNo 
+                                                    ? (receipt.poNo || receipt.po_no || receipt.purchaseOrder?.po_no || receipt.order?.po_no || receipt.order?.poNo)
+                                                    : (receipt.order_id ? `PO ID: ${receipt.order_id}` : "-"))
+                                            }
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {receipt.warehouse?.name || receipt.warehouseName || "-"}

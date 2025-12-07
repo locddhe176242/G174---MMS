@@ -10,6 +10,8 @@ import java.util.List;
 public interface IGoodsReceiptService {
     GoodsReceiptResponseDTO createReceipt(GoodsReceiptRequestDTO dto, Integer createdById);
     
+    GoodsReceiptResponseDTO createReceiptFromSalesReturnInboundOrder(Integer sriId, GoodsReceiptRequestDTO dto, Integer createdById);
+    
     GoodsReceiptResponseDTO getReceiptById(Integer receiptId);
     
     List<GoodsReceiptResponseDTO> getAllReceipts();

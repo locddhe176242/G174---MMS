@@ -14,8 +14,17 @@ import java.util.List;
 public class GoodsReceiptResponseDTO {
     private Integer receiptId;
     private String receiptNo;
+    
+    private GoodsReceipt.SourceType sourceType;
+    
     private Integer orderId;
     private String poNo;
+    
+    private Integer roId;
+    private String returnNo;
+    private Integer sriId;
+    private String sriNo;
+    
     private Integer warehouseId;
     private String warehouseName;
     private String warehouseCode;

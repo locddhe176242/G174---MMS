@@ -17,11 +17,10 @@ public class GoodsReceiptMapper {
             return null;
         }
 
-        GoodsReceiptResponseDTO dto = GoodsReceiptResponseDTO.builder()
+        GoodsReceiptResponseDTO.GoodsReceiptResponseDTOBuilder builder = GoodsReceiptResponseDTO.builder()
                 .receiptId(receipt.getReceiptId())
                 .receiptNo(receipt.getReceiptNo())
-                .orderId(receipt.getPurchaseOrder() != null ? receipt.getPurchaseOrder().getOrderId() : null)
-                .poNo(receipt.getPurchaseOrder() != null ? receipt.getPurchaseOrder().getPoNo() : null)
+                .sourceType(receipt.getSourceType())
                 .warehouseId(receipt.getWarehouse() != null ? receipt.getWarehouse().getWarehouseId() : null)
                 .warehouseName(receipt.getWarehouse() != null ? receipt.getWarehouse().getName() : null)
                 .warehouseCode(receipt.getWarehouse() != null ? receipt.getWarehouse().getCode() : null)
@@ -39,8 +38,21 @@ public class GoodsReceiptMapper {
                         : null)
                 .approvedAt(receipt.getApprovedAt())
                 .createdAt(receipt.getCreatedAt())
-                .updatedAt(receipt.getUpdatedAt())
-                .build();
+                .updatedAt(receipt.getUpdatedAt());
+
+        // Set Purchase Order info if sourceType is Purchase
+        if (receipt.getSourceType() == GoodsReceipt.SourceType.Purchase && receipt.getPurchaseOrder() != null) {
+            builder.orderId(receipt.getPurchaseOrder().getOrderId())
+                   .poNo(receipt.getPurchaseOrder().getPoNo());
+        }
+
+        // Set Return Order info if sourceType is SalesReturn
+        if (receipt.getSourceType() == GoodsReceipt.SourceType.SalesReturn && receipt.getReturnOrder() != null) {
+            builder.roId(receipt.getReturnOrder().getRoId())
+                   .returnNo(receipt.getReturnOrder().getReturnNo());
+        }
+
+        GoodsReceiptResponseDTO dto = builder.build();
 
         // Map items if they exist
         if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
@@ -59,6 +71,7 @@ public class GoodsReceiptMapper {
                 .griId(item.getGriId())
                 .receiptId(item.getGoodsReceipt() != null ? item.getGoodsReceipt().getReceiptId() : null)
                 .poiId(item.getPurchaseOrderItem() != null ? item.getPurchaseOrderItem().getPoiId() : null)
+                .roiId(item.getReturnOrderItem() != null ? item.getReturnOrderItem().getRoiId() : null)
                 .productId(item.getProduct() != null ? item.getProduct().getProductId() : null)
                 .productName(item.getProduct() != null ? item.getProduct().getName() : null)
                 .productCode(item.getProduct() != null ? item.getProduct().getSku() : null)
@@ -66,12 +79,20 @@ public class GoodsReceiptMapper {
                 .acceptedQty(item.getAcceptedQty())
                 .remark(item.getRemark());
 
-        // Get additional info from PurchaseOrderItem if available
+        // Get additional info from PurchaseOrderItem if available (for Purchase)
         if (item.getPurchaseOrderItem() != null) {
             builder.uom(item.getPurchaseOrderItem().getUom())
                    .unitPrice(item.getPurchaseOrderItem().getUnitPrice())
                    .discountPercent(item.getPurchaseOrderItem().getDiscountPercent())
                    .taxRate(item.getPurchaseOrderItem().getTaxRate());
+        }
+
+        // Get additional info from ReturnOrderItem if available (for SalesReturn)
+        if (item.getReturnOrderItem() != null && item.getReturnOrderItem().getProduct() != null) {
+            // UOM might be stored elsewhere, check if needed
+            if (builder.build().getUom() == null) {
+                // Could get from product or other source if needed
+            }
         }
 
         return builder.build();

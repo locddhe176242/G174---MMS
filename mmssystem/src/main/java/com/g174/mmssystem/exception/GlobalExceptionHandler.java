@@ -1,8 +1,10 @@
 package com.g174.mmssystem.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,11 +13,15 @@ import org.springframework.web.context.request.WebRequest;
 
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -121,17 +127,76 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(
             MethodArgumentNotValidException ex) {
 
+        log.error("Validation error occurred: {}", ex.getMessage());
+        log.error("Binding result errors count: {}", ex.getBindingResult().getErrorCount());
+        
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
+            String fieldName = error instanceof FieldError ? ((FieldError) error).getField() : error.getObjectName();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
+            log.error("Validation error - Field: {}, Message: {}, Rejected value: {}", 
+                    fieldName, errorMessage, 
+                    error instanceof FieldError ? ((FieldError) error).getRejectedValue() : "N/A");
         });
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", HttpStatus.BAD_REQUEST.value());
         response.put("message", "Dữ liệu không hợp lệ");
+        response.put("error", "Dữ liệu không hợp lệ");
         response.put("errors", errors);
+        response.put("timestamp", LocalDateTime.now());
+        
+        log.error("Returning validation error response: {}", response);
+
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle JSON parsing errors
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex) {
+        
+        String errorMessage = "Dữ liệu không hợp lệ";
+        Throwable cause = ex.getCause();
+        
+        if (cause instanceof InvalidFormatException) {
+            InvalidFormatException ife = (InvalidFormatException) cause;
+            if (ife.getTargetType().isEnum()) {
+                Object[] enumConstants = ife.getTargetType().getEnumConstants();
+                String validValues = Arrays.stream(enumConstants)
+                        .map(Object::toString)
+                        .collect(Collectors.joining(", "));
+                errorMessage = String.format("Giá trị '%s' không hợp lệ cho trường '%s'. Các giá trị hợp lệ: %s",
+                        ife.getValue(), ife.getPath().get(ife.getPath().size() - 1).getFieldName(), validValues);
+            } else {
+                errorMessage = String.format("Giá trị '%s' không hợp lệ cho trường '%s'",
+                        ife.getValue(), ife.getPath().get(ife.getPath().size() - 1).getFieldName());
+            }
+        } else if (cause != null) {
+            errorMessage = cause.getMessage();
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        response.put("error", errorMessage);
+        response.put("message", errorMessage);
+        response.put("timestamp", LocalDateTime.now());
+
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle IllegalArgumentException and IllegalStateException
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    public ResponseEntity<Map<String, Object>> handleIllegalArgumentOrStateException(
+            RuntimeException ex) {
+        
+        log.error("IllegalArgumentOrStateException: {}", ex.getMessage(), ex);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        response.put("error", ex.getMessage() != null ? ex.getMessage() : "Dữ liệu không hợp lệ");
+        response.put("message", ex.getMessage() != null ? ex.getMessage() : "Dữ liệu không hợp lệ");
         response.put("timestamp", LocalDateTime.now());
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
@@ -147,6 +212,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("status", HttpStatus.BAD_REQUEST.value());
         response.put("error", errorMessage);
+        response.put("message", errorMessage);
         response.put("timestamp", LocalDateTime.now());
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
