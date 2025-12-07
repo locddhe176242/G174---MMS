@@ -47,14 +47,12 @@ export default function APInvoiceForm() {
     const price = Number(item.unit_price || 0);
     const discountPercent = Number(item.discount_percent || 0) / 100;
 
-    const round = (v) => Math.round(v * 100) / 100;
+    // Bước 1: Tính subtotal
+    const subtotal = qty * price;
 
-    // 1. Subtotal
-    const subtotal = round(qty * price);
-
-    // 2. Discount
-    const discountAmount = round(subtotal * discountPercent);
-    const amountAfterDiscount = round(subtotal - discountAmount);
+    // Bước 2: Áp dụng chiết khấu dòng
+    const discountAmount = subtotal * discountPercent;
+    const amountAfterDiscount = subtotal - discountAmount;
 
     return {
       subtotal,
@@ -88,27 +86,24 @@ export default function APInvoiceForm() {
   }, [formData.items]);
 
   const headerDiscountAmount = useMemo(() => {
-    const round = (v) => Math.round(v * 100) / 100;
     const discountPercent = Number(formData.header_discount || 0);
     // Header discount áp dụng trên tổng sau khi trừ chiết khấu dòng
-    return round(totalAfterLineDiscount * (discountPercent / 100));
+    return totalAfterLineDiscount * (discountPercent / 100);
   }, [totalAfterLineDiscount, formData.header_discount]);
 
   const taxAmount = useMemo(() => {
-    const round = (v) => Math.round(v * 100) / 100;
     if (!Array.isArray(formData.items)) return 0;
     // Thuế tính trên tổng sau khi trừ TẤT CẢ chiết khấu (line discount + header discount)
-    const baseAmount = round(totalAfterLineDiscount - headerDiscountAmount);
+    const baseAmount = totalAfterLineDiscount - headerDiscountAmount;
     // Lấy tax rate trung bình hoặc tax rate của dòng đầu tiên (thường các dòng cùng tax rate)
     const taxRate = formData.items.length > 0 ? (Number(formData.items[0].tax_rate || 0) / 100) : 0;
-    return round(baseAmount * taxRate);
+    return baseAmount * taxRate;
   }, [formData.items, totalAfterLineDiscount, headerDiscountAmount]);
 
   const totalAmount = useMemo(() => {
-    const round = (v) => Math.round(v * 100) / 100;
     // Công thức chuẩn ERP: Tổng = (Tổng sau CK dòng - CK tổng đơn) + Thuế
     // Thuế đã được tính trên số tiền sau tất cả chiết khấu
-    return round(totalAfterLineDiscount - headerDiscountAmount + taxAmount);
+    return totalAfterLineDiscount - headerDiscountAmount + taxAmount;
   }, [totalAfterLineDiscount, headerDiscountAmount, taxAmount]);
 
   const balanceAmount = useMemo(() => {
@@ -854,7 +849,7 @@ export default function APInvoiceForm() {
                                 )}
                               </td>
                               <td className="py-3 pr-4 text-right font-medium">
-                                {formatCurrency(calc.amountAfterDiscount)}
+                                {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || 0))}
                               </td>
                               <td className="py-3 pr-4 text-center">
                                 <button
@@ -874,7 +869,7 @@ export default function APInvoiceForm() {
                       <tfoot>
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
-                            Tổng giá trị hàng:
+                            Tạm tính:
                           </td>
                           <td className="py-3 pr-4 text-right">
                             {formatCurrency(totalBeforeTax)}
@@ -899,14 +894,24 @@ export default function APInvoiceForm() {
                           </td>
                         </tr>
                         {formData.header_discount > 0 && (
-                          <tr className="border-t font-semibold bg-gray-50">
-                            <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
-                              Chiết khấu tổng đơn ({formData.header_discount}%):
-                            </td>
-                            <td className="py-3 pr-4 text-right text-red-600">
-                              -{formatCurrency(headerDiscountAmount)}
-                            </td>
-                          </tr>
+                          <>
+                            <tr className="border-t font-semibold bg-gray-50">
+                              <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
+                                Chiết khấu tổng đơn ({formData.header_discount}%):
+                              </td>
+                              <td className="py-3 pr-4 text-right text-red-600">
+                                -{formatCurrency(headerDiscountAmount)}
+                              </td>
+                            </tr>
+                            <tr className="border-t font-semibold bg-gray-50">
+                              <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
+                                Tiền sau khi chiết khấu tổng đơn:
+                              </td>
+                              <td className="py-3 pr-4 text-right font-bold">
+                                {formatCurrency(totalAfterLineDiscount - headerDiscountAmount)}
+                              </td>
+                            </tr>
+                          </>
                         )}
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">

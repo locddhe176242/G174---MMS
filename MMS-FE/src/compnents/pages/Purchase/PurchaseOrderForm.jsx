@@ -1307,7 +1307,7 @@ export default function PurchaseOrderForm() {
                                                             )}
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2 text-sm font-medium">
-                                                            {formatCurrency(item.line_total || 0)}
+                                                            {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || 0))}
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2">
                                                             <button
@@ -1327,7 +1327,7 @@ export default function PurchaseOrderForm() {
                                             <tfoot>
                                             <tr className="bg-gray-50">
                                                 <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
-                                                    Tổng giá trị hàng:
+                                                    Tạm tính:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
                                                     {formatCurrency(totalBeforeTax)}
@@ -1355,15 +1355,26 @@ export default function PurchaseOrderForm() {
                                                 <td className="border border-gray-200"></td>
                                             </tr>
                                             {formData.header_discount > 0 && (
-                                                <tr className="bg-gray-50">
-                                                    <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
-                                                        Chiết khấu tổng đơn ({formData.header_discount}%):
-                                                    </td>
-                                                    <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
-                                                        -{formatCurrency(headerDiscountAmount)}
-                                                    </td>
-                                                    <td className="border border-gray-200"></td>
-                                                </tr>
+                                                <>
+                                                    <tr className="bg-gray-50">
+                                                        <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                            Chiết khấu tổng đơn ({formData.header_discount}%):
+                                                        </td>
+                                                        <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
+                                                            -{formatCurrency(headerDiscountAmount)}
+                                                        </td>
+                                                        <td className="border border-gray-200"></td>
+                                                    </tr>
+                                                    <tr className="bg-gray-50">
+                                                        <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">
+                                                            Tiền sau khi chiết khấu tổng đơn:
+                                                        </td>
+                                                        <td className="border border-gray-200 px-4 py-2 font-semibold">
+                                                            {formatCurrency(totalAfterLineDiscount - headerDiscountAmount)}
+                                                        </td>
+                                                        <td className="border border-gray-200"></td>
+                                                    </tr>
+                                                </>
                                             )}
                                             <tr className="bg-gray-50">
                                                 <td colSpan={6} className="border border-gray-200 px-4 py-2 text-right font-semibold">

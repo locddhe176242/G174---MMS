@@ -23,6 +23,7 @@ public class APInvoiceResponseDTO {
     private String poNo;
     private Integer receiptId;
     private String receiptNo;
+    private String paymentTerms;
     private LocalDate invoiceDate;
     private LocalDate dueDate;
     private BigDecimal subtotal;

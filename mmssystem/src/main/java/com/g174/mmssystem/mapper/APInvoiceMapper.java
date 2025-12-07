@@ -28,6 +28,7 @@ public class APInvoiceMapper {
                 .poNo(invoice.getPurchaseOrder() != null ? invoice.getPurchaseOrder().getPoNo() : null)
                 .receiptId(invoice.getGoodsReceipt() != null ? invoice.getGoodsReceipt().getReceiptId() : null)
                 .receiptNo(invoice.getGoodsReceipt() != null ? invoice.getGoodsReceipt().getReceiptNo() : null)
+                .paymentTerms(invoice.getPurchaseOrder() != null ? invoice.getPurchaseOrder().getPaymentTerms() : null)
                 .invoiceDate(invoice.getInvoiceDate())
                 .dueDate(invoice.getDueDate())
                 .subtotal(invoice.getSubtotal())

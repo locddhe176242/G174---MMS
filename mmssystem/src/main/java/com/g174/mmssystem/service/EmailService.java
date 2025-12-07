@@ -414,14 +414,33 @@ public class EmailService {
         html.append("<meta charset='UTF-8'>");
         html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
         html.append("<style>");
-        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }");
         html.append(".container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
-        html.append(".header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; }");
-        html.append(".info-box { background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #10b981; }");
-        html.append(".footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e9ecef; }");
-        html.append("table { width: 100%; border-collapse: collapse; margin: 15px 0; }");
-        html.append("th { background-color: #10b981; color: white; padding: 10px; text-align: left; }");
-        html.append("td { padding: 10px; border-bottom: 1px solid #dee2e6; }");
+        html.append(".header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; }");
+        html.append(".info-section { margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px; }");
+        html.append(".info-row { display: flex; margin: 8px 0; }");
+        html.append(".info-label { font-weight: 600; min-width: 200px; color: #495057; }");
+        html.append(".info-value { color: #212529; }");
+        html.append(".table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }");
+        html.append("table { width: 100%; border-collapse: collapse; margin: 15px 0; min-width: 700px; }");
+        html.append("th { background-color: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; white-space: nowrap; }");
+        html.append("td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; }");
+        html.append("tr:hover { background-color: #f8f9fa; }");
+        html.append(".text-right { text-align: right; }");
+        html.append(".summary-box { background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0; }");
+        html.append(".summary-row { display: flex; justify-content: space-between; margin: 8px 0; padding: 8px 0; }");
+        html.append(".summary-label { font-weight: 500; color: #495057; }");
+        html.append(".summary-value { font-weight: 600; color: #212529; }");
+        html.append(".total-row { border-top: 2px solid #667eea; padding-top: 12px !important; margin-top: 12px; }");
+        html.append(".total-value { color: #667eea; font-size: 24px; }");
+        html.append(".footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e9ecef; font-size: 14px; color: #6c757d; }");
+        html.append(".highlight { background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; font-weight: 600; }");
+        html.append("@media only screen and (max-width: 600px) { ");
+        html.append("  .info-row, .summary-row { flex-direction: column; }");
+        html.append("  .info-label { min-width: auto; margin-bottom: 4px; }");
+        html.append("  table { font-size: 12px; }");
+        html.append("  th, td { padding: 8px 6px; }");
+        html.append("}");
         html.append("</style>");
         html.append("</head>");
         html.append("<body>");
@@ -429,36 +448,72 @@ public class EmailService {
         
         // Header
         html.append("<div class='header'>");
-        html.append("<h1 style='margin: 0; font-size: 24px;'>✅ Purchase Order Confirmation</h1>");
-        html.append("<p style='margin: 10px 0 0 0; opacity: 0.9;'>Xác nhận đơn đặt hàng</p>");
+        html.append("<h1 style='margin: 0; font-size: 28px;'>🛒 Đơn Đặt Hàng</h1>");
+        html.append("<p style='margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;'>Purchase Order Confirmation</p>");
         html.append("</div>");
         
         // Greeting
-        html.append("<p>Kính gửi <strong>").append(po.getVendor().getName()).append("</strong>,</p>");
-        html.append("<p>Chúng tôi xin gửi đến Quý công ty <strong>Đơn đặt hàng</strong> với thông tin chi tiết như sau:</p>");
+        html.append("<p style='font-size: 16px;'>Kính gửi <strong style='color: #667eea;'>").append(po.getVendor().getName()).append("</strong>,</p>");
+        html.append("<p>Chúng tôi trân trọng gửi đến Quý công ty <strong>Đơn đặt hàng chính thức</strong> với thông tin chi tiết như sau:</p>");
         
-        // PO Info
-        html.append("<div class='info-box'>");
-        html.append("<p style='margin: 5px 0;'><strong>📋 Số đơn hàng:</strong> ").append(po.getPoNo()).append("</p>");
-        html.append("<p style='margin: 5px 0;'><strong>📅 Ngày đặt hàng:</strong> ").append(po.getOrderDate().format(dateFormatter)).append("</p>");
+        // PO Info Section
+        html.append("<div class='info-section'>");
+        html.append("<h3 style='margin-top: 0; color: #667eea;'>📋 Thông tin đơn hàng</h3>");
+        html.append("<div class='info-row'>");
+        html.append("<div class='info-label'>Số đơn hàng:</div>");
+        html.append("<div class='info-value'><strong style='color: #667eea; font-size: 18px;'>").append(po.getPoNo()).append("</strong></div>");
+        html.append("</div>");
+        html.append("<div class='info-row'>");
+        html.append("<div class='info-label'>Ngày đặt hàng:</div>");
+        html.append("<div class='info-value'>").append(po.getOrderDate().format(dateFormatter)).append("</div>");
+        html.append("</div>");
         if (po.getDeliveryDate() != null) {
-            html.append("<p style='margin: 5px 0;'><strong>🚚 Ngày giao hàng:</strong> ").append(po.getDeliveryDate().format(dateFormatter)).append("</p>");
+            html.append("<div class='info-row'>");
+            html.append("<div class='info-label'>Ngày giao hàng dự kiến:</div>");
+            html.append("<div class='info-value'><span class='highlight'>").append(po.getDeliveryDate().format(dateFormatter)).append("</span></div>");
+            html.append("</div>");
         }
         if (po.getPaymentTerms() != null && !po.getPaymentTerms().isEmpty()) {
-            html.append("<p style='margin: 5px 0;'><strong>💳 Điều khoản thanh toán:</strong> ").append(po.getPaymentTerms()).append("</p>");
+            html.append("<div class='info-row'>");
+            html.append("<div class='info-label'>Điều khoản thanh toán:</div>");
+            html.append("<div class='info-value'><strong>").append(po.getPaymentTerms()).append("</strong></div>");
+            html.append("</div>");
+        }
+        if (po.getCreatedBy() != null) {
+            html.append("<div class='info-row'>");
+            html.append("<div class='info-label'>Người tạo đơn:</div>");
+            String creatorName = po.getCreatedBy().getEmployeeCode();
+            if (po.getCreatedBy().getProfile() != null) {
+                String firstName = po.getCreatedBy().getProfile().getFirstName();
+                String lastName = po.getCreatedBy().getProfile().getLastName();
+                if (firstName != null && lastName != null) {
+                    creatorName = lastName + " " + firstName;
+                } else if (firstName != null) {
+                    creatorName = firstName;
+                } else if (lastName != null) {
+                    creatorName = lastName;
+                }
+            }
+            html.append("<div class='info-value'>").append(creatorName).append("</div>");
+            html.append("</div>");
         }
         html.append("</div>");
         
         // Items table
-        html.append("<h3 style='color: #10b981; margin: 20px 0 10px 0;'>Chi tiết sản phẩm</h3>");
+        html.append("<h3 style='color: #667eea; margin: 25px 0 10px 0;'>📦 Chi tiết sản phẩm đặt hàng</h3>");
+        html.append("<div class='table-responsive'>");
         html.append("<table>");
         html.append("<thead>");
         html.append("<tr>");
-        html.append("<th>STT</th>");
-        html.append("<th>Sản phẩm</th>");
-        html.append("<th>Số lượng</th>");
-        html.append("<th>Đơn giá</th>");
-        html.append("<th>Thành tiền</th>");
+        html.append("<th style='width: 50px;'>STT</th>");
+        html.append("<th>Mã SP</th>");
+        html.append("<th>Tên sản phẩm</th>");
+        html.append("<th>Thông số</th>");
+        html.append("<th style='text-align: center;'>ĐVT</th>");
+        html.append("<th style='text-align: right;'>Số lượng</th>");
+        html.append("<th style='text-align: right;'>Đơn giá</th>");
+        html.append("<th style='text-align: right;'>Chiết khấu</th>");
+        html.append("<th style='text-align: right;'>Thành tiền</th>");
         html.append("</tr>");
         html.append("</thead>");
         html.append("<tbody>");
@@ -467,20 +522,77 @@ public class EmailService {
         for (com.g174.mmssystem.entity.PurchaseOrderItem item : po.getItems()) {
             html.append("<tr>");
             html.append("<td>").append(index++).append("</td>");
-            html.append("<td>").append(item.getProduct().getName()).append("</td>");
-            html.append("<td>").append(item.getQuantity()).append(" ").append(item.getUom() != null ? item.getUom() : "").append("</td>");
-            html.append("<td>").append(String.format("%,.0f VNĐ", item.getUnitPrice())).append("</td>");
-            html.append("<td>").append(String.format("%,.0f VNĐ", item.getLineTotal())).append("</td>");
+            html.append("<td><strong>").append(item.getProduct().getSku() != null ? item.getProduct().getSku() : "-").append("</strong></td>");
+            html.append("<td><strong>").append(item.getProduct().getName()).append("</strong></td>");
+            html.append("<td>").append(item.getProduct().getDescription() != null ? item.getProduct().getDescription() : "-").append("</td>");
+            html.append("<td style='text-align: center;'>").append(item.getUom() != null ? item.getUom() : "-").append("</td>");
+            html.append("<td class='text-right'><strong>").append(item.getQuantity()).append("</strong></td>");
+            html.append("<td class='text-right'>").append(String.format("%,.0f", item.getUnitPrice())).append("</td>");
+            html.append("<td class='text-right'>");
+            if (item.getDiscountPercent() != null && item.getDiscountPercent().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                html.append(item.getDiscountPercent()).append("%");
+            } else {
+                html.append("-");
+            }
+            html.append("</td>");
+            
+            // Calculate subtotal (quantity * unit_price)
+            java.math.BigDecimal subtotal = item.getUnitPrice().multiply(item.getQuantity());
+            html.append("<td class='text-right'><strong>").append(String.format("%,.0f", subtotal)).append("</strong></td>");
             html.append("</tr>");
         }
         
         html.append("</tbody>");
         html.append("</table>");
+        html.append("</div>");
         
-        // Total
-        html.append("<div style='text-align: right; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 6px;'>");
-        html.append("<p style='margin: 5px 0; font-size: 18px;'><strong>Tổng giá trị đơn hàng: </strong>");
-        html.append("<span style='color: #10b981; font-size: 22px;'>").append(String.format("%,.0f VNĐ", po.getTotalAfterTax())).append("</span></p>");
+        // Summary Box with detailed calculations
+        html.append("<div class='summary-box'>");
+        html.append("<h3 style='margin-top: 0; color: #667eea;'>💰 Tổng kết thanh toán</h3>");
+        
+        html.append("<div class='summary-row'>");
+        html.append("<div class='summary-label'>Tạm tính (Tổng giá trị hàng):</div>");
+        html.append("<div class='summary-value'>").append(String.format("%,.0f VNĐ", po.getTotalBeforeTax())).append("</div>");
+        html.append("</div>");
+        
+        if (po.getHeaderDiscount() != null && po.getHeaderDiscount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            // Calculate discount amount
+            java.math.BigDecimal totalAfterLineDiscount = po.getItems().stream()
+                .map(item -> {
+                    java.math.BigDecimal subtotal = item.getUnitPrice().multiply(item.getQuantity());
+                    if (item.getDiscountPercent() != null && item.getDiscountPercent().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal discount = subtotal.multiply(item.getDiscountPercent()).divide(new java.math.BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+                        return subtotal.subtract(discount);
+                    }
+                    return subtotal;
+                })
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            
+            java.math.BigDecimal headerDiscountAmount = totalAfterLineDiscount.multiply(po.getHeaderDiscount()).divide(new java.math.BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+            
+            html.append("<div class='summary-row'>");
+            html.append("<div class='summary-label'>Chiết khấu tổng đơn (").append(po.getHeaderDiscount()).append("%):</div>");
+            html.append("<div class='summary-value' style='color: #dc2626;'>- ").append(String.format("%,.0f VNĐ", headerDiscountAmount)).append("</div>");
+            html.append("</div>");
+            
+            java.math.BigDecimal totalAfterHeaderDiscount = totalAfterLineDiscount.subtract(headerDiscountAmount);
+            html.append("<div class='summary-row'>");
+            html.append("<div class='summary-label'>Tiền sau chiết khấu tổng đơn:</div>");
+            html.append("<div class='summary-value'>").append(String.format("%,.0f VNĐ", totalAfterHeaderDiscount)).append("</div>");
+            html.append("</div>");
+        }
+        
+        if (po.getTaxAmount() != null && po.getTaxAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            html.append("<div class='summary-row'>");
+            html.append("<div class='summary-label'>Thuế VAT (10%):</div>");
+            html.append("<div class='summary-value' style='color: #ea580c;'>+ ").append(String.format("%,.0f VNĐ", po.getTaxAmount())).append("</div>");
+            html.append("</div>");
+        }
+        
+        html.append("<div class='summary-row total-row'>");
+        html.append("<div class='summary-label' style='font-size: 20px; font-weight: 700;'>Tổng giá trị đơn hàng:</div>");
+        html.append("<div class='summary-value total-value'>").append(String.format("%,.0f VNĐ", po.getTotalAfterTax())).append("</div>");
+        html.append("</div>");
         html.append("</div>");
         
         // Instructions

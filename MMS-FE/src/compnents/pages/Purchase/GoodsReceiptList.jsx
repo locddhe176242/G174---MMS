@@ -279,8 +279,16 @@ export default function GoodsReceiptList() {
                                 </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                {receipts.map((receipt) => (
-                                    <tr key={receipt.receipt_id || receipt.id} className="hover:bg-gray-50">
+                                {receipts.map((receipt, index) => {
+                                    // Tạo màu nền cho các GR cùng PO
+                                    const poNo = receipt.poNo || receipt.po_no;
+                                    const prevPoNo = index > 0 ? (receipts[index - 1].poNo || receipts[index - 1].po_no) : null;
+                                    const nextPoNo = index < receipts.length - 1 ? (receipts[index + 1].poNo || receipts[index + 1].po_no) : null;
+                                    const isGrouped = poNo === prevPoNo || poNo === nextPoNo;
+                                    const bgClass = isGrouped ? 'bg-blue-50' : 'bg-white';
+                                    
+                                    return (
+                                    <tr key={receipt.receipt_id || receipt.id} className={`hover:bg-gray-50 ${bgClass}`}>
                                         <td className="px-6 py-4">
                                             <input type="checkbox" className="rounded border-gray-300" />
                                         </td>
@@ -392,7 +400,8 @@ export default function GoodsReceiptList() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         )}

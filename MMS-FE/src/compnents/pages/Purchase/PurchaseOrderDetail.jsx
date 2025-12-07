@@ -410,7 +410,7 @@ export default function PurchaseOrderDetail() {
                                                             {formatCurrency(item.tax_amount || item.taxAmount || 0)}
                                                         </td>
                                                         <td className="py-3 pr-0 text-right font-medium">
-                                                            {formatCurrency(itemTotal)}
+                                                            {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || item.unitPrice || 0))}
                                                         </td>
                                                     </tr>
                                                 );

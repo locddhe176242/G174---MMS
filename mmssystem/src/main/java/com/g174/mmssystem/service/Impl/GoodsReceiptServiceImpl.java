@@ -334,23 +334,25 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             log.info("All items fully received. Updating PO {} status to Completed", purchaseOrder.getOrderId());
             purchaseOrder.setStatus(PurchaseOrderStatus.Completed);
             orderRepository.save(purchaseOrder);
+            
+            // Auto-create AP Invoice when PO is completed (all items received)
+            // Invoice will include ALL goods receipts of this PO
+            try {
+                log.info("Auto-creating AP Invoice for completed PO ID: {} (includes all GRs)", purchaseOrder.getOrderId());
+                apInvoiceService.createInvoiceFromPurchaseOrder(purchaseOrder.getOrderId());
+                log.info("AP Invoice created successfully for completed PO ID: {}", purchaseOrder.getOrderId());
+            } catch (IllegalStateException e) {
+                log.warn("AP Invoice not created for PO ID: {}. Reason: {}", purchaseOrder.getOrderId(), e.getMessage());
+            } catch (Exception e) {
+                log.error("Failed to auto-create AP Invoice for PO ID: {}. Error: {}", purchaseOrder.getOrderId(), e.getMessage(), e);
+            }
         } else if (anyItemPartiallyReceived) {
-            log.info("Partial delivery detected for PO {}. Status remains Sent (partially received)", purchaseOrder.getOrderId());
+            log.info("Partial delivery detected for PO {}. Status remains Sent (partially received). Invoice will be created when fully received.", purchaseOrder.getOrderId());
             // Keep status as Sent - indicates delivery in progress
+            // Invoice will NOT be created until all items are received
         }
         
         log.info("Goods receipt approved successfully, PO items and warehouse stock updated");
-
-        // Auto-create AP Invoice in separate transaction (REQUIRES_NEW)
-        try {
-            log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
-            apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
-            log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
-        } catch (IllegalStateException e) {
-            log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to auto-create AP Invoice for Goods Receipt ID: {}. Error: {}", receiptId, e.getMessage(), e);
-        }
         
         // Load full relations for response - split queries to avoid cartesian product
         GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())

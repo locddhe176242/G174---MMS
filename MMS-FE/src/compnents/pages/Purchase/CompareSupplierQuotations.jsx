@@ -17,6 +17,7 @@ export default function CompareSupplierQuotations() {
     const [err, setErr] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [isManager, setIsManager] = useState(false);
+    const [hasPurchaseOrder, setHasPurchaseOrder] = useState(false);
 
     // Helpers
     const formatDate = (dateString, format = "MM/DD/YYYY") => {
@@ -222,27 +223,51 @@ export default function CompareSupplierQuotations() {
                         }
                         return best;
                     }, null);
-                    quotes = quotes.map(q => ({
-                        pqId: q.pqId || q.pq_id,
-                        pqNo: q.pqNo || q.pq_no,
-                        vendorId: q.vendorId || q.vendor_id,
-                        vendorName: q.vendorName || q.vendor_name || '',
-                        vendorAddress: q.vendorAddress || q.vendor_address || '',
-                        status: q.status,
-                        totalAmount: Number(q.totalAmount || q.total_amount || 0),
-                        quotationDate: q.pqDate || q.pq_date || q.createdAt || q.created_at,
-                        fullyQuotedItems: q.items?.length || 0,
-                        totalItems: rfq?.items?.length || 0,
-                        deliveryLeadTime: q.deliveryLeadTime || q.delivery_lead_time || '-',
-                        paymentTerms: q.paymentTerms || q.payment_terms || '-',
-                        deliveryTerms: q.deliveryTerms || q.delivery_terms || '-',
-                        isBest: (q.pqId || q.pq_id) === (best?.pqId || best?.pq_id)
-                    }));
+                    quotes = quotes.map(q => {
+                        // Calculate expected delivery date from leadTimeDays
+                        let expectedDeliveryDate = '-';
+                        const leadTimeDays = q.leadTimeDays || q.lead_time_days;
+                        if (leadTimeDays && (q.pqDate || q.pq_date || q.createdAt || q.created_at)) {
+                            const baseDate = new Date(q.pqDate || q.pq_date || q.createdAt || q.created_at);
+                            const deliveryDate = new Date(baseDate);
+                            deliveryDate.setDate(baseDate.getDate() + Number(leadTimeDays));
+                            expectedDeliveryDate = deliveryDate.toLocaleDateString('vi-VN');
+                        }
+                        
+                        return {
+                            pqId: q.pqId || q.pq_id,
+                            pqNo: q.pqNo || q.pq_no,
+                            vendorId: q.vendorId || q.vendor_id,
+                            vendorName: q.vendorName || q.vendor_name || '',
+                            vendorAddress: q.vendorAddress || q.vendor_address || '',
+                            status: q.status,
+                            totalAmount: Number(q.totalAmount || q.total_amount || 0),
+                            quotationDate: q.pqDate || q.pq_date || q.createdAt || q.created_at,
+                            fullyQuotedItems: q.items?.length || 0,
+                            totalItems: rfq?.items?.length || 0,
+                            leadTimeDays: leadTimeDays || null,
+                            deliveryLeadTime: leadTimeDays ? `${leadTimeDays} ngày` : '-',
+                            expectedDeliveryDate: expectedDeliveryDate,
+                            paymentTerms: q.paymentTerms || q.payment_terms || '-',
+                            deliveryTerms: q.deliveryTerms || q.delivery_terms || '-',
+                            isBest: (q.pqId || q.pq_id) === (best?.pqId || best?.pq_id)
+                        };
+                    });
+                }
+
+                // Check if any quotation already has PO created
+                let hasExistingPO = false;
+                try {
+                    const response = await apiClient.get(`/purchase-orders/rfq/${id}`);
+                    hasExistingPO = response.data && response.data.length > 0;
+                } catch (e) {
+                    console.log("No existing PO or error checking:", e);
                 }
 
                 if (mounted) {
                     setRfqData(rfq);
                     setQuotations(quotes);
+                    setHasPurchaseOrder(hasExistingPO);
                 }
             } catch (e) {
                 console.error("Error loading compare quotations:", e);
@@ -354,12 +379,30 @@ export default function CompareSupplierQuotations() {
                 console.warn('Could not close RFQ:', closeErr);
             }
 
-            // 4. Navigate to PO form with quotation_id and pr_id
+            // 4. Get full quotation details before navigating
+            let fullQuotationData = null;
+            try {
+                fullQuotationData = await purchaseQuotationService.getQuotationById(selectedId);
+            } catch (err) {
+                console.warn('Could not load full quotation details:', err);
+                fullQuotationData = selectedQuotation;
+            }
+
+            // 5. Navigate to PO form with full data
             console.log('Navigating to PO form with quotation_id:', selectedId);
             const prId = rfqData?.prId || rfqData?.pr_id;
+            const rfqId = rfqData?.rfqId || rfqData?.rfq_id || id;
+            
+            // Store quotation data in sessionStorage to pass to PO form
+            sessionStorage.setItem('selectedQuotationData', JSON.stringify({
+                quotation: fullQuotationData,
+                rfqId: rfqId,
+                prId: prId
+            }));
+            
             const navUrl = prId 
-                ? `/purchase/purchase-orders/new?quotation_id=${selectedId}&pr_id=${prId}`
-                : `/purchase/purchase-orders/new?quotation_id=${selectedId}`;
+                ? `/purchase/purchase-orders/new?quotation_id=${selectedId}&pr_id=${prId}&rfq_id=${rfqId}`
+                : `/purchase/purchase-orders/new?quotation_id=${selectedId}&rfq_id=${rfqId}`;
             navigate(navUrl);
         } catch (error) {
             console.error('Error awarding quotation:', error);
@@ -544,13 +587,18 @@ export default function CompareSupplierQuotations() {
                             >
                                 Quay lại
                             </button>
-                            {isManager && (
+                            {isManager && !hasPurchaseOrder && (
                                 <button
                                     onClick={handleCompareAward}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                                 >
                                     Phê duyệt và tạo đơn mua hàng
                                 </button>
+                            )}
+                            {hasPurchaseOrder && (
+                                <div className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg">
+                                    ✓ Đã tạo đơn mua hàng
+                                </div>
                             )}
                         </div>
                     </div>

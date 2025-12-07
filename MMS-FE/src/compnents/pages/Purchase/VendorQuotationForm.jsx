@@ -71,29 +71,20 @@ const VendorQuotationForm = () => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
         const discountPercent = Number(item.discountPercent || 0) / 100;
-        const taxRate = Number(item.taxRate || 0) / 100;
 
         const round = (v) => Math.round(v * 100) / 100;
 
         // 1. Tính tổng tiền Subtotal
         const subtotal = round(qty * price);
 
-        // 2. Discount
+        // 2. Chiết khấu dòng
         const discountAmount = round(subtotal * discountPercent);
         const amountAfterDiscount = round(subtotal - discountAmount);
-
-        // 3. Tax (Exclusive VAT)
-        const tax = round(amountAfterDiscount * taxRate);
-
-        // 4. Total
-        const lineTotal = round(amountAfterDiscount + tax);
 
         return {
             subtotal,
             discountAmount,
-            amountAfterDiscount,
-            tax,
-            total: lineTotal
+            amountAfterDiscount
         };
     };
 
@@ -101,40 +92,51 @@ const VendorQuotationForm = () => {
     const calculateTotals = useMemo(() => {
         if (!Array.isArray(formData.items)) return { subtotal: 0, tax: 0, total: 0 };
 
+        const round = (v) => Math.round(v * 100) / 100;
+
+        // 1. Subtotal (tổng tiền hàng chưa CK)
         const subtotal = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.subtotal;
         }, 0);
 
+        // 2. Chiết khấu dòng
         const totalDiscount = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.discountAmount;
         }, 0);
 
+        // 3. Tổng sau CK dòng
         const totalAfterLineDiscount = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.amountAfterDiscount;
         }, 0);
 
-        const tax = formData.items.reduce((sum, item) => {
-            const calc = calculateItemTotal(item);
-            return sum + calc.tax;
-        }, 0);
-
-        const round = (v) => Math.round(v * 100) / 100;
-        
+        // 4. Chiết khấu tổng đơn (header discount)
         const headerDiscountPercent = Number(formData.headerDiscount || 0);
         const headerDiscountAmount = round(totalAfterLineDiscount * (headerDiscountPercent / 100));
         
+        // 5. Tiền sau khi trừ CK tổng đơn
+        const amountAfterAllDiscounts = round(totalAfterLineDiscount - headerDiscountAmount);
+
+        // 6. Thuế (tính trên số tiền sau khi trừ TẤT CẢ chiết khấu)
+        const taxRate = formData.items.length > 0 ? (Number(formData.items[0].taxRate || 0) / 100) : 0;
+        const tax = round(amountAfterAllDiscounts * taxRate);
+
+        // 7. Phí vận chuyển (không chịu thuế, không chịu CK)
         const shipping = round(Number(formData.shippingCost || 0));
-        const total = round(totalAfterLineDiscount - headerDiscountAmount + tax + shipping);
+
+        // 8. Tổng cuối cùng
+        const total = round(amountAfterAllDiscounts + tax + shipping);
 
         return { 
             subtotal, 
             totalDiscount,
             totalAfterLineDiscount,
-            tax, 
             headerDiscountAmount,
+            amountAfterAllDiscounts,
+            tax, 
+            shipping,
             total 
         };
     }, [formData.items, formData.headerDiscount, formData.shippingCost]);
@@ -850,7 +852,7 @@ const VendorQuotationForm = () => {
                                             />
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {formatCurrency(item.lineTotal || 0)}
+                                            {formatCurrency((Number(item.quantity || 0) * Number(item.unitPrice || 0)))}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
@@ -867,7 +869,7 @@ const VendorQuotationForm = () => {
                                 <tfoot>
                                 <tr className="bg-gray-50 font-semibold">
                                     <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                        Tổng giá trị hàng:
+                                        Tạm tính:
                                     </td>
                                     <td className="border border-gray-200 px-2 py-1 text-xs">
                                         {formatCurrency(calculateTotals.subtotal)}
@@ -895,15 +897,26 @@ const VendorQuotationForm = () => {
                                     <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
                                 {formData.headerDiscount > 0 && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                            Chiết khấu tổng đơn ({formData.headerDiscount}%):
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
-                                            -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1"></td>
-                                    </tr>
+                                    <>
+                                        <tr className="bg-gray-50">
+                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                                Chiết khấu tổng đơn ({formData.headerDiscount}%):
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
+                                                -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1"></td>
+                                        </tr>
+                                        <tr className="bg-gray-50">
+                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                                Tiền sau khi chiết khấu tổng đơn:
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1 text-xs font-medium">
+                                                {formatCurrency(calculateTotals.amountAfterAllDiscounts || 0)}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1"></td>
+                                        </tr>
+                                    </>
                                 )}
                                 {!formData.isTaxIncluded && (
                                     <tr className="bg-gray-50">

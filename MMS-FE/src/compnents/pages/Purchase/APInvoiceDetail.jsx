@@ -246,7 +246,7 @@ export default function APInvoiceDetail() {
                               {Number(item.tax_rate || item.taxRate || 0).toFixed(2)}%
                             </td>
                             <td className="py-3 pr-0 text-right font-medium">
-                              {formatCurrency(item.line_total || item.lineTotal || 0)}
+                              {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || item.unitPrice || 0))}
                             </td>
                           </tr>
                         ))}
@@ -254,7 +254,7 @@ export default function APInvoiceDetail() {
                       <tfoot>
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
-                            Tổng giá trị hàng:
+                            Tạm tính:
                           </td>
                           <td className="py-3 pr-4 text-right">
                             {formatCurrency(subtotal)}
@@ -361,9 +361,17 @@ export default function APInvoiceDetail() {
                 <div>
                   <span className="text-gray-500">Nhà cung cấp: </span>
                   <span className="font-medium">
-                    {data.vendor?.name || vendors.find(v => (v.vendor_id || v.id) === (data.vendor_id || data.vendorId))?.name || "-"}
+                    {data.vendorName || data.vendor_name || data.vendor?.name || "-"}
                   </span>
                 </div>
+                {(data.vendorCode || data.vendor_code) && (
+                  <div>
+                    <span className="text-gray-500">Mã NCC: </span>
+                    <span className="font-medium">
+                      {data.vendorCode || data.vendor_code}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <span className="text-gray-500">Ngày hóa đơn: </span>
                   <span className="font-medium">
