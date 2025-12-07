@@ -41,6 +41,7 @@ import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.
 import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
 import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
 import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
+import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
 import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
 import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
 import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
@@ -146,6 +147,7 @@ function App() {
                 <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
 
                 <Route path="/purchase/ap-payments" element={<APaymentList />} />
+                <Route path="/purchase/ap-payments/:id" element={<APaymentDetail />} />
 
                 <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
                 <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
