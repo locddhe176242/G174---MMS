@@ -37,6 +37,10 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final WarehouseStockRepository warehouseStockRepository;
     private final IAPInvoiceService apInvoiceService;
     private final APInvoiceRepository apInvoiceRepository;
+    private final SalesReturnInboundOrderRepository salesReturnInboundOrderRepository;
+    private final SalesReturnInboundOrderItemRepository salesReturnInboundOrderItemRepository;
+    private final ReturnOrderRepository returnOrderRepository;
+    private final ReturnOrderItemRepository returnOrderItemRepository;
 
     @Override
     @Transactional
@@ -78,6 +82,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 .warehouse(warehouse)
                 .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate() : LocalDateTime.now())
                 .status(GoodsReceipt.GoodsReceiptStatus.Pending)
+                .sourceType(GoodsReceipt.SourceType.Purchase)
                 .createdBy(createdBy)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -112,6 +117,192 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
 
         log.info("Goods receipt created successfully with ID: {} and number: {}", saved.getReceiptId(), saved.getReceiptNo());
         return receiptMapper.toResponseDTO(savedWithRelations);
+    }
+
+    @Override
+    @Transactional
+    public GoodsReceiptResponseDTO createReceiptFromSalesReturnInboundOrder(Integer sriId, GoodsReceiptRequestDTO dto, Integer createdById) {
+        try {
+            log.info("Creating goods receipt from Sales Return Inbound Order ID: {}, Warehouse ID: {}", sriId, dto.getWarehouseId());
+            log.info("DTO: receiptNo={}, warehouseId={}, receivedDate={}, sourceType={}, itemsCount={}", 
+                    dto.getReceiptNo(), dto.getWarehouseId(), dto.getReceivedDate(), dto.getSourceType(), 
+                    dto.getItems() != null ? dto.getItems().size() : 0);
+
+        // Validate and load Sales Return Inbound Order
+        SalesReturnInboundOrder inboundOrder = salesReturnInboundOrderRepository.findById(sriId)
+                .filter(sri -> sri.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales Return Inbound Order not found with ID: " + sriId));
+
+        // Validate status: must be Draft or SentToWarehouse (không cần Approved)
+        if (inboundOrder.getStatus() != SalesReturnInboundOrder.Status.Draft &&
+            inboundOrder.getStatus() != SalesReturnInboundOrder.Status.SentToWarehouse) {
+            throw new IllegalStateException("Sales Return Inbound Order must be Draft or SentToWarehouse to create Goods Receipt");
+        }
+
+        // Check if Sales Return Inbound Order already has an approved Goods Receipt
+        List<GoodsReceipt> existingReceipts = receiptRepository.findByReturnOrderId(inboundOrder.getReturnOrder().getRoId());
+        boolean hasApprovedReceipt = existingReceipts.stream()
+                .anyMatch(r -> r.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved 
+                        && r.getSourceType() == GoodsReceipt.SourceType.SalesReturn
+                        && r.getDeletedAt() == null);
+        
+        if (hasApprovedReceipt) {
+            throw new IllegalStateException("Đơn nhập hàng lại này đã có phiếu nhập kho được phê duyệt. Không thể tạo phiếu nhập mới.");
+        }
+
+        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + dto.getWarehouseId()));
+
+        // Validate warehouse matches Sales Return Inbound Order warehouse
+        if (!warehouse.getWarehouseId().equals(inboundOrder.getWarehouse().getWarehouseId())) {
+            throw new IllegalArgumentException("Warehouse must match Sales Return Inbound Order warehouse");
+        }
+
+        User createdBy = userRepository.findById(createdById)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
+
+        // Generate receipt number if not provided
+        String receiptNo = dto.getReceiptNo();
+        if (receiptNo == null || receiptNo.trim().isEmpty()) {
+            receiptNo = generateReceiptNo();
+        } else if (receiptRepository.existsByReceiptNo(receiptNo)) {
+            throw new DuplicateResourceException("Goods Receipt number already exists: " + receiptNo);
+        }
+
+        // Create receipt entity
+        GoodsReceipt receipt = GoodsReceipt.builder()
+                .receiptNo(receiptNo)
+                .sourceType(GoodsReceipt.SourceType.SalesReturn)
+                .returnOrder(inboundOrder.getReturnOrder())
+                .warehouse(warehouse)
+                .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate() : LocalDateTime.now())
+                .status(GoodsReceipt.GoodsReceiptStatus.Pending)
+                .createdBy(createdBy)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        // Load Sales Return Inbound Order items
+        List<SalesReturnInboundOrderItem> inboundItems = salesReturnInboundOrderItemRepository.findByInboundOrder_SriId(sriId);
+        log.info("Loaded {} inbound items for SRI ID: {}", inboundItems != null ? inboundItems.size() : 0, sriId);
+        
+        if (inboundItems == null || inboundItems.isEmpty()) {
+            throw new IllegalStateException("Sales Return Inbound Order không có items nào");
+        }
+
+        // Create Goods Receipt items from Sales Return Inbound Order items
+        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            log.info("Processing {} items from DTO", dto.getItems().size());
+            List<GoodsReceiptItem> items = dto.getItems().stream()
+                    .map(itemDto -> {
+                        log.info("Processing item: roiId={}, productId={}, receivedQty={}", 
+                                itemDto.getRoiId(), itemDto.getProductId(), itemDto.getReceivedQty());
+                        
+                        // Find corresponding SalesReturnInboundOrderItem by roiId
+                        SalesReturnInboundOrderItem sriItem = inboundItems.stream()
+                                .filter(item -> {
+                                    if (item.getReturnOrderItem() == null) {
+                                        log.warn("SalesReturnInboundOrderItem has null ReturnOrderItem");
+                                        return false;
+                                    }
+                                    return item.getReturnOrderItem().getRoiId().equals(itemDto.getRoiId());
+                                })
+                                .findFirst()
+                                .orElseThrow(() -> {
+                                    log.error("Sales Return Inbound Order Item not found for ROI ID: {}. Available ROI IDs: {}", 
+                                            itemDto.getRoiId(), 
+                                            inboundItems.stream()
+                                                    .map(i -> i.getReturnOrderItem() != null ? i.getReturnOrderItem().getRoiId() : "null")
+                                                    .collect(Collectors.toList()));
+                                    return new ResourceNotFoundException("Sales Return Inbound Order Item not found for ROI ID: " + itemDto.getRoiId());
+                                });
+
+                        ReturnOrderItem roi;
+                        if (itemDto.getRoiId() != null) {
+                            roi = returnOrderItemRepository.findById(itemDto.getRoiId())
+                                    .orElseThrow(() -> {
+                                        log.error("Return Order Item not found with ID: {}", itemDto.getRoiId());
+                                        return new ResourceNotFoundException("Return Order Item not found with ID: " + itemDto.getRoiId());
+                                    });
+                        } else {
+                            // Use roiId from sriItem if not provided in DTO
+                            roi = sriItem.getReturnOrderItem();
+                            if (roi == null) {
+                                log.error("SalesReturnInboundOrderItem has null ReturnOrderItem");
+                                throw new IllegalStateException("Sales Return Inbound Order Item không có thông tin Return Order Item");
+                            }
+                            log.info("Using roiId from sriItem: {}", roi.getRoiId());
+                        }
+
+                        Product product = productRepository.findById(itemDto.getProductId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
+
+                        // Validate receivedQty <= plannedQty
+                        if (itemDto.getReceivedQty().compareTo(sriItem.getPlannedQty()) > 0) {
+                            throw new IllegalArgumentException("Received quantity cannot exceed planned quantity");
+                        }
+
+                        // For Sales Return, if acceptedQty is null or zero, default to receivedQty
+                        BigDecimal acceptedQty = itemDto.getAcceptedQty();
+                        if (acceptedQty == null || acceptedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                            acceptedQty = itemDto.getReceivedQty();
+                            log.info("Setting acceptedQty = receivedQty ({}) for Sales Return item", acceptedQty);
+                        }
+                        
+                        return GoodsReceiptItem.builder()
+                                .goodsReceipt(receipt)
+                                .returnOrderItem(roi)
+                                .product(product)
+                                .receivedQty(itemDto.getReceivedQty())
+                                .acceptedQty(acceptedQty)
+                                .remark(itemDto.getRemark())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+            receipt.setItems(items);
+        } else {
+            // Auto-create items from Sales Return Inbound Order items if not provided
+            List<GoodsReceiptItem> items = inboundItems.stream()
+                    .map(sriItem -> {
+                        Product product = sriItem.getProduct();
+                        if (product == null) {
+                            throw new IllegalStateException("Sales Return Inbound Order Item không có thông tin sản phẩm");
+                        }
+                        ReturnOrderItem roi = sriItem.getReturnOrderItem();
+                        if (roi == null) {
+                            throw new IllegalStateException("Sales Return Inbound Order Item không có thông tin Return Order Item");
+                        }
+                        BigDecimal plannedQty = sriItem.getPlannedQty() != null ? sriItem.getPlannedQty() : BigDecimal.ZERO;
+                        // For auto-created items, acceptedQty defaults to plannedQty (same as receivedQty)
+                        return GoodsReceiptItem.builder()
+                                .goodsReceipt(receipt)
+                                .returnOrderItem(roi)
+                                .product(product)
+                                .receivedQty(plannedQty)
+                                .acceptedQty(plannedQty) // Default to plannedQty for auto-created items
+                                .remark(sriItem.getNote())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+            
+            if (items.isEmpty()) {
+                throw new IllegalStateException("Không thể tạo items từ Sales Return Inbound Order");
+            }
+            
+            receipt.setItems(items);
+        }
+
+        GoodsReceipt saved = receiptRepository.save(receipt);
+        GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
+                .orElse(saved);
+
+            log.info("Goods receipt created successfully from Sales Return Inbound Order with ID: {} and number: {}", saved.getReceiptId(), saved.getReceiptNo());
+            return receiptMapper.toResponseDTO(savedWithRelations);
+        } catch (Exception e) {
+            log.error("Error creating goods receipt from Sales Return Inbound Order ID: {}", sriId, e);
+            log.error("Exception type: {}, Message: {}", e.getClass().getName(), e.getMessage());
+            throw e; // Re-throw để GlobalExceptionHandler xử lý
+        }
     }
 
     @Override
@@ -260,43 +451,88 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
 
         GoodsReceipt saved = receiptRepository.save(receipt);
         
-        // Update PO Items: Track received quantities
-        log.info("Updating PO items received_qty for {} GRN items", saved.getItems().size());
-        for (GoodsReceiptItem grItem : saved.getItems()) {
-            PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
-            if (poItem != null) {
-                BigDecimal acceptedQty = grItem.getAcceptedQty();
-                BigDecimal currentReceived = poItem.getReceivedQty() != null ? poItem.getReceivedQty() : BigDecimal.ZERO;
-                BigDecimal newReceived = currentReceived.add(acceptedQty);
-                
-                poItem.setReceivedQty(newReceived);
-                orderItemRepository.save(poItem);
-                
-                log.info("POI {} received_qty: {} + {} = {} (ordered: {})", 
-                         poItem.getPoiId(), currentReceived, acceptedQty, newReceived, poItem.getQuantity());
-                
-                // Check over-receipt
-                if (newReceived.compareTo(poItem.getQuantity()) > 0) {
-                    log.warn("Over-receipt detected! POI {}: received {} > ordered {}", 
-                             poItem.getPoiId(), newReceived, poItem.getQuantity());
+        // Load items with relations before processing
+        GoodsReceipt savedWithItems = receiptRepository.findByIdWithItems(saved.getReceiptId())
+                .orElseThrow(() -> new IllegalStateException("Failed to load Goods Receipt items after save"));
+        
+        if (savedWithItems.getItems() == null || savedWithItems.getItems().isEmpty()) {
+            throw new IllegalStateException("Goods Receipt has no items to process");
+        }
+        
+        log.info("Processing {} items for Goods Receipt ID: {}", savedWithItems.getItems().size(), saved.getReceiptId());
+        
+        // Handle based on source type
+        if (saved.getSourceType() == GoodsReceipt.SourceType.Purchase) {
+            // Update PO Items: Track received quantities
+            log.info("Updating PO items received_qty for {} GRN items", savedWithItems.getItems().size());
+            for (GoodsReceiptItem grItem : savedWithItems.getItems()) {
+                PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
+                if (poItem != null) {
+                    BigDecimal acceptedQty = grItem.getAcceptedQty();
+                    BigDecimal currentReceived = poItem.getReceivedQty() != null ? poItem.getReceivedQty() : BigDecimal.ZERO;
+                    BigDecimal newReceived = currentReceived.add(acceptedQty);
+                    
+                    poItem.setReceivedQty(newReceived);
+                    orderItemRepository.save(poItem);
+                    
+                    log.info("POI {} received_qty: {} + {} = {} (ordered: {})", 
+                             poItem.getPoiId(), currentReceived, acceptedQty, newReceived, poItem.getQuantity());
+                    
+                    // Check over-receipt
+                    if (newReceived.compareTo(poItem.getQuantity()) > 0) {
+                        log.warn("Over-receipt detected! POI {}: received {} > ordered {}", 
+                                 poItem.getPoiId(), newReceived, poItem.getQuantity());
+                    }
+                }
+            }
+        } else if (saved.getSourceType() == GoodsReceipt.SourceType.SalesReturn) {
+            // Update Return Order goods receipt status
+            ReturnOrder returnOrder = saved.getReturnOrder();
+            if (returnOrder != null) {
+                returnOrder.setGoodsReceiptStatus(ReturnOrder.GoodsReceiptStatus.Completed);
+                returnOrder.setGoodsReceipt(saved);
+                returnOrderRepository.save(returnOrder);
+                log.info("Updated Return Order {} goods_receipt_status to Completed", returnOrder.getRoId());
+            }
+
+            // Update Sales Return Inbound Order status to Completed
+            List<SalesReturnInboundOrder> inboundOrders = salesReturnInboundOrderRepository.findByReturnOrderId(returnOrder.getRoId());
+            for (SalesReturnInboundOrder sri : inboundOrders) {
+                if (sri.getStatus() != SalesReturnInboundOrder.Status.Completed &&
+                    sri.getStatus() != SalesReturnInboundOrder.Status.Cancelled) {
+                    sri.setStatus(SalesReturnInboundOrder.Status.Completed);
+                    salesReturnInboundOrderRepository.save(sri);
+                    log.info("Updated Sales Return Inbound Order {} status to Completed", sri.getSriId());
                 }
             }
         }
         
-        // Update Warehouse Stock: Increase inventory quantity
+        // Update Warehouse Stock: Increase inventory quantity (for both Purchase and SalesReturn)
         Integer warehouseId = saved.getWarehouse().getWarehouseId();
         log.info("Updating warehouse stock for warehouse ID: {}", warehouseId);
         
-        for (GoodsReceiptItem grItem : saved.getItems()) {
-            Integer productId = grItem.getProduct().getProductId();
+        for (GoodsReceiptItem grItem : savedWithItems.getItems()) {
+            Integer productId = grItem.getProduct() != null ? grItem.getProduct().getProductId() : null;
             BigDecimal acceptedQty = grItem.getAcceptedQty();
+            
+            if (productId == null) {
+                log.error("Goods Receipt Item {} has null product", grItem.getGriId());
+                throw new IllegalStateException("Goods Receipt Item has null product");
+            }
+            
+            if (acceptedQty == null || acceptedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                log.warn("Goods Receipt Item {} has invalid acceptedQty: {}", grItem.getGriId(), acceptedQty);
+                continue; // Skip items with zero or negative quantity
+            }
+            
+            log.info("Processing stock update for product {} with acceptedQty {}", productId, acceptedQty);
             
             // Try to update existing stock
             int updated = warehouseStockRepository.updateStockQuantity(warehouseId, productId, acceptedQty);
             
             if (updated == 0) {
                 // Stock record doesn't exist, create new one
-                log.info("Creating new stock record for warehouse {} product {}", warehouseId, productId);
+                log.info("Creating new stock record for warehouse {} product {} with quantity {}", warehouseId, productId, acceptedQty);
                 WarehouseStock newStock = new WarehouseStock();
                 newStock.setWarehouseId(warehouseId);
                 newStock.setProductId(productId);
@@ -308,23 +544,27 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             }
         }
         
-        log.info("Goods receipt approved successfully, PO items and warehouse stock updated");
+        log.info("Goods receipt approved successfully, items and warehouse stock updated");
 
-        // Auto-create AP Invoice in separate transaction (REQUIRES_NEW)
-        try {
-            log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
-            apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
-            log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
-        } catch (IllegalStateException e) {
-            log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to auto-create AP Invoice for Goods Receipt ID: {}. Error: {}", receiptId, e.getMessage(), e);
+        // Auto-create AP Invoice only for Purchase (not for SalesReturn)
+        if (saved.getSourceType() == GoodsReceipt.SourceType.Purchase) {
+            try {
+                log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
+                apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
+                log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
+            } catch (IllegalStateException e) {
+                log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
+            } catch (Exception e) {
+                log.error("Failed to auto-create AP Invoice for Goods Receipt ID: {}. Error: {}", receiptId, e.getMessage(), e);
+            }
+        } else {
+            log.info("Skipping AP Invoice creation for SalesReturn Goods Receipt ID: {}", receiptId);
         }
         
         // Load full relations for response - split queries to avoid cartesian product
         GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
                 .orElse(saved);
-        receiptRepository.findByIdWithItems(saved.getReceiptId()); // Load items separately
+        // Items already loaded in savedWithItems above, no need to reload
 
         return receiptMapper.toResponseDTO(savedWithRelations);
     }
