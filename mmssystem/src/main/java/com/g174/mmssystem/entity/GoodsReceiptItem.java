@@ -28,7 +28,7 @@ public class GoodsReceiptItem {
     private GoodsReceipt goodsReceipt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "poi_id", nullable = false)
+    @JoinColumn(name = "poi_id", nullable = true)
     private PurchaseOrderItem purchaseOrderItem;
 
     // Dùng khi phiếu nhập là từ Đơn trả hàng (SalesReturn)
