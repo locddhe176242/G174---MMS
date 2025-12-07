@@ -75,6 +75,12 @@ public class SalesOrderController {
 
     @PostMapping("/convert/{quotationId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "CREATE_SALES_ORDER_FROM_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Tạo đơn bán hàng từ báo giá ID: #{#quotationId}",
+            entityId = "#{#result.body.orderId}"
+    )
     public ResponseEntity<SalesOrderResponseDTO> createFromQuotation(@PathVariable Integer quotationId) {
         return ResponseEntity.ok(salesOrderService.createFromQuotation(quotationId));
     }

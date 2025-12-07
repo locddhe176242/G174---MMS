@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.DeliveryRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.DeliveryListResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.DeliveryResponseDTO;
@@ -61,6 +62,12 @@ public class DeliveryController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @LogActivity(
+            action = "CREATE_DELIVERY",
+            activityType = "SALES_MANAGEMENT",
+            description = "Tạo phiếu giao hàng mới cho đơn hàng ID: #{#request.salesOrderId}",
+            entityId = "#{#result.body.deliveryId}"
+    )
     public ResponseEntity<DeliveryResponseDTO> createDelivery(
             @Valid @RequestBody DeliveryRequestDTO request) {
         return ResponseEntity.ok(deliveryService.createDelivery(request));
@@ -68,12 +75,24 @@ public class DeliveryController {
 
     @PostMapping("/convert/{salesOrderId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @LogActivity(
+            action = "CREATE_DELIVERY_FROM_SALES_ORDER",
+            activityType = "SALES_MANAGEMENT",
+            description = "Tạo phiếu giao hàng từ đơn bán hàng ID: #{#salesOrderId}",
+            entityId = "#{#result.body.deliveryId}"
+    )
     public ResponseEntity<DeliveryResponseDTO> createFromSalesOrder(@PathVariable Integer salesOrderId) {
         return ResponseEntity.ok(deliveryService.createFromSalesOrder(salesOrderId));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @LogActivity(
+            action = "UPDATE_DELIVERY",
+            activityType = "SALES_MANAGEMENT",
+            description = "Cập nhật phiếu giao hàng ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<DeliveryResponseDTO> updateDelivery(
             @PathVariable Integer id,
             @Valid @RequestBody DeliveryRequestDTO request) {
@@ -82,6 +101,12 @@ public class DeliveryController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @LogActivity(
+            action = "CHANGE_DELIVERY_STATUS",
+            activityType = "SALES_MANAGEMENT",
+            description = "Đổi trạng thái giao hàng ID: #{#id} sang #{#status}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<DeliveryResponseDTO> changeStatus(
             @PathVariable Integer id,
             @RequestParam String status) {
@@ -90,6 +115,12 @@ public class DeliveryController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
+    @LogActivity(
+            action = "DELETE_DELIVERY",
+            activityType = "SALES_MANAGEMENT",
+            description = "Xóa phiếu giao hàng ID: #{#id}",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<Void> deleteDelivery(@PathVariable Integer id) {
         deliveryService.deleteDelivery(id);
         return ResponseEntity.noContent().build();

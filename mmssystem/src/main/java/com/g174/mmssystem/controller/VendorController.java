@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.VendorRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.VendorResponseDTO;
 import com.g174.mmssystem.service.IService.IVendorService;
@@ -27,6 +28,12 @@ public class VendorController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CREATE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Tạo nhà cung cấp: #{#request.name}",
+            entityId = "#{#result.body.vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> createVendor(
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
 
@@ -98,6 +105,12 @@ public class VendorController {
 
     @PutMapping("/{vendorId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "UPDATE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Cập nhật nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> updateVendor(
             @PathVariable Integer vendorId,
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
@@ -110,6 +123,12 @@ public class VendorController {
 
     @DeleteMapping("/{vendorId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "DELETE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Xóa nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<Void> deleteVendor(@PathVariable Integer vendorId) {
         log.info("REST: Soft deleting vendor with ID: {}", vendorId);
 
@@ -119,6 +138,12 @@ public class VendorController {
 
     @PostMapping("/{vendorId}/restore")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "RESTORE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Khôi phục nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> restoreVendor(@PathVariable Integer vendorId) {
         log.info("REST: Restoring vendor with ID: {}", vendorId);
 

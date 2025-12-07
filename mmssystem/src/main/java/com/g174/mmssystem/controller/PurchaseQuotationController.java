@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.PurchaseQuotationRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseQuotationResponseDTO;
 import com.g174.mmssystem.service.IService.IPurchaseQuotationService;
@@ -103,6 +104,12 @@ public class PurchaseQuotationController {
 
     @PutMapping("/{pqId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "UPDATE_PURCHASE_QUOTATION",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Cập nhật báo giá mua hàng ID: #{#pqId}",
+            entityId = "#{#pqId}"
+    )
     public ResponseEntity<PurchaseQuotationResponseDTO> updateQuotation(
             @PathVariable Integer pqId,
             @Valid @RequestBody PurchaseQuotationRequestDTO requestDTO,
@@ -123,6 +130,12 @@ public class PurchaseQuotationController {
 
     @PutMapping("/{pqId}/approve")
     @PreAuthorize("hasAuthority('ROLE_MANAGER')")
+    @LogActivity(
+            action = "APPROVE_PURCHASE_QUOTATION",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Duyệt báo giá mua hàng ID: #{#pqId}",
+            entityId = "#{#pqId}"
+    )
     public ResponseEntity<PurchaseQuotationResponseDTO> approveQuotation(
             @PathVariable Integer pqId,
             @RequestParam Integer approverId) {
@@ -134,6 +147,12 @@ public class PurchaseQuotationController {
 
     @PutMapping("/{pqId}/reject")
     @PreAuthorize("hasAuthority('ROLE_MANAGER')")
+    @LogActivity(
+            action = "REJECT_PURCHASE_QUOTATION",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Từ chối báo giá mua hàng ID: #{#pqId}",
+            entityId = "#{#pqId}"
+    )
     public ResponseEntity<PurchaseQuotationResponseDTO> rejectQuotation(
             @PathVariable Integer pqId,
             @RequestParam Integer approverId,
@@ -146,6 +165,12 @@ public class PurchaseQuotationController {
 
     @DeleteMapping("/{pqId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "DELETE_PURCHASE_QUOTATION",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Xóa báo giá mua hàng ID: #{#pqId}",
+            entityId = "#{#pqId}"
+    )
     public ResponseEntity<PurchaseQuotationResponseDTO> deleteQuotation(@PathVariable Integer pqId) {
         log.info("REST: Deleting purchase quotation ID: {}", pqId);
 

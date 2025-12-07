@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.APInvoiceRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.APInvoiceResponseDTO;
 import com.g174.mmssystem.entity.APInvoice;
@@ -28,13 +29,25 @@ public class APInvoiceController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
-    public ResponseEntity<APInvoiceResponseDTO> createInvoice(@RequestBody APInvoiceRequestDTO dto) {
-        APInvoiceResponseDTO response = apInvoiceService.createInvoice(dto);
+    @LogActivity(
+            action = "CREATE_AP_INVOICE",
+            activityType = "ACCOUNTANT_MANAGEMENT",
+            description = "Tạo hóa đơn phải trả: #{#result.body.invoiceNo}",
+            entityId = "#{#result.body.apInvoiceId}"
+    )
+    public ResponseEntity<APInvoiceResponseDTO> createInvoice(@RequestBody APInvoiceRequestDTO requestDTO) {
+        APInvoiceResponseDTO response = apInvoiceService.createInvoice(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/from-goods-receipt/{receiptId}")
     @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @LogActivity(
+            action = "CREATE_AP_INVOICE_FROM_GR",
+            activityType = "ACCOUNTANT_MANAGEMENT",
+            description = "Tạo hóa đơn từ phiếu nhập kho ID: #{#receiptId}",
+            entityId = "#{#result.body.apInvoiceId}"
+    )
     public ResponseEntity<APInvoiceResponseDTO> createInvoiceFromGoodsReceipt(@PathVariable Integer receiptId) {
         APInvoiceResponseDTO response = apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -117,6 +130,12 @@ public class APInvoiceController {
 
     @PutMapping("/{invoiceId}")
     @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @LogActivity(
+            action = "UPDATE_AP_INVOICE",
+            activityType = "ACCOUNTANT_MANAGEMENT",
+            description = "Cập nhật hóa đơn phải trả ID: #{#invoiceId}",
+            entityId = "#{#invoiceId}"
+    )
     public ResponseEntity<APInvoiceResponseDTO> updateInvoice(
             @PathVariable Integer invoiceId,
             @RequestBody APInvoiceRequestDTO dto) {
@@ -126,6 +145,12 @@ public class APInvoiceController {
 
     @DeleteMapping("/{invoiceId}")
     @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @LogActivity(
+            action = "DELETE_AP_INVOICE",
+            activityType = "ACCOUNTANT_MANAGEMENT",
+            description = "Xóa hóa đơn phải trả ID: #{#invoiceId}",
+            entityId = "#{#invoiceId}"
+    )
     public ResponseEntity<APInvoiceResponseDTO> deleteInvoice(@PathVariable Integer invoiceId) {
         APInvoiceResponseDTO response = apInvoiceService.deleteInvoice(invoiceId);
         return ResponseEntity.ok(response);

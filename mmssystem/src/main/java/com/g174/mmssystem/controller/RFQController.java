@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.RFQRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.RFQResponseDTO;
 import com.g174.mmssystem.entity.RFQ;
@@ -32,6 +33,12 @@ public class RFQController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CREATE_RFQ",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Tạo RFQ mới: #{#result.body.data.rfqNo}",
+            entityId = "#{#result.body.data.rfqId}"
+    )
     public ResponseEntity<Map<String, Object>> createRFQ(
             @Valid @RequestBody RFQRequestDTO requestDTO) {
         log.info("REST: Creating RFQ");
@@ -115,6 +122,12 @@ public class RFQController {
 
     @PutMapping("/{rfqId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "UPDATE_RFQ",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Cập nhật RFQ ID: #{#rfqId}",
+            entityId = "#{#rfqId}"
+    )
     public ResponseEntity<Map<String, Object>> updateRFQ(
             @PathVariable Integer rfqId,
             @Valid @RequestBody RFQRequestDTO requestDTO) {
@@ -151,6 +164,12 @@ public class RFQController {
 
     @PutMapping("/{rfqId}/close")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CLOSE_RFQ",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Đóng RFQ ID: #{#rfqId}",
+            entityId = "#{#rfqId}"
+    )
     public ResponseEntity<Map<String, Object>> closeRFQ(@PathVariable Integer rfqId) {
         log.info("REST: Closing RFQ ID: {}", rfqId);
 
@@ -164,6 +183,12 @@ public class RFQController {
 
     @PutMapping("/{rfqId}/cancel")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CANCEL_RFQ",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Hủy RFQ ID: #{#rfqId}",
+            entityId = "#{#rfqId}"
+    )
     public ResponseEntity<Map<String, Object>> cancelRFQ(@PathVariable Integer rfqId) {
         log.info("REST: Cancelling RFQ ID: {}", rfqId);
 
@@ -177,6 +202,12 @@ public class RFQController {
 
     @DeleteMapping("/{rfqId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "DELETE_RFQ",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Xóa RFQ ID: #{#rfqId}",
+            entityId = "#{#rfqId}"
+    )
     public ResponseEntity<Map<String, Object>> deleteRFQ(@PathVariable Integer rfqId) {
         log.info("REST: Deleting RFQ ID: {}", rfqId);
 

@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.CustomerRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerDetailResponseDTO;
@@ -28,6 +29,9 @@ public class CustomerController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "CREATE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Tạo khách hàng mới: #{#customerRequestDTO.firstName} #{#customerRequestDTO.lastName}", 
+            entityId = "#{#result.body.customerId}")
     public ResponseEntity<CustomerResponseDTO> createCustomer(
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
 
@@ -99,6 +103,9 @@ public class CustomerController {
 
     @PutMapping("/{customerId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "UPDATE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Cập nhật khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<CustomerResponseDTO> updateCustomer(
             @PathVariable Integer customerId,
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
@@ -111,6 +118,9 @@ public class CustomerController {
 
     @DeleteMapping("/{customerId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "DELETE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Xóa khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<Void> deleteCustomer(@PathVariable Integer customerId) {
         log.info("REST: Soft deleting customer with ID: {}", customerId);
 
@@ -120,6 +130,9 @@ public class CustomerController {
 
     @PostMapping("/{customerId}/restore")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "RESTORE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Khôi phục khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<CustomerResponseDTO> restoreCustomer(@PathVariable Integer customerId) {
         log.info("REST: Restoring customer with ID: {}", customerId);
 

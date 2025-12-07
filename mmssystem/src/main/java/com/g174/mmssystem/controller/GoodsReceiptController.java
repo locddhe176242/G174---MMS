@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.GoodsReceiptRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.GoodsReceiptResponseDTO;
 import com.g174.mmssystem.service.IService.IGoodsReceiptService;
@@ -8,16 +9,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 @RestController
@@ -30,6 +28,12 @@ public class GoodsReceiptController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @LogActivity(
+            action = "CREATE_GOODS_RECEIPT",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Tạo phiếu nhập kho: #{#result.body.receiptNo}",
+            entityId = "#{#result.body.receiptId}"
+    )
     public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(
             @Valid @RequestBody GoodsReceiptRequestDTO requestDTO,
             @RequestParam(required = false) Integer createdById) {
@@ -105,6 +109,12 @@ public class GoodsReceiptController {
 
     @PutMapping("/{receiptId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @LogActivity(
+            action = "UPDATE_GOODS_RECEIPT",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Cập nhật phiếu nhập kho ID: #{#receiptId}",
+            entityId = "#{#receiptId}"
+    )
     public ResponseEntity<GoodsReceiptResponseDTO> updateReceipt(
             @PathVariable Integer receiptId,
             @Valid @RequestBody GoodsReceiptRequestDTO requestDTO,
@@ -125,6 +135,12 @@ public class GoodsReceiptController {
 
     @PutMapping("/{receiptId}/approve")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @LogActivity(
+            action = "APPROVE_GOODS_RECEIPT",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Duyệt phiếu nhập kho ID: #{#receiptId}",
+            entityId = "#{#receiptId}"
+    )
     public ResponseEntity<GoodsReceiptResponseDTO> approveReceipt(
             @PathVariable Integer receiptId,
             @RequestParam Integer approverId) {
@@ -136,6 +152,12 @@ public class GoodsReceiptController {
 
     @PutMapping("/{receiptId}/reject")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @LogActivity(
+            action = "REJECT_GOODS_RECEIPT",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Từ chối phiếu nhập kho ID: #{#receiptId}",
+            entityId = "#{#receiptId}"
+    )
     public ResponseEntity<GoodsReceiptResponseDTO> rejectReceipt(
             @PathVariable Integer receiptId,
             @RequestParam Integer approverId,
@@ -148,6 +170,12 @@ public class GoodsReceiptController {
 
     @DeleteMapping("/{receiptId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @LogActivity(
+            action = "DELETE_GOODS_RECEIPT",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Xóa phiếu nhập kho ID: #{#receiptId}",
+            entityId = "#{#receiptId}"
+    )
     public ResponseEntity<GoodsReceiptResponseDTO> deleteReceipt(@PathVariable Integer receiptId) {
         log.info("REST: Deleting goods receipt ID: {}", receiptId);
 
