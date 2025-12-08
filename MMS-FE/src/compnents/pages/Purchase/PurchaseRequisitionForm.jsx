@@ -25,7 +25,16 @@ const PurchaseRequisitionForm = () => {
         status: 'Draft',
         approver_id: null,
         approved_at: null,
-        items: []
+        items: [
+            {
+                product_id: null,
+                product_name: '',
+                requested_qty: 1,
+                unit: '',
+                delivery_date: new Date(),
+                note: ''
+            }
+        ]
     });
 
     // Additional states
@@ -409,13 +418,24 @@ const PurchaseRequisitionForm = () => {
         }));
     };
 
-    // Remove item
+    // Remove item - đảm bảo luôn có ít nhất 1 dòng
     const removeItem = (index) => {
-        const newItems = formData.items.filter((_, i) => i !== index);
-        setFormData(prev => ({
-            ...prev,
-            items: newItems
-        }));
+        setFormData(prev => {
+            const next = [...prev.items];
+            next.splice(index, 1);
+            // Nếu xóa hết thì thêm lại 1 dòng trống (giống RFQForm)
+            return { 
+                ...prev, 
+                items: next.length ? next : [{
+                    product_id: null,
+                    product_name: '',
+                    requested_qty: 1,
+                    unit: '',
+                    delivery_date: new Date(),
+                    note: ''
+                }] 
+            };
+        });
     };
 
     // Handle Excel import
@@ -909,7 +929,6 @@ const PurchaseRequisitionForm = () => {
                                 placeholder="Mã phiếu yêu cầu"
                                 readOnly={!isEdit}
                             />
-                            <p className="text-gray-500 text-xs mt-1">Hệ thống tự tạo mã phiếu</p>
                         </div>
 
                         {/* Requisition Date */}
@@ -1027,26 +1046,21 @@ const PurchaseRequisitionForm = () => {
                         <p className="text-red-500 text-sm px-6 pt-4">{validationErrors.items}</p>
                     )}
 
-                    {formData.items.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            <p>Chưa có sản phẩm nào. Nhấn "Thêm sản phẩm" để bắt đầu.</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">#</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
-                                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Số lượng</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn vị</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ngày giao hàng</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
-                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {formData.items.map((item, index) => (
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">#</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
+                                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Số lượng</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn vị</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ngày giao hàng</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
+                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {formData.items.map((item, index) => (
                                         <tr key={index} className="hover:bg-gray-50">
                                             <td className="px-4 py-3 text-sm text-gray-700 text-center">
                                                 {index + 1}
@@ -1154,11 +1168,10 @@ const PurchaseRequisitionForm = () => {
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {/* Action Buttons */}
