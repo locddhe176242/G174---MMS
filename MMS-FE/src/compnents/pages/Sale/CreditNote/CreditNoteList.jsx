@@ -160,7 +160,6 @@ export default function CreditNoteList() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Danh sách Credit Note</h1>
-                <p className="mt-1 text-sm text-gray-500">Quản lý các Credit Note điều chỉnh Invoice</p>
               </div>
               <button
                 onClick={() => navigate("/sales/credit-notes/new")}
