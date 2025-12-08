@@ -48,6 +48,36 @@ const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
   return Number(itemTaxRate || 0);
 };
 
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "40px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const compactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "36px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
 export default function SalesOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -475,33 +505,29 @@ export default function SalesOrderForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-          <div>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-5 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Cập nhật đơn bán hàng" : "Tạo đơn bán hàng"}
             </h1>
-            <p className="text-gray-500">Nhập thông tin đơn hàng và danh sách sản phẩm</p>
-          </div>
-          <div className="flex gap-2">
             <button
-              type="button"
               onClick={() => navigate("/sales/orders")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
               ← Quay lại
             </button>
           </div>
+          <div className="border-t border-gray-200" />
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4 lg:col-span-2">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Thông tin đơn hàng</h2>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Thông tin đơn hàng */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin đơn hàng</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-sm text-gray-600">Số đơn</label>
                   <input
                     type="text"
@@ -510,10 +536,10 @@ export default function SalesOrderForm() {
                       formData.orderNo ||
                       (isEdit ? "—" : "Sẽ được tạo tự động sau khi lưu")
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-sm text-gray-600">
                     Khách hàng <span className="text-red-500">*</span>
                   </label>
@@ -524,9 +550,15 @@ export default function SalesOrderForm() {
                     options={customers}
                     placeholder="Chọn khách hàng"
                     isClearable
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
+                    menuShouldScrollIntoView={false}
+                    styles={selectStyles}
                   />
                   {errors.customerId && (
-                    <p className="text-xs text-red-500 mt-1">{errors.customerId}</p>
+                    <p className="text-sm text-red-600 mt-1">{errors.customerId}</p>
                   )}
                 </div>
                 <div className="md:col-span-2">
@@ -542,13 +574,13 @@ export default function SalesOrderForm() {
                           : "")
                       }
                       placeholder="Chưa chọn báo giá"
-                      className="w-full border rounded-lg px-3 py-2 bg-gray-50"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => setQuotationModalOpen(true)}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
                       >
                         Chọn
                       </button>
@@ -556,7 +588,7 @@ export default function SalesOrderForm() {
                         <button
                           type="button"
                           onClick={clearSelectedQuotation}
-                          className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600"
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-red-600"
                         >
                           Xóa
                         </button>
@@ -564,137 +596,81 @@ export default function SalesOrderForm() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
-                  <div>
-                    <label className="text-sm text-gray-600">Ngày tạo đơn</label>
-                    <DatePicker
-                      selected={formData.orderDate}
-                      onChange={(date) => setFormData((prev) => ({ ...prev, orderDate: date }))}
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      wrapperClassName="mt-1 w-full"
-                      dateFormat="dd/MM/yyyy"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
-                    <input
-                      type="text"
-                      value={formData.paymentTerms}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, paymentTerms: e.target.value }))
-                      }
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="VD: Thanh toán trong 30 ngày"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Ngày tạo đơn</label>
+                  <DatePicker
+                    selected={formData.orderDate}
+                    onChange={(date) => setFormData((prev) => ({ ...prev, orderDate: date }))}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    dateFormat="dd/MM/yyyy"
+                  />
                 </div>
-                <div className="md:col-span-2 flex flex-col gap-4">
-                  <div>
-                    <label className="text-sm text-gray-600">Địa chỉ giao hàng</label>
-                    <input
-                      type="text"
-                      value={formData.shippingAddress}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, shippingAddress: e.target.value }))
-                      }
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="Nhập địa chỉ giao hàng"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Ghi chú</label>
-                    <textarea
-                      rows={3}
-                      value={formData.notes}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="Thông tin bổ sung cho đơn hàng"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
+                  <input
+                    type="text"
+                    value={formData.paymentTerms}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, paymentTerms: e.target.value }))
+                    }
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="VD: Thanh toán trong 30 ngày"
+                  />
                 </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Tổng quan tiền tệ</h2>
-              <label className="text-sm text-gray-600">Thuế (%)</label>
-              <input
-                type="number"
-                min="0"
-                value={globalTaxRate}
-                onChange={(e) => handleGlobalTaxChange(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2"
-                placeholder="Áp dụng thuế chung cho toàn bộ sản phẩm"
-              />
-              <hr className="my-3" />
-              <div className="space-y-2 text-sm text-gray-700">
-                <div className="flex justify-between">
-                  <span>Tạm tính</span>
-                  <span className="font-semibold">{formatCurrency(totals.gross)}</span>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Địa chỉ giao hàng</label>
+                  <input
+                    type="text"
+                    value={formData.shippingAddress}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, shippingAddress: e.target.value }))
+                    }
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Nhập địa chỉ giao hàng"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Chiết khấu dòng</span>
-                  <span>{formatCurrency(totals.discount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Thuế</span>
-                  <span>{formatCurrency(totals.tax)}</span>
-                </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t">
-                  <span>Tổng cộng</span>
-                  <span>{formatCurrency(totalValue)}</span>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Ghi chú</label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Thông tin bổ sung cho đơn hàng"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
+          {/* Danh sách sản phẩm */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
               <button
                 type="button"
                 onClick={addItem}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                + Thêm dòng
+                + Thêm sản phẩm
               </button>
             </div>
-
-            {errors.items && <p className="text-red-500 text-sm mb-2">{errors.items}</p>}
-
             <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-200">
-                <thead className="bg-gray-100">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      #
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Sản phẩm
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Kho
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Số lượng
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Đơn giá
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Chiết khấu (%)
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Thuế (%)
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                      Thành tiền
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                      Hành động
-                    </th>
+                    <th className="px-4 py-3 text-left">#</th>
+                    <th className="px-4 py-3 text-left">Sản phẩm</th>
+                    <th className="px-4 py-3 text-left">Kho</th>
+                    <th className="px-4 py-3 text-right">Số lượng</th>
+                    <th className="px-4 py-3 text-right">Đơn giá</th>
+                    <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
+                    <th className="px-4 py-3 text-right">Thuế (%)</th>
+                    <th className="px-4 py-3 text-right">Thành tiền</th>
+                    <th className="px-4 py-3 text-center">#</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {formData.items.map((item, index) => {
                     const itemError = errors.itemDetails?.[index] || {};
                     const qty = Number(item.quantity || 0);
@@ -706,21 +682,25 @@ export default function SalesOrderForm() {
                     const tax = base * (taxRate / 100);
                     const lineTotal = base + tax;
                     return (
-                      <tr key={index} className="border-t">
-                        <td className="px-3 py-2 text-sm text-gray-600">{index + 1}</td>
-                        <td className="px-3 py-2">
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
+                        <td className="px-4 py-3 w-64">
                           <Select
                             value={products.find((p) => p.value === item.productId) || null}
                             onChange={(opt) => handleItemSelect(index, opt)}
                             options={products}
                             placeholder="Chọn sản phẩm"
                             isClearable
+                            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                            menuPosition="fixed"
+                            menuShouldScrollIntoView={false}
+                            styles={compactSelectStyles}
                           />
                           {itemError.productId && (
-                            <p className="text-red-500 text-xs">{itemError.productId}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.productId}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <Select
                             value={warehouses.find((w) => w.value === item.warehouseId) || null}
                             onChange={(opt) =>
@@ -729,9 +709,13 @@ export default function SalesOrderForm() {
                             options={warehouses}
                             placeholder="Chọn kho (tuỳ chọn)"
                             isClearable
+                            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                            menuPosition="fixed"
+                            menuShouldScrollIntoView={false}
+                            styles={compactSelectStyles}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -739,13 +723,13 @@ export default function SalesOrderForm() {
                             onChange={(e) =>
                               handleItemChange(index, "quantity", Number(e.target.value))
                             }
-                            className="w-24 px-2 py-1 border rounded"
+                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
                           />
                           {itemError.quantity && (
-                            <p className="text-red-500 text-xs">{itemError.quantity}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.quantity}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -757,10 +741,10 @@ export default function SalesOrderForm() {
                                 normalizeNumberInput(e.target.value)
                               )
                             }
-                            className="w-32 border rounded px-3 py-1 text-right tracking-wide"
+                            className="w-32 border border-gray-300 rounded px-3 py-1 text-right tracking-wide"
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -769,13 +753,14 @@ export default function SalesOrderForm() {
                             onChange={(e) =>
                               handleItemChange(index, "discountPercent", Number(e.target.value))
                             }
-                            className="w-24 px-2 py-1 border rounded"
+                            className="w-28 border border-gray-300 rounded px-2 py-1 text-right"
+                            placeholder="0"
                           />
                           {itemError.discountPercent && (
-                            <p className="text-red-500 text-xs">{itemError.discountPercent}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.discountPercent}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -783,20 +768,22 @@ export default function SalesOrderForm() {
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", Number(e.target.value))
                             }
-                            className="w-20 px-2 py-1 border rounded"
+                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                        <td className="px-4 py-3 text-right font-medium">
                           {formatCurrency(lineTotal)}
                         </td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Xóa
-                          </button>
+                        <td className="px-4 py-3 text-center">
+                          {formData.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -804,31 +791,59 @@ export default function SalesOrderForm() {
                 </tbody>
               </table>
             </div>
+            {errors.items && (
+              <p className="text-sm text-red-600 px-6 py-3">{errors.items}</p>
+            )}
           </div>
 
-          <div className="border-t pt-4 flex items-center justify-between">
+          {/* Thuế và tổng cộng */}
+          <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
             <div>
-              <div className="text-sm text-gray-500">Tổng dự kiến</div>
-              <div className="text-2xl font-semibold text-gray-900">
-                {formatCurrency(totalValue)}
+              <label className="text-sm text-gray-600">Thuế (%)</label>
+              <input
+                type="number"
+                min="0"
+                value={globalTaxRate}
+                onChange={(e) => handleGlobalTaxChange(e.target.value)}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Áp dụng thuế chung cho toàn bộ sản phẩm"
+              />
+            </div>
+            <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Tạm tính</span>
+                <span className="font-semibold">{formatCurrency(totals.gross)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Chiết khấu dòng</span>
+                <span>{formatCurrency(totals.discount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Thuế</span>
+                <span>{formatCurrency(totals.tax)}</span>
+              </div>
+              <div className="flex justify-between text-base font-semibold text-gray-900">
+                <span>Tổng cộng</span>
+                <span>{formatCurrency(totalValue)}</span>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/sales/orders")}
-                className="px-6 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
-              </button>
-            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
+            </button>
           </div>
         </form>
       </div>
