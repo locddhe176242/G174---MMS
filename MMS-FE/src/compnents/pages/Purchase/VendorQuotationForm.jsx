@@ -765,11 +765,13 @@ const VendorQuotationForm = () => {
                 </div>
 
                 {/* Quotation Items */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách sản phẩm</h2>
+                <div className="bg-white rounded-lg shadow-sm">
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
+                    </div>
 
                     {validationErrors.items && (
-                        <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
+                        <p className="text-red-500 text-sm px-6 pt-4">{validationErrors.items}</p>
                     )}
 
                     {formData.items.length === 0 ? (
@@ -778,176 +780,165 @@ const VendorQuotationForm = () => {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">#</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Sản phẩm (từ RFQ)</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">SL yêu cầu</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Đơn giá báo</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">CK (%)</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thuế (%)</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Thành tiền</th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">Ghi chú</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {formData.items.map((item, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="border border-gray-200 px-2 py-1 text-xs text-gray-700 text-center">
-                                            {index + 1}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-blue-600">🔗</span>
-                                                <span className="font-medium">{item.productName || `${item.productCode || ''} - Sản phẩm`}</span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-0.5">Mã: {item.productCode || 'N/A'}</p>
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="number"
-                                                value={item.quantity}
-                                                disabled
-                                                className="w-20 px-1.5 py-0.5 border border-gray-200 rounded text-xs bg-gray-50 text-gray-600 cursor-not-allowed"
-                                            />
-                                            <p className="text-xs text-gray-500 mt-0.5">Từ RFQ</p>
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="text"
-                                                value={formatNumberInput(item.unitPrice)}
-                                                onChange={(e) => {
-                                                    const rawValue = parseNumberInput(e.target.value);
-                                                    handleItemChange(index, 'unitPrice', rawValue);
-                                                }}
-                                                className="w-32 px-1.5 py-0.5 border border-gray-300 rounded text-xs text-right"
-                                                placeholder="0"
-                                            />
-                                            {validationErrors[`item_${index}_unitPrice`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_unitPrice`]}</p>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="number"
-                                                value={item.discountPercent || 0}
-                                                onChange={(e) => handleItemChange(index, 'discountPercent', parseFloat(e.target.value) || 0)}
-                                                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                            />
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="number"
-                                                value={item.taxRate || 0}
-                                                onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
-                                                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                                disabled={formData.isTaxIncluded}
-                                            />
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {formatCurrency((Number(item.quantity || 0) * Number(item.unitPrice || 0)))}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="text"
-                                                value={item.remark || ''}
-                                                onChange={(e) => handleItemChange(index, 'remark', e.target.value)}
-                                                className="w-32 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                placeholder="Ghi chú"
-                                            />
-                                        </td>
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">#</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm </th>
+                                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">SL yêu cầu</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn giá báo</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">CK (%)</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Thuế (%)</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Thành tiền</th>
                                     </tr>
-                                ))}
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {formData.items.map((item, index) => (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                {index + 1}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-medium text-sm">{item.productName || `${item.productCode || ''} - Sản phẩm`}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    disabled
+                                                    className="w-20 px-2 py-1 border border-gray-200 rounded text-sm bg-gray-50 text-gray-600 cursor-not-allowed text-right"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    value={formatNumberInput(item.unitPrice)}
+                                                    onChange={(e) => {
+                                                        const rawValue = parseNumberInput(e.target.value);
+                                                        handleItemChange(index, 'unitPrice', rawValue);
+                                                    }}
+                                                    className={`w-32 px-2 py-1 border rounded text-sm text-right ${validationErrors[`item_${index}_unitPrice`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholder="0"
+                                                />
+                                                {validationErrors[`item_${index}_unitPrice`] && (
+                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_unitPrice`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    value={item.discountPercent || 0}
+                                                    onChange={(e) => handleItemChange(index, 'discountPercent', parseFloat(e.target.value) || 0)}
+                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    value={item.taxRate || 0}
+                                                    onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
+                                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    disabled={formData.isTaxIncluded}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    value={item.remark || ''}
+                                                    onChange={(e) => handleItemChange(index, 'remark', e.target.value)}
+                                                    className="w-48 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholder="Ghi chú"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                                {formatCurrency((Number(item.quantity || 0) * Number(item.unitPrice || 0)))}
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                                 <tfoot>
-                                <tr className="bg-gray-50 font-semibold">
-                                    <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                <tr className="bg-gray-50 font-semibold border-t border-gray-200">
+                                    <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                         Tạm tính:
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1 text-xs">
+                                    <td className="px-4 py-3 text-sm">
                                         {formatCurrency(calculateTotals.subtotal)}
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
                                 {calculateTotals.totalDiscount > 0 && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                    <tr className="bg-gray-50 border-t border-gray-200">
+                                        <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                             Chiết khấu sản phẩm:
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
+                                        <td className="px-4 py-3 text-sm text-red-600">
                                             -{formatCurrency(calculateTotals.totalDiscount)}
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>
                                 )}
-                                <tr className="bg-gray-50">
-                                    <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                <tr className="bg-gray-50 border-t border-gray-200">
+                                    <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                         Tổng sau chiết khấu sản phẩm:
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1 text-xs">
+                                    <td className="px-4 py-3 text-sm">
                                         {formatCurrency(calculateTotals.totalAfterLineDiscount)}
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
                                 {formData.headerDiscount > 0 && (
                                     <>
-                                        <tr className="bg-gray-50">
-                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                        <tr className="bg-gray-50 border-t border-gray-200">
+                                            <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                                 Chiết khấu tổng đơn ({formData.headerDiscount}%):
                                             </td>
-                                            <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
+                                            <td className="px-4 py-3 text-sm text-red-600">
                                                 -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
                                             </td>
-                                            <td className="border border-gray-200 px-2 py-1"></td>
                                         </tr>
-                                        <tr className="bg-gray-50">
-                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                        <tr className="bg-gray-50 border-t border-gray-200">
+                                            <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                                 Tiền sau khi chiết khấu tổng đơn:
                                             </td>
-                                            <td className="border border-gray-200 px-2 py-1 text-xs font-medium">
+                                            <td className="px-4 py-3 text-sm font-medium">
                                                 {formatCurrency(calculateTotals.amountAfterAllDiscounts || 0)}
                                             </td>
-                                            <td className="border border-gray-200 px-2 py-1"></td>
                                         </tr>
                                     </>
                                 )}
                                 {!formData.isTaxIncluded && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                    <tr className="bg-gray-50 border-t border-gray-200">
+                                        <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                             Thuế:
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs">
+                                        <td className="px-4 py-3 text-sm">
                                             {formatCurrency(calculateTotals.tax)}
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>
                                 )}
                                 {formData.shippingCost > 0 && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                    <tr className="bg-gray-50 border-t border-gray-200">
+                                        <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                             Phí vận chuyển:
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs">
+                                        <td className="px-4 py-3 text-sm">
                                             {formatCurrency(formData.shippingCost)}
                                         </td>
-                                        <td className="border border-gray-200 px-2 py-1"></td>
                                     </tr>
                                 )}
-                                <tr className="bg-blue-50 font-bold">
-                                    <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                <tr className="bg-blue-50 font-bold border-t-2 border-gray-300">
+                                    <td colSpan="7" className="px-4 py-3 text-sm text-right">
                                         Tổng cộng:
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1 text-xs">
+                                    <td className="px-4 py-3 text-sm">
                                         {formatCurrency(calculateTotals.total)}
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
                                 </tfoot>
                             </table>
