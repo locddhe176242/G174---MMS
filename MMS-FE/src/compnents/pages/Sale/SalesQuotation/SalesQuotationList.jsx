@@ -256,9 +256,6 @@ export default function SalesQuotationList() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Người tạo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Người cập nhật
-                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Tổng tiền
                     </th>
@@ -290,17 +287,6 @@ export default function SalesQuotationList() {
                       <td className="px-6 py-3 text-sm text-gray-900">
                         <div className="font-semibold">
                           {quotation.createdByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {quotation.updatedByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.updatedAt)}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">
