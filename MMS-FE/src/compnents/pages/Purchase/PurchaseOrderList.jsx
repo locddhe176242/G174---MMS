@@ -218,7 +218,6 @@ export default function PurchaseOrderList() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý Đơn hàng mua</h1>
-                            <p className="text-sm text-gray-600 mt-1">Quản lý các đơn đặt hàng gửi đến nhà cung cấp và theo dõi trạng thái</p>
                         </div>
                         <button
                             onClick={() => navigate("/purchase/purchase-orders/new")}
@@ -232,9 +231,6 @@ export default function PurchaseOrderList() {
 
             <div className="container mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">Danh sách Đơn hàng mua</h2>
-                    </div>
 
                     <div className="px-6 py-4 border-b border-gray-200">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -260,7 +256,7 @@ export default function PurchaseOrderList() {
                             </form>
 
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                <label className="text-sm text-gray-600">Trạng thái ERP:</label>
+                                <label className="text-sm text-gray-600">Trạng thái:</label>
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
