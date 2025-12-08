@@ -236,7 +236,6 @@ public class GlobalExceptionHandler {
             // Map tên cột sang tiếng Việt
             Map<String, String> columnNames = new HashMap<>();
             columnNames.put("sku", "SKU");
-            columnNames.put("barcode", "Mã vạch");
             columnNames.put("name", "Tên sản phẩm");
             columnNames.put("product_id", "ID sản phẩm");
             

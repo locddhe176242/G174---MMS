@@ -7,7 +7,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer> {
@@ -17,7 +16,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL ORDER BY p.createdAt DESC")
     List<Product> findAllActiveOrderByCreatedAt();
 
-    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND (p.name LIKE %:keyword% OR p.sku LIKE %:keyword% OR p.barcode LIKE %:keyword%) ORDER BY p.createdAt DESC")
+    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND (p.name LIKE %:keyword% OR p.sku LIKE %:keyword%) ORDER BY p.createdAt DESC")
     List<Product> searchActiveProducts(@Param("keyword") String keyword);
 
     @Query("SELECT p FROM Product p WHERE p.deletedAt IS NOT NULL ORDER BY p.createdAt DESC")

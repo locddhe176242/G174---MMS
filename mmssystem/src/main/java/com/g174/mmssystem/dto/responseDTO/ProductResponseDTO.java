@@ -22,7 +22,6 @@ public class ProductResponseDTO {
     private BigDecimal purchasePrice;
     private BigDecimal sellingPrice;
     private String status;
-    private String barcode;
     private String imageUrl;
     private Integer categoryId;
     private String categoryName;

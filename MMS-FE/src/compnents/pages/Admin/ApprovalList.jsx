@@ -83,12 +83,27 @@ export default function ApprovalList() {
 
       const sort = `${sortField},${sortDirection}`;
       const allDocuments = [];
+      
+      console.log('=== Starting fetchDocuments ===');
+      console.log('Type filter:', type);
 
       // Fetch Purchase Requisitions (Pending)
       if (type === "all" || type === "purchase") {
         try {
-          const prData = await purchaseRequisitionService.getRequisitionsWithPagination(0, 100, sort, "Pending");
-          if (prData.content) {
+          console.log('Fetching Purchase Requisitions...');
+          let prResponse = await purchaseRequisitionService.getRequisitionsWithPagination(0, 100, sort, "Pending");
+          console.log('PR Raw Response:', prResponse);
+          
+          // Extract data if wrapped
+          let prData = prResponse;
+          if (prData && typeof prData === 'object' && 'data' in prData) {
+            prData = prData.data;
+          }
+          
+          console.log('PR Data after extract:', prData);
+          
+          if (prData && prData.content && Array.isArray(prData.content)) {
+            console.log('PR Count:', prData.content.length);
             prData.content.forEach(item => {
               const docId = item.requisitionId || item.requisition_id || item.id;
               if (docId) {
@@ -104,32 +119,127 @@ export default function ApprovalList() {
                 });
               }
             });
+          } else {
+            console.log('PR Data structure unexpected:', prData);
           }
         } catch (err) {
           console.error("Error fetching purchase requisitions:", err);
+          console.error("Error details:", err.response?.data);
         }
       }
 
       // Fetch Purchase Quotations (Pending)
       if (type === "all" || type === "purchase") {
         try {
+          console.log('Fetching Purchase Quotations...');
           const pqData = await purchaseQuotationService.getQuotationsWithPagination(0, 100, sort);
-          if (pqData.content) {
-            pqData.content.filter(item => item.status === "Pending").forEach(item => {
-              const docId = item.quotationId || item.quotation_id || item.id;
+          console.log('PQ Data:', pqData);
+          if (pqData && pqData.content && Array.isArray(pqData.content)) {
+            console.log('PQ Total Count:', pqData.content.length);
+            const pendingPQs = pqData.content.filter(item => item.status === "Pending");
+            console.log('PQ Pending Count:', pendingPQs.length);
+            console.log('Pending PQs:', pendingPQs);
+            
+            // Fetch details for each PQ to get complete information
+            for (const item of pendingPQs) {
+              console.log('PQ item:', item);
+              console.log('PQ item keys:', Object.keys(item));
+              const docId = item.pqId || item.quotationId || item.quotation_id || item.id;
+              console.log('Processing PQ with ID:', docId);
               if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "Purchase Quotation",
-                  documentTypeCode: "PQ",
-                  id: docId,
-                  number: item.quotationNo || item.quotation_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.vendorName || item.vendor_name || item.vendor,
-                  totalAmount: item.totalAmount || item.total_amount || 0,
-                });
+                try {
+                  console.log(`Fetching PQ detail for ${docId}...`);
+                  // Fetch full PQ detail
+                  const response = await apiClient.get(`/purchase-quotations/${docId}`);
+                  console.log(`PQ ${docId} response:`, response);
+                  
+                  // Extract the actual data
+                  let pqDetail = response.data;
+                  if (pqDetail && typeof pqDetail === 'object' && 'data' in pqDetail) {
+                    pqDetail = pqDetail.data;
+                  }
+                  
+                  // Try to get totalAmount from various fields
+                  let totalAmount = pqDetail?.totalAfterTax || pqDetail?.total_after_tax ||
+                                   pqDetail?.totalAmount || pqDetail?.total_amount || 
+                                   pqDetail?.grandTotal || pqDetail?.grand_total ||
+                                   pqDetail?.finalAmount || pqDetail?.final_amount || 0;
+                  
+                  // If still 0, calculate from items
+                  if (totalAmount === 0 && pqDetail?.items && Array.isArray(pqDetail.items)) {
+                    totalAmount = pqDetail.items.reduce((sum, lineItem) => {
+                      const lineTotal = lineItem.lineTotal || lineItem.line_total || 
+                                       lineItem.totalPrice || lineItem.total_price ||
+                                       lineItem.total || lineItem.amount || 
+                                       (lineItem.quantity && lineItem.unitPrice ? lineItem.quantity * lineItem.unitPrice : 0) ||
+                                       (lineItem.quantity && lineItem.unit_price ? lineItem.quantity * lineItem.unit_price : 0) ||
+                                       0;
+                      return sum + Number(lineTotal);
+                    }, 0);
+                  }
+                  
+                  // Get RFQ information if exists
+                  const rfqId = pqDetail?.rfqId || pqDetail?.rfq_id || pqDetail?.rfq?.rfqId || pqDetail?.rfq?.rfq_id;
+                  const rfqNo = pqDetail?.rfqNo || pqDetail?.rfq_no || pqDetail?.rfq?.rfqNo || pqDetail?.rfq?.rfq_no;
+                  
+                  // If has RFQ, fetch other quotations for comparison
+                  let compareQuotations = [];
+                  if (rfqId) {
+                    try {
+                      const rfqQuotations = await purchaseQuotationService.getQuotationsByRfqId(rfqId);
+                      if (rfqQuotations && Array.isArray(rfqQuotations)) {
+                        compareQuotations = rfqQuotations
+                          .filter(q => (q.quotationId || q.quotation_id || q.id) !== docId)
+                          .map(q => ({
+                            quotationId: q.quotationId || q.quotation_id || q.id,
+                            quotationNo: q.quotationNo || q.quotation_no,
+                            vendorName: q.vendorName || q.vendor_name,
+                            totalAmount: q.totalAfterTax || q.total_after_tax || q.totalAmount || q.total_amount || 0,
+                            status: q.status
+                          }));
+                      }
+                    } catch (compareErr) {
+                      console.error(`Error fetching compare quotations for RFQ ${rfqId}:`, compareErr);
+                    }
+                  }
+                  
+                  const pqDoc = {
+                    ...pqDetail,
+                    documentType: "Purchase Quotation",
+                    documentTypeCode: "PQ",
+                    id: docId,
+                    number: pqDetail.quotationNo || pqDetail.quotation_no || item.quotationNo || item.quotation_no || item.number,
+                    createdDate: pqDetail.createdAt || pqDetail.created_at || item.createdAt || item.created_at || item.createdDate,
+                    requesterName: pqDetail.vendorName || pqDetail.vendor_name || item.vendorName || item.vendor_name || item.vendor,
+                    totalAmount: totalAmount,
+                    rfqId: rfqId,
+                    rfqNo: rfqNo,
+                    compareQuotations: compareQuotations,
+                  };
+                  console.log('Adding PQ document:', pqDoc);
+                  allDocuments.push(pqDoc);
+                  console.log('allDocuments after adding PQ:', allDocuments.length);
+                } catch (detailErr) {
+                  console.error(`Error fetching PQ detail for ${docId}:`, detailErr);
+                  console.error('Error details:', detailErr.response?.data);
+                  // Fallback to list data
+                  const fallbackDoc = {
+                    ...item,
+                    documentType: "Purchase Quotation",
+                    documentTypeCode: "PQ",
+                    id: docId,
+                    number: item.pqNo || item.quotationNo || item.quotation_no || item.number,
+                    createdDate: item.pqDate || item.createdAt || item.created_at || item.createdDate,
+                    requesterName: item.vendorName || item.vendor_name || item.vendor,
+                    totalAmount: item.totalAmount || item.total_amount || 0,
+                  };
+                  console.log('Adding PQ fallback document:', fallbackDoc);
+                  allDocuments.push(fallbackDoc);
+                }
+              } else {
+                console.warn('PQ item has no valid ID:', item);
               }
-            });
+            }
           }
         } catch (err) {
           console.error("Error fetching purchase quotations:", err);
@@ -139,9 +249,13 @@ export default function ApprovalList() {
       // Fetch Purchase Orders (Pending)
       if (type === "all" || type === "purchase") {
         try {
+          console.log('Fetching Purchase Orders...');
           const poData = await purchaseOrderService.getPurchaseOrdersWithPagination(0, 100, sort);
-          if (poData.content) {
+          console.log('PO Data:', poData);
+          if (poData && poData.content && Array.isArray(poData.content)) {
+            console.log('PO Total Count:', poData.content.length);
             const pendingPOs = poData.content.filter(item => item.approvalStatus === "Pending" || item.approval_status === "Pending");
+            console.log('PO Pending Count:', pendingPOs.length);
             
             // Fetch details for each PO to get totalAmount
             for (const item of pendingPOs) {
@@ -274,57 +388,10 @@ export default function ApprovalList() {
         }
       }
 
-      // Fetch AP Invoices (Pending approval)
-      if (type === "all" || type === "purchase") {
-        try {
-          const apiData = await apInvoiceService.getAllInvoices({ status: "Pending" });
-          if (Array.isArray(apiData)) {
-            apiData.forEach(item => {
-              const docId = item.invoiceId || item.invoice_id || item.id;
-              if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "AP Invoice",
-                  documentTypeCode: "API",
-                  id: docId,
-                  number: item.invoiceNo || item.invoice_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.vendorName || item.vendor_name || item.vendor,
-                  totalAmount: item.total_after_tax || item.totalAfterTax || item.totalAmount || item.total_amount || 0,
-                });
-              }
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching AP invoices:", err);
-        }
-      }
+      // Note: AP/AR Invoices are handled by Accounting department, not in this approval workflow
 
-      // Fetch AR Invoices (Pending approval)
-      if (type === "all" || type === "sales") {
-        try {
-          const ariData = await invoiceService.getInvoices({ status: "Pending" });
-          if (Array.isArray(ariData)) {
-            ariData.forEach(item => {
-              const docId = item.invoiceId || item.invoice_id || item.id;
-              if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "AR Invoice",
-                  documentTypeCode: "ARI",
-                  id: docId,
-                  number: item.invoiceNo || item.invoice_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.customerName || item.customer_name || item.customer,
-                  totalAmount: item.total_after_tax || item.totalAfterTax || item.totalAmount || item.total_amount || 0,
-                });
-              }
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching AR invoices:", err);
-        }
-      }
+      console.log('=== Total documents collected:', allDocuments.length);
+      console.log('All documents:', allDocuments);
 
       // Filter by keyword if provided
       let filteredDocuments = allDocuments;
@@ -336,6 +403,8 @@ export default function ApprovalList() {
           doc.documentType?.toLowerCase().includes(lowerKeyword)
         );
       }
+
+      console.log('Filtered documents:', filteredDocuments.length);
 
       // Sort documents
       filteredDocuments.sort((a, b) => {
@@ -354,10 +423,17 @@ export default function ApprovalList() {
       const endIndex = startIndex + pageSize;
       const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
 
+      console.log('Paginated documents:', paginatedDocuments);
+      console.log('=== FINAL RESULT ===');
+      console.log('Total documents to display:', paginatedDocuments.length);
+      console.log('Documents array:', paginatedDocuments);
+
       setDocuments(paginatedDocuments);
       setTotalElements(filteredDocuments.length);
       setTotalPages(Math.ceil(filteredDocuments.length / pageSize));
       setCurrentPage(page);
+      
+      console.log('State updated - documents.length:', paginatedDocuments.length);
     } catch (err) {
       console.error("Error fetching documents:", err);
       setError("Không thể tải danh sách đơn cần duyệt: " + (err.message || ""));
@@ -737,20 +813,33 @@ export default function ApprovalList() {
                               >
                                 Xem
                               </button>
-                              <button
-                                onClick={() => openApproveModal(doc)}
-                                className="text-green-600 hover:text-green-800"
-                                title="Duyệt đơn"
-                              >
-                                Duyệt
-                              </button>
-                              <button
-                                onClick={() => openRejectModal(doc)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Từ chối đơn"
-                              >
-                                Từ chối
-                              </button>
+                              {/* For PQ with RFQ, show Compare button to select best vendor */}
+                              {doc.documentTypeCode === "PQ" && doc.rfqId ? (
+                                <button
+                                  onClick={() => navigate(`/purchase/rfqs/${doc.rfqId}/compare-quotations`)}
+                                  className="px-3 py-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded border border-purple-200"
+                                  title="So sánh và chọn báo giá tốt nhất"
+                                >
+                                  So sánh báo giá
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => openApproveModal(doc)}
+                                    className="text-green-600 hover:text-green-800"
+                                    title="Duyệt đơn"
+                                  >
+                                    Duyệt
+                                  </button>
+                                  <button
+                                    onClick={() => openRejectModal(doc)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Từ chối đơn"
+                                  >
+                                    Từ chối
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -828,18 +917,72 @@ export default function ApprovalList() {
 
       {/* Approve Modal */}
       {showApproveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 my-8">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Xác nhận duyệt đơn</h3>
               <p className="text-sm text-gray-600 mb-2">
                 Bạn có chắc chắn muốn duyệt đơn:
               </p>
-              <div className="bg-gray-50 p-3 rounded mb-6">
+              <div className="bg-gray-50 p-3 rounded mb-4">
                 <p className="text-sm"><strong>Loại:</strong> {selectedDocument?.documentType}</p>
                 <p className="text-sm"><strong>Số:</strong> {selectedDocument?.number}</p>
                 <p className="text-sm"><strong>Giá trị:</strong> {formatCurrency(selectedDocument?.totalAmount || 0)}</p>
+                {selectedDocument?.requesterName && (
+                  <p className="text-sm"><strong>Nhà cung cấp:</strong> {selectedDocument.requesterName}</p>
+                )}
               </div>
+
+              {/* RFQ Comparison for Purchase Quotation */}
+              {selectedDocument?.documentTypeCode === "PQ" && selectedDocument?.rfqId && (
+                <div className="mb-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <p className="text-sm font-medium text-blue-900 mb-1">
+                      📋 Yêu cầu báo giá: <span className="font-semibold">{selectedDocument.rfqNo}</span>
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Báo giá này thuộc yêu cầu báo giá {selectedDocument.rfqNo}
+                    </p>
+                  </div>
+
+                  {selectedDocument?.compareQuotations && selectedDocument.compareQuotations.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                        💰 So sánh với các báo giá khác ({selectedDocument.compareQuotations.length})
+                      </h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {selectedDocument.compareQuotations.map((quote, idx) => (
+                          <div 
+                            key={quote.quotationId} 
+                            className="bg-gray-50 rounded p-2 flex justify-between items-center text-xs"
+                          >
+                            <div>
+                              <p className="font-medium text-gray-900">{quote.quotationNo}</p>
+                              <p className="text-gray-600">{quote.vendorName}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-gray-900">
+                                {formatCurrency(quote.totalAmount || 0)}
+                              </p>
+                              <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+                                quote.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                                quote.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {quote.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        ℹ️ Xem xét so sánh giá trước khi phê duyệt
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => {

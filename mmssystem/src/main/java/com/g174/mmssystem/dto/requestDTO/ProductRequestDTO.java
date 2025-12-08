@@ -52,7 +52,4 @@ public class ProductRequestDTO {
     private String imageUrl;
 
     private String status;
-
-    @Size(max = 100, message = "Barcode không được quá 100 ký tự")
-    private String barcode;
 }
