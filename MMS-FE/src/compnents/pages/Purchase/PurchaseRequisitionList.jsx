@@ -6,10 +6,8 @@ import Pagination from "../../common/Pagination.jsx";
 
 
 export default function PurchaseRequisitionList() {
-    // ==================== ROUTING ====================
     const navigate = useNavigate();
 
-    // ==================== STATE MANAGEMENT ====================
     const [requisitions, setRequisitions] = useState([]); // Danh sách phiếu yêu cầu
     const [loading, setLoading] = useState(true); // Loading state
     const [error, setError] = useState(null); // Error state
@@ -31,25 +29,12 @@ export default function PurchaseRequisitionList() {
     const [requisitionToDelete, setRequisitionToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // ==================== HELPER FUNCTIONS ====================
-    /**
-     * Format date string sang định dạng VN (dd/mm/yyyy)
-     *
-     * @param {string} dateString - ISO date string từ backend
-     * @returns {string} Formatted date hoặc empty string
-     */
     const formatDate = (dateString) => {
         if (!dateString) return "";
         const date = new Date(dateString);
         return date.toLocaleDateString("vi-VN");
     };
 
-    /**
-     * Tạo badge hiển thị trạng thái phiếu (RequisitionStatus)
-     *
-     * @param {string} status - Open/Closed/Converted/Cancelled
-     * @returns {JSX.Element} Badge component với màu tương ứng
-     */
     const getStatusBadge = (status) => {
         const statusMap = {
             Open: { label: "Đang mở", color: "bg-blue-100 text-blue-800" },
@@ -61,24 +46,12 @@ export default function PurchaseRequisitionList() {
         return <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>{statusInfo.label}</span>;
     };
 
-    /**
-     * Helper function để lấy status string từ status field (có thể là string hoặc enum object)
-     *
-     * @param {string|object} status - Status từ backend (có thể là string hoặc enum object)
-     * @returns {string} Status string
-     */
     const getStatusString = (status) => {
         if (!status) return 'Draft';
         if (typeof status === 'string') return status;
         return status.name || status.toString() || 'Draft';
     };
 
-    /**
-     * Tạo badge hiển thị trạng thái duyệt (ApprovalStatus)
-     *
-     * @param {string|object} approvalStatus - Draft/Pending/Approved/Rejected/Cancelled
-     * @returns {JSX.Element} Badge component với màu tương ứng
-     */
     const getApprovalStatusBadge = (approvalStatus) => {
         const statusStr = getStatusString(approvalStatus);
         
@@ -92,21 +65,8 @@ export default function PurchaseRequisitionList() {
         const statusInfo = statusMap[statusStr] || { label: statusStr, color: "bg-gray-100 text-gray-800" };
         return <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>{statusInfo.label}</span>;
     };
-
-    /**
-     * Đếm tổng số items trong một phiếu yêu cầu
-     *
-     * @param {Array} items - Array of items
-     * @returns {number} Số lượng items
-     */
     const getTotalItems = (items) => (Array.isArray(items) ? items.length : 0);
 
-    /**
-     * Format số tiền sang định dạng VND
-     *
-     * @param {number} amount - Số tiền
-     * @returns {string} Formatted currency string
-     */
     const formatCurrency = (amount) => {
         if (!amount) return "0 đ";
         return new Intl.NumberFormat('vi-VN', {
@@ -115,15 +75,6 @@ export default function PurchaseRequisitionList() {
         }).format(Number(amount));
     };
 
-    // ==================== API FUNCTIONS ====================
-    /**
-     * Fetch danh sách phiếu yêu cầu từ backend
-     * Hỗ trợ pagination, sorting và search
-     *
-     * @param {number} page - Page number (0-indexed)
-     * @param {number} size - Page size
-     * @param {string} keyword - Search keyword
-     */
     const fetchRequisitions = async (
         page = 0,
         size = pageSize,
@@ -134,7 +85,6 @@ export default function PurchaseRequisitionList() {
             setLoading(true);
             setError(null);
 
-            // Build sort parameter (format: "field,direction")
             const sort = `${sortField},${sortDirection}`;
             const normalizedStatus =
                 !keyword.trim() && statusOverride !== "ALL"
@@ -169,62 +119,33 @@ export default function PurchaseRequisitionList() {
         }
     };
 
-    // ==================== USEEFFECT HOOKS ====================
-    /**
-     * Load dữ liệu lần đầu khi component mount
-     */
     useEffect(() => {
         fetchRequisitions();
     }, []);
 
     useEffect(() => {
         fetchRequisitions(0);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter]);
 
-    /**
-     * Refetch data khi sort field hoặc direction thay đổi
-     */
     useEffect(() => {
         fetchRequisitions(currentPage);
     }, [sortField, sortDirection]);
 
-    // ==================== EVENT HANDLERS ====================
-    /**
-     * Xử lý submit form search
-     */
+
     const handleSearch = (e) => {
         e.preventDefault();
-        fetchRequisitions(0); // Reset về page 0 khi search
+        fetchRequisitions(0);
     };
 
-    /**
-     * Xử lý click vào column header để sort
-     * - Click lần 1: sort asc
-     * - Click lần 2 (same field): toggle asc/desc
-     *
-     * @param {string} field - Field name để sort
-     */
     const handleSort = (field) => {
         if (sortField === field) {
-            // Toggle direction nếu đang sort cùng field
             setSortDirection(sortDirection === "asc" ? "desc" : "asc");
         } else {
-            // Sort field mới, bắt đầu với asc
             setSortField(field);
             setSortDirection("asc");
         }
     };
 
-    /**
-     * Hiển thị icon sort cho column header
-     * - Gray icon: Column chưa được sort
-     * - Blue icon up: Column đang sort asc
-     * - Blue icon down: Column đang sort desc
-     *
-     * @param {string} field - Field name
-     * @returns {JSX.Element} Sort icon SVG
-     */
     const getSortIcon = (field) => {
         if (sortField !== field)
             return (
@@ -246,20 +167,11 @@ export default function PurchaseRequisitionList() {
         );
     };
 
-    // ==================== DELETE HANDLERS ====================
-    /**
-     * Mở delete confirmation modal
-     *
-     * @param {Object} requisition - Phiếu yêu cầu cần xóa
-     */
     const handleDeleteClick = (requisition) => {
         setRequisitionToDelete(requisition);
         setShowDeleteModal(true);
     };
 
-    /**
-     * Đóng delete modal và clear state
-     */
     const handleDeleteCancel = () => {
         setShowDeleteModal(false);
         setRequisitionToDelete(null);
@@ -278,7 +190,7 @@ export default function PurchaseRequisitionList() {
             await purchaseRequisitionService.deleteRequisition(id);
             toast.success("Xóa phiếu yêu cầu thành công!");
             setShowDeleteModal(false);
-            fetchRequisitions(currentPage); // Refetch current page
+            fetchRequisitions(currentPage); 
         } catch (err) {
             toast.error(err.message || "Không thể xóa phiếu yêu cầu");
             console.error(err);
@@ -287,38 +199,25 @@ export default function PurchaseRequisitionList() {
         }
     };
 
-    // ==================== PAGINATION HANDLERS ====================
-    /**
-     * Xử lý thay đổi page từ Pagination component
-     *
-     * @param {number} page - Page number mới (0-indexed)
-     */
+
     const handlePageChange = (page) => {
         if (page < 0 || page >= totalPages) return;
         fetchRequisitions(page);
     };
 
-    /**
-     * Xử lý thay đổi page size
-     * Reset về page 0 khi thay đổi page size
-     *
-     * @param {number} size - Page size mới
-     */
     const handlePageSizeChange = (size) => {
         setPageSize(size);
-        fetchRequisitions(0, size); // Reset to first page
+        fetchRequisitions(0, size); 
     };
 
-    // ==================== RENDER ====================
+
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* ==================== HEADER ==================== */}
             <div className="bg-white shadow-sm">
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý phiếu yêu cầu mua hàng</h1>
-                            <p className="text-sm text-gray-600 mt-1">Quản lý các yêu cầu mua hàng từ các bộ phận trong công ty</p>
                         </div>
                         <button
                             onClick={() => navigate("/purchase/purchase-requisitions/new")}
@@ -331,10 +230,8 @@ export default function PurchaseRequisitionList() {
                 </div>
             </div>
 
-            {/* ==================== MAIN CONTENT ==================== */}
             <div className="container mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg shadow-sm">
-                    {/* ==================== SEARCH BAR ==================== */}
                     {/* Tìm kiếm theo: requisition_no, department, purpose */}
                     <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <form onSubmit={handleSearch} className="flex items-center gap-4">
@@ -428,23 +325,16 @@ export default function PurchaseRequisitionList() {
                                         const reqId = requisition.requisitionId || requisition.requisition_id || requisition.id;
                                         return (
                                             <tr key={reqId} className="hover:bg-gray-50">
-                                                {/* Mã phiếu */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                                                     <span
                                                         className="px-2 py-1 bg-gray-100 rounded text-xs">{requisition.requisitionNo || requisition.requisition_no}</span>
                                                 </td>
-                                                {/* Trạng thái (duyệt) */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{getApprovalStatusBadge(requisition.status || requisition.approvalStatus)}</td>
-                                                {/* Mục đích */}
                                                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate"
                                                     title={requisition.purpose}>{requisition.purpose || "-"}</td>
-                                                {/* Số sản phẩm */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">{getTotalItems(requisition.items || [])}</td>
-                                                {/* Ngày tạo */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(requisition.createdAt)}</td>
-                                                {/* Người yêu cầu */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{requisition.requesterName || "-"}</td>
-                                                {/* Hành động */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex items-center gap-2">
                                                         <button
@@ -498,8 +388,6 @@ export default function PurchaseRequisitionList() {
                         )}
                     </div>
 
-                    {/* ==================== PAGINATION ==================== */}
-                    {/* Hiển thị pagination nếu có data */}
                     {!loading && !error && requisitions.length > 0 && (
                         <Pagination
                             currentPage={currentPage}
@@ -513,8 +401,6 @@ export default function PurchaseRequisitionList() {
                 </div>
             </div>
 
-            {/* ==================== DELETE CONFIRMATION MODAL ==================== */}
-            {/* Modal xác nhận xóa phiếu yêu cầu (soft delete) */}
             {showDeleteModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
