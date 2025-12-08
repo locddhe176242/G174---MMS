@@ -25,5 +25,9 @@ public interface DeliveryItemRepository extends JpaRepository<DeliveryItem, Inte
 
     @Query("select coalesce(sum(di.deliveredQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status = com.g174.mmssystem.entity.Delivery$DeliveryStatus.Delivered")
     BigDecimal sumDeliveredQtyBySalesOrderItem(@Param("soiId") Integer soiId);
+
+    // Lấy danh sách DeliveryItem đã planned (chưa Delivered) để kiểm tra số lượng trong kho
+    @Query("select di from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery$DeliveryStatus.Cancelled and di.delivery.status <> com.g174.mmssystem.entity.Delivery$DeliveryStatus.Delivered")
+    List<DeliveryItem> findPlannedItemsBySalesOrderItem(@Param("soiId") Integer soiId);
 }
 

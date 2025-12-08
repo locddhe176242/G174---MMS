@@ -155,7 +155,9 @@ export default function InvoiceForm() {
           dueDate: formData.dueDate ? formData.dueDate.toISOString().slice(0, 10) : null,
           notes: formData.notes || null,
         };
-        await invoiceService.updateInvoice(id, payload);
+        // Invoice gốc không được chỉnh sửa theo nghiệp vụ ERP chuẩn
+        // Nếu cần điều chỉnh, phải tạo Credit Note (hóa đơn điều chỉnh) mới
+        throw new Error("Hóa đơn gốc không được chỉnh sửa. Vui lòng tạo Credit Note (hóa đơn điều chỉnh) để điều chỉnh hóa đơn này.");
         toast.success("Đã cập nhật hóa đơn");
       } else {
         // Tạo invoice từ delivery

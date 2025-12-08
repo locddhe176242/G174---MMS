@@ -37,6 +37,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
     private final CreditNoteRepository creditNoteRepository;
     private final CreditNoteItemRepository creditNoteItemRepository;
     private final ARInvoiceRepository arInvoiceRepository;
+    private final ARInvoiceItemRepository arInvoiceItemRepository;
+    private final ARPaymentRepository arPaymentRepository;
     private final ReturnOrderRepository returnOrderRepository;
     private final ReturnOrderItemRepository returnOrderItemRepository;
     private final ProductRepository productRepository;
@@ -157,48 +159,57 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
     }
 
     @Override
-    public CreditNoteResponseDTO createFromReturnOrder(Integer returnOrderId) {
-        ReturnOrder returnOrder = getReturnOrder(returnOrderId);
+    public CreditNoteResponseDTO createFromInvoice(Integer invoiceId) {
+        ARInvoice invoice = getInvoice(invoiceId);
 
-        if (returnOrder.getStatus() != ReturnOrder.ReturnStatus.Completed) {
-            throw new IllegalStateException("Chỉ có thể tạo Credit Note từ Return Order đã hoàn thành (Completed)");
+        if (invoice.getStatus() == ARInvoice.InvoiceStatus.Cancelled) {
+            throw new IllegalStateException("Không thể tạo Credit Note từ hóa đơn đã hủy");
         }
 
-        if (returnOrder.getInvoice() == null) {
-            throw new IllegalStateException("Return Order phải liên kết với Invoice để tạo Credit Note");
-        }
-
-        ARInvoice invoice = returnOrder.getInvoice();
-
-        // Tạo Credit Note với các items từ Return Order
+        // Copy toàn bộ thông tin từ Invoice gốc
         CreditNoteRequestDTO request = new CreditNoteRequestDTO();
         request.setInvoiceId(invoice.getArInvoiceId());
-        request.setReturnOrderId(returnOrderId);
+        request.setReturnOrderId(null); // Không liên kết với Return Order
         request.setCreditNoteDate(LocalDate.now());
-        request.setReason("Tự động tạo từ Return Order: " + returnOrder.getReturnNo());
+        request.setReason("Hóa đơn điều chỉnh từ: " + invoice.getInvoiceNo());
+        request.setNotes("Tự động tạo từ hóa đơn gốc. Vui lòng điều chỉnh số lượng theo nhu cầu.");
 
+        // Copy tất cả items từ Invoice, cho phép người dùng điều chỉnh số lượng sau
         List<CreditNoteItemRequestDTO> items = new ArrayList<>();
-        for (ReturnOrderItem returnItem : returnOrder.getItems()) {
-            // Lấy thông tin giá từ Sales Order Item gốc
-            DeliveryItem deliveryItem = returnItem.getDeliveryItem();
-            SalesOrderItem salesOrderItem = deliveryItem != null ? deliveryItem.getSalesOrderItem() : null;
-
-            if (salesOrderItem != null) {
-                CreditNoteItemRequestDTO item = new CreditNoteItemRequestDTO();
-                item.setProductId(returnItem.getProduct().getProductId());
-                item.setProductCode(returnItem.getProduct().getSku());
-                item.setProductName(returnItem.getProduct().getName());
-                item.setUom(returnItem.getUom());
-                item.setQuantity(returnItem.getReturnedQty());
-                item.setUnitPrice(salesOrderItem.getUnitPrice());
-                item.setDiscountAmount(salesOrderItem.getDiscountAmount() != null ? salesOrderItem.getDiscountAmount() : BigDecimal.ZERO);
-                item.setTaxRate(salesOrderItem.getTaxRate() != null ? salesOrderItem.getTaxRate() : BigDecimal.ZERO);
-                items.add(item);
+        List<ARInvoiceItem> invoiceItems = arInvoiceItemRepository.findByInvoice_ArInvoiceId(invoiceId);
+        
+        for (ARInvoiceItem invoiceItem : invoiceItems) {
+            CreditNoteItemRequestDTO item = new CreditNoteItemRequestDTO();
+            item.setProductId(invoiceItem.getProduct().getProductId());
+            item.setProductCode(invoiceItem.getProduct().getSku());
+            item.setProductName(invoiceItem.getProduct().getName());
+            
+            // Lấy UOM từ SalesOrderItem hoặc Product
+            String uom = null;
+            if (invoiceItem.getSalesOrderItem() != null && invoiceItem.getSalesOrderItem().getUom() != null) {
+                uom = invoiceItem.getSalesOrderItem().getUom();
+            } else if (invoiceItem.getProduct() != null && invoiceItem.getProduct().getUom() != null) {
+                uom = invoiceItem.getProduct().getUom();
             }
+            item.setUom(uom);
+            
+            // Mặc định copy số lượng từ Invoice, người dùng có thể điều chỉnh sau
+            item.setQuantity(invoiceItem.getQuantity());
+            item.setUnitPrice(invoiceItem.getUnitPrice());
+            
+            // Lấy discountAmount từ SalesOrderItem (ARInvoiceItem không có field này)
+            BigDecimal discountAmount = BigDecimal.ZERO;
+            if (invoiceItem.getSalesOrderItem() != null && invoiceItem.getSalesOrderItem().getDiscountAmount() != null) {
+                discountAmount = invoiceItem.getSalesOrderItem().getDiscountAmount();
+            }
+            item.setDiscountAmount(discountAmount);
+            
+            item.setTaxRate(invoiceItem.getTaxRate() != null ? invoiceItem.getTaxRate() : BigDecimal.ZERO);
+            items.add(item);
         }
 
         if (items.isEmpty()) {
-            throw new IllegalStateException("Không có sản phẩm nào để tạo Credit Note");
+            throw new IllegalStateException("Hóa đơn không có sản phẩm nào để tạo Credit Note");
         }
 
         request.setItems(items);
@@ -248,26 +259,56 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
             ARInvoice freshInvoice = arInvoiceRepository.findById(invoice.getArInvoiceId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Invoice ID " + invoice.getArInvoiceId()));
             
-            // Giảm balance của Invoice bằng totalAmount của Credit Note
-            BigDecimal newBalance = freshInvoice.getBalanceAmount()
-                    .subtract(creditNote.getTotalAmount())
-                    .max(BigDecimal.ZERO);
-            freshInvoice.setBalanceAmount(newBalance);
+            // Tính lại balance từ đầu: totalAmount - tổng Credit Notes - tổng Payments
+            // Đây là cách đúng trong ERP: không trừ trực tiếp, mà tính lại từ đầu để đảm bảo chính xác
+            BigDecimal balance = freshInvoice.getTotalAmount();
+            
+            // Trừ đi tất cả Credit Notes đã áp dụng (Issued hoặc Applied)
+            List<CreditNote> allCreditNotes = creditNoteRepository.findByInvoice_ArInvoiceIdAndDeletedAtIsNull(freshInvoice.getArInvoiceId());
+            for (CreditNote cn : allCreditNotes) {
+                if (cn.getStatus() == CreditNote.CreditNoteStatus.Issued || 
+                    cn.getStatus() == CreditNote.CreditNoteStatus.Applied) {
+                    balance = balance.subtract(cn.getTotalAmount());
+                    log.debug("Trừ Credit Note {}: -{}", cn.getCreditNoteNo(), cn.getTotalAmount());
+                }
+            }
+            
+            // Trừ đi tất cả Payments
+            BigDecimal totalPaid = arPaymentRepository.getTotalPaidByInvoiceId(freshInvoice.getArInvoiceId());
+            if (totalPaid != null && totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+                balance = balance.subtract(totalPaid);
+                log.debug("Trừ Payments: -{}", totalPaid);
+            }
+            
+            // Đảm bảo balance không âm
+            balance = balance.max(BigDecimal.ZERO);
+            
+            BigDecimal oldBalance = freshInvoice.getBalanceAmount();
+            freshInvoice.setBalanceAmount(balance);
 
             // Cập nhật status của Invoice nếu cần
-            if (newBalance.compareTo(BigDecimal.ZERO) == 0) {
+            if (balance.compareTo(BigDecimal.ZERO) == 0) {
                 if (freshInvoice.getStatus() == ARInvoice.InvoiceStatus.PartiallyPaid || 
                     freshInvoice.getStatus() == ARInvoice.InvoiceStatus.Unpaid) {
                     freshInvoice.setStatus(ARInvoice.InvoiceStatus.Paid);
                 }
-            } else if (freshInvoice.getStatus() == ARInvoice.InvoiceStatus.Unpaid) {
-                // Nếu còn nợ nhưng trước đó là Unpaid, chuyển sang PartiallyPaid
+            } else if (freshInvoice.getStatus() == ARInvoice.InvoiceStatus.Unpaid && 
+                      (totalPaid != null && totalPaid.compareTo(BigDecimal.ZERO) > 0 || 
+                       !allCreditNotes.isEmpty())) {
+                // Nếu còn nợ nhưng đã có payment hoặc credit note, chuyển sang PartiallyPaid
                 freshInvoice.setStatus(ARInvoice.InvoiceStatus.PartiallyPaid);
             }
 
             arInvoiceRepository.save(freshInvoice);
-            log.info("Đã cập nhật balance của Invoice {} từ {} xuống {}", 
-                    freshInvoice.getInvoiceNo(), invoice.getBalanceAmount(), newBalance);
+            log.info("Đã tính lại balance của Invoice {}: {} -> {} (Total: {}, Credit Notes: {}, Payments: {})", 
+                    freshInvoice.getInvoiceNo(), oldBalance, balance, 
+                    freshInvoice.getTotalAmount(),
+                    allCreditNotes.stream()
+                        .filter(cn -> cn.getStatus() == CreditNote.CreditNoteStatus.Issued || 
+                                     cn.getStatus() == CreditNote.CreditNoteStatus.Applied)
+                        .map(CreditNote::getTotalAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add),
+                    totalPaid != null ? totalPaid : BigDecimal.ZERO);
         }
     }
 

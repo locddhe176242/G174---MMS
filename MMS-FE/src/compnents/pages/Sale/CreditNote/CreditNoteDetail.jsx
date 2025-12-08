@@ -134,7 +134,17 @@ export default function CreditNoteDetail() {
                   </span>
                 </li>
                 <li>
-                  <span className="text-gray-500">Invoice:</span> {data.invoiceNo || "—"}
+                  <span className="text-gray-500">Invoice:</span>{" "}
+                  {data.invoiceNo ? (
+                    <button
+                      onClick={() => navigate(`/sales/invoices/${data.invoiceId}`)}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {data.invoiceNo}
+                    </button>
+                  ) : (
+                    "—"
+                  )}
                 </li>
                 <li>
                   <span className="text-gray-500">Sales Order:</span> {data.salesOrderNo || "—"}

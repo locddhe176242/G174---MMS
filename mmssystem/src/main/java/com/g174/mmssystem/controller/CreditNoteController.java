@@ -44,11 +44,11 @@ public class CreditNoteController {
         return ResponseEntity.ok(creditNoteService.createCreditNote(request));
     }
 
-    @PostMapping("/convert/{returnOrderId}")
+    @PostMapping("/from-invoice/{invoiceId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
-    @LogActivity(action = "CREATE_CREDIT_NOTE_FROM_RETURN", activityType = "SALES_MANAGEMENT", description = "Tạo Credit Note từ Return Order")
-    public ResponseEntity<CreditNoteResponseDTO> createFromReturnOrder(@PathVariable Integer returnOrderId) {
-        return ResponseEntity.ok(creditNoteService.createFromReturnOrder(returnOrderId));
+    @LogActivity(action = "CREATE_CREDIT_NOTE_FROM_INVOICE", activityType = "SALES_MANAGEMENT", description = "Tạo Credit Note (hóa đơn điều chỉnh) từ Invoice gốc")
+    public ResponseEntity<CreditNoteResponseDTO> createFromInvoice(@PathVariable Integer invoiceId) {
+        return ResponseEntity.ok(creditNoteService.createFromInvoice(invoiceId));
     }
 
     @PutMapping("/{id}")

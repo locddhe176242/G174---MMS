@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { deliveryService } from "../../../../api/deliveryService";
 import { salesOrderService } from "../../../../api/salesOrderService";
 import { warehouseService } from "../../../../api/warehouseService";
+import { warehouseStockService } from "../../../../api/warehouseStockService";
 import { getProducts } from "../../../../api/productService";
 
 const formatCurrency = (value) =>
@@ -19,8 +20,11 @@ const defaultItem = () => ({
   salesOrderItemId: null,
   productId: null,
   warehouseId: null,
-  plannedQty: 0,
-  deliveredQty: 0,
+  orderedQty: 0, // Số lượng đặt
+  deliveredQtyFromSalesOrder: 0, // Số lượng đã giao từ các Delivery khác (từ SalesOrder) - chỉ đọc
+  deliveredQty: 0, // Số lượng đã giao của Delivery này (nhập khi status = Shipped)
+  remainingQty: 0, // Số lượng chưa giao
+  plannedQty: 0, // Số lượng dự kiến
   note: "",
 });
 
@@ -37,6 +41,12 @@ export default function DeliveryForm() {
   const [salesOrderModalOpen, setSalesOrderModalOpen] = useState(false);
   const [salesOrderSearch, setSalesOrderSearch] = useState("");
   const [salesOrderLoading, setSalesOrderLoading] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState(null); // Lưu status khi edit
+  const [stockWarningDialog, setStockWarningDialog] = useState({
+    open: false,
+    items: [],
+    onConfirm: null,
+  });
   const [formData, setFormData] = useState({
     salesOrderId: "",
     warehouseId: "",
@@ -138,6 +148,30 @@ export default function DeliveryForm() {
     try {
       setLoading(true);
       const data = await deliveryService.getDeliveryById(id);
+      setDeliveryStatus(data.status); // Lưu status để biết khi nào hiển thị cột deliveredQty
+      
+      // Load SalesOrder để lấy thông tin orderedQty, deliveredQty, remainingQty
+      let salesOrder = null;
+      if (data.salesOrderId) {
+        try {
+          salesOrder = await salesOrderService.getOrderById(data.salesOrderId);
+        } catch (err) {
+          console.error("Không thể tải Sales Order:", err);
+        }
+      }
+      
+      // Tạo map để tra cứu thông tin từ SalesOrder items
+      const salesOrderItemMap = new Map();
+      if (salesOrder?.items) {
+        salesOrder.items.forEach((soItem) => {
+          salesOrderItemMap.set(soItem.soiId, {
+            orderedQty: soItem.quantity || 0,
+            deliveredQty: soItem.deliveredQty || 0,
+            remainingQty: soItem.remainingQty || 0,
+          });
+        });
+      }
+      
       setFormData({
         salesOrderId: data.salesOrderId,
         warehouseId: data.warehouseId,
@@ -147,14 +181,24 @@ export default function DeliveryForm() {
         carrierName: data.carrierName || "",
         trackingCode: data.trackingCode || "",
         notes: data.notes || "",
-        items: (data.items || []).map((item) => ({
-          salesOrderItemId: item.salesOrderItemId,
-          productId: item.productId,
-          warehouseId: item.warehouseId || null,
-          plannedQty: item.plannedQty || 0,
-          deliveredQty: item.deliveredQty || 0,
+        items: (data.items || []).map((item) => {
+          const soItemInfo = salesOrderItemMap.get(item.salesOrderItemId) || {
+            orderedQty: item.orderedQty || 0,
+            deliveredQty: 0,
+            remainingQty: item.orderedQty || 0,
+          };
+          return {
+            salesOrderItemId: item.salesOrderItemId,
+            productId: item.productId,
+            warehouseId: item.warehouseId || null,
+          orderedQty: soItemInfo.orderedQty,
+          deliveredQtyFromSalesOrder: soItemInfo.deliveredQty || 0, // Số lượng đã giao từ các Delivery khác
+          deliveredQty: item.deliveredQty || 0, // Số lượng đã giao của Delivery này
+          remainingQty: soItemInfo.remainingQty,
+          plannedQty: item.plannedQty || 0, // Số lượng dự kiến
           note: item.note || "",
-        })),
+          };
+        }),
       });
     } catch (error) {
       console.error(error);
@@ -164,41 +208,59 @@ export default function DeliveryForm() {
     }
   };
 
-  const loadFromSalesOrder = async () => {
-    if (!formData.salesOrderId) {
+  const loadFromSalesOrder = async (salesOrderIdArg) => {
+    const targetId = salesOrderIdArg || formData.salesOrderId;
+    if (!targetId) {
       toast.warn("Vui lòng chọn Sales Order");
       return;
     }
     try {
       setLoading(true);
-      const delivery = await deliveryService.createFromSalesOrder(formData.salesOrderId);
-      setFormData({
-        salesOrderId: delivery.salesOrderId,
-        warehouseId: delivery.warehouseId,
-        plannedDate: delivery.plannedDate ? new Date(delivery.plannedDate) : new Date(),
-        actualDate: null,
-        shippingAddress: delivery.shippingAddress || "",
-        carrierName: "",
-        trackingCode: "",
-        notes: "",
-        items: (delivery.items || []).map((item) => ({
-          salesOrderItemId: item.salesOrderItemId,
+      // Load SalesOrder trực tiếp 
+      const salesOrder = await salesOrderService.getOrderById(targetId);
+      
+      // Filter chỉ lấy items có remainingQty > 0 (chưa giao hết)
+      const availableItems = (salesOrder.items || []).filter(
+        (item) => Number(item.remainingQty || 0) > 0
+      );
+      
+      // Kiểm tra nếu tất cả items đã giao hết
+      if (availableItems.length === 0) {
+        toast.error("Đơn hàng này đã được giao hết. Không thể tạo phiếu giao hàng mới.");
+        // Reset form
+        setFormData((prev) => ({
+          ...prev,
+          salesOrderId: "",
+          items: [defaultItem()],
+        }));
+        setSelectedSalesOrder(null);
+        return;
+      }
+      
+      // Lấy warehouse đầu tiên từ items hoặc để null
+      const firstWarehouseId = availableItems[0]?.warehouseId || null;
+      
+      setFormData((prev) => ({
+        ...prev,
+        salesOrderId: salesOrder.soId || targetId,
+        warehouseId: firstWarehouseId || prev.warehouseId || "",
+        shippingAddress: salesOrder.shippingAddress || "",
+        items: availableItems.map((item) => ({
+          salesOrderItemId: item.soiId,
           productId: item.productId,
-          warehouseId: item.warehouseId || null,
-          plannedQty: item.plannedQty || 0,
-          deliveredQty: 0,
+          warehouseId: item.warehouseId || firstWarehouseId || null,
+          orderedQty: item.quantity || 0,
+          deliveredQtyFromSalesOrder: item.deliveredQty || 0, // Số lượng đã giao từ các Delivery khác (từ SalesOrder)
+          deliveredQty: 0, // Số lượng đã giao của Delivery này (ban đầu = 0, nhập khi status = Shipped)
+          remainingQty: item.remainingQty || 0,
+          plannedQty: item.remainingQty || 0, // Số lượng dự kiến = số lượng chưa giao (khi tạo mới)
           note: "",
         })),
-      });
+      }));
       toast.success("Đã tải dữ liệu từ Sales Order");
     } catch (error) {
       console.error(error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Không thể tải từ Sales Order";
-      if (errorMessage.includes("Sản phẩm trong đơn hàng hết hàng")) {
-        toast.error("Tất cả sản phẩm trong đơn hàng này đã được giao hết. Vui lòng chọn đơn hàng khác hoặc tạo phiếu giao hàng thủ công.");
-      } else {
-        toast.error(errorMessage);
-      }
+      toast.error(error?.response?.data?.message || "Không thể tải Sales Order");
     } finally {
       setLoading(false);
     }
@@ -216,6 +278,8 @@ export default function DeliveryForm() {
       ...prev,
       salesOrderId: so.orderId,
     }));
+    // Tự động load data từ Sales Order khi chọn (giống SalesOrderForm)
+    loadFromSalesOrder(so.orderId);
   };
 
   const handleItemSelect = (index, option) => {
@@ -279,12 +343,9 @@ export default function DeliveryForm() {
         if (!item.productId) {
           e.productId = "Chọn sản phẩm";
         }
-        if (!item.plannedQty || Number(item.plannedQty) <= 0) {
-          e.plannedQty = "Số lượng giao > 0";
-        }
-        if (item.deliveredQty && Number(item.deliveredQty) > Number(item.plannedQty || 0)) {
-          e.deliveredQty = "Số lượng đã giao không được vượt quá số lượng dự kiến";
-        }
+        // Không validate plannedQty khi tạo mới (sẽ tự động set = remainingQty khi submit)
+        // Chỉ validate deliveredQty khi status = Shipped (sắp chuyển sang Delivered)
+        // Validation khi change status sang Delivered sẽ được xử lý ở backend
         return e;
       });
       if (itemErrors.some((e) => Object.keys(e).length > 0)) {
@@ -295,12 +356,51 @@ export default function DeliveryForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Kiểm tra số lượng trong kho trước khi submit
+  const checkStockBeforeSubmit = async (items) => {
+    const insufficientItems = [];
+    
+    for (const item of items) {
+      if (!item.productId || !item.warehouseId || Number(item.remainingQty || 0) <= 0) {
+        continue;
+      }
+      
+      try {
+        const stockQty = await warehouseStockService.getQuantityByWarehouseAndProduct(
+          item.warehouseId,
+          item.productId
+        );
+        // Sử dụng remainingQty để check stock (vì plannedQty sẽ = remainingQty khi submit)
+        const plannedQty = Number(item.plannedQty || item.remainingQty || 0);
+        const availableQty = Number(stockQty || 0);
+        
+        if (plannedQty > availableQty) {
+          const product = products.find((p) => p.value === item.productId);
+          const warehouse = warehouses.find((w) => w.value === item.warehouseId);
+          insufficientItems.push({
+            productName: product?.label || `Sản phẩm ID ${item.productId}`,
+            warehouseName: warehouse?.label || `Kho ID ${item.warehouseId}`,
+            plannedQty: plannedQty,
+            availableQty,
+            shortage: plannedQty - availableQty,
+          });
+        }
+      } catch (error) {
+        console.error(`Error checking stock for product ${item.productId}:`, error);
+        // Nếu không kiểm tra được, vẫn cho phép tiếp tục
+      }
+    }
+    
+    return insufficientItems;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) {
       toast.error("Vui lòng kiểm tra thông tin");
       return;
     }
+    
     const payload = {
       salesOrderId: formData.salesOrderId,
       warehouseId: formData.warehouseId,
@@ -314,11 +414,35 @@ export default function DeliveryForm() {
         salesOrderItemId: item.salesOrderItemId,
         productId: item.productId,
         warehouseId: item.warehouseId || null,
-        plannedQty: Number(item.plannedQty || 0),
-        deliveredQty: Number(item.deliveredQty || 0),
+        // Khi tạo mới: plannedQty = remainingQty (tự động)
+        // Khi edit: plannedQty từ formData (user có thể chỉnh sửa)
+        plannedQty: Number(item.plannedQty || item.remainingQty || 0),
+        deliveredQty: Number(item.deliveredQty || 0), // Số lượng đã giao (chỉ nhập khi change status sang Delivered)
         note: item.note || null,
       })),
     };
+
+    // Kiểm tra số lượng trong kho trước khi submit
+    const insufficientItems = await checkStockBeforeSubmit(formData.items);
+    
+    if (insufficientItems.length > 0) {
+      // Hiển thị dialog xác nhận
+      setStockWarningDialog({
+        open: true,
+        items: insufficientItems,
+        onConfirm: () => {
+          setStockWarningDialog({ open: false, items: [], onConfirm: null });
+          submitDelivery(payload);
+        },
+      });
+      return;
+    }
+
+    // Nếu đủ stock, submit ngay
+    submitDelivery(payload);
+  };
+
+  const submitDelivery = async (payload) => {
     try {
       setLoading(true);
       if (isEdit) {
@@ -363,15 +487,6 @@ export default function DeliveryForm() {
             >
               ← Quay lại
             </button>
-            {!isEdit && (
-              <button
-                type="button"
-                onClick={loadFromSalesOrder}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Tải từ Sales Order
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -553,11 +668,19 @@ export default function DeliveryForm() {
                       Kho
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Số lượng dự kiến
+                      Số lượng đặt
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       Số lượng đã giao
                     </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Số lượng chưa giao
+                    </th>
+                    {(isEdit && deliveryStatus === "Shipped") && (
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Số lượng đã giao (nhập)
+                      </th>
+                    )}
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       Ghi chú
                     </th>
@@ -596,35 +719,39 @@ export default function DeliveryForm() {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.plannedQty || ""}
-                            onChange={(e) =>
-                              handleItemChange(index, "plannedQty", Number(e.target.value))
-                            }
-                            className="w-24 px-2 py-1 border rounded"
-                          />
-                          {itemError.plannedQty && (
-                            <p className="text-red-500 text-xs">{itemError.plannedQty}</p>
-                          )}
+                          <div className="text-sm text-gray-700">
+                            {Number(item.orderedQty || 0).toLocaleString("vi-VN")}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.deliveredQty || ""}
-                            onChange={(e) =>
-                              handleItemChange(index, "deliveredQty", Number(e.target.value))
-                            }
-                            className="w-24 px-2 py-1 border rounded"
-                          />
-                          {itemError.deliveredQty && (
-                            <p className="text-red-500 text-xs">{itemError.deliveredQty}</p>
-                          )}
+                          <div className="text-sm text-gray-700">
+                            {Number(item.deliveredQtyFromSalesOrder || 0).toLocaleString("vi-VN")}
+                          </div>
                         </td>
+                        <td className="px-3 py-2">
+                          <div className="text-sm text-gray-700 font-medium">
+                            {Number(item.remainingQty || 0).toLocaleString("vi-VN")}
+                          </div>
+                        </td>
+                        {(isEdit && deliveryStatus === "Shipped") && (
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              max={item.plannedQty || item.remainingQty || 0}
+                              value={item.deliveredQty || ""}
+                              onChange={(e) =>
+                                handleItemChange(index, "deliveredQty", Number(e.target.value))
+                              }
+                              className="w-24 px-2 py-1 border rounded"
+                              placeholder="Nhập số lượng"
+                            />
+                            {itemError.deliveredQty && (
+                              <p className="text-red-500 text-xs">{itemError.deliveredQty}</p>
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -679,6 +806,62 @@ export default function DeliveryForm() {
         searchTerm={salesOrderSearch}
         onSearchChange={setSalesOrderSearch}
       />
+
+      {/* Dialog cảnh báo số lượng trong kho không đủ */}
+      {stockWarningDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-orange-600">Số lượng trong kho không đủ</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Số lượng sản phẩm trong kho không đủ cho một số sản phẩm. Bạn có muốn tiếp tục tạo đơn?
+                </p>
+              </div>
+              <button
+                onClick={() => setStockWarningDialog({ open: false, items: [], onConfirm: null })}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {stockWarningDialog.items.map((item, index) => (
+                  <div key={index} className="border rounded-lg p-3 bg-orange-50">
+                    <div className="font-semibold text-gray-900">{item.productName}</div>
+                    <div className="text-sm text-gray-600 mt-1">Kho: {item.warehouseName}</div>
+                    <div className="text-sm text-gray-700 mt-2">
+                      <span className="font-medium">Số lượng giao dự kiến:</span> {item.plannedQty.toLocaleString("vi-VN")}
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-medium">Số lượng có sẵn trong kho:</span>{" "}
+                      <span className="text-red-600 font-semibold">{item.availableQty.toLocaleString("vi-VN")}</span>
+                    </div>
+                    <div className="text-sm text-red-600 font-semibold mt-1">
+                      Thiếu: {item.shortage.toLocaleString("vi-VN")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t flex justify-end gap-3">
+              <button
+                onClick={() => setStockWarningDialog({ open: false, items: [], onConfirm: null })}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={stockWarningDialog.onConfirm}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+              >
+                Tiếp tục tạo đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

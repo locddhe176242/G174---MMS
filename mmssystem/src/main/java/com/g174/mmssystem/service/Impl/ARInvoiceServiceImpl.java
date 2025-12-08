@@ -109,31 +109,9 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
 
     @Override
     public ARInvoiceResponseDTO updateInvoice(Integer invoiceId, ARInvoiceRequestDTO request) {
-        ARInvoice invoice = getInvoiceEntity(invoiceId);
-
-        if (invoice.getStatus() == ARInvoice.InvoiceStatus.Paid || 
-            invoice.getStatus() == ARInvoice.InvoiceStatus.Cancelled) {
-            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã hủy");
-        }
-
-        Customer customer = getCustomer(request.getCustomerId());
-        SalesOrder salesOrder = request.getSalesOrderId() != null ? getSalesOrder(request.getSalesOrderId()) : null;
-        Delivery delivery = request.getDeliveryId() != null ? getDelivery(request.getDeliveryId()) : null;
-        User currentUser = getCurrentUser();
-
-        arInvoiceMapper.updateEntity(invoice, request, currentUser);
-        invoice.setUpdatedBy(currentUser);
-
-        arInvoiceItemRepository.deleteByInvoiceId(invoiceId);
-        invoice.getItems().clear();
-        List<ARInvoiceItem> items = buildItems(invoice, request.getItems(), delivery, salesOrder);
-        invoice.getItems().addAll(items);
-
-        recalcTotals(invoice, items);
-
-        ARInvoice saved = arInvoiceRepository.save(invoice);
-        List<ARPayment> payments = arPaymentRepository.findByInvoice_ArInvoiceId(invoiceId);
-        return arInvoiceMapper.toResponse(saved, items, payments);
+        // Invoice gốc không được chỉnh sửa theo nghiệp vụ ERP chuẩn
+        // Nếu cần điều chỉnh, phải tạo Credit Note (hóa đơn điều chỉnh) mới
+        throw new IllegalStateException("Hóa đơn gốc không được chỉnh sửa. Vui lòng tạo Credit Note (hóa đơn điều chỉnh) để điều chỉnh hóa đơn này.");
     }
 
     @Override
