@@ -546,19 +546,12 @@ export default function SalesQuotationForm() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Trạng thái</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      handleInputChange("status", e.target.value)
-                    }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={STATUS_LABELS[formData.status] || formData.status}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 cursor-not-allowed"
+                    readOnly
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
