@@ -775,7 +775,6 @@ export default function RFQForm() {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                                             readOnly
                                         />
-                                        <p className="text-xs text-gray-500 mt-1">Tự động lấy từ tài khoản đang đăng nhập</p>
                                     </div>
                                 </div>
 
@@ -847,7 +846,6 @@ export default function RFQForm() {
                                             placeholderText="Chọn hạn phản hồi"
                                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.dueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
-                                        <p className="mt-1 text-xs text-gray-500">Ngày cuối cùng nhà cung cấp phải gửi báo giá</p>
                                         {validationErrors.dueDate && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.dueDate}</p>
                                         )}
