@@ -82,9 +82,12 @@ CREATE TABLE menu_items (
     menu_label VARCHAR(100) NOT NULL,
     menu_path VARCHAR(255) NOT NULL,
     menu_icon VARCHAR(50),
+    parent_id INT DEFAULT NULL,
     display_order INT DEFAULT 0,
     INDEX idx_menu_key (menu_key),
-    INDEX idx_display_order (display_order)
+    INDEX idx_display_order (display_order),
+    INDEX idx_parent_id (parent_id),
+    FOREIGN KEY (parent_id) REFERENCES menu_items(menu_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE role_menus (
@@ -143,6 +146,7 @@ CREATE TABLE Contacts (
     contact_id INT AUTO_INCREMENT PRIMARY KEY,
     phone VARCHAR(50),
     email VARCHAR(100),
+    website VARCHAR(255),
     INDEX idx_phone (phone),
     INDEX idx_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -207,8 +211,7 @@ CREATE TABLE Products (
     size DECIMAL(10, 2) DEFAULT NULL,
     purchase_price DECIMAL(18, 2),
     selling_price DECIMAL(18, 2),
-    status ENUM('In Stock', 'Out of Stock', 'Discontinued') NOT NULL DEFAULT 'In Stock',
-    barcode VARCHAR(100),
+    status VARCHAR(50) NOT NULL DEFAULT 'In Stock',
     image_url VARCHAR(255),
     category_id INT,
     created_by INT,
@@ -223,9 +226,7 @@ CREATE TABLE Products (
     INDEX idx_product_name (name),
     INDEX idx_product_category (category_id),
     INDEX idx_product_status (status, deleted_at),
-    INDEX idx_product_barcode (barcode),
     UNIQUE KEY uq_product_sku_deleted (sku, deleted_at),
-    UNIQUE KEY uq_product_barcode_deleted (barcode, deleted_at),
     UNIQUE KEY uq_product_name_deleted (name, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -275,7 +276,7 @@ CREATE TABLE Warehouse_Stock (
 -- =====================================================
 
 CREATE TABLE Purchase_Requisitions (
-    requisition_id INT AUTO_INCREMENT PRIMARY KEY,
+    requisition_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     requisition_no VARCHAR(30) UNIQUE NOT NULL,
     requisition_date DATE DEFAULT (CURRENT_DATE),
     requester_id INT NOT NULL,
@@ -304,7 +305,7 @@ CREATE TABLE Purchase_Requisitions (
 
 CREATE TABLE Purchase_Requisition_Items (
     pri_id INT AUTO_INCREMENT PRIMARY KEY,
-    requisition_id INT NOT NULL,
+    requisition_id BIGINT NOT NULL,
     product_id INT,
     product_name VARCHAR(255),
     requested_qty DECIMAL(18, 2) NOT NULL,
@@ -331,7 +332,7 @@ CREATE TABLE Purchase_Requisition_Items (
 CREATE TABLE RFQs (
     rfq_id INT AUTO_INCREMENT PRIMARY KEY,
     rfq_no VARCHAR(30) UNIQUE NOT NULL,
-    requisition_id INT,
+    requisition_id BIGINT,
     issue_date DATE,
     due_date DATE,
     status ENUM('Draft', 'Pending', 'Sent', 'Completed', 'Closed', 'Cancelled') DEFAULT 'Draft',
@@ -432,9 +433,12 @@ CREATE TABLE Purchase_Quotation_Items (
     tax_amount DECIMAL(18, 2),
     line_total DECIMAL(18, 2) NOT NULL,
     remark TEXT,
-    FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
-    FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
+    CONSTRAINT fk_pqi_pq
+      FOREIGN KEY (pq_id) REFERENCES Purchase_Quotations(pq_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_rfq_item
+      FOREIGN KEY (rfq_item_id) REFERENCES RFQ_Items(rfq_item_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pqi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE SET NULL,
     INDEX idx_pqi_pq (pq_id),
     INDEX idx_pqi_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -475,7 +479,7 @@ CREATE TABLE Purchase_Orders (
 
 CREATE TABLE Purchase_Order_Items (
     poi_id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
+    order_id INT NULL,
     pq_item_id INT,
     product_id INT NOT NULL,
     uom VARCHAR(50),
@@ -489,9 +493,12 @@ CREATE TABLE Purchase_Order_Items (
     line_total DECIMAL(18, 2) NOT NULL,
     delivery_date DATE,
     note TEXT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_poi_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT fk_poi_pq_item
+      FOREIGN KEY (pq_item_id) REFERENCES Purchase_Quotation_Items(pq_item_id) ON DELETE SET NULL,
+    CONSTRAINT fk_poi_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_poi_order (order_id),
     INDEX idx_poi_product (product_id),
     INDEX idx_poi_qty_tracking (order_id, received_qty, invoiced_qty)
@@ -500,39 +507,56 @@ CREATE TABLE Purchase_Order_Items (
 CREATE TABLE Goods_Receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_no VARCHAR(30) UNIQUE NOT NULL,
-    order_id INT NOT NULL,
+    order_id INT NULL,
     warehouse_id INT NOT NULL,
     received_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    -- Phân loại nguồn chứng từ: nhập mua (Purchase) hay nhập trả hàng bán (SalesReturn)
+    source_type ENUM('Purchase', 'SalesReturn') NOT NULL DEFAULT 'Purchase',
+    -- Tham chiếu Đơn trả hàng khi là phiếu nhập hàng trả (sẽ thêm FK sau khi return_orders được tạo)
+    ro_id INT NULL,
     created_by INT,
     approved_by INT,
     approved_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_warehouse
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gr_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_approved_by
+      FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_gr_no (receipt_no),
     INDEX idx_gr_status (status, deleted_at),
     INDEX idx_gr_order (order_id),
-    INDEX idx_gr_warehouse (warehouse_id)
+    INDEX idx_gr_warehouse (warehouse_id),
+    INDEX idx_gr_return_order (ro_id),
+    INDEX idx_gr_source_type (source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Goods_Receipt_Items (
     gri_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_id INT NOT NULL,
-    poi_id INT NOT NULL,
+    -- Dùng cho trường hợp nhập mua (purchase)
+    poi_id INT NULL,
+    -- Dùng cho trường hợp nhập hàng trả bán (sales return) - FK sẽ được thêm sau khi return_order_items được tạo
+    roi_id INT NULL,
     product_id INT NOT NULL,
     received_qty DECIMAL(18, 2) NOT NULL,
     accepted_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
     remark TEXT,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gri_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gri_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gri_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_gri_receipt (receipt_id),
-    INDEX idx_gri_product (product_id)
+    INDEX idx_gri_product (product_id),
+    INDEX idx_gri_return_item (roi_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -556,11 +580,16 @@ CREATE TABLE AP_Invoices (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
-    FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
-    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_vendor
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_api_order
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_receipt
+      FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_api_updated_by
+      FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_ap_invoice_no (invoice_no),
     INDEX idx_ap_status (status, deleted_at),
     INDEX idx_ap_vendor (vendor_id),
@@ -598,9 +627,12 @@ CREATE TABLE AP_Invoice_Items (
     discount_percent DECIMAL(5, 2) DEFAULT 0,
     tax_rate DECIMAL(5, 2),
     line_total DECIMAL(18, 2),
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
-    FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
-    FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_apii_poi
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
+    CONSTRAINT fk_apii_gri
+      FOREIGN KEY (gri_id) REFERENCES Goods_Receipt_Items(gri_id) ON DELETE SET NULL,
     INDEX idx_api_invoice (ap_invoice_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -613,7 +645,8 @@ CREATE TABLE AP_Payments (
     reference_no VARCHAR(100),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
+    CONSTRAINT fk_app_invoice
+      FOREIGN KEY (ap_invoice_id) REFERENCES AP_Invoices(ap_invoice_id) ON DELETE CASCADE,
     INDEX idx_app_invoice (ap_invoice_id),
     INDEX idx_app_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -870,6 +903,9 @@ CREATE TABLE IF NOT EXISTS return_orders (
     warehouse_id INT NOT NULL,
     return_date DATETIME,
     status ENUM('Draft', 'Approved', 'Rejected', 'Completed', 'Cancelled') DEFAULT 'Draft',
+    -- Trạng thái liên quan tới phiếu nhập kho cho đơn trả hàng
+    goods_receipt_status ENUM('None','Pending','Completed') DEFAULT 'None',
+    receipt_id INT,
     reason TEXT,
     notes TEXT,
     created_by INT,
@@ -880,12 +916,68 @@ CREATE TABLE IF NOT EXISTS return_orders (
     FOREIGN KEY (delivery_id) REFERENCES Deliveries(delivery_id) ON DELETE RESTRICT,
     FOREIGN KEY (invoice_id) REFERENCES AR_Invoices(ar_invoice_id) ON DELETE SET NULL,
     FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_return_order_status (status, deleted_at),
     INDEX idx_return_order_delivery (delivery_id),
     INDEX idx_return_order_invoice (invoice_id),
-    INDEX idx_return_order_warehouse (warehouse_id)
+    INDEX idx_return_order_warehouse (warehouse_id),
+    INDEX idx_return_order_receipt (receipt_id),
+    INDEX idx_return_order_gr_status (goods_receipt_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Sau khi cả Goods_Receipts và return_orders đã tồn tại, thêm ràng buộc FK
+ALTER TABLE Goods_Receipts
+  ADD CONSTRAINT fk_gr_return_order
+  FOREIGN KEY (ro_id) REFERENCES return_orders(ro_id) ON DELETE SET NULL;
+
+
+-- =====================================================
+-- SALES RETURN INBOUND (ĐƠN NHẬP HÀNG LẠI TỪ ĐƠN TRẢ HÀNG)
+-- =====================================================
+
+-- Return Inbound Orders: chứng từ thương mại yêu cầu kho nhập lại hàng khách trả
+CREATE TABLE IF NOT EXISTS Sales_Return_Inbound_Orders (
+    sri_id INT AUTO_INCREMENT PRIMARY KEY,
+    sri_no VARCHAR(30) UNIQUE NOT NULL,
+    ro_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    expected_receipt_date DATETIME,
+    status ENUM('Draft', 'Approved', 'SentToWarehouse', 'Completed', 'Cancelled') DEFAULT 'Draft',
+    notes TEXT,
+    created_by INT,
+    approved_by INT,
+    approved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (ro_id) REFERENCES return_orders(ro_id) ON DELETE CASCADE,
+    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    INDEX idx_sri_no (sri_no),
+    INDEX idx_sri_status (status, deleted_at),
+    INDEX idx_sri_ro (ro_id),
+    INDEX idx_sri_warehouse (warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS Sales_Return_Inbound_Order_Items (
+    srii_id INT AUTO_INCREMENT PRIMARY KEY,
+    sri_id INT NOT NULL,
+    roi_id INT NOT NULL,
+    product_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    planned_qty DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    uom VARCHAR(50),
+    note TEXT,
+    FOREIGN KEY (sri_id) REFERENCES Sales_Return_Inbound_Orders(sri_id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    INDEX idx_srii_sri (sri_id),
+    INDEX idx_srii_roi (roi_id),
+    INDEX idx_srii_product (product_id),
+    INDEX idx_srii_warehouse (warehouse_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Return Order Items Table
@@ -908,6 +1000,15 @@ CREATE TABLE IF NOT EXISTS return_order_items (
     INDEX idx_return_item_product (product_id),
     INDEX idx_return_item_warehouse (warehouse_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Sau khi return_order_items và Goods_Receipt_Items đã tồn tại, thêm ràng buộc FK
+ALTER TABLE Goods_Receipt_Items
+  ADD CONSTRAINT fk_gri_return_item
+  FOREIGN KEY (roi_id) REFERENCES return_order_items(roi_id) ON DELETE SET NULL;
+
+ALTER TABLE Sales_Return_Inbound_Order_Items
+  ADD CONSTRAINT fk_srii_return_item
+  FOREIGN KEY (roi_id) REFERENCES return_order_items(roi_id) ON DELETE RESTRICT;
 
 -- Credit Notes Table
 CREATE TABLE IF NOT EXISTS credit_notes (

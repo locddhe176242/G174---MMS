@@ -96,7 +96,6 @@ public class ProductMapper {
             try {
                 entity.setStatus(Product.Status.valueOf(dto.getStatus().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                // Invalid status value, keep existing status
             }
         }
         if (dto.getBarcode() != null) entity.setBarcode(dto.getBarcode());

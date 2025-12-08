@@ -31,10 +31,5 @@ export const returnOrderService = {
     });
     return response.data;
   },
-
-  createFromDelivery: async (deliveryId) => {
-    const response = await apiClient.post(`/return-orders/convert/${deliveryId}`);
-    return response.data;
-  },
 };
 

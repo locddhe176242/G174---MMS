@@ -28,6 +28,9 @@ public class MenuItem {
     @Column(name = "menu_icon")
     private String menuIcon;
 
+    @Column(name = "parent_id")
+    private Integer parentId;
+
     @Column(name = "display_order")
     private Integer displayOrder;
 }

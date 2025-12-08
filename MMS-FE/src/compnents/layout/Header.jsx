@@ -49,7 +49,7 @@ export default function Header({
   };
 
   return (
-    <div className="bg-white border-b border-slate-200">
+    <div className="sticky top-0 z-50 bg-white border-b border-slate-200">
       <header className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-3">
           <img src={logo} alt="MMS" className="w-10 h-10 object-contain" />

@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionService {
 
     private final PurchaseRequisitionRepository requisitionRepository;
-    private final PurchaseRequisitionItemRepository requisitionItemRepository;
+    // private final PurchaseRequisitionItemRepository requisitionItemRepository;
     private final PurchaseRequisitionMapper requisitionMapper;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
@@ -316,7 +316,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             requisition.setApprovedAt(dto.getApprovedAt());
         }
 
-        // Update items - xử lý đúng cách với orphanRemoval
+        // Update items
         // Nếu status = Draft, cho phép items null hoặc empty (giữ nguyên items cũ nếu không có items mới)
         if (dto.getItems() != null) {
             // Với orphanRemoval, cần xóa items cũ trước khi thêm mới

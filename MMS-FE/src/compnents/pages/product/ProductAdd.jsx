@@ -32,7 +32,6 @@ const getImageUrl = (imageUrl) => {
 const ProductAdd = ({ onClose, onSave }) => {
     const [formData, setFormData] = useState({
         name: '',
-        barcode: '',
         description: '',
         purchasePrice: '',
         sellingPrice: '',
@@ -160,7 +159,7 @@ const ProductAdd = ({ onClose, onSave }) => {
     // Chuẩn hóa dữ liệu trước khi gửi - đảm bảo các field bắt buộc có giá trị hợp lệ
     const newProduct = {
       // Field bắt buộc (@NotBlank/@NotNull)
-      sku: (formData.sku || formData.barcode || `PRD${Date.now()}`).trim(),
+      sku: (formData.sku || `PRD${Date.now()}`).trim(),
       name: formData.name.trim(),
       uom: (formData.uom || '').trim(),
       size: parseFloatSafe(formData.size),
@@ -170,7 +169,7 @@ const ProductAdd = ({ onClose, onSave }) => {
       
       // Field không bắt buộc
       description: formData.description?.trim() || null,
-      barcode: formData.barcode?.trim() || null,
+
       // Chỉ gửi imageUrl nếu không phải base64 (data:image/...)
       // Base64 quá dài (>255 ký tự) sẽ vi phạm validation
       imageUrl: (formData.imageUrl || formData.image_url) && 
@@ -300,17 +299,6 @@ const ProductAdd = ({ onClose, onSave }) => {
                                 onInput={(e) => {
                                     e.target.setCustomValidity('');
                                 }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Mã vạch/Barcode</label>
-                            <input
-                                type="text"
-                                name="barcode"
-                                value={formData.barcode}
-                                onChange={handleChange}
-                                placeholder="Nhập mã vạch"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                             />
                         </div>
                         <div>

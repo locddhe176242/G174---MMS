@@ -37,6 +37,12 @@ export const goodsReceiptService = {
         return apiClient.post(BASE_PATH, payload, config).then((response) => response.data);
     },
 
+    // Create goods receipt from Sales Return Inbound Order
+    createGoodsReceiptFromSalesReturnInboundOrder(sriId, payload, createdById) {
+        const config = createdById ? { params: { createdById } } : undefined;
+        return apiClient.post(`${BASE_PATH}/from-sales-return-inbound/${sriId}`, payload, config).then((response) => response.data);
+    },
+
     // Update goods receipt
     updateGoodsReceipt(id, payload, updatedById) {
         const config = updatedById ? { params: { updatedById } } : undefined;

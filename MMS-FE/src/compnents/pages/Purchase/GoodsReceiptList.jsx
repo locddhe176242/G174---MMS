@@ -253,7 +253,7 @@ export default function GoodsReceiptList() {
                                         SỐ PHIẾU
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        ĐƠN HÀNG
+                                        NGUỒN / ĐƠN HÀNG
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         TIẾN ĐỘ NHẬP
@@ -296,10 +296,26 @@ export default function GoodsReceiptList() {
                                             {receipt.receipt_no || receipt.receiptNo}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {receipt.poNo || receipt.po_no || "-"}
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                    receipt.sourceType === "SalesReturn" 
+                                                        ? "bg-purple-100 text-purple-800" 
+                                                        : "bg-blue-100 text-blue-800"
+                                                }`}>
+                                                    {receipt.sourceType === "SalesReturn" ? "Sales Return" : "Purchase"}
+                                                </span>
+                                                <span className="font-medium">
+                                                    {receipt.sourceType === "SalesReturn" 
+                                                        ? (receipt.returnNo || receipt.return_no || "-")
+                                                        : (receipt.poNo || receipt.po_no || "-")
+                                                    }
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-900">
-                                            {receipt.poStatus === 'Completed' ? (
+                                            {receipt.sourceType === "SalesReturn" ? (
+                                                <span className="text-gray-400 text-xs">N/A</span>
+                                            ) : receipt.poStatus === 'Completed' ? (
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between text-xs mb-1">

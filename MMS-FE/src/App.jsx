@@ -65,6 +65,9 @@ import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail
 import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+import SalesReturnInboundOrderList from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderList.jsx";
+import SalesReturnInboundOrderDetail from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderDetail.jsx";
+import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderForm.jsx";
 
 //pages for Report module
 import ReportList from "./compnents/pages/Report/ReportList.jsx";
@@ -100,7 +103,6 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/categories" element={<CategoryList />} />
                 <Route path="/profile" element={<UserProfile />} />
-
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/new" element={<CustomerForm />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
@@ -180,6 +182,9 @@ function App() {
                 <Route path="/sales/invoices/new" element={<InvoiceForm />} />
                 <Route path="/sales/invoices/:id" element={<InvoiceDetail />} />
                 <Route path="/sales/invoices/:id/edit" element={<InvoiceForm />} />
+                <Route path="/sales/return-inbound-orders" element={<SalesReturnInboundOrderList />} />
+                <Route path="/sales/return-inbound-orders/new" element={<SalesReturnInboundOrderForm />} />
+                <Route path="/sales/return-inbound-orders/:id" element={<SalesReturnInboundOrderDetail />} />
 
                 {/**Report Module Routes */}
                 <Route path="/reports" element={<ReportList />} />

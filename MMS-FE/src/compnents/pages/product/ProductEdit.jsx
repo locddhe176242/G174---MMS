@@ -33,7 +33,7 @@ const getImageUrl = (imageUrl) => {
 const ProductEdit = ({ product, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         name: product?.name || '',
-        barcode: product?.barcode || product?.sku || '',
+
         description: product?.description || '',
         purchasePrice: product?.purchasePrice || '',
         sellingPrice: product?.sellingPrice || '',
@@ -153,7 +153,7 @@ const ProductEdit = ({ product, onClose, onSave }) => {
             if (formData.sku && formData.sku.trim()) payload.sku = formData.sku.trim();
             if (formData.uom && formData.uom.trim()) payload.uom = formData.uom.trim();
             if (formData.description !== undefined) payload.description = formData.description?.trim() || null;
-            if (formData.barcode !== undefined) payload.barcode = formData.barcode?.trim() || null;
+
             
             // Parse số - chỉ gửi nếu có giá trị hợp lệ
             if (formData.size && formData.size !== '' && !isNaN(parseFloat(formData.size))) {
@@ -287,16 +287,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                                 onInput={(e) => {
                                     e.target.setCustomValidity('');
                                 }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Barcode</label>
-                            <input
-                                type="text"
-                                name="barcode"
-                                value={formData.barcode}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                             />
                         </div>
                         <div>

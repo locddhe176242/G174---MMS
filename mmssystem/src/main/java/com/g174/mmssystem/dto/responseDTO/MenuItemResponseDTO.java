@@ -14,5 +14,6 @@ public class MenuItemResponseDTO {
     private String menuLabel;
     private String menuPath;
     private String menuIcon;
+    private Integer parentId;
     private Integer displayOrder;
 }

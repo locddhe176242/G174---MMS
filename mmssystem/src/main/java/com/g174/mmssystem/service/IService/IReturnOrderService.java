@@ -19,7 +19,5 @@ public interface IReturnOrderService {
     void deleteReturnOrder(Integer id);
 
     ReturnOrderResponseDTO changeStatus(Integer id, String status);
-
-    ReturnOrderResponseDTO createFromDelivery(Integer deliveryId);
 }
 

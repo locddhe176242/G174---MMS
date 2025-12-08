@@ -52,6 +52,44 @@ public class GoodsReceiptController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/from-sales-return-inbound/{sriId}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    public ResponseEntity<GoodsReceiptResponseDTO> createReceiptFromSalesReturnInboundOrder(
+            @PathVariable Integer sriId,
+            @Valid @RequestBody GoodsReceiptRequestDTO requestDTO,
+            @RequestParam(required = false) Integer createdById) {
+        log.info("REST: Creating goods receipt from Sales Return Inbound Order ID: {}, Warehouse ID: {}",
+                sriId, requestDTO != null ? requestDTO.getWarehouseId() : "null");
+        
+        if (requestDTO == null) {
+            log.error("Request DTO is null");
+            throw new IllegalArgumentException("Request DTO cannot be null");
+        }
+        
+        log.info("REST: Request DTO - receiptNo: {}, sourceType: {}, itemsCount: {}", 
+                requestDTO.getReceiptNo(), requestDTO.getSourceType(), 
+                requestDTO.getItems() != null ? requestDTO.getItems().size() : 0);
+        
+        if (requestDTO.getItems() != null) {
+            for (int idx = 0; idx < requestDTO.getItems().size(); idx++) {
+                var item = requestDTO.getItems().get(idx);
+                log.info("REST: Item {} - roiId: {}, productId: {}, receivedQty: {}", 
+                        idx, item.getRoiId(), item.getProductId(), item.getReceivedQty());
+            }
+        }
+
+        // Get current user ID if not provided
+        if (createdById == null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+                createdById = 1; // Placeholder - implement based on your auth system
+            }
+        }
+
+        GoodsReceiptResponseDTO response = receiptService.createReceiptFromSalesReturnInboundOrder(sriId, requestDTO, createdById);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @GetMapping("/{receiptId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
     public ResponseEntity<GoodsReceiptResponseDTO> getReceiptById(@PathVariable Integer receiptId) {

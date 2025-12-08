@@ -1,5 +1,8 @@
 package com.g174.mmssystem.dto.requestDTO;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.g174.mmssystem.entity.GoodsReceipt;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -15,17 +18,27 @@ import java.util.List;
 public class GoodsReceiptRequestDTO {
     private String receiptNo;
 
-    @NotNull(message = "Purchase Order ID là bắt buộc")
+    // For Purchase: orderId is required
+    // For SalesReturn: sriId is required, orderId is null
     private Integer orderId;
+
+    // For SalesReturn: Sales Return Inbound Order ID
+    private Integer sriId;
 
     @NotNull(message = "Warehouse ID là bắt buộc")
     private Integer warehouseId;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss", shape = JsonFormat.Shape.STRING)
     private LocalDateTime receivedDate;
 
     private Integer createdById;
 
-    @NotEmpty(message = "Danh sách items không được để trống")
+    // Source type: Purchase or SalesReturn
+    @Builder.Default
+    private GoodsReceipt.SourceType sourceType = GoodsReceipt.SourceType.Purchase;
+
+    // Items: Required for Purchase, optional for SalesReturn (can be auto-created)
+    @Valid
     private List<GoodsReceiptItemRequestDTO> items;
 }
 

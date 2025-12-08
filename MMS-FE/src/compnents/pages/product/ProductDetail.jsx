@@ -46,10 +46,6 @@ const ProductDetail = ({ product, onClose }) => {
                             <p className="text-slate-800">{product.name || '—'}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Mã vạch/Barcode</label>
-                            <p className="text-slate-800 font-mono">{product.barcode || '—'}</p>
-                        </div>
-                        <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">SKU</label>
                             <p className="text-slate-800 font-mono">{product.sku || '—'}</p>
                         </div>

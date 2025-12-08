@@ -221,7 +221,7 @@ export default function VendorForm() {
 
   // Validation functions
   const validateEmail = (email) => {
-    if (!email) return true; // Email không bắt buộc
+    if (!email) return false; // Email bắt buộc phải nhập
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
   };
@@ -262,8 +262,10 @@ export default function VendorForm() {
       errors.ward = "Vui lòng chọn phường/xã";
     }
 
-    // Validate email (không bắt buộc nhưng phải đúng format)
-    if (formData.contact.email && !validateEmail(formData.contact.email)) {
+    // Validate email (bắt buộc)
+    if (!formData.contact.email || formData.contact.email.trim().length === 0) {
+      errors.email = "Email là bắt buộc";
+    } else if (!validateEmail(formData.contact.email)) {
       errors.email = "Email không đúng định dạng (vd: example@gmail.com)";
     }
 
@@ -545,12 +547,16 @@ export default function VendorForm() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
+                    name="email"
+                    autoComplete="off"
                     value={formData.contact.email}
                     onChange={(e) => handleInputChange("contact.email", e.target.value)}
+                    placeholder="example@gmail.com"
+                    required
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.email ? 'border-red-500' : 'border-gray-300'
                       }`}
                   />
@@ -566,8 +572,11 @@ export default function VendorForm() {
                 </label>
                 <input
                   type="url"
+                  name="website"
+                  autoComplete="off"
                   value={formData.contact.website}
                   onChange={(e) => handleInputChange("contact.website", e.target.value)}
+                  placeholder="https://example.com"
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.website ? 'border-red-500' : 'border-gray-300'
                     }`}
                 />
