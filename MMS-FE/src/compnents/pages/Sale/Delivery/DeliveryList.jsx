@@ -162,7 +162,6 @@ export default function DeliveryList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu Giao Hàng</h1>
-            <p className="text-gray-500">Theo dõi và quản lý các phiếu giao hàng</p>
           </div>
           <button
             onClick={() => navigate("/sales/deliveries/new")}
