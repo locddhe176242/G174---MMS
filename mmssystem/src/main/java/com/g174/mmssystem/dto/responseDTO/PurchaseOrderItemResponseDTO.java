@@ -19,6 +19,7 @@ public class PurchaseOrderItemResponseDTO {
     private String productCode;
     private String uom;
     private BigDecimal quantity;
+    private BigDecimal receivedQty;  // Số lượng đã nhập kho
     private BigDecimal unitPrice;
     private BigDecimal discountPercent;
     private BigDecimal taxRate;

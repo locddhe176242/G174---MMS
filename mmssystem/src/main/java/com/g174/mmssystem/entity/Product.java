@@ -15,8 +15,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_product_sku", columnList = "sku"),
                 @Index(name = "idx_product_name", columnList = "name"),
                 @Index(name = "idx_product_category", columnList = "category_id"),
-                @Index(name = "idx_product_status", columnList = "status, deleted_at"),
-                @Index(name = "idx_product_barcode", columnList = "barcode")
+                @Index(name = "idx_product_status", columnList = "status, deleted_at")
         })
 @Getter
 @Setter
@@ -60,10 +59,6 @@ public class Product {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private Status status = Status.IN_STOCK;
-
-    @Size(max = 100, message = "Barcode không được quá 100 ký tự")
-    @Column(name = "barcode", length = 100)
-    private String barcode;
 
     @Size(max = 255, message = "URL hình ảnh không được quá 255 ký tự")
     @Column(name = "image_url", length = 255)

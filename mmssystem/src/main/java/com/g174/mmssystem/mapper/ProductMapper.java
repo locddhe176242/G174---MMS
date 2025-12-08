@@ -34,7 +34,6 @@ public class ProductMapper {
                 .category(category)
                 .imageUrl(dto.getImageUrl())
                 .status(status)
-                .barcode(dto.getBarcode())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .createdBy(createdBy)
@@ -57,7 +56,6 @@ public class ProductMapper {
                 .purchasePrice(entity.getPurchasePrice())
                 .sellingPrice(entity.getSellingPrice())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : null)
-                .barcode(entity.getBarcode())
                 .imageUrl(entity.getImageUrl())
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getCategoryId() : null)
                 .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : null)
@@ -98,7 +96,6 @@ public class ProductMapper {
             } catch (IllegalArgumentException e) {
             }
         }
-        if (dto.getBarcode() != null) entity.setBarcode(dto.getBarcode());
         if (category != null) entity.setCategory(category);
         entity.setUpdatedAt(LocalDateTime.now());
         entity.setUpdatedBy(updatedBy);

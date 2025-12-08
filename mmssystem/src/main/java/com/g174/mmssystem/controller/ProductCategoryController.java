@@ -22,6 +22,7 @@ public class ProductCategoryController {
     private final IProductCategoryService productCategoryService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<List<ProductCategoryResponseDTO>> getProductCategories() {
         try {
             List<ProductCategoryResponseDTO> categories = productCategoryService.getProductCategories();
@@ -33,6 +34,7 @@ public class ProductCategoryController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<ProductCategoryResponseDTO> getProductCategory(@PathVariable Integer id) {
         try {
             ProductCategoryResponseDTO category = productCategoryService.getProductCategory(id);
@@ -47,7 +49,7 @@ public class ProductCategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "CREATE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
@@ -68,7 +70,7 @@ public class ProductCategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "UPDATE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
@@ -91,7 +93,7 @@ public class ProductCategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "DELETE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
@@ -112,7 +114,7 @@ public class ProductCategoryController {
     }
 
     @PutMapping("/{id}/restore")
-    @PreAuthorize("hasRole('MANAGER') or hasRole('PURCHASER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "RESTORE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
@@ -133,6 +135,7 @@ public class ProductCategoryController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<List<ProductCategoryResponseDTO>> getDeletedProductCategories() {
         try {
             List<ProductCategoryResponseDTO> categories = productCategoryService.getDeletedProductCategories();

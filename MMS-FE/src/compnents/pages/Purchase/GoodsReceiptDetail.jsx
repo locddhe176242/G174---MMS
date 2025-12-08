@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
+import { apInvoiceService } from "../../../api/apInvoiceService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
+import { formatCurrency } from "../../../utils/formatters";
 
 export default function GoodsReceiptDetail() {
     const { id } = useParams();
@@ -12,6 +14,7 @@ export default function GoodsReceiptDetail() {
     const [data, setData] = useState(null);
     const [items, setItems] = useState([]);
     const [poItems, setPoItems] = useState([]);
+    const [relatedInvoices, setRelatedInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
@@ -19,15 +22,43 @@ export default function GoodsReceiptDetail() {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
-    // Tạo hóa đơn - navigate to form
-    const handleCreateInvoice = () => {
-        navigate(`/purchase/ap-invoices/new`);
+    // Tạo hóa đơn từ goods receipt
+    const handleCreateInvoice = async () => {
+        if (!id) {
+            toast.error("Không tìm thấy ID phiếu nhập kho");
+            return;
+        }
+
+        setIsCreatingInvoice(true);
+        try {
+            const response = await apiClient.post(`/ap-invoices/from-goods-receipt/${id}`);
+            toast.success("Tạo hóa đơn thành công!");
+            
+            // Reload invoices to update UI
+            await loadRelatedInvoices();
+            
+            // Navigate to the newly created invoice
+            if (response.data?.apInvoiceId) {
+                navigate(`/purchase/ap-invoices/${response.data.apInvoiceId}`);
+            } else {
+                navigate("/purchase/ap-invoices");
+            }
+        } catch (error) {
+            console.error("Error creating invoice:", error);
+            toast.error(error?.response?.data?.message || "Không thể tạo hóa đơn");
+        } finally {
+            setIsCreatingInvoice(false);
+        }
     };
 
     useEffect(() => {
         loadCurrentUser();
-    }, []);
+        if (id) {
+            loadRelatedInvoices();
+        }
+    }, [id]);
 
     const loadCurrentUser = async () => {
         try {
@@ -35,6 +66,17 @@ export default function GoodsReceiptDetail() {
             setCurrentUser(user);
         } catch (error) {
             console.warn("Could not load current user:", error);
+        }
+    };
+
+    const loadRelatedInvoices = async () => {
+        if (!id) return;
+        try {
+            const response = await apiClient.get(`/ap-invoices/goods-receipt/${id}`);
+            setRelatedInvoices(Array.isArray(response.data) ? response.data : []);
+        } catch (error) {
+            console.warn("Could not load related invoices:", error);
+            setRelatedInvoices([]);
         }
     };
 
@@ -106,10 +148,20 @@ export default function GoodsReceiptDetail() {
                     }
                 }
 
+                // Load related invoices
+                let invoices = [];
+                try {
+                    const invoicesData = await apInvoiceService.getInvoicesByGoodsReceipt(id);
+                    invoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.content || [];
+                } catch (invoiceError) {
+                    console.warn("Could not load related invoices:", invoiceError);
+                }
+
                 if (mounted) {
                     setData(receipt);
                     setItems(receiptItems);
                     setPoItems(orderItems);
+                    setRelatedInvoices(invoices);
                     console.log("=== DATA SET SUCCESSFULLY ===");
                 }
             } catch (error) {
@@ -141,13 +193,13 @@ export default function GoodsReceiptDetail() {
         setIsSubmitting(true);
         try {
             await goodsReceiptService.approveGoodsReceipt(id, currentUser.userId);
-            toast.success("Đã phê duyệt Phiếu nhập kho!");
+            toast.success("Đã xác nhận Phiếu nhập kho!");
             const updated = await goodsReceiptService.getGoodsReceiptById(id);
             setData(updated);
             setShowApproveModal(false);
         } catch (error) {
             console.error("Approve Goods Receipt failed:", error);
-            toast.error(error?.response?.data?.message || "Không thể phê duyệt Phiếu nhập kho");
+            toast.error(error?.response?.data?.message || "Không thể xác nhận Phiếu nhập kho");
         } finally {
             setIsSubmitting(false);
         }
@@ -239,13 +291,13 @@ export default function GoodsReceiptDetail() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            {data.status === "Approved" && !data.hasInvoice && (
+                            {data.status === "Approved" && relatedInvoices.length === 0 && (
                                 <button
                                     onClick={handleCreateInvoice}
                                     className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                                    disabled={isSubmitting}
+                                    disabled={isCreatingInvoice}
                                 >
-                                    {isSubmitting ? (
+                                    {isCreatingInvoice ? (
                                         <span className="flex items-center gap-2">
                                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                             Đang tạo hóa đơn...
@@ -255,7 +307,7 @@ export default function GoodsReceiptDetail() {
                                     )}
                                 </button>
                             )}
-                            {data.status === "Approved" && data.hasInvoice && (
+                            {data.status === "Approved" && relatedInvoices.length > 0 && (
                                 <div className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg">
                                     ✓ Đã tạo hóa đơn
                                 </div>
@@ -266,7 +318,7 @@ export default function GoodsReceiptDetail() {
                                         onClick={handleApproveClick}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                     >
-                                        Phê duyệt
+                                        Xác nhận
                                     </button>
                                     <button
                                         onClick={handleRejectClick}
@@ -427,6 +479,55 @@ export default function GoodsReceiptDetail() {
                                 </div>
                             </div>
                         )}
+
+                        {relatedInvoices.length > 0 && (
+                            <div className="bg-white border rounded-lg">
+                                <div className="px-6 py-4 border-b font-medium">
+                                    Hóa đơn đã tạo ({relatedInvoices.length})
+                                </div>
+                                <div className="divide-y">
+                                    {relatedInvoices.map((invoice) => (
+                                        <div
+                                            key={invoice.apInvoiceId}
+                                            className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                                            onClick={() => navigate(`/purchase/ap-invoices/${invoice.apInvoiceId}`)}
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="font-medium text-blue-600 hover:text-blue-700">
+                                                    {invoice.invoiceNo}
+                                                </div>
+                                                <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                                    invoice.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                                                    invoice.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-800' :
+                                                    'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {invoice.status === 'Paid' ? 'Đã thanh toán' :
+                                                     invoice.status === 'Partially Paid' ? 'Thanh toán 1 phần' :
+                                                     'Chưa thanh toán'}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm space-y-1">
+                                                <div className="flex justify-between text-gray-600">
+                                                    <span>Tổng tiền:</span>
+                                                    <span className="font-medium text-gray-900">
+                                                        {formatCurrency(invoice.totalAmount)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between text-gray-600">
+                                                    <span>Còn lại:</span>
+                                                    <span className="font-medium text-red-600">
+                                                        {formatCurrency(invoice.balanceAmount)}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString("vi-VN") : "-"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </aside>
                 </div>
             </div>
@@ -436,7 +537,7 @@ export default function GoodsReceiptDetail() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="px-6 py-4 border-b">
-                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận phê duyệt</h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận nhập kho</h3>
                         </div>
                         <div className="px-6 py-4">
                             <div className="flex items-start gap-3">
@@ -447,10 +548,10 @@ export default function GoodsReceiptDetail() {
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-sm text-gray-700">
-                                        Bạn có chắc chắn muốn phê duyệt Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong> không?
+                                        Bạn có chắc chắn muốn xác nhận Phiếu nhập kho <strong>{data.receipt_no || data.receiptNo}</strong> không?
                                     </p>
                                     <p className="text-sm text-gray-500 mt-2">
-                                        Sau khi phê duyệt, hàng hóa sẽ được cập nhật vào kho.
+                                        Sau khi xác nhận, hàng hóa sẽ được cập nhật vào kho.
                                     </p>
                                 </div>
                             </div>
@@ -471,7 +572,7 @@ export default function GoodsReceiptDetail() {
                                 {isSubmitting && (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 )}
-                                Phê duyệt
+                                Xác nhận
                             </button>
                         </div>
                     </div>

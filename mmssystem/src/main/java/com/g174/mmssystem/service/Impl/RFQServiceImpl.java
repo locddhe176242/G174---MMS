@@ -4,11 +4,13 @@ import com.g174.mmssystem.dto.requestDTO.RFQRequestDTO;
 import com.g174.mmssystem.dto.requestDTO.RFQVendorRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.RFQResponseDTO;
 import com.g174.mmssystem.entity.*;
+import com.g174.mmssystem.entity.RFQ.RFQStatus;
 import com.g174.mmssystem.enums.RFQVendorStatus;
 import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.RFQMapper;
 import com.g174.mmssystem.repository.*;
+import com.g174.mmssystem.service.EmailService;
 import com.g174.mmssystem.service.IService.IRFQService;
 import com.g174.mmssystem.service.IService.IRFQVendorService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +42,7 @@ public class RFQServiceImpl implements IRFQService {
     private final ProductRepository productRepository;
     private final PurchaseRequisitionItemRepository requisitionItemRepository;
     private final IRFQVendorService rfqVendorService;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -121,9 +126,37 @@ public class RFQServiceImpl implements IRFQService {
             rfq.setItems(items);
         }
 
+        // VALIDATE: All selected vendors must have email addresses BEFORE creating RFQ
+        if (dto.getSelectedVendorIds() != null && !dto.getSelectedVendorIds().isEmpty()) {
+            List<String> vendorsWithoutEmail = new ArrayList<>();
+            
+            for (Integer vendorId : dto.getSelectedVendorIds()) {
+                Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+                if (vendor == null) {
+                    throw new ResourceNotFoundException("Vendor not found with ID: " + vendorId);
+                }
+                
+                // Check if vendor has email (same validation as PO)
+                if (vendor.getContact() == null || 
+                    vendor.getContact().getEmail() == null || 
+                    vendor.getContact().getEmail().trim().isEmpty()) {
+                    vendorsWithoutEmail.add(vendor.getName());
+                }
+            }
+            
+            // If any vendor doesn't have email, throw exception and stop RFQ creation
+            if (!vendorsWithoutEmail.isEmpty()) {
+                throw new IllegalStateException(
+                    "Cannot create RFQ: The following vendors do not have email addresses: " + 
+                    String.join(", ", vendorsWithoutEmail) + 
+                    ". Please update vendor contact information before creating RFQ.");
+            }
+        }
+
         RFQ saved = rfqRepository.save(rfq);
 
-        // Create RFQ Vendors if selectedVendorIds provided
+        // Create RFQ Vendors and collect vendors for email sending
+        List<Vendor> vendorsToNotify = new ArrayList<>();
         if (dto.getSelectedVendorIds() != null && !dto.getSelectedVendorIds().isEmpty()) {
             for (Integer vendorId : dto.getSelectedVendorIds()) {
                 try {
@@ -133,6 +166,9 @@ public class RFQServiceImpl implements IRFQService {
                             .status(RFQVendorStatus.Invited)
                             .build();
                     rfqVendorService.createRFQVendor(vendorDto);
+                    
+                    // Add vendor to notification list (now guaranteed to have email)
+                    vendorRepository.findById(vendorId).ifPresent(vendorsToNotify::add);
                 } catch (Exception e) {
                     log.warn("Failed to add vendor {} to RFQ {}: {}", vendorId, saved.getRfqId(), e.getMessage());
                 }
@@ -141,6 +177,26 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
                 .orElse(saved);
+
+        // Send email notifications to vendors
+        if (!vendorsToNotify.isEmpty()) {
+            try {
+                emailService.sendRFQInvitationsToVendors(savedWithRelations, vendorsToNotify);
+                log.info("Email notifications sent to {} vendors for RFQ {}", vendorsToNotify.size(), saved.getRfqNo());
+                
+                // Update RFQ status to "Sent" after successfully sending emails
+                saved.setStatus(RFQStatus.Sent);
+                saved = rfqRepository.save(saved);
+                // Reload with relations after status update
+                savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
+                        .orElse(saved);
+                log.info("RFQ status updated to Sent after email delivery");
+            } catch (Exception e) {
+                log.error("Error sending email notifications for RFQ {}: {}", saved.getRfqNo(), e.getMessage(), e);
+                // Don't fail the RFQ creation if email sending fails
+                // RFQ will remain in Draft status if email fails
+            }
+        }
 
         log.info("RFQ created successfully with ID: {} and number: {}", saved.getRfqId(), saved.getRfqNo());
         return rfqMapper.toResponseDTO(savedWithRelations);
@@ -230,44 +286,52 @@ public class RFQServiceImpl implements IRFQService {
 
         // Update items if provided
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            // Remove all existing items properly for orphan removal
             rfq.getItems().clear();
-            List<RFQItem> items = dto.getItems().stream()
-                    .map(itemDto -> {
-                        PurchaseRequisitionItem pri = null;
-                        if (itemDto.getPriId() != null) {
-                            pri = requisitionItemRepository.findById(itemDto.getPriId().intValue())
-                                    .orElse(null);
-                        }
+            rfq.getItems().addAll(
+                    dto.getItems().stream()
+                            .map(itemDto -> {
+                                PurchaseRequisitionItem pri = null;
+                                if (itemDto.getPriId() != null) {
+                                    pri = requisitionItemRepository.findById(itemDto.getPriId().intValue())
+                                            .orElse(null);
+                                }
 
-                        Product product = null;
-                        if (itemDto.getProductId() != null) {
-                            product = productRepository.findById(itemDto.getProductId())
-                                    .orElse(null);
-                        }
+                                Product product = null;
+                                if (itemDto.getProductId() != null) {
+                                    product = productRepository.findById(itemDto.getProductId())
+                                            .orElse(null);
+                                }
 
-                        return RFQItem.builder()
-                                .rfq(rfq)
-                                .purchaseRequisitionItem(pri)
-                                .product(product)
-                                .productCode(itemDto.getProductCode())
-                                .productName(itemDto.getProductName())
-                                .spec(itemDto.getSpec())
-                                .uom(itemDto.getUom())
-                                .quantity(itemDto.getQuantity())
-                                .deliveryDate(itemDto.getDeliveryDate())
-                                .targetPrice(itemDto.getTargetPrice() != null ? itemDto.getTargetPrice() : BigDecimal.ZERO)
-                                .priceUnit(itemDto.getPriceUnit() != null ? itemDto.getPriceUnit() : BigDecimal.ONE)
-                                .note(itemDto.getNote())
-                                .build();
-                    })
-                    .collect(Collectors.toList());
-            rfq.setItems(items);
+                                return RFQItem.builder()
+                                        .rfq(rfq)
+                                        .purchaseRequisitionItem(pri)
+                                        .product(product)
+                                        .productCode(itemDto.getProductCode())
+                                        .productName(itemDto.getProductName())
+                                        .spec(itemDto.getSpec())
+                                        .uom(itemDto.getUom())
+                                        .quantity(itemDto.getQuantity())
+                                        .deliveryDate(itemDto.getDeliveryDate())
+                                        .targetPrice(itemDto.getTargetPrice() != null ? itemDto.getTargetPrice() : BigDecimal.ZERO)
+                                        .priceUnit(itemDto.getPriceUnit() != null ? itemDto.getPriceUnit() : BigDecimal.ONE)
+                                        .note(itemDto.getNote())
+                                        .build();
+                            })
+                            .collect(Collectors.toList())
+            );
         }
 
         // Update vendors if provided
+        List<Vendor> newVendorsToNotify = new ArrayList<>();
         if (dto.getSelectedVendorIds() != null) {
-            // Remove existing vendors
+            // Get existing vendor IDs before update
             List<com.g174.mmssystem.dto.responseDTO.RFQVendorResponseDTO> existingVendors = rfqVendorService.getVendorsByRfqId(rfqId);
+            Set<Integer> existingVendorIds = existingVendors.stream()
+                    .map(com.g174.mmssystem.dto.responseDTO.RFQVendorResponseDTO::getVendorId)
+                    .collect(Collectors.toSet());
+
+            // Remove existing vendors
             for (com.g174.mmssystem.dto.responseDTO.RFQVendorResponseDTO v : existingVendors) {
                 try {
                     rfqVendorService.deleteRFQVendor(rfqId, v.getVendorId());
@@ -276,7 +340,7 @@ public class RFQServiceImpl implements IRFQService {
                 }
             }
 
-            // Add new vendors
+            // Add new vendors and identify newly added ones
             for (Integer vendorId : dto.getSelectedVendorIds()) {
                 try {
                     RFQVendorRequestDTO vendorDto = RFQVendorRequestDTO.builder()
@@ -285,6 +349,11 @@ public class RFQServiceImpl implements IRFQService {
                             .status(RFQVendorStatus.Invited)
                             .build();
                     rfqVendorService.createRFQVendor(vendorDto);
+
+                    // If this vendor was not in the existing list, add to notification list
+                    if (!existingVendorIds.contains(vendorId)) {
+                        vendorRepository.findById(vendorId).ifPresent(newVendorsToNotify::add);
+                    }
                 } catch (Exception e) {
                     log.warn("Failed to add vendor {}: {}", vendorId, e.getMessage());
                 }
@@ -295,6 +364,28 @@ public class RFQServiceImpl implements IRFQService {
         RFQ saved = rfqRepository.save(rfq);
         RFQ savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
                 .orElse(saved);
+
+        // Send email notifications to newly added vendors only
+        if (!newVendorsToNotify.isEmpty()) {
+            try {
+                emailService.sendRFQInvitationsToVendors(savedWithRelations, newVendorsToNotify);
+                log.info("Email notifications sent to {} new vendors for updated RFQ {}", 
+                        newVendorsToNotify.size(), saved.getRfqNo());
+                
+                // Update RFQ status to "Sent" if it was in Draft status
+                if (saved.getStatus() == RFQStatus.Draft) {
+                    saved.setStatus(RFQStatus.Sent);
+                    saved = rfqRepository.save(saved);
+                    // Reload with relations after status update
+                    savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
+                            .orElse(saved);
+                    log.info("RFQ status updated to Sent after sending emails to new vendors");
+                }
+            } catch (Exception e) {
+                log.error("Failed to send email notifications for updated RFQ {}: {}", 
+                        saved.getRfqNo(), e.getMessage(), e);
+            }
+        }
 
         log.info("RFQ updated successfully");
         return rfqMapper.toResponseDTO(savedWithRelations);
@@ -397,7 +488,26 @@ public class RFQServiceImpl implements IRFQService {
             }
         }
         
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String rfqNo;
+        int maxAttempts = 100; // Giới hạn số lần thử để tránh vòng lặp vô hạn
+        int attempts = 0;
+        
+        do {
+            rfqNo = String.format("%s%04d", prefix, nextNumber);
+            if (!rfqRepository.existsByRfqNo(rfqNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique RFQ number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã RFQ duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return rfqNo;
     }
 }
 

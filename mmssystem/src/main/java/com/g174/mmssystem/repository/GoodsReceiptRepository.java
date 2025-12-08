@@ -24,6 +24,23 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.deletedAt IS NULL")
     Page<GoodsReceipt> findAllActive(Pageable pageable);
 
+    @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
+           "LEFT JOIN FETCH gr.warehouse w " +
+           "LEFT JOIN FETCH gr.createdBy cb " +
+           "LEFT JOIN FETCH cb.profile " +
+           "WHERE gr.deletedAt IS NULL")
+    List<GoodsReceipt> findAllActiveWithRelations();
+
+    @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
+           "LEFT JOIN FETCH gr.warehouse w " +
+           "LEFT JOIN FETCH gr.createdBy cb " +
+           "LEFT JOIN FETCH cb.profile " +
+           "WHERE gr.deletedAt IS NULL " +
+           "ORDER BY gr.createdAt DESC")
+    Page<GoodsReceipt> findAllActiveWithRelations(Pageable pageable);
+
     @Query("SELECT gr FROM GoodsReceipt gr WHERE " +
            "(LOWER(gr.receiptNo) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
            "gr.deletedAt IS NULL")

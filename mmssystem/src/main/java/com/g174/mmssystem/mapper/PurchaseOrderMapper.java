@@ -77,6 +77,7 @@ public class PurchaseOrderMapper {
                 .productCode(item.getProduct() != null ? item.getProduct().getSku() : null)
                 .uom(item.getUom())
                 .quantity(item.getQuantity())
+                .receivedQty(item.getReceivedQty())
                 .unitPrice(item.getUnitPrice())
                 .discountPercent(item.getDiscountPercent())
                 .taxRate(item.getTaxRate())

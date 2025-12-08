@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.PurchaseOrderRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseOrderResponseDTO;
 import com.g174.mmssystem.service.IService.IPurchaseOrderService;
@@ -27,6 +28,12 @@ public class PurchaseOrderController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CREATE_PURCHASE_ORDER",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Tạo đơn mua hàng: #{#result.body.poNo}",
+            entityId = "#{#result.body.orderId}"
+    )
     public ResponseEntity<PurchaseOrderResponseDTO> createOrder(
             @Valid @RequestBody PurchaseOrderRequestDTO requestDTO,
             @RequestParam(required = false) Integer createdById) {
@@ -101,6 +108,12 @@ public class PurchaseOrderController {
 
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "UPDATE_PURCHASE_ORDER",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Cập nhật đơn mua hàng ID: #{#orderId}",
+            entityId = "#{#orderId}"
+    )
     public ResponseEntity<PurchaseOrderResponseDTO> updateOrder(
             @PathVariable Integer orderId,
             @Valid @RequestBody PurchaseOrderRequestDTO requestDTO,
@@ -121,6 +134,12 @@ public class PurchaseOrderController {
 
     @PutMapping("/{orderId}/approve")
     @PreAuthorize("hasAnyRole('MANAGER')")
+    @LogActivity(
+            action = "APPROVE_PURCHASE_ORDER",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Duyệt đơn mua hàng ID: #{#orderId}",
+            entityId = "#{#orderId}"
+    )
     public ResponseEntity<PurchaseOrderResponseDTO> approveOrder(
             @PathVariable Integer orderId,
             @RequestParam Integer approverId) {
@@ -132,6 +151,12 @@ public class PurchaseOrderController {
 
     @PutMapping("/{orderId}/reject")
     @PreAuthorize("hasAnyRole('MANAGER')")
+    @LogActivity(
+            action = "REJECT_PURCHASE_ORDER",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Từ chối đơn mua hàng ID: #{#orderId}",
+            entityId = "#{#orderId}"
+    )
     public ResponseEntity<PurchaseOrderResponseDTO> rejectOrder(
             @PathVariable Integer orderId,
             @RequestParam Integer approverId,
@@ -162,6 +187,12 @@ public class PurchaseOrderController {
 
     @PutMapping("/{orderId}/cancel")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CANCEL_PURCHASE_ORDER",
+            activityType = "PURCHASE_MANAGEMENT",
+            description = "Hủy đơn mua hàng ID: #{#orderId}",
+            entityId = "#{#orderId}"
+    )
     public ResponseEntity<PurchaseOrderResponseDTO> cancelOrder(@PathVariable Integer orderId) {
         log.info("REST: Cancelling purchase order ID: {}", orderId);
 
@@ -186,7 +217,6 @@ public class PurchaseOrderController {
         PurchaseOrderResponseDTO order = orderService.getOrderById(orderId);
         return ResponseEntity.ok(order.getItems());
     }
-
     @GetMapping("/generate-number")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     public ResponseEntity<String> generatePoNo() {
@@ -195,5 +225,6 @@ public class PurchaseOrderController {
         String poNo = orderService.generatePoNo();
         return ResponseEntity.ok(poNo);
     }
-}
+}   
+
 

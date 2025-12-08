@@ -104,6 +104,47 @@ export default function APaymentForm() {
       errors.amount = `Số tiền không thể lớn hơn công nợ còn lại (${formatCurrency(invoice.balanceAmount)})`;
     }
 
+    // Payment terms validation for PO-related invoices
+    if (invoice && invoice.paymentTerms) {
+      const paymentTerms = invoice.paymentTerms.toUpperCase();
+      
+      // COD (Cash On Delivery) - Payment must be made immediately
+      if (paymentTerms.includes('COD')) {
+        const invoiceDate = invoice.invoiceDate ? new Date(invoice.invoiceDate) : null;
+        const paymentDate = formData.paymentDate instanceof Date ? formData.paymentDate : new Date(formData.paymentDate);
+        
+        if (invoiceDate) {
+          const daysDiff = Math.floor((paymentDate - invoiceDate) / (1000 * 60 * 60 * 24));
+          if (daysDiff > 0) {
+            errors.paymentDate = "Điều khoản COD yêu cầu thanh toán ngay. Ngày thanh toán không được sau ngày hóa đơn.";
+          }
+        }
+        
+        // COD typically requires full payment
+        if (invoice.balanceAmount && Number(formData.amount) < Number(invoice.balanceAmount)) {
+          errors.amount = "Điều khoản COD yêu cầu thanh toán toàn bộ số tiền.";
+        }
+      }
+      
+      // Net 30 - Payment within 30 days
+      if (paymentTerms.includes('NET') && paymentTerms.includes('30')) {
+        const invoiceDate = invoice.invoiceDate ? new Date(invoice.invoiceDate) : null;
+        const dueDate = invoice.dueDate ? new Date(invoice.dueDate) : null;
+        const paymentDate = formData.paymentDate instanceof Date ? formData.paymentDate : new Date(formData.paymentDate);
+        
+        if (invoiceDate) {
+          const daysDiff = Math.floor((paymentDate - invoiceDate) / (1000 * 60 * 60 * 24));
+          if (daysDiff > 30) {
+            errors.paymentDate = "Điều khoản Net 30 yêu cầu thanh toán trong vòng 30 ngày kể từ ngày hóa đơn.";
+          }
+        }
+        
+        if (dueDate && paymentDate > dueDate) {
+          errors.paymentDate = `Ngày thanh toán không được vượt quá ngày đến hạn (${dueDate.toLocaleDateString("vi-VN")}).`;
+        }
+      }
+    }
+
     // Payment method specific validations
     if (formData.method === "Bank Transfer") {
       // Bank Transfer requires reference number for reconciliation
@@ -202,6 +243,18 @@ export default function APaymentForm() {
                         <div className="text-gray-600">Nhà cung cấp</div>
                         <div className="font-medium">{invoice.vendorName}</div>
                       </div>
+                      {invoice.poNo && (
+                        <div>
+                          <div className="text-gray-600">Số PO</div>
+                          <div className="font-medium">{invoice.poNo}</div>
+                        </div>
+                      )}
+                      {invoice.paymentTerms && (
+                        <div>
+                          <div className="text-gray-600">Điều khoản thanh toán</div>
+                          <div className="font-medium">{invoice.paymentTerms}</div>
+                        </div>
+                      )}
                       <div>
                         <div className="text-gray-600">Ngày hóa đơn</div>
                         <div className="font-medium">{invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString("vi-VN") : "-"}</div>
@@ -237,44 +290,6 @@ export default function APaymentForm() {
                   )}
                 </div>
 
-                {invoice && invoice.balanceAmount > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Thanh toán nhanh
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange("amount", invoice.balanceAmount)}
-                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
-                      >
-                        Trả toàn bộ ({formatCurrency(invoice.balanceAmount)})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.5))}
-                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                      >
-                        50% ({formatCurrency(Math.round(invoice.balanceAmount * 0.5))})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.3))}
-                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                      >
-                        30% ({formatCurrency(Math.round(invoice.balanceAmount * 0.3))})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange("amount", Math.round(invoice.balanceAmount * 0.25))}
-                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                      >
-                        25% ({formatCurrency(Math.round(invoice.balanceAmount * 0.25))})
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Số tiền <span className="text-red-500">*</span>
@@ -292,9 +307,6 @@ export default function APaymentForm() {
                   {validationErrors.amount && (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.amount}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nhập số tiền hoặc chọn từ các nút thanh toán nhanh bên trên
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

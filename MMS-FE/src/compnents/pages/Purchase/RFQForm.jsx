@@ -661,7 +661,12 @@ export default function RFQForm() {
                 toast.success("Cập nhật Yêu cầu báo giá thành công!");
             } else {
                 const createdRfq = await rfqService.createRFQ(payload);
-                toast.success("Tạo Yêu cầu báo giá thành công!");
+                const vendorCount = payload.selectedVendorIds?.length || 0;
+                if (vendorCount > 0) {
+                    toast.success(`Tạo RFQ thành công và đã gửi email đến ${vendorCount} nhà cung cấp!`);
+                } else {
+                    toast.success("Tạo Yêu cầu báo giá thành công!");
+                }
                 
                 // Update PR status to "Converted" after creating RFQ
                 if (importedPrId) {
@@ -706,12 +711,22 @@ export default function RFQForm() {
                         <h1 className="text-2xl font-bold text-gray-900">
                             {isEdit ? "Cập nhật Yêu cầu báo giá" : "Thêm Yêu cầu báo giá"}
                         </h1>
-                        <button
-                            onClick={handleCancel}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            Quay lại
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={openImportModal}
+                                disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                Nhập từ <strong>Phiếu yêu cầu</strong>
+                            </button>
+                            <button
+                                onClick={handleCancel}
+                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Quay lại
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -787,7 +802,17 @@ export default function RFQForm() {
                                         </label>
                                         <input
                                             type="text"
-                                            value={formData.status || "Draft"}
+                                            value={(() => {
+                                                const statusMap = {
+                                                    'Draft': 'Nháp',
+                                                    'Pending': 'Chờ phản hồi',
+                                                    'Sent': 'Đã gửi',
+                                                    'Closed': 'Đã đóng',
+                                                    'Cancelled': 'Đã hủy'
+                                                };
+                                                const status = formData.status || "Draft";
+                                                return statusMap[status] || status;
+                                            })()}
                                             readOnly
                                             className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
                                         />
@@ -833,24 +858,14 @@ export default function RFQForm() {
                             <div className="bg-white rounded-lg">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={addItem}
-                                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        >
-                                            Thêm sản phẩm
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={openImportModal}
-                                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                            className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        >
-                                            Nhập từ PR
-                                        </button>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                    >
+                                        Thêm sản phẩm
+                                    </button>
                                 </div>
 
                                 {validationErrors.items && (

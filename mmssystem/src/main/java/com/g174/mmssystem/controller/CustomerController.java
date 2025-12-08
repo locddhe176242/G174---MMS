@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.CustomerRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.CustomerDetailResponseDTO;
@@ -28,6 +29,9 @@ public class CustomerController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "CREATE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Tạo khách hàng mới: #{#customerRequestDTO.firstName} #{#customerRequestDTO.lastName}", 
+            entityId = "#{#result.body.customerId}")
     public ResponseEntity<CustomerResponseDTO> createCustomer(
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
 
@@ -39,7 +43,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{customerId}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerResponseDTO> getCustomerById(@PathVariable Integer customerId) {
         log.info("REST: Fetching customer with ID: {}", customerId);
 
@@ -48,7 +52,7 @@ public class CustomerController {
     }
 
     @GetMapping("/code/{customerCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerResponseDTO> getCustomerByCode(@PathVariable String customerCode) {
         log.info("REST: Fetching customer with code: {}", customerCode);
 
@@ -57,7 +61,7 @@ public class CustomerController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<List<CustomerResponseDTO>> getAllCustomers() {
         log.info("REST: Fetching all customers");
 
@@ -66,7 +70,7 @@ public class CustomerController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Page<CustomerResponseDTO>> getAllCustomersWithPagination(Pageable pageable) {
         log.info("REST: Fetching customers with pagination - page: {}, size: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
@@ -76,7 +80,7 @@ public class CustomerController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<List<CustomerResponseDTO>> searchCustomers(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("REST: Searching customers with keyword: '{}'", keyword);
@@ -86,7 +90,7 @@ public class CustomerController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Page<CustomerResponseDTO>> searchCustomersWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -99,6 +103,9 @@ public class CustomerController {
 
     @PutMapping("/{customerId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "UPDATE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Cập nhật khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<CustomerResponseDTO> updateCustomer(
             @PathVariable Integer customerId,
             @Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
@@ -111,6 +118,9 @@ public class CustomerController {
 
     @DeleteMapping("/{customerId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "DELETE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Xóa khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<Void> deleteCustomer(@PathVariable Integer customerId) {
         log.info("REST: Soft deleting customer with ID: {}", customerId);
 
@@ -120,6 +130,9 @@ public class CustomerController {
 
     @PostMapping("/{customerId}/restore")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "RESTORE_CUSTOMER", activityType = "CUSTOMER_MANAGEMENT", 
+            description = "Khôi phục khách hàng ID: #{#customerId}", 
+            entityId = "#{#customerId}")
     public ResponseEntity<CustomerResponseDTO> restoreCustomer(@PathVariable Integer customerId) {
         log.info("REST: Restoring customer with ID: {}", customerId);
 
@@ -130,7 +143,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{customerId}/detail")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<CustomerDetailResponseDTO> getCustomerDetailById(@PathVariable Integer customerId) {
         log.info("REST: Fetching customer detail with ID: {}", customerId);
 
@@ -139,7 +152,7 @@ public class CustomerController {
     }
 
     @GetMapping("/exists/{customerCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
     public ResponseEntity<Map<String, Boolean>> checkCustomerCodeExists(@PathVariable String customerCode) {
         log.info("REST: Checking if customer code exists: {}", customerCode);
 

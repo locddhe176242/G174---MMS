@@ -27,7 +27,7 @@ export default function MainLayout() {
         onLogout={handleLogout}
       />
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 relative">
         <Sidebar isCollapsed={isSidebarCollapsed} />
 
         <button
@@ -48,7 +48,9 @@ export default function MainLayout() {
           )}
         </button>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <main className={`flex-1 overflow-y-auto p-6 bg-gray-50 transition-all duration-300 ${
+          isSidebarCollapsed ? "ml-20" : "ml-64"
+        }`}>
           <Outlet />
         </main>
       </div>

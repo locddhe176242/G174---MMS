@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService.js";
+import Pagination from "../../common/Pagination";
 
 export default function GoodsReceiptList() {
     const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function GoodsReceiptList() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
-    const [pageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(10);
 
     const [sortField, setSortField] = useState("createdAt");
     const [sortDirection, setSortDirection] = useState("desc");
@@ -137,7 +138,7 @@ export default function GoodsReceiptList() {
         if (!receiptToDelete) return;
         try {
             setIsDeleting(true);
-            await goodsReceiptService.deleteGoodsReceipt(receiptToDelete.receipt_id || receiptToDelete.id);
+            await goodsReceiptService.deleteGoodsReceipt(receiptToDelete.receiptId);
             toast.success("Đã xóa Phiếu nhập kho!");
             setShowDeleteModal(false);
             setReceiptToDelete(null);
@@ -179,10 +180,13 @@ export default function GoodsReceiptList() {
             <div className="bg-white shadow-sm">
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu nhập kho</h1>
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu nhập kho</h1>
+                            <p className="text-sm text-gray-600 mt-1">Ghi nhận hàng hóa nhận được từ nhà cung cấp vào kho</p>
+                        </div>
                         <button
                             onClick={() => navigate("/purchase/goods-receipts/new")}
-                            className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
                             + Tạo Phiếu nhập kho
                         </button>
@@ -249,7 +253,10 @@ export default function GoodsReceiptList() {
                                         SỐ PHIẾU
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        ĐƠN HÀNG
+                                        NGUỒN / ĐƠN HÀNG
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        TIẾN ĐỘ NHẬP
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         KHO
@@ -272,8 +279,16 @@ export default function GoodsReceiptList() {
                                 </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                {receipts.map((receipt) => (
-                                    <tr key={receipt.receipt_id || receipt.id} className="hover:bg-gray-50">
+                                {receipts.map((receipt, index) => {
+                                    // Tạo màu nền cho các GR cùng PO
+                                    const poNo = receipt.poNo || receipt.po_no;
+                                    const prevPoNo = index > 0 ? (receipts[index - 1].poNo || receipts[index - 1].po_no) : null;
+                                    const nextPoNo = index < receipts.length - 1 ? (receipts[index + 1].poNo || receipts[index + 1].po_no) : null;
+                                    const isGrouped = poNo === prevPoNo || poNo === nextPoNo;
+                                    const bgClass = isGrouped ? 'bg-blue-50' : 'bg-white';
+                                    
+                                    return (
+                                    <tr key={receipt.receipt_id || receipt.id} className={`hover:bg-gray-50 ${bgClass}`}>
                                         <td className="px-6 py-4">
                                             <input type="checkbox" className="rounded border-gray-300" />
                                         </td>
@@ -281,12 +296,68 @@ export default function GoodsReceiptList() {
                                             {receipt.receipt_no || receipt.receiptNo}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {receipt.sourceType === "SalesReturn" 
-                                                ? (receipt.returnNo || receipt.return_no ? `RO: ${receipt.returnNo || receipt.return_no}` : "-")
-                                                : (receipt.poNo || receipt.po_no || receipt.purchaseOrder?.po_no || receipt.order?.po_no || receipt.order?.poNo 
-                                                    ? (receipt.poNo || receipt.po_no || receipt.purchaseOrder?.po_no || receipt.order?.po_no || receipt.order?.poNo)
-                                                    : (receipt.order_id ? `PO ID: ${receipt.order_id}` : "-"))
-                                            }
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                    receipt.sourceType === "SalesReturn" 
+                                                        ? "bg-purple-100 text-purple-800" 
+                                                        : "bg-blue-100 text-blue-800"
+                                                }`}>
+                                                    {receipt.sourceType === "SalesReturn" ? "Sales Return" : "Purchase"}
+                                                </span>
+                                                <span className="font-medium">
+                                                    {receipt.sourceType === "SalesReturn" 
+                                                        ? (receipt.returnNo || receipt.return_no || "-")
+                                                        : (receipt.poNo || receipt.po_no || "-")
+                                                    }
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                            {receipt.sourceType === "SalesReturn" ? (
+                                                <span className="text-gray-400 text-xs">N/A</span>
+                                            ) : receipt.poStatus === 'Completed' ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between text-xs mb-1">
+                                                            <span className="text-green-600 font-medium">Hoàn tất</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                                            <div className="bg-green-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+                                                        </div>
+                                                    </div>
+                                                    <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                            ) : receipt.totalReceivedQty && receipt.totalOrderedQty ? (
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between text-xs mb-1">
+                                                        <span className="font-medium">{receipt.totalReceivedQty}/{receipt.totalOrderedQty}</span>
+                                                        <span className="text-gray-500">
+                                                            {Math.round((receipt.totalReceivedQty / receipt.totalOrderedQty) * 100)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className={`h-2 rounded-full ${
+                                                                receipt.totalReceivedQty >= receipt.totalOrderedQty 
+                                                                    ? 'bg-green-500' 
+                                                                    : 'bg-blue-500'
+                                                            }`}
+                                                            style={{ 
+                                                                width: `${Math.min((receipt.totalReceivedQty / receipt.totalOrderedQty) * 100, 100)}%` 
+                                                            }}
+                                                        ></div>
+                                                    </div>
+                                                    {receipt.totalReceivedQty < receipt.totalOrderedQty && (
+                                                        <span className="text-xs text-orange-600 mt-1 block">
+                                                            Còn {receipt.totalOrderedQty - receipt.totalReceivedQty}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">-</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {receipt.warehouse?.name || receipt.warehouseName || "-"}
@@ -345,52 +416,25 @@ export default function GoodsReceiptList() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         )}
                     </div>
 
                     {!loading && !error && receipts.length > 0 && (
-                        <div className="px-6 py-4 border-t border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-gray-700">
-                                    Hiển thị {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, totalElements)} trong tổng số {totalElements} Phiếu nhập kho
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => handlePageChange(currentPage - 1)}
-                                        disabled={currentPage === 0}
-                                        className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                                        </svg>
-                                    </button>
-
-                                    {Array.from({ length: totalPages }, (_, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => handlePageChange(i)}
-                                            className={getPaginationButtonClass(i === currentPage)}
-                                        >
-                                            {i + 1}
-                                        </button>
-                                    ))}
-
-                                    <button
-                                        onClick={() => handlePageChange(currentPage + 1)}
-                                        disabled={currentPage === totalPages - 1}
-                                        className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={pageSize}
+                            totalElements={totalElements}
+                            onPageChange={handlePageChange}
+                            onPageSizeChange={(newSize) => {
+                                setPageSize(newSize);
+                                fetchReceipts(0, searchKeyword, sortField, sortDirection);
+                            }}
+                        />
                     )}
                 </div>
             </div>

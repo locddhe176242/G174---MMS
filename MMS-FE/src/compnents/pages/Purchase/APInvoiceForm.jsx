@@ -849,7 +849,7 @@ export default function APInvoiceForm() {
                                 )}
                               </td>
                               <td className="py-3 pr-4 text-right font-medium">
-                                {formatCurrency(calc.amountAfterDiscount)}
+                                {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || 0))}
                               </td>
                               <td className="py-3 pr-4 text-center">
                                 <button
@@ -869,7 +869,7 @@ export default function APInvoiceForm() {
                       <tfoot>
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
-                            Tổng giá trị hàng:
+                            Tạm tính:
                           </td>
                           <td className="py-3 pr-4 text-right">
                             {formatCurrency(totalBeforeTax)}
@@ -894,14 +894,24 @@ export default function APInvoiceForm() {
                           </td>
                         </tr>
                         {formData.header_discount > 0 && (
-                          <tr className="border-t font-semibold bg-gray-50">
-                            <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
-                              Chiết khấu tổng đơn ({formData.header_discount}%):
-                            </td>
-                            <td className="py-3 pr-4 text-right text-red-600">
-                              -{formatCurrency(headerDiscountAmount)}
-                            </td>
-                          </tr>
+                          <>
+                            <tr className="border-t font-semibold bg-gray-50">
+                              <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
+                                Chiết khấu tổng đơn ({formData.header_discount}%):
+                              </td>
+                              <td className="py-3 pr-4 text-right text-red-600">
+                                -{formatCurrency(headerDiscountAmount)}
+                              </td>
+                            </tr>
+                            <tr className="border-t font-semibold bg-gray-50">
+                              <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
+                                Tiền sau khi chiết khấu tổng đơn:
+                              </td>
+                              <td className="py-3 pr-4 text-right font-bold">
+                                {formatCurrency(totalAfterLineDiscount - headerDiscountAmount)}
+                              </td>
+                            </tr>
+                          </>
                         )}
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">

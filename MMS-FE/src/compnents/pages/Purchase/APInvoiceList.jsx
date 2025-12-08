@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
+import Pagination from "../../common/Pagination";
 
 export default function APInvoiceList() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function APInvoiceList() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
 
   const [sortField, setSortField] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState("desc");
@@ -335,10 +336,13 @@ export default function APInvoiceList() {
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Quản lý Hóa đơn phải trả</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Quản lý Hóa đơn phải trả</h1>
+              <p className="text-sm text-gray-600 mt-1">Quản lý các hóa đơn cần thanh toán cho nhà cung cấp</p>
+            </div>
             <button
               onClick={() => navigate("/purchase/ap-invoices/new")}
-              className="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               + Tạo mới
             </button>
@@ -389,45 +393,17 @@ export default function APInvoiceList() {
           </div>
 
           {!loading && !error && invoices && invoices.length > 0 && (
-            <div className="px-6 py-4 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Hiển thị {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, totalElements)} trong tổng số {totalElements} hóa đơn
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 0}
-                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handlePageChange(i)}
-                      className={getPaginationButtonClass(i === currentPage)}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages - 1}
-                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalElements={totalElements}
+              onPageChange={handlePageChange}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                fetchInvoices(0, searchKeyword, sortField, sortDirection);
+              }}
+            />
           )}
         </div>
       </div>

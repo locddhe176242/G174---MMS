@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionService {
 
     private final PurchaseRequisitionRepository requisitionRepository;
-    private final PurchaseRequisitionItemRepository requisitionItemRepository;
+    // private final PurchaseRequisitionItemRepository requisitionItemRepository;
     private final PurchaseRequisitionMapper requisitionMapper;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
@@ -253,7 +253,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
 
         // Check if requisition can be updated (only if status is Draft or Pending)
-        if (requisition.getStatus() == RequisitionStatus.Approved || 
+        if (requisition.getStatus() == RequisitionStatus.Approved ||
             requisition.getStatus() == RequisitionStatus.Rejected ||
             requisition.getStatus() == RequisitionStatus.Cancelled) {
             throw new IllegalStateException("Không thể cập nhật requisition khi status là " + requisition.getStatus());
@@ -316,7 +316,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             requisition.setApprovedAt(dto.getApprovedAt());
         }
 
-        // Update items - xử lý đúng cách với orphanRemoval
+        // Update items
         // Nếu status = Draft, cho phép items null hoặc empty (giữ nguyên items cũ nếu không có items mới)
         if (dto.getItems() != null) {
             // Với orphanRemoval, cần xóa items cũ trước khi thêm mới
@@ -328,32 +328,32 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
             // Add new items (có thể empty nếu status = Draft)
             if (!dto.getItems().isEmpty()) {
-            List<PurchaseRequisitionItem> newItems = dto.getItems().stream()
-                    .map(itemDto -> {
-                        // Load Product entity if productId is provided
+                List<PurchaseRequisitionItem> newItems = dto.getItems().stream()
+                        .map(itemDto -> {
+                            // Load Product entity if productId is provided
                             Product product = null;
-                        if (itemDto.getProductId() != null) {
-                            product = productRepository.findById(itemDto.getProductId().intValue())
+                            if (itemDto.getProductId() != null) {
+                                product = productRepository.findById(itemDto.getProductId().intValue())
                                         .orElse(null);
-                        }
+                            }
 
-                        // Set product name from product if not provided
-                        String productName = itemDto.getProductName();
-                        if (productName == null || productName.trim().isEmpty()) {
-                            productName = product != null ? product.getName() : null;
-                        }
+                            // Set product name from product if not provided
+                            String productName = itemDto.getProductName();
+                            if (productName == null || productName.trim().isEmpty()) {
+                                productName = product != null ? product.getName() : null;
+                            }
 
-                        // Set unit from product if not provided
-                        String unit = itemDto.getUnit();
-                        if (unit == null || unit.trim().isEmpty()) {
-                            unit = product != null ? product.getUom() : null;
-                        }
+                            // Set unit from product if not provided
+                            String unit = itemDto.getUnit();
+                            if (unit == null || unit.trim().isEmpty()) {
+                                unit = product != null ? product.getUom() : null;
+                            }
 
                             // Ensure deliveryDate is not null (default nếu null)
-                        LocalDate deliveryDate = itemDto.getDeliveryDate();
-                        if (deliveryDate == null) {
-                            deliveryDate = LocalDate.now().plusDays(30); // Default to 30 days from now
-                        }
+                            LocalDate deliveryDate = itemDto.getDeliveryDate();
+                            if (deliveryDate == null) {
+                                deliveryDate = LocalDate.now().plusDays(30); // Default to 30 days from now
+                            }
 
                             // Ensure requestedQty is not null (default nếu null)
                             BigDecimal requestedQty = itemDto.getRequestedQty();
@@ -361,22 +361,22 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                                 requestedQty = BigDecimal.ONE; // Default to 1
                             }
 
-                        PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
-                                .purchaseRequisition(requisition)
-                                .product(product)
-                                .productName(productName)
+                            PurchaseRequisitionItem item = PurchaseRequisitionItem.builder()
+                                    .purchaseRequisition(requisition)
+                                    .product(product)
+                                    .productName(productName)
                                     .requestedQty(requestedQty)
-                                .unit(unit)
-                                .deliveryDate(deliveryDate)
-                                .note(itemDto.getNote())
-                                .createdBy(requisition.getCreatedBy())
-                                .updatedBy(updatedBy)
-                                .createdAt(LocalDateTime.now())
-                                .updatedAt(LocalDateTime.now())
-                                .build();
-                        return item;
-                    })
-                    .collect(Collectors.toList());
+                                    .unit(unit)
+                                    .deliveryDate(deliveryDate)
+                                    .note(itemDto.getNote())
+                                    .createdBy(requisition.getCreatedBy())
+                                    .updatedBy(updatedBy)
+                                    .createdAt(LocalDateTime.now())
+                                    .updatedAt(LocalDateTime.now())
+                                    .build();
+                            return item;
+                        })
+                        .collect(Collectors.toList());
                 // Thêm items mới vào collection hiện tại (không setItems mới)
                 requisition.getItems().addAll(newItems);
             }
@@ -681,7 +681,26 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             }
         }
 
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String requisitionNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            requisitionNo = String.format("%s%04d", prefix, nextNumber);
+            if (!requisitionRepository.existsByRequisitionNo(requisitionNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique Requisition number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã phiếu yêu cầu duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return requisitionNo;
     }
 }
 

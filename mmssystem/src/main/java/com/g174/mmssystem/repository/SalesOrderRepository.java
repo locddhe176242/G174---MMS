@@ -55,4 +55,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Integer>
             "WHERE so.customer.customerId = :customerId AND so.deletedAt IS NULL " +
             "ORDER BY so.orderDate DESC")
     Page<SalesOrder> findByCustomerIdOrderByDateDesc(@Param("customerId") Integer customerId, Pageable pageable);
+
+    @Query("SELECT COUNT(so) FROM SalesOrder so WHERE so.status = :status AND so.deletedAt IS NULL")
+    Long countByStatus(@Param("status") SalesOrder.OrderStatus status);
 }

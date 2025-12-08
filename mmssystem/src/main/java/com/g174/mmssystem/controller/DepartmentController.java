@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.DepartmentRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.DepartmentResponseDTO;
 import com.g174.mmssystem.service.IService.IDepartmentService;
@@ -55,6 +56,9 @@ public class DepartmentController {
 
     @PostMapping
     @PreAuthorize("hasRole('MANAGER')")
+    @LogActivity(action = "CREATE_DEPARTMENT", activityType = "USER_MANAGEMENT",
+            description = "Tạo phòng ban mới: #{#request.departmentName}",
+            entityId = "#{#result.body.data.departmentId}")
     public ResponseEntity<Map<String, Object>> createDepartment(@Valid @RequestBody DepartmentRequestDTO request) {
         log.info("API: Tạo department mới: {}", request.getDepartmentName());
 
@@ -70,6 +74,9 @@ public class DepartmentController {
 
     @PutMapping("/{departmentId}")
     @PreAuthorize("hasRole('MANAGER')")
+    @LogActivity(action = "UPDATE_DEPARTMENT", activityType = "USER_MANAGEMENT",
+            description = "Cập nhật phòng ban ID: #{#departmentId}",
+            entityId = "#{#departmentId}")
     public ResponseEntity<Map<String, Object>> updateDepartment(
             @PathVariable Integer departmentId,
             @Valid @RequestBody DepartmentRequestDTO request) {
@@ -87,6 +94,9 @@ public class DepartmentController {
 
     @DeleteMapping("/{departmentId}")
     @PreAuthorize("hasRole('MANAGER')")
+    @LogActivity(action = "DELETE_DEPARTMENT", activityType = "USER_MANAGEMENT",
+            description = "Dừng hoạt động phòng ban ID: #{#departmentId}",
+            entityId = "#{#departmentId}")
     public ResponseEntity<Map<String, Object>> deleteDepartment(@PathVariable Integer departmentId) {
         log.info("API: Dừng hoạt động department ID: {}", departmentId);
 

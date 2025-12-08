@@ -108,56 +108,57 @@ export default function Sidebar({ isCollapsed = false }) {
                 : `/${item.menuPath}`;
             return {
               ...item,
+              menuId: item.menuId,
               id: item.menuKey,
               path: absolutePath,
               label: item.menuLabel,
-              icon: getIcon(item.iconName),
+              icon: getIcon(item.menuIcon),
+              parentId: item.parentId,
+              displayOrder: item.displayOrder,
             };
           });
 
+          // Build parent-child relationships using parentId
           const menuMap = new Map();
           const rootMenus = [];
-          const processedChildren = new Set();
 
-          // First pass: identify parent menus and their children
+          // First pass: create map of all menus
           transformed.forEach((item) => {
-            if (!item.path) return;
-            
-            // Find parent menu (e.g., "/purchase")
-            const parentPath = item.path.split('/').slice(0, 2).join('/'); // Get "/purchase" from "/purchase/xxx"
-            
-            if (item.path === parentPath) {
-              // This is a potential parent menu
-              const children = transformed.filter((child) => 
-                child.id !== item.id && 
-                child.path && 
-                child.path.startsWith(item.path + "/") &&
-                !processedChildren.has(child.id)
-              );
-
-              if (children.length > 0) {
-                children.forEach(child => processedChildren.add(child.id));
-item.children = children;
-              }
-              rootMenus.push(item);
-            }
+            menuMap.set(item.menuId, { ...item, children: [] });
           });
 
-          // Second pass: add remaining items that are not children
+          // Second pass: build hierarchy
           transformed.forEach((item) => {
-            if (!processedChildren.has(item.id) && !rootMenus.some(m => m.id === item.id)) {
-              rootMenus.push(item);
+            const menuItem = menuMap.get(item.menuId);
+            
+            if (item.parentId === null || item.parentId === undefined) {
+              // Root menu
+              rootMenus.push(menuItem);
+            } else {
+              // Child menu
+              const parent = menuMap.get(item.parentId);
+              if (parent) {
+                parent.children.push(menuItem);
+              } else {
+                // Parent not found, treat as root
+                console.warn(`Parent menu ${item.parentId} not found for ${item.label}`);
+                rootMenus.push(menuItem);
+              }
             }
           });
 
           // Sort by display order
           rootMenus.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
           rootMenus.forEach(menu => {
-            if (menu.children) {
+            if (menu.children && menu.children.length > 0) {
               menu.children.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+            } else {
+              // Remove empty children array
+              delete menu.children;
             }
           });
 
+          console.log('Transformed menu structure:', rootMenus);
           return rootMenus;
         };
         
@@ -196,7 +197,6 @@ item.children = children;
             onClick={() => toggleDropdown(item.id)}
             className="relative group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue transition-all duration-200"
           >
-            <span className="w-5 h-5 flex-shrink-0 text-brand-blue">{item.icon}</span>
             <span className="flex-1 font-medium text-sm text-left whitespace-nowrap">{item.label}</span>
             {item.badge && (
               <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{item.badge}</span>
@@ -216,7 +216,7 @@ item.children = children;
           </button>
 
           {isOpen && (
-            <div className="mt-1 ml-8 space-y-1">
+            <div className="mt-1 ml-6 space-y-1">
               {item.children.map((child) => (
                 <Link
                   key={child.id}
@@ -243,10 +243,12 @@ className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-l
       return (
         <button
           onClick={() => {}}
-          className="relative group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue transition-all duration-200"
+          className="relative group w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-slate-700 hover:bg-brand-blue-50 hover:text-brand-blue transition-all duration-200"
           title={item.label}
         >
-          <span className="w-5 h-5 flex-shrink-0 text-brand-blue">{item.icon}</span>
+          <div className="w-5 h-5">
+            {getIcon(item.icon)}
+          </div>
 
           <div className="absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
             {item.label}
@@ -266,8 +268,13 @@ className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-l
         }`}
         title={isCollapsed ? item.label : ""}
       >
-        <span className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-white" : "text-brand-blue"}`}>{item.icon}</span>
-        {!isCollapsed && <span className="flex-1 font-medium text-sm whitespace-nowrap">{item.label}</span>}
+        {isCollapsed ? (
+          <div className="w-5 h-5 mx-auto">
+            {getIcon(item.icon)}
+          </div>
+        ) : (
+          <span className="flex-1 font-medium text-sm whitespace-nowrap">{item.label}</span>
+        )}
         {!isCollapsed && item.badge && (
           <span
             className={`text-xs px-2 py-0.5 rounded ${
@@ -291,10 +298,10 @@ className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-l
   if (loading) {
     return (
       <aside
-className={`relative border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
+className={`fixed left-0 top-16 border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
           isCollapsed ? "w-20" : "w-64"
         }`}
-        style={{ fontFamily: "Roboto, sans-serif" }}
+        style={{ fontFamily: "Roboto, sans-serif", height: "calc(100vh - 4rem)" }}
       >
         <div className="p-4 flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-blue"></div>
@@ -306,10 +313,10 @@ className={`relative border-r border-slate-200 bg-white overflow-y-auto overflow
   if (error) {
     return (
       <aside
-        className={`relative border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
+        className={`fixed left-0 top-16 border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
           isCollapsed ? "w-20" : "w-64"
         }`}
-        style={{ fontFamily: "Roboto, sans-serif" }}
+        style={{ fontFamily: "Roboto, sans-serif", height: "calc(100vh - 4rem)" }}
       >
         <div className="p-4">
           <div className="text-red-500 text-sm">
@@ -323,10 +330,10 @@ className={`relative border-r border-slate-200 bg-white overflow-y-auto overflow
 
   return (
     <aside
-      className={`relative border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
+      className={`fixed left-0 top-16 border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden flex-shrink-0 transition-all duration-300 ease-in-out z-40 ${
         isCollapsed ? "w-20" : "w-64"
       }`}
-      style={{ fontFamily: "Roboto, sans-serif" }}
+      style={{ fontFamily: "Roboto, sans-serif", height: "calc(100vh - 4rem)" }}
     >
       <div className="p-4">
         {menuConfig.mainMenu && menuConfig.mainMenu.length > 0 && (

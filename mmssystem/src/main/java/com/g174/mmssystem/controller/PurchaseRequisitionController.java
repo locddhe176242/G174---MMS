@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.PurchaseRequisitionRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseRequisitionResponseDTO;
 import com.g174.mmssystem.enums.RequisitionStatus;
@@ -26,6 +27,9 @@ public class PurchaseRequisitionController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "CREATE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Tạo yêu cầu mua hàng mới",
+            entityId = "#{#result.body.requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> createRequisition(
             @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
         log.info("API: Tạo purchase requisition");
@@ -78,6 +82,9 @@ public class PurchaseRequisitionController {
 
     @PutMapping("/{requisitionId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "UPDATE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Cập nhật yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> updateRequisition(
             @PathVariable Long requisitionId,
             @RequestBody PurchaseRequisitionRequestDTO requestDTO) {
@@ -95,6 +102,9 @@ public class PurchaseRequisitionController {
 
     @PostMapping("/{requisitionId}/submit")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "SUBMIT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Gửi yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> submitRequisition(@PathVariable Long requisitionId) {
         log.info("API: Submit purchase requisition ID: {}", requisitionId);
         Integer requesterId = userContextService.getCurrentUserId();
@@ -107,6 +117,9 @@ public class PurchaseRequisitionController {
 
     @PutMapping("/{requisitionId}/approve")
     @PreAuthorize("hasAnyRole('MANAGER')")
+    @LogActivity(action = "APPROVE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Phê duyệt yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> approveRequisition(@PathVariable Long requisitionId) {
         log.info("API: Approve purchase requisition ID: {}", requisitionId);
         Integer approverId = userContextService.getCurrentUserId();
@@ -119,6 +132,9 @@ public class PurchaseRequisitionController {
 
     @PutMapping("/{requisitionId}/reject")
     @PreAuthorize("hasAnyRole('MANAGER')")
+    @LogActivity(action = "REJECT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Từ chối yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> rejectRequisition(
             @PathVariable Long requisitionId,
             @RequestParam(required = false) String reason) {
@@ -133,6 +149,9 @@ public class PurchaseRequisitionController {
 
     @PutMapping("/{requisitionId}/close")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "CLOSE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Đóng yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> closeRequisition(@PathVariable Long requisitionId) {
         log.info("API: Close purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.closeRequisition(requisitionId);
@@ -141,6 +160,9 @@ public class PurchaseRequisitionController {
 
     @PutMapping("/{requisitionId}/convert")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "CONVERT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Chuyển đổi yêu cầu mua hàng ID: #{#requisitionId} thành RFQ",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> convertRequisition(@PathVariable Long requisitionId) {
         log.info("API: Convert purchase requisition ID: {} to RFQ", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.convertRequisition(requisitionId);
@@ -149,6 +171,9 @@ public class PurchaseRequisitionController {
 
     @DeleteMapping("/{requisitionId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(action = "DELETE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
+            description = "Xóa yêu cầu mua hàng ID: #{#requisitionId}",
+            entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> deleteRequisition(@PathVariable Long requisitionId) {
         log.info("API: Xóa purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.deleteRequisition(requisitionId);

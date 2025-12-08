@@ -41,6 +41,7 @@ import VendorQuotationList from "./compnents/pages/Purchase/VendorQuotationList.
 import CompareSupplierQuotations from "./compnents/pages/Purchase/CompareSupplierQuotations.jsx";
 import APaymentList from "./compnents/pages/Purchase/APaymentList.jsx";
 import APaymentForm from "./compnents/pages/Purchase/APaymentForm.jsx";
+import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
 import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
 import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
 import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
@@ -68,6 +69,10 @@ import SalesReturnInboundOrderList from "./compnents/pages/Sale/SalesReturnInbou
 import SalesReturnInboundOrderDetail from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderDetail.jsx";
 import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderForm.jsx";
 
+//pages for Report module
+import ReportList from "./compnents/pages/Report/ReportList.jsx";
+import ReportDetail from "./compnents/pages/Report/ReportDetail.jsx";
+import GenerateReport from "./compnents/pages/Report/GenerateReport.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -144,6 +149,7 @@ function App() {
                 <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetail />} />
 
                 <Route path="/purchase/ap-payments" element={<APaymentList />} />
+                <Route path="/purchase/ap-payments/:id" element={<APaymentDetail />} />
 
                 <Route path="/purchase/ap-invoices" element={<APInvoiceList />} />
                 <Route path="/purchase/ap-invoices/new" element={<APInvoiceForm />} />
@@ -180,6 +186,10 @@ function App() {
                 <Route path="/sales/return-inbound-orders/new" element={<SalesReturnInboundOrderForm />} />
                 <Route path="/sales/return-inbound-orders/:id" element={<SalesReturnInboundOrderDetail />} />
 
+                {/**Report Module Routes */}
+                <Route path="/reports" element={<ReportList />} />
+                <Route path="/reports/generate" element={<GenerateReport />} />
+                <Route path="/reports/:id" element={<ReportDetail />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 

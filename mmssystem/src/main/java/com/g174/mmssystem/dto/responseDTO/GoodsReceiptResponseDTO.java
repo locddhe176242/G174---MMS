@@ -39,5 +39,10 @@ public class GoodsReceiptResponseDTO {
     private LocalDateTime updatedAt;
     private List<GoodsReceiptItemResponseDTO> items;
     private Boolean hasInvoice; // Đánh dấu GR đã được tạo invoice
+    
+    // Thông tin tiến độ nhập kho
+    private Double totalReceivedQty; // Tổng số lượng đã nhận (tất cả các GR của PO này)
+    private Double totalOrderedQty;  // Tổng số lượng đã đặt
+    private String poStatus;         // Trạng thái của PO (Sent, Completed, etc.)
 }
 

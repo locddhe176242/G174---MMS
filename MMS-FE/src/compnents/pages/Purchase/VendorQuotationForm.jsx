@@ -48,62 +48,43 @@ const VendorQuotationForm = () => {
 
     // Common options for delivery and payment terms
     const deliveryTermsOptions = [
-        { value: 'FOB - Giao tại kho người bán', label: 'FOB - Giao tại kho người bán' },
+        { value: 'FOB - Giao tại kho nhà cung cấp', label: 'FOB - Giao tại kho nhà cung cấp' },
         { value: 'CIF - Bao gồm phí vận chuyển và bảo hiểm', label: 'CIF - Bao gồm phí vận chuyển và bảo hiểm' },
-        { value: 'EXW - Lấy tại kho nhà máy', label: 'EXW - Lấy tại kho nhà máy' },
-        { value: 'DDP - Giao tận nơi, đã bao gồm thuế', label: 'DDP - Giao tận nơi, đã bao gồm thuế' },
-        { value: 'Giao hàng miễn phí trong nội thành', label: 'Giao hàng miễn phí trong nội thành' },
-        { value: 'Giao hàng trong 7-10 ngày làm việc', label: 'Giao hàng trong 7-10 ngày làm việc' },
     ];
 
     const paymentTermsOptions = [
-        { value: 'COD - Thanh toán khi nhận hàng', label: 'COD - Thanh toán khi nhận hàng' },
+        { value: 'COD - Thanh toán sau khi nhận hàng và giao hàng', label: 'COD - Thanh toán sau khi nhận hàng và giao hàng' },
         { value: 'Net 30 - Thanh toán trong 30 ngày', label: 'Net 30 - Thanh toán trong 30 ngày' },
-        { value: 'Net 60 - Thanh toán trong 60 ngày', label: 'Net 60 - Thanh toán trong 60 ngày' },
-        { value: '50% trả trước, 50% trước khi giao', label: '50% trả trước, 50% trước khi giao' },
-        { value: '100% trả trước', label: '100% trả trước' },
-        { value: 'Chuyển khoản trong 7 ngày', label: 'Chuyển khoản trong 7 ngày' },
-        { value: 'LC 90 ngày', label: 'LC 90 ngày (Letter of Credit)' },
     ];
 
     // Check if delivery terms requires shipping cost
     const requiresShippingCost = (deliveryTerms) => {
         if (!deliveryTerms) return true; // Default allow shipping cost
         const term = deliveryTerms.toUpperCase();
-        // FOB and EXW means buyer handles shipping - no shipping cost from vendor
-        if (term.includes('FOB') || term.includes('EXW')) return false;
-        // CIF, DDP, or custom delivery means vendor handles shipping - has shipping cost
+        // FOB means buyer handles shipping - no shipping cost from vendor
+        if (term.includes('FOB')) return false;
         return true;
     };
-
-    // Note: formatCurrency, formatNumberInput, parseNumberInput now imported from utils/formatters.js
 
     // Calculate item total with proper formula
     const calculateItemTotal = (item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
         const discountPercent = Number(item.discountPercent || 0) / 100;
-        const taxRate = Number(item.taxRate || 0) / 100;
-        
-        // Bước 1: Tính subtotal
-        const subtotal = qty * price;
-        
-        // Bước 2: Áp dụng chiết khấu dòng
-        const discountAmount = subtotal * discountPercent;
-        const amountAfterDiscount = subtotal - discountAmount;
-        
-        // Bước 3: Tính thuế trên số tiền sau chiết khấu
-        const tax = amountAfterDiscount * taxRate;
-        
-        // Bước 4: Tổng dòng
-        const lineTotal = amountAfterDiscount + tax;
-        
+
+        const round = (v) => Math.round(v * 100) / 100;
+
+        // 1. Tính tổng tiền Subtotal
+        const subtotal = round(qty * price);
+
+        // 2. Chiết khấu dòng
+        const discountAmount = round(subtotal * discountPercent);
+        const amountAfterDiscount = round(subtotal - discountAmount);
+
         return {
             subtotal,
             discountAmount,
-            amountAfterDiscount,
-            tax,
-            total: lineTotal
+            amountAfterDiscount
         };
     };
 
@@ -111,38 +92,51 @@ const VendorQuotationForm = () => {
     const calculateTotals = useMemo(() => {
         if (!Array.isArray(formData.items)) return { subtotal: 0, tax: 0, total: 0 };
 
+        const round = (v) => Math.round(v * 100) / 100;
+
+        // 1. Subtotal (tổng tiền hàng chưa CK)
         const subtotal = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.subtotal;
         }, 0);
 
+        // 2. Chiết khấu dòng
         const totalDiscount = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.discountAmount;
         }, 0);
 
+        // 3. Tổng sau CK dòng
         const totalAfterLineDiscount = formData.items.reduce((sum, item) => {
             const calc = calculateItemTotal(item);
             return sum + calc.amountAfterDiscount;
         }, 0);
 
-        const tax = formData.items.reduce((sum, item) => {
-            const calc = calculateItemTotal(item);
-            return sum + calc.tax;
-        }, 0);
-
+        // 4. Chiết khấu tổng đơn (header discount)
         const headerDiscountPercent = Number(formData.headerDiscount || 0);
-        const headerDiscountAmount = totalAfterLineDiscount * (headerDiscountPercent / 100);
+        const headerDiscountAmount = round(totalAfterLineDiscount * (headerDiscountPercent / 100));
         
-        const shipping = Number(formData.shippingCost || 0);
-        const total = totalAfterLineDiscount - headerDiscountAmount + tax + shipping;
+        // 5. Tiền sau khi trừ CK tổng đơn
+        const amountAfterAllDiscounts = round(totalAfterLineDiscount - headerDiscountAmount);
+
+        // 6. Thuế (tính trên số tiền sau khi trừ TẤT CẢ chiết khấu)
+        const taxRate = formData.items.length > 0 ? (Number(formData.items[0].taxRate || 0) / 100) : 0;
+        const tax = round(amountAfterAllDiscounts * taxRate);
+
+        // 7. Phí vận chuyển (không chịu thuế, không chịu CK)
+        const shipping = round(Number(formData.shippingCost || 0));
+
+        // 8. Tổng cuối cùng
+        const total = round(amountAfterAllDiscounts + tax + shipping);
 
         return { 
             subtotal, 
             totalDiscount,
             totalAfterLineDiscount,
-            tax, 
             headerDiscountAmount,
+            amountAfterAllDiscounts,
+            tax, 
+            shipping,
             total 
         };
     }, [formData.items, formData.headerDiscount, formData.shippingCost]);
@@ -688,7 +682,7 @@ const VendorQuotationForm = () => {
                                 className="react-select-container"
                                 classNamePrefix="react-select"
                             />
-                            <p className="text-xs text-gray-500 mt-1">VD: FOB, CIF, EXW, DDP, giao trong X ngày</p>
+                            <p className="text-xs text-gray-500 mt-1">VD: FOB, CIF</p>
                         </div>
 
                         {/* Payment Terms */}
@@ -707,7 +701,7 @@ const VendorQuotationForm = () => {
                                 className="react-select-container"
                                 classNamePrefix="react-select"
                             />
-                            <p className="text-xs text-gray-500 mt-1">VD: COD, Net 30, 50% trả trước, LC 90 ngày</p>
+                            <p className="text-xs text-gray-500 mt-1">VD: COD, Net 30</p>
                         </div>
 
                         {/* Header Discount */}
@@ -726,7 +720,7 @@ const VendorQuotationForm = () => {
                                 placeholder="VD: 2 (giảm 2%)"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                💡 Chiết khấu chung cho toàn bộ đơn hàng (Document Discount)
+                                💡 Chiết khấu chung cho toàn bộ đơn HÀNG
                             </p>
                         </div>
 
@@ -858,7 +852,7 @@ const VendorQuotationForm = () => {
                                             />
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1 text-xs">
-                                            {formatCurrency(item.lineTotal || 0)}
+                                            {formatCurrency((Number(item.quantity || 0) * Number(item.unitPrice || 0)))}
                                         </td>
                                         <td className="border border-gray-200 px-2 py-1">
                                             <input
@@ -875,7 +869,7 @@ const VendorQuotationForm = () => {
                                 <tfoot>
                                 <tr className="bg-gray-50 font-semibold">
                                     <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                        Tổng giá trị hàng:
+                                        Tạm tính:
                                     </td>
                                     <td className="border border-gray-200 px-2 py-1 text-xs">
                                         {formatCurrency(calculateTotals.subtotal)}
@@ -903,15 +897,26 @@ const VendorQuotationForm = () => {
                                     <td className="border border-gray-200 px-2 py-1"></td>
                                 </tr>
                                 {formData.headerDiscount > 0 && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
-                                            Chiết khấu tổng đơn ({formData.headerDiscount}%):
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
-                                            -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1"></td>
-                                    </tr>
+                                    <>
+                                        <tr className="bg-gray-50">
+                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                                Chiết khấu tổng đơn ({formData.headerDiscount}%):
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1 text-xs text-red-600">
+                                                -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1"></td>
+                                        </tr>
+                                        <tr className="bg-gray-50">
+                                            <td colSpan="6" className="border border-gray-200 px-2 py-1 text-xs text-right">
+                                                Tiền sau khi chiết khấu tổng đơn:
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1 text-xs font-medium">
+                                                {formatCurrency(calculateTotals.amountAfterAllDiscounts || 0)}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-1"></td>
+                                        </tr>
+                                    </>
                                 )}
                                 {!formData.isTaxIncluded && (
                                     <tr className="bg-gray-50">

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
 import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
 import apiClient from "../../../api/apiClient";
+import { getCurrentUser } from "../../../api/authService";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">
@@ -22,6 +23,17 @@ export default function RFQDetail() {
   const [quotations, setQuotations] = useState([]); // Danh sách báo giá của RFQ
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [isManager, setIsManager] = useState(false);
+
+  // Check if user is MANAGER
+  useEffect(() => {
+    const user = getCurrentUser();
+    const userRoles = user?.roles || [];
+    const hasManagerRole = userRoles.some(role => 
+      role === 'MANAGER' || role === 'ROLE_MANAGER' || role?.name === 'MANAGER'
+    );
+    setIsManager(hasManagerRole);
+  }, []);
 
   // Helpers
   const formatDate = (dateString) => {
@@ -102,7 +114,7 @@ export default function RFQDetail() {
   const lineValue = (item) => {
     const price = Number(item?.targetPrice || item?.target_price || 0);
     const qty = Number(item?.quantity || 0);
-    return price * qty;
+    return Math.round(price * qty * 100) / 100;
   };
 
   const totalValue = useMemo(() => {
@@ -127,7 +139,7 @@ export default function RFQDetail() {
       Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
     };
 
-    const statusInfo = map[statusStr] || { label: statusStr || "Draft", color: "bg-gray-100 text-gray-800" };
+    const statusInfo = map[statusStr] || { label: statusStr || "Nháp", color: "bg-gray-100 text-gray-800" };
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
         {statusInfo.label}
@@ -274,14 +286,16 @@ export default function RFQDetail() {
                   </button>
                 );
               })()}
-              {/* Nút so sánh báo giá - chỉ hiển thị khi RFQ đã có báo giá */}
-              <button
-                onClick={() => navigate(`/purchase/rfqs/${id}/compare-quotations`)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                title="So sánh báo giá từ các nhà cung cấp"
-              >
-                So sánh báo giá
-              </button>
+              {/* Nút so sánh báo giá - chỉ MANAGER mới thấy */}
+              {isManager && (
+                <button
+                  onClick={() => navigate(`/purchase/rfqs/${id}/compare-quotations`)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  title="So sánh báo giá từ các nhà cung cấp"
+                >
+                  So sánh báo giá
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -480,10 +494,6 @@ export default function RFQDetail() {
                                       {formatCurrency(vendorQuotation.totalAmount || vendorQuotation.total_amount || 0)}
                                     </span>
                                   </div>
-                                  <div>
-                                    <span className="font-medium">Trạng thái: </span>
-                                    {getStatusBadge(vendorQuotation.status)}
-                                  </div>
                                 </div>
                               )}
                             </div>
@@ -535,10 +545,6 @@ export default function RFQDetail() {
                                     <span className="text-green-600 font-semibold">
                                       {formatCurrency(vendorQuotation.totalAmount || vendorQuotation.total_amount || 0)}
                                     </span>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Trạng thái: </span>
-                                    {getStatusBadge(vendorQuotation.status)}
                                   </div>
                                 </div>
                               )}

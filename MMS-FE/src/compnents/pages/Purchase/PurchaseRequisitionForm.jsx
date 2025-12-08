@@ -175,7 +175,15 @@ const PurchaseRequisitionForm = () => {
                     // Kiểm tra status - chỉ cho phép edit khi status là Draft
                     const status = data.status || 'Draft';
                     if (status !== 'Draft') {
-                        toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${status}". Chỉ có thể chỉnh sửa khi trạng thái là "Draft".`);
+                        const statusMap = {
+                            'Draft': 'Bản nháp',
+                            'Pending': 'Chờ duyệt',
+                            'Approved': 'Đã duyệt',
+                            'Rejected': 'Đã từ chối',
+                            'Cancelled': 'Đã hủy'
+                        };
+                        const statusLabel = statusMap[status] || status;
+                        toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${statusLabel}". Chỉ có thể chỉnh sửa khi trạng thái là "Bản nháp".`);
                         navigate(`/purchase/purchase-requisitions/${id}`);
                         return;
                     }
@@ -941,7 +949,16 @@ const PurchaseRequisitionForm = () => {
                             </label>
                             <input
                                 type="text"
-                                value={formData.status}
+                                value={(() => {
+                                    const statusMap = {
+                                        'Draft': 'Bản nháp',
+                                        'Pending': 'Chờ duyệt',
+                                        'Approved': 'Đã duyệt',
+                                        'Rejected': 'Đã từ chối',
+                                        'Cancelled': 'Đã hủy'
+                                    };
+                                    return statusMap[formData.status] || formData.status;
+                                })()}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                                 readOnly
                             />

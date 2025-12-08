@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +24,7 @@ public class WarehouseController {
     private final WarehouseServiceImpl warehouseServiceImpl;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "CREATE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -38,22 +40,26 @@ public class WarehouseController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<List<WarehouseResponseDTO>> getAllWarehouses() {
         return ResponseEntity.ok(service.getAllWarehouses());
     }
 
     @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<Page<WarehouseResponseDTO>> getAllWarehousesPaged(Pageable pageable) {
         return ResponseEntity.ok(service.getAllWarehouses(pageable));
     }
 
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<WarehouseResponseDTO> getWarehouseById(@PathVariable Integer id) {
         return ResponseEntity.ok(service.getWarehouseById(id));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "UPDATE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -69,6 +75,7 @@ public class WarehouseController {
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "DEACTIVATE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -81,6 +88,7 @@ public class WarehouseController {
     }
 
     @PatchMapping("/{id}/restore")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "RESTORE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -93,6 +101,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<List<WarehouseResponseDTO>> searchWarehouses(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         return ResponseEntity.ok(service.searchWarehouses(keyword));
@@ -100,6 +109,7 @@ public class WarehouseController {
 
 
     @GetMapping("/search/page")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<Page<WarehouseResponseDTO>> searchWarehousesPaged(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -107,6 +117,7 @@ public class WarehouseController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     public ResponseEntity<WarehouseResponseDTO> deleteWarehouse(@PathVariable Integer id) {
         WarehouseResponseDTO deleted = warehouseServiceImpl.deleteWarehouse(id);
         return ResponseEntity.ok(deleted);
@@ -114,6 +125,7 @@ public class WarehouseController {
 
 
     @GetMapping("/exists/{code}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<Boolean> checkWarehouseCodeExists(@PathVariable String code) {
         return ResponseEntity.ok(service.existsByCode(code));
     }

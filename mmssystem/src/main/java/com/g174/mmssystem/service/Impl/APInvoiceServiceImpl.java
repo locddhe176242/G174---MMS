@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -175,9 +176,10 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         }
 
         // Check if invoice already exists for this GR
+        // ERP Standard: 1 Goods Receipt = 1 Invoice (multiple payments on that invoice)
         List<APInvoice> existingInvoices = invoiceRepository.findByReceiptId(receiptId);
         if (!existingInvoices.isEmpty()) {
-            throw new IllegalStateException("AP Invoice already exists for this Goods Receipt");
+            throw new IllegalStateException("Hóa đơn đã được tạo cho phiếu nhập kho này");
         }
 
         PurchaseOrder purchaseOrder = goodsReceipt.getPurchaseOrder();
@@ -273,6 +275,116 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public APInvoiceResponseDTO createInvoiceFromPurchaseOrder(Integer orderId) {
+        log.info("Creating AP Invoice from completed Purchase Order ID: {}", orderId);
+
+        // Load PO with all relations
+        PurchaseOrder purchaseOrder = orderRepository.findByIdWithRelations(orderId)
+                .filter(po -> po.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+
+        // Check if PO is completed
+        if (purchaseOrder.getStatus() != com.g174.mmssystem.enums.PurchaseOrderStatus.Completed) {
+            throw new IllegalStateException("Only completed Purchase Orders can be invoiced");
+        }
+
+        // Check if invoice already exists for this PO
+        List<APInvoice> existingInvoices = invoiceRepository.findByOrderId(orderId);
+        if (!existingInvoices.isEmpty()) {
+            throw new IllegalStateException("AP Invoice already exists for this Purchase Order");
+        }
+
+        // Get all approved GRs for this PO
+        List<GoodsReceipt> goodsReceipts = receiptRepository.findByOrderId(orderId).stream()
+                .filter(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved)
+                .toList();
+
+        if (goodsReceipts.isEmpty()) {
+            throw new IllegalStateException("No approved Goods Receipts found for Purchase Order ID: " + orderId);
+        }
+
+        Vendor vendor = purchaseOrder.getVendor();
+        if (vendor == null) {
+            throw new IllegalStateException("Vendor not found for Purchase Order ID: " + orderId);
+        }
+
+        // Use PO totals (which already include all discounts and taxes)
+        BigDecimal subtotal = purchaseOrder.getTotalBeforeTax();
+        BigDecimal taxAmount = purchaseOrder.getTaxAmount();
+        BigDecimal totalAmount = purchaseOrder.getTotalAfterTax();
+
+        // Generate invoice number
+        String invoiceNo = generateInvoiceNo();
+
+        // Use the last GR's received date as invoice date
+        GoodsReceipt lastGR = goodsReceipts.get(goodsReceipts.size() - 1);
+
+        // Build notes with all GR numbers
+        StringBuilder notesBuilder = new StringBuilder();
+        notesBuilder.append("Auto-generated from completed PO: ").append(purchaseOrder.getPoNo());
+        notesBuilder.append("\nBao gồm ").append(goodsReceipts.size()).append(" phiếu nhập kho: ");
+        notesBuilder.append(goodsReceipts.stream()
+                .map(GoodsReceipt::getReceiptNo)
+                .collect(java.util.stream.Collectors.joining(", ")));
+        notesBuilder.append("\nTổng giá trị: ").append(totalAmount.toString()).append(" VNĐ");
+
+        // Create invoice
+        APInvoice invoice = APInvoice.builder()
+                .invoiceNo(invoiceNo)
+                .vendor(vendor)
+                .purchaseOrder(purchaseOrder)
+                .goodsReceipt(lastGR) // Reference to last GR
+                .invoiceDate(lastGR.getReceivedDate().toLocalDate())
+                .dueDate(lastGR.getReceivedDate().toLocalDate().plusDays(30))
+                .subtotal(subtotal)
+                .taxAmount(taxAmount)
+                .totalAmount(totalAmount)
+                .balanceAmount(totalAmount)
+                .status(APInvoice.APInvoiceStatus.Unpaid)
+                .notes(notesBuilder.toString())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        // Create invoice items from PO items
+        List<APInvoiceItem> invoiceItems = purchaseOrder.getItems().stream()
+                .map(poItem -> {
+                    BigDecimal quantity = poItem.getQuantity();
+                    BigDecimal unitPrice = poItem.getUnitPrice();
+                    BigDecimal lineTotal = poItem.getLineTotal();
+
+                    return APInvoiceItem.builder()
+                            .apInvoice(invoice)
+                            .purchaseOrderItem(poItem)
+                            .goodsReceiptItem(null) // No specific GR item since this covers all GRs
+                            .description(poItem.getProduct().getName())
+                            .quantity(quantity)
+                            .unitPrice(unitPrice)
+                            .lineTotal(lineTotal)
+                            .build();
+                })
+                .toList();
+
+        invoice.setItems(invoiceItems);
+
+        APInvoice saved = invoiceRepository.save(invoice);
+        APInvoice savedWithRelations = invoiceRepository.findByIdWithRelations(saved.getApInvoiceId())
+                .orElse(saved);
+
+        // Update vendor balance
+        try {
+            vendorBalanceService.updateOnInvoiceCreated(vendor.getVendorId(), saved.getTotalAmount());
+        } catch (Exception e) {
+            log.error("Failed to update vendor balance for vendor {}: {}", vendor.getVendorId(), e.getMessage());
+        }
+
+        log.info("AP Invoice created from completed PO: {} with invoice number: {} (covering {} GRs)", 
+                 purchaseOrder.getPoNo(), invoiceNo, goodsReceipts.size());
+        return invoiceMapper.toResponseDTO(savedWithRelations);
+    }
+
+    @Override
     public APInvoiceResponseDTO getInvoiceById(Integer invoiceId) {
         APInvoice invoice = invoiceRepository.findByIdWithRelations(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
@@ -347,6 +459,14 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         APInvoice invoice = invoiceRepository.findById(invoiceId)
                 .filter(inv -> inv.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
+
+        // Validate invoice can be edited
+        if (!"Unpaid".equals(invoice.getStatus()) && !"Chưa thanh toán".equals(invoice.getStatus())) {
+            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn có trạng thái: " + invoice.getStatus());
+        }
+        if (invoice.getBalanceAmount().compareTo(invoice.getTotalAmount()) != 0) {
+            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn đã có thanh toán một phần");
+        }
 
         // Update fields
         if (dto.getInvoiceDate() != null) {
@@ -534,7 +654,26 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             }
         }
 
-        return String.format("%s%04d", prefix, nextNumber);
+        // Kiểm tra và tìm số tiếp theo nếu bị trùng
+        String invoiceNo;
+        int maxAttempts = 100;
+        int attempts = 0;
+        
+        do {
+            invoiceNo = String.format("%s%04d", prefix, nextNumber);
+            if (!invoiceRepository.existsByInvoiceNo(invoiceNo)) {
+                break;
+            }
+            nextNumber++;
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+                log.error("Could not generate unique Invoice number after {} attempts", maxAttempts);
+                throw new RuntimeException("Không thể tạo mã hóa đơn duy nhất. Vui lòng thử lại sau.");
+            }
+        } while (true);
+        
+        return invoiceNo;
     }
 
     /**

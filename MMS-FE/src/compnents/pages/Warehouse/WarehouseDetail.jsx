@@ -76,12 +76,12 @@ export default function WarehouseDetail() {
                             <h2 className="text-xl font-bold text-gray-800">
                                 Chi tiết kho: <strong>{warehouse.code}</strong>{" "}
                                 <Tag color={warehouse.status === "Active" ? "green" : "red"}>
-                                    {warehouse.status}
+                                    {warehouse.status === "Active" ? "Hoạt động" : "Không hoạt động"}
                                 </Tag>
                             </h2>
                             <Link
                                 to="/warehouse"
-                                className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                                className="inline-flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
                             >
                                 ← Quay lại danh sách
                             </Link>
@@ -102,7 +102,7 @@ export default function WarehouseDetail() {
                                         : "bg-red-100 text-red-700"
                                 }`}
                             >
-                                {warehouse.status}
+                                {warehouse.status === "Active" ? "Hoạt động" : "Không hoạt động"}
                             </span>
                         </Descriptions.Item>
                         <Descriptions.Item label="Ngày tạo">

@@ -23,6 +23,7 @@ public class MenuItemMapper {
                 .menuLabel(entity.getMenuLabel())
                 .menuPath(entity.getMenuPath())
                 .menuIcon(entity.getMenuIcon())
+                .parentId(entity.getParentId())
                 .displayOrder(entity.getDisplayOrder())
                 .build();
     }

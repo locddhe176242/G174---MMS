@@ -15,6 +15,8 @@ public interface IAPInvoiceService {
     
     APInvoiceResponseDTO createInvoiceFromGoodsReceipt(Integer receiptId);
     
+    APInvoiceResponseDTO createInvoiceFromPurchaseOrder(Integer orderId);
+    
     APInvoiceResponseDTO getInvoiceById(Integer invoiceId);
     
     List<APInvoiceResponseDTO> getAllInvoices();

@@ -59,6 +59,26 @@ public class GoodsReceiptMapper {
             dto.setItems(toItemResponseDTOList(receipt.getItems()));
         }
 
+        // Calculate progress info from PurchaseOrder
+        if (receipt.getPurchaseOrder() != null) {
+            dto.setPoStatus(receipt.getPurchaseOrder().getStatus() != null 
+                ? receipt.getPurchaseOrder().getStatus().toString() 
+                : null);
+            
+            if (receipt.getPurchaseOrder().getItems() != null) {
+                double totalOrdered = receipt.getPurchaseOrder().getItems().stream()
+                    .mapToDouble(item -> item.getQuantity() != null ? item.getQuantity().doubleValue() : 0.0)
+                    .sum();
+                
+                double totalReceived = receipt.getPurchaseOrder().getItems().stream()
+                    .mapToDouble(item -> item.getReceivedQty() != null ? item.getReceivedQty().doubleValue() : 0.0)
+                    .sum();
+                
+                dto.setTotalOrderedQty(totalOrdered);
+                dto.setTotalReceivedQty(totalReceived);
+            }
+        }
+
         return dto;
     }
 

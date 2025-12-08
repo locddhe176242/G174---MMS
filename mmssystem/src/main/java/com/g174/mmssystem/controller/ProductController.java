@@ -25,6 +25,7 @@ public class ProductController {
     private final IProductService productService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<List<ProductResponseDTO>> getProducts(
             @RequestParam(required = false) String keyword) {
         try {
@@ -42,6 +43,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<ProductResponseDTO> getProduct(@PathVariable Integer id) {
         try {
             ProductResponseDTO product = productService.getProduct(id);
@@ -56,7 +58,7 @@ public class ProductController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "CREATE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
@@ -81,7 +83,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "UPDATE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
@@ -115,7 +117,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "DELETE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
@@ -136,7 +138,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}/restore")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "RESTORE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
@@ -157,6 +159,7 @@ public class ProductController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
     public ResponseEntity<List<ProductResponseDTO>> getDeletedProducts() {
         try {
             List<ProductResponseDTO> products = productService.getDeletedProducts();
@@ -168,7 +171,7 @@ public class ProductController {
     }
 
     @PostMapping("/upload-image")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "UPLOAD_PRODUCT_IMAGE",
             activityType = "PRODUCT_MANAGEMENT",

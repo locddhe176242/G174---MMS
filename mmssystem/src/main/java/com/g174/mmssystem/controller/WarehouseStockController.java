@@ -5,6 +5,7 @@ import com.g174.mmssystem.dto.responseDTO.WarehouseStockResponseDTO;
 import com.g174.mmssystem.service.IService.IWarehouseStockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ public class WarehouseStockController {
      * Lấy danh sách stock trong một warehouse
      */
     @GetMapping("/warehouse/{warehouseId}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<List<WarehouseStockResponseDTO>> getStockByWarehouse(
             @PathVariable Integer warehouseId) {
         List<WarehouseStockResponseDTO> stocks = warehouseStockService.getStockByWarehouseId(warehouseId);
@@ -31,6 +33,7 @@ public class WarehouseStockController {
      * Lấy stock của một product trong một warehouse cụ thể
      */
     @GetMapping("/warehouse/{warehouseId}/product/{productId}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<WarehouseStockResponseDTO> getStockByWarehouseAndProduct(
             @PathVariable Integer warehouseId,
             @PathVariable Integer productId) {
@@ -42,6 +45,7 @@ public class WarehouseStockController {
      * Lấy tổng số lượng của một product trong tất cả warehouses
      */
     @GetMapping("/product/{productId}/total-quantity")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<BigDecimal> getTotalQuantityByProduct(@PathVariable Integer productId) {
         BigDecimal totalQuantity = warehouseStockService.getTotalQuantityByProductId(productId);
         return ResponseEntity.ok(totalQuantity);
@@ -51,6 +55,7 @@ public class WarehouseStockController {
      * Lấy số lượng của một product trong một warehouse cụ thể (trả về số, không phải object)
      */
     @GetMapping("/warehouse/{warehouseId}/product/{productId}/quantity")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
     public ResponseEntity<BigDecimal> getQuantityByWarehouseAndProduct(
             @PathVariable Integer warehouseId,
             @PathVariable Integer productId) {
@@ -62,6 +67,7 @@ public class WarehouseStockController {
      * Cập nhật số lượng stock (set giá trị mới)
      */
     @PutMapping("/warehouse/{warehouseId}/product/{productId}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "UPDATE_WAREHOUSE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
@@ -80,6 +86,7 @@ public class WarehouseStockController {
      * Tăng số lượng stock
      */
     @PostMapping("/warehouse/{warehouseId}/product/{productId}/increase")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "INCREASE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
@@ -98,6 +105,7 @@ public class WarehouseStockController {
      * Giảm số lượng stock
      */
     @PostMapping("/warehouse/{warehouseId}/product/{productId}/decrease")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "DECREASE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
@@ -116,6 +124,7 @@ public class WarehouseStockController {
      * Tạo hoặc cập nhật stock
      */
     @PostMapping("/warehouse/{warehouseId}/product/{productId}")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "CREATE_OR_UPDATE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",

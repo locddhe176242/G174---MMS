@@ -1,5 +1,6 @@
 package com.g174.mmssystem.controller;
 
+import com.g174.mmssystem.annotation.LogActivity;
 import com.g174.mmssystem.dto.requestDTO.VendorRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.VendorResponseDTO;
 import com.g174.mmssystem.service.IService.IVendorService;
@@ -27,6 +28,12 @@ public class VendorController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "CREATE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Tạo nhà cung cấp: #{#request.name}",
+            entityId = "#{#result.body.vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> createVendor(
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
 
@@ -38,7 +45,7 @@ public class VendorController {
     }
 
     @GetMapping("/{vendorId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<VendorResponseDTO> getVendorById(@PathVariable Integer vendorId) {
         log.info("REST: Fetching vendor with ID: {}", vendorId);
 
@@ -47,7 +54,7 @@ public class VendorController {
     }
 
     @GetMapping("/code/{vendorCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<VendorResponseDTO> getVendorByCode(@PathVariable String vendorCode) {
         log.info("REST: Fetching vendor with code: {}", vendorCode);
 
@@ -56,7 +63,7 @@ public class VendorController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<List<VendorResponseDTO>> getAllVendors() {
         log.info("REST: Fetching all vendors");
 
@@ -65,7 +72,7 @@ public class VendorController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<Page<VendorResponseDTO>> getAllVendorsWithPagination(Pageable pageable) {
         log.info("REST: Fetching vendors with pagination - page: {}, size: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
@@ -75,7 +82,7 @@ public class VendorController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<List<VendorResponseDTO>> searchVendors(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("REST: Searching vendors with keyword: '{}'", keyword);
@@ -85,7 +92,7 @@ public class VendorController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
     public ResponseEntity<Page<VendorResponseDTO>> searchVendorsWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -98,6 +105,12 @@ public class VendorController {
 
     @PutMapping("/{vendorId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "UPDATE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Cập nhật nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> updateVendor(
             @PathVariable Integer vendorId,
             @Valid @RequestBody VendorRequestDTO vendorRequestDTO) {
@@ -110,6 +123,12 @@ public class VendorController {
 
     @DeleteMapping("/{vendorId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "DELETE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Xóa nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<Void> deleteVendor(@PathVariable Integer vendorId) {
         log.info("REST: Soft deleting vendor with ID: {}", vendorId);
 
@@ -119,6 +138,12 @@ public class VendorController {
 
     @PostMapping("/{vendorId}/restore")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @LogActivity(
+            action = "RESTORE_VENDOR",
+            activityType = "VENDOR_MANAGEMENT",
+            description = "Khôi phục nhà cung cấp ID: #{#vendorId}",
+            entityId = "#{#vendorId}"
+    )
     public ResponseEntity<VendorResponseDTO> restoreVendor(@PathVariable Integer vendorId) {
         log.info("REST: Restoring vendor with ID: {}", vendorId);
 
@@ -129,12 +154,14 @@ public class VendorController {
     }
 
     @GetMapping("/exists/{vendorCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
-    public ResponseEntity<Boolean> checkVendorCodeExists(@PathVariable String vendorCode) {
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    public ResponseEntity<Map<String, Boolean>> checkVendorCodeExists(@PathVariable String vendorCode) {
         log.info("REST: Checking if vendor code exists: {}", vendorCode);
 
         boolean exists = vendorService.existsByVendorCode(vendorCode);
-        return ResponseEntity.ok(exists);
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("exists", exists);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/generate-code")
