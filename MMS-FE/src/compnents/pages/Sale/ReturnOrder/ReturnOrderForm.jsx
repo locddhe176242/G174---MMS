@@ -34,6 +34,36 @@ const normalizeNumberInput = (rawValue) => {
   return cleaned ? parseFloat(cleaned) : 0;
 };
 
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "40px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const compactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "36px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
 export default function ReturnOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -344,156 +374,163 @@ export default function ReturnOrderForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isEdit ? "Cập nhật đơn trả hàng" : "Tạo đơn trả hàng mới"}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  {isEdit ? "Cập nhật thông tin đơn trả hàng" : "Nhập thông tin đơn trả hàng"}
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/sales/return-orders")}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                ← Quay lại
-              </button>
-            </div>
+          <div className="px-6 py-5 flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEdit ? "Cập nhật đơn trả hàng" : "Tạo đơn trả hàng mới"}
+            </h1>
+            <button
+              onClick={() => navigate("/sales/return-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              ← Quay lại
+            </button>
           </div>
+          <div className="border-t border-gray-200" />
+        </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Delivery * <span className="text-red-500">*</span>
-                </label>
-                {isEdit ? (
-                  <input
-                    type="text"
-                    value={selectedDelivery?.deliveryNo || ""}
-                    disabled
-                    className="w-full border rounded-lg px-3 py-2 bg-gray-100"
-                  />
-                ) : (
-                  <div className="flex gap-2">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Thông tin đơn trả hàng */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin đơn trả hàng</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">
+                    Delivery <span className="text-red-500">*</span>
+                  </label>
+                  {isEdit ? (
                     <input
                       type="text"
                       value={selectedDelivery?.deliveryNo || ""}
-                      readOnly
-                      placeholder="Chọn Delivery"
-                      className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
+                      disabled
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryModalOpen(true)}
-                      className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-                    >
-                      Chọn
-                    </button>
-                    {selectedDelivery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedDelivery(null);
-                          handleInputChange("deliveryId", "");
-                        }}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600"
-                      >
-                        Xóa
-                      </button>
-                    )}
-                  </div>
-                )}
-                {errors.deliveryId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.deliveryId}</p>
-                )}
-              </div>
+                  ) : (
+                    <div className="mt-1 flex flex-col lg:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={selectedDelivery?.deliveryNo || ""}
+                        readOnly
+                        placeholder="Chọn Delivery"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryModalOpen(true)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                        >
+                          Chọn
+                        </button>
+                        {selectedDelivery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDelivery(null);
+                              handleInputChange("deliveryId", "");
+                            }}
+                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-red-600"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {errors.deliveryId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.deliveryId}</p>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kho nhận hàng trả lại <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={warehouses.find((w) => w.value === formData.warehouseId) || null}
-                  onChange={(opt) => handleInputChange("warehouseId", opt ? opt.value : "")}
-                  options={warehouses}
-                  placeholder="Chọn kho"
-                  isClearable
-                />
-                {errors.warehouseId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.warehouseId}</p>
-                )}
-              </div>
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Kho nhận hàng trả lại <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    className="mt-1"
+                    value={warehouses.find((w) => w.value === formData.warehouseId) || null}
+                    onChange={(opt) => handleInputChange("warehouseId", opt ? opt.value : "")}
+                    options={warehouses}
+                    placeholder="Chọn kho"
+                    isClearable
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
+                    menuShouldScrollIntoView={false}
+                    styles={selectStyles}
+                  />
+                  {errors.warehouseId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.warehouseId}</p>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ngày trả hàng
-                </label>
-                <DatePicker
-                  selected={formData.returnDate}
-                  onChange={(date) => handleDateChange("returnDate", date)}
-                  dateFormat="dd/MM/yyyy"
-                  className="w-full border rounded-lg px-3 py-2"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Ngày trả hàng</label>
+                  <DatePicker
+                    selected={formData.returnDate}
+                    onChange={(date) => handleDateChange("returnDate", date)}
+                    dateFormat="dd/MM/yyyy"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lý do trả hàng
-                </label>
-                <input
-                  type="text"
-                  value={formData.reason}
-                  onChange={(e) => handleInputChange("reason", e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2"
-                  placeholder="Nhập lý do trả hàng"
-                />
+                <div>
+                  <label className="text-sm text-gray-600">Lý do trả hàng</label>
+                  <input
+                    type="text"
+                    value={formData.reason}
+                    onChange={(e) => handleInputChange("reason", e.target.value)}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Nhập lý do trả hàng"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Ghi chú</label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Thông tin bổ sung"
+                  />
+                </div>
               </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-              <textarea
-                rows={3}
-                value={formData.notes}
-                onChange={(e) => handleInputChange("notes", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Thông tin bổ sung"
-              />
+          {/* Danh sách sản phẩm trả lại */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm trả lại</h2>
+              {!isEdit && (
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  + Thêm sản phẩm
+                </button>
+              )}
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm trả lại</h2>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    + Thêm dòng
-                  </button>
-                )}
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left">Sản phẩm</th>
-                      <th className="px-4 py-3 text-left">Kho</th>
-                      <th className="px-4 py-3 text-right">Đã giao</th>
-                      <th className="px-4 py-3 text-right">Số lượng trả lại</th>
-                      <th className="px-4 py-3 text-left">Lý do</th>
-                      <th className="px-4 py-3 text-left">Ghi chú</th>
-                      {!isEdit && <th className="px-4 py-3 text-center">#</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left">#</th>
+                    <th className="px-4 py-3 text-left">Sản phẩm</th>
+                    <th className="px-4 py-3 text-left">Kho</th>
+                    <th className="px-4 py-3 text-right">Đã giao</th>
+                    <th className="px-4 py-3 text-right">Số lượng trả lại</th>
+                    <th className="px-4 py-3 text-left">Lý do</th>
+                    <th className="px-4 py-3 text-left">Ghi chú</th>
+                    {!isEdit && <th className="px-4 py-3 text-center">#</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
                     {formData.items.map((item, index) => {
                       const deliveryItem = getDeliveryItemInfo(item.deliveryItemId);
                       const maxReturnable = deliveryItem
@@ -503,12 +540,11 @@ export default function ReturnOrderForm() {
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
+                          <td className="px-4 py-3 w-64">
                             {isEdit ? (
-                              <div>
-                                <div className="font-semibold">
-                                  {products.find((p) => p.value === item.productId)?.label || "—"}
-                                </div>
+                              <div className="font-semibold">
+                                {products.find((p) => p.value === item.productId)?.label || "—"}
                               </div>
                             ) : (
                               <Select
@@ -521,11 +557,14 @@ export default function ReturnOrderForm() {
                                     : null
                                 }
                                 isDisabled
-                                className="w-64"
+                                menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                                menuPosition="fixed"
+                                menuShouldScrollIntoView={false}
+                                styles={compactSelectStyles}
                               />
                             )}
                             {itemError.productId && (
-                              <p className="text-red-500 text-xs mt-1">{itemError.productId}</p>
+                              <p className="text-xs text-red-600 mt-1">{itemError.productId}</p>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -537,9 +576,13 @@ export default function ReturnOrderForm() {
                               options={warehouses}
                               placeholder="Chọn kho"
                               isClearable
+                              menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                              menuPosition="fixed"
+                              menuShouldScrollIntoView={false}
+                              styles={compactSelectStyles}
                             />
                             {itemError.warehouseId && (
-                              <p className="text-red-500 text-xs mt-1">{itemError.warehouseId}</p>
+                              <p className="text-xs text-red-600 mt-1">{itemError.warehouseId}</p>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600">
@@ -557,33 +600,33 @@ export default function ReturnOrderForm() {
                                   normalizeNumberInput(e.target.value)
                                 )
                               }
-                              className="w-32 border rounded px-3 py-1 text-right"
+                              className="w-32 border border-gray-300 rounded px-3 py-1 text-right"
                               max={maxReturnable}
                             />
                             {itemError.returnedQty && (
-                              <p className="text-red-500 text-xs mt-1">{itemError.returnedQty}</p>
+                              <p className="text-xs text-red-600 mt-1">{itemError.returnedQty}</p>
                             )}
                             {item.returnedQty > maxReturnable && (
-                              <p className="text-red-500 text-xs mt-1">
+                              <p className="text-xs text-red-600 mt-1">
                                 Vượt quá số lượng đã giao ({maxReturnable})
                               </p>
                             )}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-40">
                             <input
                               type="text"
                               value={item.reason}
                               onChange={(e) => handleItemChange(index, "reason", e.target.value)}
-                              className="w-48 border rounded px-2 py-1"
+                              className="w-full border border-gray-300 rounded px-2 py-1"
                               placeholder="Lý do"
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-40">
                             <input
                               type="text"
                               value={item.note}
                               onChange={(e) => handleItemChange(index, "note", e.target.value)}
-                              className="w-48 border rounded px-2 py-1"
+                              className="w-full border border-gray-300 rounded px-2 py-1"
                               placeholder="Ghi chú"
                             />
                           </td>
@@ -608,24 +651,23 @@ export default function ReturnOrderForm() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => navigate("/sales/return-orders")}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-              >
-                {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới"}
-              </button>
-            </div>
-          </form>
-        </div>
+          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/return-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới"}
+            </button>
+          </div>
+        </form>
       </div>
 
       <DeliveryPickerModal
