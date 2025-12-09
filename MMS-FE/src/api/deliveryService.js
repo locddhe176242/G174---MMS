@@ -39,11 +39,6 @@ export const deliveryService = {
     const response = await apiClient.delete(`${BASE_PATH}/${id}`);
     return response.data;
   },
-
-  createFromSalesOrder: async (salesOrderId) => {
-    const response = await apiClient.post(`${BASE_PATH}/convert/${salesOrderId}`);
-    return response.data;
-  },
 };
 
 export default deliveryService;
