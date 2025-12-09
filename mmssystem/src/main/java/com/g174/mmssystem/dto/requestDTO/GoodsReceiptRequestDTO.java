@@ -28,7 +28,7 @@ public class GoodsReceiptRequestDTO {
     @NotNull(message = "Warehouse ID là bắt buộc")
     private Integer warehouseId;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss", shape = JsonFormat.Shape.STRING)
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS]", shape = JsonFormat.Shape.STRING)
     private LocalDateTime receivedDate;
 
     private Integer createdById;
