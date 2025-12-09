@@ -58,7 +58,6 @@ export default function SalesOrderForm() {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
-  const [originalStatus, setOriginalStatus] = useState(null);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [quotationModalOpen, setQuotationModalOpen] = useState(false);
   const [quotationSearch, setQuotationSearch] = useState("");
@@ -204,7 +203,6 @@ export default function SalesOrderForm() {
           note: item.note || "",
         })),
       });
-      setOriginalStatus(data.status);
       const uniqueTaxRates = new Set((data.items || []).map((item) => item.taxRate ?? ""));
       if (uniqueTaxRates.size === 1) {
         const [onlyRate] = Array.from(uniqueTaxRates);
@@ -454,11 +452,7 @@ export default function SalesOrderForm() {
     try {
       setSubmitting(true);
       if (isEdit) {
-        const updated = await salesOrderService.updateOrder(id, payload);
-        // Nếu status thay đổi, gọi changeStatus
-        if (updated.status && updated.status !== originalStatus) {
-          await salesOrderService.changeOrderStatus(id, updated.status);
-        }
+        await salesOrderService.updateOrder(id, payload);
         toast.success("Đã cập nhật đơn bán hàng");
       } else {
         await salesOrderService.createOrder(payload);
