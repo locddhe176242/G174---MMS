@@ -37,7 +37,6 @@ export default function SalesOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [statusLoading, setStatusLoading] = useState(false);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [data, setData] = useState(null);
 
@@ -59,21 +58,6 @@ export default function SalesOrderDetail() {
     fetchOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  const handleOrderStatus = async (newStatus) => {
-    if (statusLoading) return;
-    setStatusLoading(true);
-    try {
-      await salesOrderService.changeOrderStatus(id, newStatus);
-      toast.success("Đã cập nhật trạng thái đơn");
-      fetchOrder();
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể cập nhật trạng thái đơn");
-    } finally {
-      setStatusLoading(false);
-    }
-  };
 
   const handleApprovalStatus = async (newApprovalStatus) => {
     if (approvalLoading) return;
@@ -226,28 +210,6 @@ export default function SalesOrderDetail() {
             )}
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Trạng thái thực thi</h3>
-              <span className="text-sm text-gray-500">{getStatusLabel(data.status)}</span>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => handleOrderStatus("Fulfilled")}
-                disabled={statusLoading || data.status === "Fulfilled"}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {statusLoading && data.status !== "Fulfilled" ? "Đang xử lý..." : "Đánh dấu đã giao"}
-              </button>
-              <button
-                onClick={() => handleOrderStatus("Cancelled")}
-                disabled={statusLoading || data.status === "Cancelled"}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {statusLoading && data.status !== "Cancelled" ? "Đang xử lý..." : "Hủy đơn"}
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">

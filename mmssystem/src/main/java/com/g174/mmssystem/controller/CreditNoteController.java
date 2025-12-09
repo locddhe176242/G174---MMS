@@ -38,28 +38,22 @@ public class CreditNoteController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
-    @LogActivity(action = "CREATE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", 
-            description = "Tạo Credit Note cho hóa đơn ID: #{#request.invoiceId}",
-            entityId = "#{#result.body.creditNoteId}")
+    @LogActivity(action = "CREATE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", description = "Tạo Credit Note")
     public ResponseEntity<CreditNoteResponseDTO> createCreditNote(
             @Valid @RequestBody CreditNoteRequestDTO request) {
         return ResponseEntity.ok(creditNoteService.createCreditNote(request));
     }
 
-    @PostMapping("/convert/{returnOrderId}")
+    @PostMapping("/from-invoice/{invoiceId}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
-    @LogActivity(action = "CREATE_CREDIT_NOTE_FROM_RETURN", activityType = "SALES_MANAGEMENT", 
-            description = "Tạo Credit Note từ Return Order ID: #{#returnOrderId}",
-            entityId = "#{#result.body.creditNoteId}")
-    public ResponseEntity<CreditNoteResponseDTO> createFromReturnOrder(@PathVariable Integer returnOrderId) {
-        return ResponseEntity.ok(creditNoteService.createFromReturnOrder(returnOrderId));
+    @LogActivity(action = "CREATE_CREDIT_NOTE_FROM_INVOICE", activityType = "SALES_MANAGEMENT", description = "Tạo Credit Note (hóa đơn điều chỉnh) từ Invoice gốc")
+    public ResponseEntity<CreditNoteResponseDTO> createFromInvoice(@PathVariable Integer invoiceId) {
+        return ResponseEntity.ok(creditNoteService.createFromInvoice(invoiceId));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
-    @LogActivity(action = "UPDATE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", 
-            description = "Cập nhật Credit Note ID: #{#id}",
-            entityId = "#{#id}")
+    @LogActivity(action = "UPDATE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", description = "Cập nhật Credit Note")
     public ResponseEntity<CreditNoteResponseDTO> updateCreditNote(
             @PathVariable Integer id,
             @Valid @RequestBody CreditNoteRequestDTO request) {
@@ -68,9 +62,7 @@ public class CreditNoteController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
-    @LogActivity(action = "CHANGE_CREDIT_NOTE_STATUS", activityType = "SALES_MANAGEMENT", 
-            description = "Thay đổi trạng thái Credit Note ID: #{#id} sang #{#status}",
-            entityId = "#{#id}")
+    @LogActivity(action = "CHANGE_CREDIT_NOTE_STATUS", activityType = "SALES_MANAGEMENT", description = "Thay đổi trạng thái Credit Note")
     public ResponseEntity<CreditNoteResponseDTO> changeStatus(
             @PathVariable Integer id,
             @RequestParam String status) {
@@ -79,12 +71,9 @@ public class CreditNoteController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
-    @LogActivity(action = "DELETE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", 
-            description = "Xóa Credit Note ID: #{#id}",
-            entityId = "#{#id}")
+    @LogActivity(action = "DELETE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", description = "Xóa Credit Note")
     public ResponseEntity<Void> deleteCreditNote(@PathVariable Integer id) {
         creditNoteService.deleteCreditNote(id);
         return ResponseEntity.noContent().build();
     }
 }
-

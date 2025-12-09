@@ -20,6 +20,5 @@ public interface ICreditNoteService {
 
     CreditNoteResponseDTO changeStatus(Integer id, String status);
 
-    CreditNoteResponseDTO createFromReturnOrder(Integer returnOrderId);
+    CreditNoteResponseDTO createFromInvoice(Integer invoiceId);
 }
-

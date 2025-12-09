@@ -32,9 +32,8 @@ export const creditNoteService = {
     return response.data;
   },
 
-  createFromReturnOrder: async (returnOrderId) => {
-    const response = await apiClient.post(`/credit-notes/convert/${returnOrderId}`);
+  createFromInvoice: async (invoiceId) => {
+    const response = await apiClient.post(`/credit-notes/from-invoice/${invoiceId}`);
     return response.data;
   },
 };
-

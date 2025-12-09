@@ -4,6 +4,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { invoiceService } from "../../../../api/invoiceService";
+import { creditNoteService } from "../../../../api/creditNoteService";
 
 const getStatusLabel = (status) => {
   const statusMap = {
@@ -42,6 +43,7 @@ export default function InvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState(null);
+  const [creditNotes, setCreditNotes] = useState([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
@@ -56,6 +58,17 @@ export default function InvoiceDetail() {
     try {
       const response = await invoiceService.getInvoiceById(id);
       setData(response);
+      // Load Credit Notes for this Invoice
+      if (response.arInvoiceId) {
+        try {
+          const creditNotesList = await creditNoteService.getAllCreditNotes({ invoiceId: response.arInvoiceId });
+          setCreditNotes(creditNotesList || []);
+        } catch (err) {
+          console.error("Error loading credit notes:", err);
+          // Don't show error, just set empty array
+          setCreditNotes([]);
+        }
+      }
     } catch (error) {
       console.error(error);
       toast.error("Không thể tải hóa đơn");
@@ -123,6 +136,20 @@ export default function InvoiceDetail() {
   }
 
   const canAddPayment = data.status !== "Paid" && data.status !== "Cancelled" && Number(data.balanceAmount || 0) > 0;
+  const canCreateCreditNote = data.status !== "Cancelled";
+
+  const handleCreateCreditNote = async () => {
+    if (!window.confirm("Xác nhận tạo Credit Note (hóa đơn điều chỉnh) từ hóa đơn này?\n\nHệ thống sẽ copy toàn bộ thông tin và sản phẩm. Bạn có thể điều chỉnh số lượng sau.")) return;
+
+    try {
+      const creditNote = await creditNoteService.createFromInvoice(id);
+      toast.success("Đã tạo Credit Note thành công. Vui lòng điều chỉnh số lượng theo nhu cầu.");
+      navigate(`/sales/credit-notes/${creditNote.cnId}/edit`);
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Không thể tạo Credit Note");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -226,6 +253,25 @@ export default function InvoiceDetail() {
             </div>
           </div>
         </div>
+
+        {canCreateCreditNote && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Tạo hóa đơn điều chỉnh (Credit Note)</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Tạo Credit Note mới từ hóa đơn này. Hệ thống sẽ copy toàn bộ thông tin và sản phẩm. Bạn có thể điều chỉnh số lượng sau.
+                </p>
+              </div>
+              <button
+                onClick={handleCreateCreditNote}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                + Tạo Credit Note
+              </button>
+            </div>
+          </div>
+        )}
 
         {canAddPayment && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -413,6 +459,112 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
+        {creditNotes && creditNotes.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm mb-6">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Credit Notes liên quan</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Các Credit Note đã được áp dụng vào hóa đơn này
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Số Credit Note
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Ngày xuất
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Trạng thái
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Tổng tiền
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Return Order
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {creditNotes.map((cn) => (
+                    <tr key={cn.cnId} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                        {cn.creditNoteNo}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {formatDate(cn.creditNoteDate)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            cn.status === "Applied"
+                              ? "bg-green-100 text-green-700"
+                              : cn.status === "Issued"
+                              ? "bg-blue-100 text-blue-700"
+                              : cn.status === "Cancelled"
+                              ? "bg-gray-100 text-gray-500"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {cn.status === "Applied"
+                            ? "Đã áp dụng"
+                            : cn.status === "Issued"
+                            ? "Đã xuất"
+                            : cn.status === "Cancelled"
+                            ? "Đã hủy"
+                            : "Nháp"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-red-600">
+                        -{formatCurrency(cn.totalAmount || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {cn.returnOrderNo ? (
+                          <button
+                            onClick={() => navigate(`/sales/return-orders/${cn.returnOrderId}`)}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {cn.returnOrderNo}
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => navigate(`/sales/credit-notes/${cn.cnId}`)}
+                          className="text-blue-600 hover:underline text-sm"
+                        >
+                          Xem chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-gray-900">
+                      Tổng Credit Notes:
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-red-600">
+                      -{formatCurrency(
+                        creditNotes.reduce((sum, cn) => sum + Number(cn.totalAmount || 0), 0)
+                      )}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
         {data.payments && data.payments.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -490,4 +642,3 @@ export default function InvoiceDetail() {
     </div>
   );
 }
-

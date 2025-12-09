@@ -16,14 +16,17 @@ public interface DeliveryItemRepository extends JpaRepository<DeliveryItem, Inte
 
     void deleteByDelivery_DeliveryId(Integer deliveryId);
 
-    @Query("select coalesce(sum(di.plannedQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery$DeliveryStatus.Cancelled")
+    @Query("select coalesce(sum(di.plannedQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery.DeliveryStatus.Cancelled")
     BigDecimal sumPlannedQtyBySalesOrderItem(@Param("soiId") Integer soiId);
 
     // Tính tổng plannedQty từ các Delivery chưa Delivered (Draft, Picked, Shipped)
-    @Query("select coalesce(sum(di.plannedQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery$DeliveryStatus.Cancelled and di.delivery.status <> com.g174.mmssystem.entity.Delivery$DeliveryStatus.Delivered")
+    @Query("select coalesce(sum(di.plannedQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery.DeliveryStatus.Cancelled and di.delivery.status <> com.g174.mmssystem.entity.Delivery.DeliveryStatus.Delivered")
     BigDecimal sumPlannedQtyBySalesOrderItemExcludingDelivered(@Param("soiId") Integer soiId);
 
-    @Query("select coalesce(sum(di.deliveredQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status = com.g174.mmssystem.entity.Delivery$DeliveryStatus.Delivered")
+    @Query("select coalesce(sum(di.deliveredQty), 0) from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status = com.g174.mmssystem.entity.Delivery.DeliveryStatus.Delivered")
     BigDecimal sumDeliveredQtyBySalesOrderItem(@Param("soiId") Integer soiId);
-}
 
+    // Lấy danh sách DeliveryItem đã planned (chưa Delivered) để kiểm tra số lượng trong kho
+    @Query("select di from DeliveryItem di where di.salesOrderItem.soiId = :soiId and di.delivery.deletedAt is null and di.delivery.status <> com.g174.mmssystem.entity.Delivery.DeliveryStatus.Cancelled and di.delivery.status <> com.g174.mmssystem.entity.Delivery.DeliveryStatus.Delivered")
+    List<DeliveryItem> findPlannedItemsBySalesOrderItem(@Param("soiId") Integer soiId);
+}

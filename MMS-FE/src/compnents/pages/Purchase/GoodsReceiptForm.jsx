@@ -332,14 +332,18 @@ export default function GoodsReceiptForm() {
             console.log("=== Mapping items ===", sri.items);
             if (sri.items && sri.items.length > 0) {
                 const mapped = sri.items.map((item, index) => {
+                    const planned = Number(item.plannedQty || item.planned_qty || 0);
                     const mappedItem = {
                         roi_id: item.roiId || item.roi_id,
                         product_id: item.productId || item.product_id,
                         productName: item.productName || item.product_name || "-",
                         productCode: item.productCode || item.product_code || "",
-                        planned_qty: Number(item.plannedQty || item.planned_qty || 0),
-                        received_qty: Number(item.plannedQty || item.planned_qty || 0),
-                        accepted_qty: Number(item.plannedQty || item.planned_qty || 0), // Mặc định accepted = received
+                        planned_qty: planned,
+                        // Đặt ordered_qty = planned_qty để validation “vượt quá SL còn lại” dùng đúng số
+                        ordered_qty: planned,
+                        previously_received_qty: 0,
+                        received_qty: planned,
+                        accepted_qty: planned, // Mặc định accepted = received
                         remark: item.note || "",
                     };
                     console.log(`Mapped item ${index}:`, mappedItem);

@@ -74,10 +74,10 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
         recalcTotals(invoice, items);
 
         ARInvoice saved = arInvoiceRepository.save(invoice);
-        
+
         // Cập nhật customer balance
         customerBalanceService.updateOnInvoiceCreated(customer.getCustomerId(), saved.getTotalAmount());
-        
+
         return arInvoiceMapper.toResponse(saved, items, new ArrayList<>());
     }
 
@@ -99,7 +99,7 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
         request.setSalesOrderId(salesOrder != null ? salesOrder.getSoId() : null);
         request.setCustomerId(customer.getCustomerId());
         request.setInvoiceDate(LocalDate.now());
-        request.setDueDate(LocalDate.now().plusDays(30)); 
+        request.setDueDate(LocalDate.now().plusDays(30));
 
         List<ARInvoiceItemRequestDTO> items = buildItemsFromDelivery(delivery);
         request.setItems(items);
@@ -109,31 +109,9 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
 
     @Override
     public ARInvoiceResponseDTO updateInvoice(Integer invoiceId, ARInvoiceRequestDTO request) {
-        ARInvoice invoice = getInvoiceEntity(invoiceId);
-
-        if (invoice.getStatus() == ARInvoice.InvoiceStatus.Paid || 
-            invoice.getStatus() == ARInvoice.InvoiceStatus.Cancelled) {
-            throw new IllegalStateException("Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã hủy");
-        }
-
-        Customer customer = getCustomer(request.getCustomerId());
-        SalesOrder salesOrder = request.getSalesOrderId() != null ? getSalesOrder(request.getSalesOrderId()) : null;
-        Delivery delivery = request.getDeliveryId() != null ? getDelivery(request.getDeliveryId()) : null;
-        User currentUser = getCurrentUser();
-
-        arInvoiceMapper.updateEntity(invoice, request, currentUser);
-        invoice.setUpdatedBy(currentUser);
-
-        arInvoiceItemRepository.deleteByInvoiceId(invoiceId);
-        invoice.getItems().clear();
-        List<ARInvoiceItem> items = buildItems(invoice, request.getItems(), delivery, salesOrder);
-        invoice.getItems().addAll(items);
-
-        recalcTotals(invoice, items);
-
-        ARInvoice saved = arInvoiceRepository.save(invoice);
-        List<ARPayment> payments = arPaymentRepository.findByInvoice_ArInvoiceId(invoiceId);
-        return arInvoiceMapper.toResponse(saved, items, payments);
+        // Invoice gốc không được chỉnh sửa theo nghiệp vụ ERP chuẩn
+        // Nếu cần điều chỉnh, phải tạo Credit Note (hóa đơn điều chỉnh) mới
+        throw new IllegalStateException("Hóa đơn gốc không được chỉnh sửa. Vui lòng tạo Credit Note (hóa đơn điều chỉnh) để điều chỉnh hóa đơn này.");
     }
 
     @Override
@@ -191,7 +169,7 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
         BigDecimal remainingBalance = invoice.getBalanceAmount();
         if (request.getAmount().compareTo(remainingBalance) > 0) {
             throw new IllegalArgumentException(
-                    String.format("Số tiền thanh toán (%,.0f) vượt quá số tiền còn nợ (%,.0f)", 
+                    String.format("Số tiền thanh toán (%,.0f) vượt quá số tiền còn nợ (%,.0f)",
                             request.getAmount(), remainingBalance));
         }
 
@@ -228,16 +206,16 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
     // ========== Helper Methods ==========
 
     private List<ARInvoiceItem> buildItems(ARInvoice invoice, List<ARInvoiceItemRequestDTO> itemDTOs,
-                                          Delivery delivery, SalesOrder salesOrder) {
+                                           Delivery delivery, SalesOrder salesOrder) {
         List<ARInvoiceItem> items = new ArrayList<>();
         if (itemDTOs == null || itemDTOs.isEmpty()) {
             return items;
         }
 
         for (ARInvoiceItemRequestDTO dto : itemDTOs) {
-            DeliveryItem deliveryItem = dto.getDeliveryItemId() != null ? 
+            DeliveryItem deliveryItem = dto.getDeliveryItemId() != null ?
                     getDeliveryItem(dto.getDeliveryItemId()) : null;
-            SalesOrderItem salesOrderItem = deliveryItem != null ? deliveryItem.getSalesOrderItem() : 
+            SalesOrderItem salesOrderItem = deliveryItem != null ? deliveryItem.getSalesOrderItem() :
                     (dto.getSalesOrderItemId() != null ? getSalesOrderItem(dto.getSalesOrderItemId()) : null);
             Product product = getProduct(dto.getProductId());
 
@@ -312,31 +290,31 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
     private void recalculateInvoiceBalance(ARInvoice invoice) {
         // Bắt đầu từ totalAmount
         BigDecimal balance = invoice.getTotalAmount();
-        
+
         // Trừ đi tất cả Credit Notes đã áp dụng (Issued hoặc Applied)
         List<CreditNote> creditNotes = creditNoteRepository.findByInvoice_ArInvoiceIdAndDeletedAtIsNull(invoice.getArInvoiceId());
         for (CreditNote cn : creditNotes) {
-            if (cn.getStatus() == CreditNote.CreditNoteStatus.Issued || 
-                cn.getStatus() == CreditNote.CreditNoteStatus.Applied) {
+            if (cn.getStatus() == CreditNote.CreditNoteStatus.Issued ||
+                    cn.getStatus() == CreditNote.CreditNoteStatus.Applied) {
                 balance = balance.subtract(cn.getTotalAmount());
             }
         }
-        
+
         // Trừ đi tất cả Payments
         BigDecimal totalPaid = arPaymentRepository.getTotalPaidByInvoiceId(invoice.getArInvoiceId());
         if (totalPaid != null) {
             balance = balance.subtract(totalPaid);
         }
-        
+
         // Đảm bảo balance không âm
         balance = balance.max(BigDecimal.ZERO);
-        
+
         // Cập nhật balance
         if (invoice.getBalanceAmount().compareTo(balance) != 0) {
-            log.info("Recalculating balance for Invoice {}: {} -> {}", 
+            log.info("Recalculating balance for Invoice {}: {} -> {}",
                     invoice.getInvoiceNo(), invoice.getBalanceAmount(), balance);
             invoice.setBalanceAmount(balance);
-            
+
             // Cập nhật status nếu cần
             if (balance.compareTo(BigDecimal.ZERO) == 0) {
                 if (invoice.getStatus() != ARInvoice.InvoiceStatus.Paid) {
@@ -349,7 +327,7 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
                 // Nếu đã có payment nhưng vẫn Unpaid, chuyển sang PartiallyPaid
                 invoice.setStatus(ARInvoice.InvoiceStatus.PartiallyPaid);
             }
-            
+
             arInvoiceRepository.save(invoice);
         }
     }
@@ -413,4 +391,3 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + email));
     }
 }
-
