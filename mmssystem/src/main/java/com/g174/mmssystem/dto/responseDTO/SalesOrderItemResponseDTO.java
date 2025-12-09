@@ -22,4 +22,6 @@ public class SalesOrderItemResponseDTO {
     private BigDecimal taxAmount;
     private BigDecimal lineTotal;
     private String note;
+    private BigDecimal deliveredQty;
+    private BigDecimal remainingQty;
 }

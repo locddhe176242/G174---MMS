@@ -6,6 +6,8 @@ import com.g174.mmssystem.dto.responseDTO.SalesOrderItemResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.SalesOrderListResponseDTO;
 import com.g174.mmssystem.dto.responseDTO.SalesOrderResponseDTO;
 import com.g174.mmssystem.entity.*;
+import com.g174.mmssystem.repository.DeliveryItemRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -16,7 +18,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Component
+@RequiredArgsConstructor
 public class SalesOrderMapper {
+
+    private final DeliveryItemRepository deliveryItemRepository;
 
     public SalesOrder toEntity(SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation, User currentUser) {
         SalesOrder order = new SalesOrder();
@@ -113,6 +118,20 @@ public class SalesOrderMapper {
     private SalesOrderItemResponseDTO toItemResponse(SalesOrderItem item) {
         Product product = item.getProduct();
         Warehouse warehouse = item.getWarehouse();
+
+        // Tính số lượng đã nhận (từ các Delivery đã Delivered)
+        BigDecimal deliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(item.getSoiId());
+        if (deliveredQty == null) {
+            deliveredQty = BigDecimal.ZERO;
+        }
+
+        // Tính số lượng chưa nhận
+        BigDecimal quantity = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+        BigDecimal remainingQty = quantity.subtract(deliveredQty);
+        if (remainingQty.compareTo(BigDecimal.ZERO) < 0) {
+            remainingQty = BigDecimal.ZERO;
+        }
+
         return SalesOrderItemResponseDTO.builder()
                 .soiId(item.getSoiId())
                 .productId(product != null ? product.getProductId() : null)
@@ -121,13 +140,15 @@ public class SalesOrderMapper {
                 .warehouseId(warehouse != null ? warehouse.getWarehouseId() : null)
                 .warehouseName(warehouse != null ? warehouse.getName() : null)
                 .uom(item.getUom())
-                .quantity(item.getQuantity())
+                .quantity(quantity)
                 .unitPrice(item.getUnitPrice())
                 .discountAmount(item.getDiscountAmount())
                 .taxRate(item.getTaxRate())
                 .taxAmount(item.getTaxAmount())
                 .lineTotal(item.getLineTotal())
                 .note(item.getNote())
+                .deliveredQty(deliveredQty)
+                .remainingQty(remainingQty)
                 .build();
     }
 
