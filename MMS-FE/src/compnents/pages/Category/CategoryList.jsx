@@ -167,9 +167,6 @@ const CategoryList = () => {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FontAwesomeIcon icon={faTag} className="w-6 h-6 text-blue-600" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Quản lý danh mục</h1>
               </div>

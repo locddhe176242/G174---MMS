@@ -255,7 +255,6 @@ export default function PurchaseOrderList() {
                             </form>
 
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                <label className="text-sm text-gray-600">Trạng thái ERP:</label>
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}

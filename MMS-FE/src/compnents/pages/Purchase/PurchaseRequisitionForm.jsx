@@ -909,7 +909,6 @@ const PurchaseRequisitionForm = () => {
                                 placeholder="Mã phiếu yêu cầu"
                                 readOnly={!isEdit}
                             />
-                            <p className="text-gray-500 text-xs mt-1">Hệ thống tự tạo mã phiếu</p>
                         </div>
 
                         {/* Requisition Date */}

@@ -5,43 +5,39 @@ import {warehouseService} from "../../../api/warehouseService.js";
 import Pagination from "../../common/Pagination.jsx";
 
 export default function WarehouseList() {
-    const [warehouses, setWarehouses] = useState([]); // Lưu trữ danh sách kho hàng
-    const [loading, setLoading] = useState(true);  // Quản lý trạng thái loading khi fetch data
-    const [error, setError] = useState(null); // Lưu trữ thông báo lỗi nếu có
+    const [warehouses, setWarehouses] = useState([]); 
+    const [loading, setLoading] = useState(true);  
+    const [error, setError] = useState(null); 
 
-    const [searchKeyword, setSearchKeyword] = useState("");// Từ khóa tìm kiếm
-    const [currentPage, setCurrentPage] = useState(0); // Trang hiện tại (bắt đầu từ 0)
-    const [totalPages, setTotalPages] = useState(0);// Tổng số trang
-    const [totalElements, setTotalElements] = useState(0);// Tổng số phần tử
-    const [pageSize, setPageSize] = useState(10);// Số phần tử trên mỗi trang
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [currentPage, setCurrentPage] = useState(0); 
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalElements, setTotalElements] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
 
-    //  States cho bộ lọc
-    const [filterNameOrCode, setFilterNameOrCode] = useState(""); // Lọc theo tên hoặc mã
-    const [filterStatus, setFilterStatus] = useState("All"); // Lọc theo trạng thái (All/Active/Inactive)
+    const [filterNameOrCode, setFilterNameOrCode] = useState(""); 
+    const [filterStatus, setFilterStatus] = useState("All"); 
 
-    // Confirm modal state
     const [confirmState, setConfirmState] = useState({
-        open: false, // Trạng thái hiển thị modal
-        action: null, // Hành động (deactivate/restore)
-        warehouseId: null,  // ID của kho cần thực hiện hành động
-        message: "", // Thông báo xác nhận
+        open: false, 
+        action: null, 
+        warehouseId: null,  
+        message: "", 
     });
 
-    // Toast state
     const [toast, setToast] = useState({
-        open: false, // Trạng thái hiển thị toast
-        message: "",  // Nội dung thông báo
-        type: "success" // Loại thông báo (success/error)
+        open: false, 
+        message: "",  
+        type: "success" 
     }); 
 
-    //Hàm fetch dữ liệu kho
     const fetchWarehouses = async (
-        page = 0, // Trang cần lấy
-        keyword = "", // Từ khóa tìm kiếm
-        statusFilter = "All", // Bộ lọc trạng thái
-        nameOrCodeFilter = "", // Bộ lọc tên/mã
-        useClientFilter = false, // Có sử dụng filter ở client không
-        customPageSize = pageSize // Số phần tử trên trang
+        page = 0, 
+        keyword = "",
+        statusFilter = "All", 
+        nameOrCodeFilter = "", 
+        useClientFilter = false, 
+        customPageSize = pageSize
     ) => {
         try {
             setLoading(true);
@@ -92,14 +88,11 @@ export default function WarehouseList() {
         }
     };
 
-
-
     useEffect(() => {
         setCurrentPage(0);
         fetchWarehouses(0, searchKeyword, filterStatus, filterNameOrCode);
     }, [pageSize]);
 
-    // Xử lý tìm kiếm
     const handleSearch = (e) => {
         e.preventDefault();
 
@@ -108,13 +101,11 @@ export default function WarehouseList() {
         setFilterStatus("All");
     };
 
-     // Xử lý đổi trang
     const handlePageChange = (newPage) => {
         const useClientFilter = Boolean(filterNameOrCode.trim() || (filterStatus && filterStatus !== "All"));
         fetchWarehouses(newPage, searchKeyword, filterStatus, filterNameOrCode, useClientFilter);
     };
 
-    // Xử lý thay đổi số phần tử/trang
     const handlePageSizeChange = (newSize) => {
         setPageSize(newSize);
         setCurrentPage(0);
@@ -199,11 +190,7 @@ export default function WarehouseList() {
 
             <div className="container mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">Danh sách kho</h2>
-                    </div>
 
-                    {/* Confirm Modal */}
                     {confirmState.open && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center">
                             <div className="absolute inset-0 bg-black/30" onClick={closeConfirm}></div>
@@ -226,7 +213,6 @@ export default function WarehouseList() {
                         </div>
                     )}
 
-                    {/* Toast */}
                     {toast.open && (
                         <div className="fixed top-6 right-6 z-[1000] animate-fade-in-down">
                             <div
@@ -260,7 +246,6 @@ export default function WarehouseList() {
                             </form>
 
                             <div className="flex items-center gap-4">
-                                {/* Filters: name/code + status + apply/reset */}
                                 <div className="flex items-center gap-2">
                                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                                             className="px-3 py-2 border border-gray-300 rounded-lg">
@@ -278,14 +263,6 @@ export default function WarehouseList() {
                                     </button>
                                 </div>
 
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"/>
-                                    </svg>
-                                    Bộ lọc
-                                </button>
                             </div>
                         </div>
                     </div>

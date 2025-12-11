@@ -162,7 +162,7 @@ export default function SalesReturnInboundOrderList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Đơn nhập hàng lại (từ đơn trả hàng)
+              Đơn nhập hàng lại
             </h1>
           </div>
           <button
