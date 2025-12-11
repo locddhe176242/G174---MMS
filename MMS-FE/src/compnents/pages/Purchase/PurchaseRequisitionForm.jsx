@@ -872,24 +872,21 @@ const PurchaseRequisitionForm = () => {
 
     return (
         <div className="max-w-7xl mx-auto p-6">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
+            <div className="bg-white shadow-sm">
+                <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">
+                            {isEdit ? 'Cập nhật phiếu yêu cầu' : 'Tạo phiếu yêu cầu'}
+                        </h1>
+                    </div>
                     <button
-                        onClick={() => handleNavigate('/purchase/purchase-requisitions')}
-                        className="text-gray-600 hover:text-gray-800"
+                        onClick={() => navigate("/purchase/purchase-requisitions")}
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
+                        ← Quay lại
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-800">
-                        {isEdit ? 'Cập nhật phiếu yêu cầu' : 'Tạo phiếu yêu cầu'}
-                    </h1>
                 </div>
-                <p className="text-gray-600">
-                    {isEdit ? 'Chỉnh sửa thông tin phiếu yêu cầu mua hàng' : 'Tạo phiếu yêu cầu mua hàng mới'}
-                </p>
+                <div className="border-t border-gray-200" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -985,9 +982,9 @@ const PurchaseRequisitionForm = () => {
                 </div>
 
                 {/* Product Items */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-semibold text-gray-800">Danh sách sản phẩm</h2>
+                <div className="bg-white rounded-lg shadow-sm">
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
                         <div className="flex gap-2">
                             <button
                                 type="button"
@@ -1027,7 +1024,7 @@ const PurchaseRequisitionForm = () => {
                     </div>
 
                     {validationErrors.items && (
-                        <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
+                        <p className="text-red-500 text-sm px-6 pt-4">{validationErrors.items}</p>
                     )}
 
                     {formData.items.length === 0 ? (
@@ -1036,142 +1033,128 @@ const PurchaseRequisitionForm = () => {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        #
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Sản phẩm
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Số lượng
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Đơn vị
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Ngày giao hàng
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Ghi chú
-                                    </th>
-                                    <th className="border border-gray-200 px-2 py-1 text-left text-xs font-medium text-gray-700">
-                                        Thao tác
-                                    </th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {formData.items.map((item, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="border border-gray-200 px-2 py-1 text-xs text-gray-700 text-center">
-                                            {index + 1}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <Select
-                                                value={item.product_id ? products.find(option => {
-                                                    const optionValue = Number(option.value);
-                                                    const itemValue = Number(item.product_id);
-                                                    return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
-                                                }) || null : null}
-                                                onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
-                                                options={getAvailableProducts(index)}
-                                                placeholder="Chọn sản phẩm"
-                                                className="text-xs"
-                                                menuPortalTarget={document.body}
-                                                menuPosition="fixed"
-                                                menuShouldScrollIntoView={false}
-                                                isClearable
-                                                styles={{
-                                                    control: (base) => ({ ...base, fontSize: '0.75rem', minHeight: '28px', height: '28px' }),
-                                                    valueContainer: (base) => ({ ...base, padding: '2px 8px' }),
-                                                    input: (base) => ({ ...base, margin: '0px', fontSize: '0.75rem' }),
-                                                    indicatorsContainer: (base) => ({ ...base, height: '28px' }),
-                                                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                                    menu: (base) => ({ ...base, zIndex: 9999, fontSize: '0.75rem' }),
-                                                }}
-                                            />
-                                            {validationErrors[`item_${index}_product`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_product`]}</p>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="number"
-                                                value={item.requested_qty || ''}
-                                                onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                                onBlur={(e) => {
-                                                    const value = e.target.value;
-                                                    const numValue = parseFloat(value);
-                                                    // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
-                                                    if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
-                                                        setFormData(prev => {
-                                                            const newItems = [...prev.items];
-                                                            newItems[index] = {
-                                                                ...newItems[index],
-                                                                requested_qty: 1
-                                                            };
-                                                            return {
-                                                                ...prev,
-                                                                items: newItems
-                                                            };
-                                                        });
-                                                    }
-                                                }}
-                                                className={`w-16 px-1.5 py-0.5 border rounded text-xs ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                step="1"
-                                                min="1"
-                                            />
-                                            {validationErrors[`item_${index}_qty`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_qty`]}</p>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="text"
-                                                value={item.unit || ''}
-                                                onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                                                className={`w-16 px-1.5 py-0.5 border rounded text-xs ${validationErrors[`item_${index}_unit`] ? 'border-red-500' : 'border-gray-300'}`}
-                                                placeholder="Đơn vị"
-                                                maxLength={50}
-                                            />
-                                            {validationErrors[`item_${index}_unit`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_unit`]}</p>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <DatePicker
-                                                selected={item.delivery_date}
-                                                onChange={(date) => handleItemChange(index, 'delivery_date', date)}
-                                                dateFormat="dd/MM/yyyy"
-                                                className="w-24 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                placeholderText="Chọn ngày"
-                                            />
-                                            {validationErrors[`item_${index}_delivery_date`] && (
-                                                <p className="text-red-500 text-xs mt-0.5">{validationErrors[`item_${index}_delivery_date`]}</p>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <input
-                                                type="text"
-                                                value={item.note}
-                                                onChange={(e) => handleItemChange(index, 'note', e.target.value)}
-                                                className="w-24 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-                                                placeholder="Ghi chú"
-                                            />
-                                        </td>
-                                        <td className="border border-gray-200 px-2 py-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeItem(index)}
-                                                className="text-red-600 hover:text-red-800 text-xs"
-                                            >
-                                                Xóa
-                                            </button>
-                                        </td>
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">#</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
+                                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Số lượng</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn vị</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ngày giao hàng</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Thao tác</th>
                                     </tr>
-                                ))}
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {formData.items.map((item, index) => (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                {index + 1}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Select
+                                                    value={item.product_id ? products.find(option => {
+                                                        const optionValue = Number(option.value);
+                                                        const itemValue = Number(item.product_id);
+                                                        return optionValue === itemValue && !isNaN(optionValue) && !isNaN(itemValue);
+                                                    }) || null : null}
+                                                    onChange={(selectedOption) => handleProductSelect(index, selectedOption)}
+                                                    options={getAvailableProducts(index)}
+                                                    placeholder="Chọn sản phẩm"
+                                                    className="text-xs"
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                    menuShouldScrollIntoView={false}
+                                                    isClearable
+                                                    styles={{
+                                                        control: (base) => ({ ...base, fontSize: '0.875rem', minHeight: '36px', height: '36px' }),
+                                                        valueContainer: (base) => ({ ...base, padding: '2px 8px' }),
+                                                        input: (base) => ({ ...base, margin: '0px', fontSize: '0.875rem' }),
+                                                        indicatorsContainer: (base) => ({ ...base, height: '36px' }),
+                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                        menu: (base) => ({ ...base, zIndex: 9999, fontSize: '0.875rem' }),
+                                                    }}
+                                                />
+                                                {validationErrors[`item_${index}_product`] && (
+                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_product`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    value={item.requested_qty || ''}
+                                                    onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                                    onBlur={(e) => {
+                                                        const value = e.target.value;
+                                                        const numValue = parseFloat(value);
+                                                        // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
+                                                        if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
+                                                            setFormData(prev => {
+                                                                const newItems = [...prev.items];
+                                                                newItems[index] = {
+                                                                    ...newItems[index],
+                                                                    requested_qty: 1
+                                                                };
+                                                                return {
+                                                                    ...prev,
+                                                                    items: newItems
+                                                                };
+                                                            });
+                                                        }
+                                                    }}
+                                                    className={`w-20 px-2 py-1 border rounded text-sm text-right ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    step="1"
+                                                    min="1"
+                                                />
+                                                {validationErrors[`item_${index}_qty`] && (
+                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_qty`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    value={item.unit || ''}
+                                                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                                                    className={`w-24 px-2 py-1 border rounded text-sm ${validationErrors[`item_${index}_unit`] ? 'border-red-500' : 'border-gray-300'}`}
+                                                    placeholder="Đơn vị"
+                                                    maxLength={50}
+                                                />
+                                                {validationErrors[`item_${index}_unit`] && (
+                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_unit`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <DatePicker
+                                                    selected={item.delivery_date}
+                                                    onChange={(date) => handleItemChange(index, 'delivery_date', date)}
+                                                    dateFormat="dd/MM/yyyy"
+                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholderText="Chọn ngày"
+                                                />
+                                                {validationErrors[`item_${index}_delivery_date`] && (
+                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_delivery_date`]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    value={item.note}
+                                                    onChange={(e) => handleItemChange(index, 'note', e.target.value)}
+                                                    className="w-48 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    placeholder="Ghi chú"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(index)}
+                                                    className="text-red-600 hover:text-red-800 text-xs"
+                                                >
+                                                    Xóa
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
