@@ -338,7 +338,6 @@ export default function APInvoiceList() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Quản lý Hóa đơn phải trả</h1>
-              <p className="text-sm text-gray-600 mt-1">Quản lý các hóa đơn cần thanh toán cho nhà cung cấp</p>
             </div>
             <button
               onClick={() => navigate("/purchase/ap-invoices/new")}
