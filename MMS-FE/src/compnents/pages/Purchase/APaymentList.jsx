@@ -242,10 +242,6 @@ export default function APaymentList() {
               <h1 className="text-2xl font-bold text-gray-900">Lịch sử thanh toán</h1>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Tổng thanh toán</div>
-                <div className="text-xl font-bold text-green-600">{formatCurrency(totalPaid)}</div>
-              </div>
               <button
                 onClick={() => navigate("/purchase/ap-invoices")}
                 className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-50 transition-colors"

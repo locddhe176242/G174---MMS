@@ -16,12 +16,10 @@ export default function CustomerList() {
   const [sortField, setSortField] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState("desc");
   
-  // State cho popup xác nhận xóa
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Helper function để tránh nested ternary
   const getPaginationButtonClass = (isActive) => {
     if (isActive) {
       return "px-3 py-1 border rounded-md bg-black text-white border-black";
@@ -29,13 +27,10 @@ export default function CustomerList() {
     return "px-3 py-1 border rounded-md border-gray-300 hover:bg-gray-50";
   };
 
-  // Handle sort
   const handleSort = (field) => {
     if (sortField === field) {
-      // Toggle direction if same field
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      // New field, default to asc
       setSortField(field);
       setSortDirection("asc");
     }
@@ -66,7 +61,6 @@ export default function CustomerList() {
     }
   };
 
-  // Fetch customers
   const fetchCustomers = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc") => {
     try {
       setLoading(true);
@@ -94,34 +88,28 @@ export default function CustomerList() {
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchCustomers();
   }, []);
 
-  // Fetch when sort changes
   useEffect(() => {
     fetchCustomers(currentPage, searchKeyword, sortField, sortDirection);
   }, [sortField, sortDirection]);
 
-  // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
     fetchCustomers(0, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle page change
   const handlePageChange = (newPage) => {
     fetchCustomers(newPage, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle delete button click - mở popup xác nhận
   const handleDeleteClick = (customer) => {
     setCustomerToDelete(customer);
     setShowDeleteModal(true);
   };
 
-  // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     if (!customerToDelete) return;
 
@@ -140,20 +128,17 @@ export default function CustomerList() {
     }
   };
 
-  // Handle delete cancel
   const handleDeleteCancel = () => {
     setShowDeleteModal(false);
     setCustomerToDelete(null);
   };
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("vi-VN");
   };
 
-  // Format address - chỉ hiển thị tỉnh/thành phố
   const formatMainAddress = (address) => {
     if (!address) return "Chưa có địa chỉ";
     
@@ -166,7 +151,6 @@ export default function CustomerList() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -181,15 +165,9 @@ export default function CustomerList() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm">
-          {/* Section Header */}
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Danh sách khách hàng</h2>
-          </div>
 
-          {/* Search and Filter */}
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <form onSubmit={handleSearch} className="flex items-center gap-4">
@@ -212,17 +190,9 @@ export default function CustomerList() {
                   Tìm kiếm
                 </button>
               </form>
-
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                </svg>
-                Bộ lọc
-              </button>
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -352,7 +322,6 @@ export default function CustomerList() {
             )}
           </div>
 
-          {/* Pagination */}
           {!loading && !error && customers.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
@@ -397,7 +366,6 @@ export default function CustomerList() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">

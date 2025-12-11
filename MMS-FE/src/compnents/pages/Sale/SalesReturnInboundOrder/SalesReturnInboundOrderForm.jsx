@@ -16,6 +16,20 @@ const formatDateTime = (value) =>
 const formatNumber = (value) =>
   value ? Number(value).toLocaleString("vi-VN") : "0";
 
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "40px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
 export default function SalesReturnInboundOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -189,120 +203,124 @@ export default function SalesReturnInboundOrderForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-          <div>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-5 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">
               Tạo Đơn nhập hàng lại
             </h1>
-            <p className="text-gray-500 text-sm">
-              Bước 2: Đơn trả hàng → Đơn nhập hàng lại → Phiếu nhập kho.
-            </p>
+            <button
+              onClick={() => navigate("/sales/return-inbound-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              ← Quay lại
+            </button>
           </div>
-          <button
-            onClick={() => navigate("/sales/return-inbound-orders")}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-          >
-            ← Quay lại
-          </button>
+          <div className="border-t border-gray-200" />
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-lg shadow-sm p-6 space-y-6"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Đơn trả hàng nguồn <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={selectedRO?.returnNo || ""}
-                  readOnly
-                  placeholder="Chưa chọn Đơn trả hàng"
-                  className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setReturnOrderModalOpen(true)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-                >
-                  Chọn
-                </button>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Thông tin đơn nhập hàng lại */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin đơn nhập hàng lại</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">
+                    Đơn trả hàng nguồn <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1 flex flex-col lg:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={selectedRO?.returnNo || ""}
+                      readOnly
+                      placeholder="Chưa chọn Đơn trả hàng"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setReturnOrderModalOpen(true)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                    >
+                      Chọn
+                    </button>
+                  </div>
+                  {selectedRO && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Delivery: {selectedRO.deliveryNo || "—"} | Khách hàng:{" "}
+                      {selectedRO.customerName || "—"} | Ngày trả:{" "}
+                      {formatDate(selectedRO.returnDate)}
+                    </p>
+                  )}
+                  {errors.roId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.roId}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Kho nhập lại <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    className="mt-1"
+                    value={
+                      warehouses.find((w) => w.value === formData.warehouseId) ||
+                      null
+                    }
+                    onChange={(opt) =>
+                      handleInputChange("warehouseId", opt ? opt.value : null)
+                    }
+                    options={warehouses}
+                    placeholder="Chọn kho"
+                    isClearable
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
+                    menuShouldScrollIntoView={false}
+                    styles={selectStyles}
+                  />
+                  {errors.warehouseId && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.warehouseId}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Ngày dự kiến nhập lại
+                  </label>
+                  <DatePicker
+                    selected={formData.expectedReceiptDate}
+                    onChange={(date) =>
+                      handleInputChange("expectedReceiptDate", date)
+                    }
+                    dateFormat="dd/MM/yyyy"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Ghi chú</label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) =>
+                      handleInputChange("notes", e.target.value || "")
+                    }
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Thông tin bổ sung cho kho (nếu có)"
+                  />
+                </div>
               </div>
-              {selectedRO && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Delivery: {selectedRO.deliveryNo || "—"} | Khách hàng:{" "}
-                  {selectedRO.customerName || "—"} | Ngày trả:{" "}
-                  {formatDate(selectedRO.returnDate)}
-                </p>
-              )}
-              {errors.roId && (
-                <p className="text-xs text-red-500 mt-1">{errors.roId}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kho nhập lại <span className="text-red-500">*</span>
-              </label>
-              <Select
-                value={
-                  warehouses.find((w) => w.value === formData.warehouseId) ||
-                  null
-                }
-                onChange={(opt) =>
-                  handleInputChange("warehouseId", opt ? opt.value : null)
-                }
-                options={warehouses}
-                placeholder="Chọn kho"
-                isClearable
-              />
-              {errors.warehouseId && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errors.warehouseId}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ngày dự kiến nhập lại
-              </label>
-              <DatePicker
-                selected={formData.expectedReceiptDate}
-                onChange={(date) =>
-                  handleInputChange("expectedReceiptDate", date)
-                }
-                dateFormat="dd/MM/yyyy"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ghi chú
-              </label>
-              <textarea
-                rows={3}
-                value={formData.notes}
-                onChange={(e) =>
-                  handleInputChange("notes", e.target.value || "")
-                }
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Thông tin bổ sung cho kho (nếu có)"
-              />
             </div>
           </div>
 
           {selectedReturnOrderDetail && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 border-t pt-6">
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <h2 className="text-sm font-semibold text-gray-700 uppercase">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase mb-4">
                   Thông tin Đơn trả hàng
                 </h2>
                 <div className="text-sm text-gray-700 space-y-1">
@@ -341,8 +359,8 @@ export default function SalesReturnInboundOrderForm() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <h2 className="text-sm font-semibold text-gray-700 uppercase">
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase mb-4">
                   Thông tin kiểm soát
                 </h2>
                 <div className="text-sm text-gray-700 space-y-1">
@@ -376,12 +394,12 @@ export default function SalesReturnInboundOrderForm() {
           )}
 
           {selectedReturnOrderDetail && (
-            <div className="bg-white rounded-lg border mt-2">
-              <div className="px-4 py-3 border-b">
-                <h2 className="text-sm font-semibold text-gray-800">
+            <div className="bg-white rounded-lg shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
                   Danh sách sản phẩm trong Đơn trả hàng
                 </h2>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-gray-500 mt-1">
                   Tham khảo để kiểm tra lại trước khi tạo Đơn nhập hàng lại. Số
                   lượng nhập thực tế sẽ được xác nhận ở bước Phiếu nhập kho.
                 </p>
@@ -390,34 +408,20 @@ export default function SalesReturnInboundOrderForm() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        #
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Sản phẩm
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Kho
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                        SL trả lại
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Đơn vị
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Lý do
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Ghi chú
-                      </th>
+                      <th className="px-4 py-3 text-left">#</th>
+                      <th className="px-4 py-3 text-left">Sản phẩm</th>
+                      <th className="px-4 py-3 text-left">Kho</th>
+                      <th className="px-4 py-3 text-right">SL trả lại</th>
+                      <th className="px-4 py-3 text-left">Đơn vị</th>
+                      <th className="px-4 py-3 text-left">Lý do</th>
+                      <th className="px-4 py-3 text-left">Ghi chú</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-100">
                     {selectedReturnOrderDetail.items?.map((item, index) => (
                       <tr key={item.roiId || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-600">{index + 1}</td>
-                        <td className="px-4 py-2 text-gray-900">
+                        <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
+                        <td className="px-4 py-3 text-gray-900">
                           <div className="font-semibold">
                             {item.productName || "—"}
                           </div>
@@ -425,17 +429,17 @@ export default function SalesReturnInboundOrderForm() {
                             {item.productSku || item.productCode || ""}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-gray-700">
+                        <td className="px-4 py-3 text-gray-700">
                           {item.warehouseName || selectedReturnOrderDetail.warehouseName || "—"}
                         </td>
-                        <td className="px-4 py-2 text-right text-gray-900">
+                        <td className="px-4 py-3 text-right text-gray-900">
                           {formatNumber(item.returnedQty || 0)}
                         </td>
-                        <td className="px-4 py-2 text-gray-700">{item.uom || "—"}</td>
-                        <td className="px-4 py-2 text-gray-700">
+                        <td className="px-4 py-3 text-gray-700">{item.uom || "—"}</td>
+                        <td className="px-4 py-3 text-gray-700">
                           {item.reason || "—"}
                         </td>
-                        <td className="px-4 py-2 text-gray-700">{item.note || "—"}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.note || "—"}</td>
                       </tr>
                     ))}
                     {(!selectedReturnOrderDetail.items ||
@@ -455,18 +459,18 @@ export default function SalesReturnInboundOrderForm() {
             </div>
           )}
 
-          <div className="border-t pt-4 flex justify-end gap-3">
+          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate("/sales/return-inbound-orders")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {submitting ? "Đang tạo..." : "Tạo Đơn nhập hàng lại"}
             </button>
