@@ -21,8 +21,8 @@ public class UserRequestDTO {
     @NotBlank(message = "Email không được để trống")
     @Email(message = "Email không đúng định dạng")
     @Size(max = 255, message = "Email tối đa 255 ký tự")
-    //@Pattern(regexp = "^[A-Za-z0-9._%+-]+@mms\\.com$",
-            //message = "Email phải có đuôi @mms.com")
+    //@Pattern(regexp = "^[A-Za-z0-9._%+-]+@gmail\\.com$",
+            //message = "Email phải có đuôi @gmail.com")
     private String email;
 
     @Pattern(

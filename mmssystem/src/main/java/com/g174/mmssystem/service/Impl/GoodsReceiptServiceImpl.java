@@ -499,7 +499,6 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 log.info("Updated Return Order {} goods_receipt_status to Completed", returnOrder.getRoId());
             }
 
-            // Update Sales Return Inbound Order status to Completed
             List<SalesReturnInboundOrder> inboundOrders = salesReturnInboundOrderRepository.findByReturnOrderId(returnOrder.getRoId());
             for (SalesReturnInboundOrder sri : inboundOrders) {
                 if (sri.getStatus() != SalesReturnInboundOrder.Status.Completed &&
