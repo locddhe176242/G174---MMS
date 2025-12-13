@@ -1,0 +1,890 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import Select from "react-select";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { toast } from "react-toastify";
+import { goodIssueService } from "../../../../api/goodIssueService";
+import { deliveryService } from "../../../../api/deliveryService";
+import { warehouseService } from "../../../../api/warehouseService";
+import { warehouseStockService } from "../../../../api/warehouseStockService";
+import { getCurrentUser } from "../../../../api/authService";
+import apiClient from "../../../../api/apiClient";
+
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "40px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const compactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: "none",
+    minHeight: "36px",
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const defaultItem = () => ({
+  diId: null,
+  productId: null,
+  issuedQty: 0,
+  remark: "",
+});
+
+export default function GoodIssueForm() {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isEdit = Boolean(id);
+  const deliveryIdFromQuery = searchParams.get("deliveryId");
+
+  const [loading, setLoading] = useState(false);
+  const [deliveries, setDeliveries] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [deliverySearch, setDeliverySearch] = useState("");
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [stockWarningDialog, setStockWarningDialog] = useState({
+    open: false,
+    items: [],
+    onConfirm: null,
+  });
+
+  const [formData, setFormData] = useState({
+    issueNo: "",
+    deliveryId: null,
+    warehouseId: null,
+    issueDate: new Date(),
+    notes: "",
+    items: [],
+  });
+
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    loadUser();
+    loadWarehouses();
+    if (!isEdit) {
+      loadDeliveries();
+      generateIssueNumber();
+      if (deliveryIdFromQuery) {
+        loadDelivery(deliveryIdFromQuery);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isEdit && id) {
+      loadIssue();
+    }
+  }, [isEdit, id]);
+
+  const loadUser = async () => {
+    try {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.warn("Could not load current user:", error);
+    }
+  };
+
+  const generateIssueNumber = async () => {
+    try {
+      const response = await goodIssueService.generateIssueNo();
+      if (response?.issueNo || response?.issue_no) {
+        setFormData((prev) => ({
+          ...prev,
+          issueNo: response.issueNo || response.issue_no,
+        }));
+      }
+    } catch (err) {
+      console.warn("Could not generate issue number:", err);
+    }
+  };
+
+  const loadWarehouses = async () => {
+    try {
+      const response = await apiClient.get("/warehouses/page", {
+        params: { page: 0, size: 100 },
+      });
+      const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
+      setWarehouses(
+        data.map((warehouse) => ({
+          value: warehouse.warehouseId || warehouse.warehouse_id || warehouse.id,
+          label: warehouse.name,
+          warehouse,
+        }))
+      );
+    } catch (err) {
+      console.error("Error loading warehouses:", err);
+      toast.error("Không thể tải danh sách kho");
+    }
+  };
+
+  const loadDeliveries = async () => {
+    try {
+      setDeliveryLoading(true);
+      const response = await deliveryService.getAllDeliveries();
+      const data = Array.isArray(response) ? response : response?.content || [];
+      
+      // Filter: Chỉ lấy Delivery có status Draft hoặc Picked và chưa có Good Issue approved
+      const eligibleDeliveries = await Promise.all(
+        data
+          .filter((delivery) => {
+            const status = delivery.status?.toString() || "";
+            return ["Draft", "Picked"].includes(status);
+          })
+          .map(async (delivery) => {
+            try {
+              // Check xem Delivery đã có Good Issue approved chưa
+              const issuesResponse = await goodIssueService.getIssuesByDeliveryId(
+                delivery.deliveryId || delivery.delivery_id || delivery.id
+              );
+              const issues = Array.isArray(issuesResponse) ? issuesResponse : [];
+              const hasApprovedIssue = issues.some(
+                (issue) => issue.status === "Approved" && !issue.deletedAt
+              );
+              
+              return {
+                ...delivery,
+                hasApprovedIssue,
+              };
+            } catch (err) {
+              // Nếu lỗi, giả sử chưa có Good Issue
+              return {
+                ...delivery,
+                hasApprovedIssue: false,
+              };
+            }
+          })
+      );
+
+      const filtered = eligibleDeliveries.filter((d) => !d.hasApprovedIssue);
+
+      setDeliveries(
+        filtered.map((delivery) => ({
+          value: delivery.deliveryId || delivery.delivery_id || delivery.id,
+          label: `${delivery.deliveryNo || delivery.delivery_no} - ${delivery.salesOrderNo || ""}`,
+          delivery,
+          isDisabled: delivery.hasApprovedIssue,
+        }))
+      );
+    } catch (err) {
+      console.error("Error loading deliveries:", err);
+      toast.error("Không thể tải danh sách phiếu giao hàng");
+    } finally {
+      setDeliveryLoading(false);
+    }
+  };
+
+  const loadDelivery = async (deliveryId) => {
+    try {
+      setLoading(true);
+      const delivery = await deliveryService.getDelivery(deliveryId);
+      
+      if (!delivery) {
+        toast.error("Không tìm thấy phiếu giao hàng");
+        return;
+      }
+
+      // Check xem Delivery đã có Good Issue approved chưa
+      const issuesResponse = await goodIssueService.getIssuesByDeliveryId(deliveryId);
+      const issues = Array.isArray(issuesResponse) ? issuesResponse : [];
+      const hasApprovedIssue = issues.some(
+        (issue) => issue.status === "Approved" && !issue.deletedAt
+      );
+
+      if (hasApprovedIssue) {
+        toast.error("Phiếu giao hàng này đã có phiếu xuất kho được phê duyệt");
+        navigate("/sales/good-issues");
+        return;
+      }
+
+      // Validate delivery status
+      if (delivery.status !== "Draft" && delivery.status !== "Picked") {
+        toast.error("Chỉ có thể tạo phiếu xuất kho từ phiếu giao hàng ở trạng thái Draft hoặc Picked");
+        navigate("/sales/good-issues");
+        return;
+      }
+
+      setSelectedDelivery({
+        value: delivery.deliveryId || delivery.delivery_id || delivery.id,
+        label: `${delivery.deliveryNo || delivery.delivery_no} - ${delivery.salesOrderNo || ""}`,
+        data: delivery,
+      });
+
+      // Load warehouse stock for each item
+      const itemsWithStock = await Promise.all(
+        (delivery.items || []).map(async (item) => {
+          const warehouseId = delivery.warehouseId || delivery.warehouse_id;
+          const productId = item.productId || item.product_id;
+          
+          let availableStock = 0;
+          try {
+            const stock = await warehouseStockService.getQuantityByWarehouseAndProduct(
+              warehouseId,
+              productId
+            );
+            availableStock = Number(stock || 0);
+          } catch (err) {
+            console.warn(`Could not load stock for product ${productId}:`, err);
+          }
+
+          return {
+            diId: item.diId || item.di_id || item.id,
+            productId: productId,
+            productName: item.productName || item.product_name,
+            productCode: item.productCode || item.product_code,
+            plannedQty: Number(item.plannedQty || item.planned_qty || 0),
+            uom: item.uom,
+            availableStock,
+          };
+        })
+      );
+
+      setFormData({
+        issueNo: "",
+        deliveryId: delivery.deliveryId || delivery.delivery_id || delivery.id,
+        warehouseId: delivery.warehouseId || delivery.warehouse_id,
+        issueDate: new Date(),
+        notes: "",
+        items: itemsWithStock.map((item) => ({
+          diId: item.diId,
+          productId: item.productId,
+          issuedQty: item.plannedQty, // Default to plannedQty
+          remark: "",
+          // Store additional info for display
+          productName: item.productName,
+          productCode: item.productCode,
+          plannedQty: item.plannedQty,
+          uom: item.uom,
+          availableStock: item.availableStock,
+        })),
+      });
+
+      toast.success("Đã tải dữ liệu từ phiếu giao hàng");
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Không thể tải phiếu giao hàng");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadIssue = async () => {
+    try {
+      setLoading(true);
+      const data = await goodIssueService.getGoodIssueById(id);
+      
+      setFormData({
+        issueNo: data.issueNo || data.issue_no || "",
+        deliveryId: data.deliveryId || data.delivery_id,
+        warehouseId: data.warehouseId || data.warehouse_id,
+        issueDate: data.issueDate ? new Date(data.issueDate) : new Date(),
+        notes: data.notes || "",
+        items: (data.items || []).map((item) => ({
+          diId: item.diId || item.di_id,
+          productId: item.productId || item.product_id,
+          issuedQty: Number(item.issuedQty || item.issued_qty || 0),
+          remark: item.remark || "",
+          productName: item.productName || item.product_name,
+          productCode: item.productCode || item.product_code,
+          plannedQty: Number(item.plannedQty || item.planned_qty || 0),
+          uom: item.uom,
+        })),
+      });
+
+      // Load delivery info
+      if (data.deliveryId) {
+        const delivery = await deliveryService.getDelivery(data.deliveryId);
+        setSelectedDelivery({
+          value: delivery.deliveryId || delivery.delivery_id || delivery.id,
+          label: `${delivery.deliveryNo || delivery.delivery_no} - ${delivery.salesOrderNo || ""}`,
+          data: delivery,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể tải phiếu xuất kho");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeliverySelectFromModal = (delivery) => {
+    setDeliveryModalOpen(false);
+    if (!delivery?.deliveryId && !delivery?.delivery_id && !delivery?.id) return;
+    const deliveryId = delivery.deliveryId || delivery.delivery_id || delivery.id;
+    loadDelivery(deliveryId);
+  };
+
+  const handleItemChange = (index, field, value) => {
+    setFormData((prev) => {
+      const next = [...prev.items];
+      next[index] = { ...next[index], [field]: value };
+      
+      // Validate issuedQty không vượt quá plannedQty
+      if (field === "issuedQty") {
+        const plannedQty = next[index].plannedQty || 0;
+        if (value > plannedQty) {
+          toast.warn(`Số lượng xuất không được vượt quá số lượng dự kiến (${plannedQty})`);
+          next[index][field] = plannedQty;
+        }
+      }
+      
+      return { ...prev, items: next };
+    });
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.deliveryId) {
+      newErrors.deliveryId = "Chọn phiếu giao hàng";
+    }
+    if (!formData.warehouseId) {
+      newErrors.warehouseId = "Chọn kho xuất hàng";
+    }
+    if (!formData.items || formData.items.length === 0) {
+      newErrors.items = "Cần ít nhất một dòng xuất kho";
+    } else {
+      const itemErrors = formData.items.map((item) => {
+        const e = {};
+        if (!item.diId) {
+          e.diId = "Delivery Item ID không hợp lệ";
+        }
+        if (!item.productId) {
+          e.productId = "Sản phẩm không hợp lệ";
+        }
+        if (!item.issuedQty || item.issuedQty <= 0) {
+          e.issuedQty = "Số lượng xuất phải lớn hơn 0";
+        }
+        if (item.issuedQty > item.plannedQty) {
+          e.issuedQty = `Số lượng xuất không được vượt quá số lượng dự kiến (${item.plannedQty})`;
+        }
+        return e;
+      });
+      if (itemErrors.some((e) => Object.keys(e).length > 0)) {
+        newErrors.itemDetails = itemErrors;
+      }
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const checkStockBeforeSubmit = async (items) => {
+    const insufficientItems = [];
+    
+    for (const item of items) {
+      if (!item.productId || !formData.warehouseId || Number(item.issuedQty || 0) <= 0) {
+        continue;
+      }
+      
+      try {
+        const stockQty = await warehouseStockService.getQuantityByWarehouseAndProduct(
+          formData.warehouseId,
+          item.productId
+        );
+        const issuedQty = Number(item.issuedQty || 0);
+        const availableQty = Number(stockQty || 0);
+        
+        if (issuedQty > availableQty) {
+          insufficientItems.push({
+            productName: item.productName || `Sản phẩm ID ${item.productId}`,
+            warehouseName: warehouses.find((w) => w.value === formData.warehouseId)?.label || `Kho ID ${formData.warehouseId}`,
+            issuedQty: issuedQty,
+            availableQty,
+            shortage: issuedQty - availableQty,
+          });
+        }
+      } catch (error) {
+        console.error(`Error checking stock for product ${item.productId}:`, error);
+      }
+    }
+    
+    return insufficientItems;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) {
+      toast.error("Vui lòng kiểm tra thông tin");
+      return;
+    }
+
+    const payload = {
+      issueNo: formData.issueNo || undefined,
+      deliveryId: formData.deliveryId,
+      warehouseId: formData.warehouseId,
+      issueDate: formData.issueDate ? formData.issueDate.toISOString() : new Date().toISOString(),
+      notes: formData.notes || null,
+      items: formData.items.map((item) => ({
+        diId: item.diId,
+        productId: item.productId,
+        issuedQty: Number(item.issuedQty || 0),
+        remark: item.remark || null,
+      })),
+    };
+
+    // Check stock availability
+    const insufficientItems = await checkStockBeforeSubmit(formData.items);
+    
+    if (insufficientItems.length > 0) {
+      setStockWarningDialog({
+        open: true,
+        items: insufficientItems,
+        onConfirm: () => {
+          setStockWarningDialog({ open: false, items: [], onConfirm: null });
+          submitIssue(payload);
+        },
+      });
+      return;
+    }
+
+    submitIssue(payload);
+  };
+
+  const submitIssue = async (payload) => {
+    try {
+      setLoading(true);
+      const userId = currentUser?.id || currentUser?.userId || 1;
+      
+      if (isEdit) {
+        await goodIssueService.updateGoodIssue(id, payload, userId);
+        toast.success("Đã cập nhật phiếu xuất kho");
+      } else {
+        await goodIssueService.createGoodIssue(payload, userId);
+        toast.success("Đã tạo phiếu xuất kho");
+      }
+      navigate("/sales/good-issues");
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Lỗi lưu phiếu xuất kho");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredDeliveries = deliveries.filter((delivery) =>
+    delivery.label.toLowerCase().includes(deliverySearch.toLowerCase())
+  );
+
+  if (loading && isEdit && !formData.deliveryId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Đang tải dữ liệu...
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-5 flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEdit ? "Cập nhật Phiếu Xuất Kho" : "Tạo Phiếu Xuất Kho"}
+            </h1>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/sales/good-issues")}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                ← Quay lại
+              </button>
+            </div>
+          </div>
+          <div className="border-t border-gray-200" />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Thông tin phiếu xuất kho */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin phiếu xuất kho</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-600">Số phiếu xuất kho</label>
+                  <input
+                    type="text"
+                    value={formData.issueNo}
+                    readOnly
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">
+                    Phiếu Giao Hàng <span className="text-red-500">*</span>
+                  </label>
+                  {isEdit ? (
+                    <input
+                      type="text"
+                      value={selectedDelivery?.label || ""}
+                      disabled
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                    />
+                  ) : (
+                    <div className="mt-1 flex flex-col lg:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={selectedDelivery?.label || ""}
+                        readOnly
+                        placeholder="Chọn phiếu giao hàng"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryModalOpen(true)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                        >
+                          Chọn
+                        </button>
+                        {selectedDelivery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDelivery(null);
+                              setFormData((prev) => ({ ...prev, deliveryId: null, items: [] }));
+                            }}
+                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-red-600"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {errors.deliveryId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.deliveryId}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Kho xuất hàng <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    className="mt-1"
+                    value={warehouses.find((w) => w.value === formData.warehouseId) || null}
+                    onChange={(option) =>
+                      setFormData((prev) => ({ ...prev, warehouseId: option?.value || null }))
+                    }
+                    options={warehouses}
+                    placeholder="Chọn kho"
+                    isDisabled={isEdit}
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
+                    menuShouldScrollIntoView={false}
+                    styles={selectStyles}
+                  />
+                  {errors.warehouseId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.warehouseId}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Ngày xuất kho</label>
+                  <DatePicker
+                    selected={formData.issueDate}
+                    onChange={(date) => setFormData((prev) => ({ ...prev, issueDate: date }))}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    dateFormat="dd/MM/yyyy"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-600">Ghi chú</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                    placeholder="Ghi chú"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Danh sách sản phẩm */}
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left">#</th>
+                    <th className="px-4 py-3 text-left">Mã sản phẩm</th>
+                    <th className="px-4 py-3 text-left">Tên sản phẩm</th>
+                    <th className="px-4 py-3 text-right">ĐVT</th>
+                    <th className="px-4 py-3 text-right">Số lượng dự kiến</th>
+                    <th className="px-4 py-3 text-right">Tồn kho</th>
+                    <th className="px-4 py-3 text-right">Số lượng xuất <span className="text-red-500">*</span></th>
+                    <th className="px-4 py-3 text-left">Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {formData.items.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                        {selectedDelivery ? "Không có sản phẩm nào" : "Vui lòng chọn phiếu giao hàng để tải sản phẩm"}
+                      </td>
+                    </tr>
+                  ) : (
+                    formData.items.map((item, index) => {
+                      const itemError = errors.itemDetails?.[index] || {};
+                      const isStockInsufficient = item.availableStock !== undefined && item.issuedQty > item.availableStock;
+                      return (
+                        <tr key={index} className={`hover:bg-gray-50 ${isStockInsufficient ? "bg-red-50" : ""}`}>
+                          <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {item.productCode || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {item.productName || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm text-gray-700">
+                            {item.uom || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="text-sm text-gray-700 font-medium">
+                              {Number(item.plannedQty || 0).toLocaleString("vi-VN")}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className={`text-sm ${item.availableStock !== undefined && item.availableStock < item.issuedQty ? "text-red-600 font-semibold" : "text-gray-700"}`}>
+                              {item.availableStock !== undefined 
+                                ? Number(item.availableStock).toLocaleString("vi-VN")
+                                : "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              max={item.plannedQty || 0}
+                              value={item.issuedQty || ""}
+                              onChange={(e) =>
+                                handleItemChange(index, "issuedQty", Number(e.target.value))
+                              }
+                              className={`w-24 border rounded px-2 py-1 text-right ${
+                                isStockInsufficient
+                                  ? "border-red-500 bg-red-50"
+                                  : "border-gray-300"
+                              }`}
+                              placeholder="Nhập số lượng"
+                            />
+                            {itemError.issuedQty && (
+                              <p className="text-xs text-red-600 mt-1">{itemError.issuedQty}</p>
+                            )}
+                            {isStockInsufficient && (
+                              <p className="text-xs text-red-600 mt-1">
+                                Thiếu: {(item.issuedQty - item.availableStock).toLocaleString("vi-VN")}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 w-40">
+                            <input
+                              type="text"
+                              value={item.remark || ""}
+                              onChange={(e) => handleItemChange(index, "remark", e.target.value)}
+                              className="w-full border border-gray-300 rounded px-2 py-1"
+                              placeholder="Ghi chú"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {errors.items && (
+              <p className="text-sm text-red-600 px-6 py-3">{errors.items}</p>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/good-issues")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={loading || isEdit}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "Đang lưu..." : isEdit ? "Không cho sửa" : "Tạo mới"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Delivery Picker Modal */}
+      <DeliveryPickerModal
+        isOpen={deliveryModalOpen}
+        onClose={() => setDeliveryModalOpen(false)}
+        deliveries={filteredDeliveries}
+        loading={deliveryLoading}
+        onSelect={handleDeliverySelectFromModal}
+        searchTerm={deliverySearch}
+        onSearchChange={setDeliverySearch}
+      />
+
+      {/* Stock Warning Dialog */}
+      {stockWarningDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-orange-600">Số lượng trong kho không đủ</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Số lượng sản phẩm trong kho không đủ cho một số sản phẩm. Bạn có muốn tiếp tục tạo phiếu xuất kho?
+                </p>
+              </div>
+              <button
+                onClick={() => setStockWarningDialog({ open: false, items: [], onConfirm: null })}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {stockWarningDialog.items.map((item, index) => (
+                  <div key={index} className="border rounded-lg p-3 bg-orange-50">
+                    <div className="font-semibold text-gray-900">{item.productName}</div>
+                    <div className="text-sm text-gray-600 mt-1">Kho: {item.warehouseName}</div>
+                    <div className="text-sm text-gray-700 mt-2">
+                      <span className="font-medium">Số lượng xuất:</span> {item.issuedQty.toLocaleString("vi-VN")}
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-medium">Số lượng có sẵn trong kho:</span>{" "}
+                      <span className="text-red-600 font-semibold">{item.availableQty.toLocaleString("vi-VN")}</span>
+                    </div>
+                    <div className="text-sm text-red-600 font-semibold mt-1">
+                      Thiếu: {item.shortage.toLocaleString("vi-VN")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t flex justify-end gap-3">
+              <button
+                onClick={() => setStockWarningDialog({ open: false, items: [], onConfirm: null })}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={stockWarningDialog.onConfirm}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+              >
+                Tiếp tục tạo phiếu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DeliveryPickerModal = ({
+  isOpen,
+  onClose,
+  deliveries,
+  loading,
+  onSelect,
+  searchTerm,
+  onSearchChange,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">Chọn Phiếu Giao Hàng</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="px-6 py-4 border-b">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Tìm kiếm theo số phiếu giao hàng..."
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="text-center text-gray-500 py-8">Đang tải...</div>
+          ) : deliveries.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              {searchTerm ? "Không tìm thấy phiếu giao hàng" : "Không có phiếu giao hàng nào"}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {deliveries.map((delivery) => (
+                <button
+                  key={delivery.value}
+                  onClick={() => onSelect(delivery.delivery)}
+                  disabled={delivery.isDisabled}
+                  className={`w-full text-left px-4 py-3 border rounded-lg hover:bg-gray-50 transition-colors ${
+                    delivery.isDisabled ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  <div className="font-medium text-gray-900">{delivery.label}</div>
+                  {delivery.delivery?.salesOrderNo && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      Sales Order: {delivery.delivery.salesOrderNo}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+

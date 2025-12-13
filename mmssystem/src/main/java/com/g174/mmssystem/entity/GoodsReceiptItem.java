@@ -50,4 +50,3 @@ public class GoodsReceiptItem {
     @Column(name = "remark", columnDefinition = "TEXT")
     private String remark;
 }
-

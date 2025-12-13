@@ -159,12 +159,6 @@ public class DeliveryServiceImpl implements IDeliveryService {
             throw new IllegalStateException("Không thể xóa phiếu giao hàng đã giao");
         }
 
-        // Nếu Delivery đã Shipped, cần hoàn lại số lượng vào kho
-        if (delivery.getStatus() == Delivery.DeliveryStatus.Shipped) {
-            List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(id);
-            restoreStockForItems(delivery, items);
-        }
-
         delivery.setDeletedAt(Instant.now());
         deliveryRepository.save(delivery);
     }
@@ -193,9 +187,10 @@ public class DeliveryServiceImpl implements IDeliveryService {
             }
         }
 
-        // Cập nhật số lượng trong kho khi thay đổi trạng thái
-        updateWarehouseStockOnStatusChange(delivery, oldStatus, newStatus);
-
+        // NOTE: Stock management is now handled by Good Issue approval
+        // Removed automatic stock update on Delivery status change
+        // Stock will be decreased only when Good Issue is approved
+        
         delivery.setStatus(newStatus);
 
         // Đặt ngày giao thực tế khi đã giao hàng
@@ -488,125 +483,6 @@ public class DeliveryServiceImpl implements IDeliveryService {
         return items;
     }
 
-    private void updateWarehouseStockOnStatusChange(Delivery delivery, Delivery.DeliveryStatus oldStatus, Delivery.DeliveryStatus newStatus) {
-        List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(delivery.getDeliveryId());
-
-        // Khi chuyển sang Shipped: trừ số lượng dự kiến ra khỏi kho (hàng xuất kho)
-        if (newStatus == Delivery.DeliveryStatus.Shipped && oldStatus != Delivery.DeliveryStatus.Shipped) {
-            decreaseStockForItems(delivery, items, true);
-        }
-
-        // Khi chuyển sang Delivered: hoàn lại phần chưa giao vào kho (nếu chỉ giao một phần)
-        if (newStatus == Delivery.DeliveryStatus.Delivered && oldStatus != Delivery.DeliveryStatus.Delivered) {
-            // Validate: phải có deliveredQty > 0 cho tất cả items
-            for (DeliveryItem item : items) {
-                if (item.getDeliveredQty() == null || item.getDeliveredQty().compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new IllegalStateException(
-                            String.format("Không thể chuyển sang trạng thái 'Delivered': Sản phẩm %s chưa có số lượng đã giao. Vui lòng cập nhật số lượng đã giao trước.",
-                                    item.getProduct().getName()));
-                }
-                if (item.getDeliveredQty().compareTo(item.getPlannedQty()) > 0) {
-                    throw new IllegalStateException(
-                            String.format("Không thể chuyển sang trạng thái 'Delivered': Số lượng đã giao (%s) vượt quá số lượng dự kiến (%s) cho sản phẩm %s.",
-                                    item.getDeliveredQty(), item.getPlannedQty(), item.getProduct().getName()));
-                }
-            }
-            restoreUnDeliveredStock(delivery, items);
-        }
-
-        // Khi chuyển từ Delivered sang trạng thái khác: trừ lại số lượng đã giao (nếu đã hoàn lại trước đó)
-        if (oldStatus == Delivery.DeliveryStatus.Delivered && newStatus != Delivery.DeliveryStatus.Delivered) {
-            decreaseStockForDeliveredItems(delivery, items, false);
-        }
-
-        // Khi chuyển sang Cancelled và trước đó đã Shipped: hoàn lại số lượng vào kho
-        if (newStatus == Delivery.DeliveryStatus.Cancelled && oldStatus == Delivery.DeliveryStatus.Shipped) {
-            restoreStockForItems(delivery, items);
-        }
-    }
-
-    private void decreaseStockForItems(Delivery delivery, List<DeliveryItem> items, boolean throwOnError) {
-        for (DeliveryItem item : items) {
-            Integer warehouseId = getWarehouseId(item, delivery);
-            Integer productId = item.getProduct().getProductId();
-            BigDecimal quantity = item.getPlannedQty();
-
-            try {
-                warehouseStockService.decreaseStock(warehouseId, productId, quantity);
-                log.info("Đã trừ {} sản phẩm ID {} ra khỏi kho ID {} cho Delivery {}",
-                        quantity, productId, warehouseId, delivery.getDeliveryNo());
-            } catch (Exception e) {
-                log.error("Lỗi khi trừ số lượng kho cho Delivery {}: {}", delivery.getDeliveryNo(), e.getMessage());
-                if (throwOnError) {
-                    throw new IllegalStateException("Không đủ số lượng trong kho để xuất hàng: " + e.getMessage());
-                }
-            }
-        }
-    }
-
-    // Hoàn lại phần chưa giao vào kho (khi chỉ giao một phần)
-    private void restoreUnDeliveredStock(Delivery delivery, List<DeliveryItem> items) {
-        for (DeliveryItem item : items) {
-            Integer warehouseId = getWarehouseId(item, delivery);
-            Integer productId = item.getProduct().getProductId();
-            // Hoàn lại phần chưa giao = plannedQty - deliveredQty
-            BigDecimal unDeliveredQty = item.getPlannedQty().subtract(item.getDeliveredQty());
-
-            if (unDeliveredQty.compareTo(BigDecimal.ZERO) > 0) {
-                try {
-                    warehouseStockService.increaseStock(warehouseId, productId, unDeliveredQty);
-                    log.info("Đã hoàn lại {} sản phẩm ID {} vào kho ID {} cho Delivery {} (phần chưa giao: {} - {} = {})",
-                            unDeliveredQty, productId, warehouseId, delivery.getDeliveryNo(),
-                            item.getPlannedQty(), item.getDeliveredQty(), unDeliveredQty);
-                } catch (Exception e) {
-                    log.error("Lỗi khi hoàn lại số lượng kho cho Delivery {}: {}", delivery.getDeliveryNo(), e.getMessage());
-                }
-            }
-        }
-    }
-
-    // Trừ stock theo số lượng đã giao thực tế (deliveredQty) - dùng khi revert từ Delivered
-    private void decreaseStockForDeliveredItems(Delivery delivery, List<DeliveryItem> items, boolean throwOnError) {
-        for (DeliveryItem item : items) {
-            Integer warehouseId = getWarehouseId(item, delivery);
-            Integer productId = item.getProduct().getProductId();
-            BigDecimal quantity = item.getDeliveredQty();
-
-            if (quantity.compareTo(BigDecimal.ZERO) > 0) {
-                try {
-                    warehouseStockService.decreaseStock(warehouseId, productId, quantity);
-                    log.info("Đã trừ {} sản phẩm ID {} ra khỏi kho ID {} cho Delivery {} (revert từ Delivered)",
-                            quantity, productId, warehouseId, delivery.getDeliveryNo());
-                } catch (Exception e) {
-                    log.error("Lỗi khi trừ số lượng kho cho Delivery {}: {}", delivery.getDeliveryNo(), e.getMessage());
-                    if (throwOnError) {
-                        throw new IllegalStateException("Không đủ số lượng trong kho: " + e.getMessage());
-                    }
-                }
-            }
-        }
-    }
-
-    private void restoreStockForItems(Delivery delivery, List<DeliveryItem> items) {
-        for (DeliveryItem item : items) {
-            Integer warehouseId = getWarehouseId(item, delivery);
-            Integer productId = item.getProduct().getProductId();
-            BigDecimal quantity = item.getPlannedQty();
-
-            try {
-                warehouseStockService.increaseStock(warehouseId, productId, quantity);
-                log.info("Đã hoàn lại {} sản phẩm ID {} vào kho ID {} cho Delivery {}",
-                        quantity, productId, warehouseId, delivery.getDeliveryNo());
-            } catch (Exception e) {
-                log.error("Lỗi khi hoàn lại số lượng kho cho Delivery {}: {}", delivery.getDeliveryNo(), e.getMessage());
-                // Không throw exception vì đây là hoàn lại, không ảnh hưởng đến nghiệp vụ chính
-            }
-        }
-    }
-
-    private Integer getWarehouseId(DeliveryItem item, Delivery delivery) {
-        return item.getWarehouse() != null ? item.getWarehouse().getWarehouseId() : delivery.getWarehouse().getWarehouseId();
-    }
 
     private void validateStatusTransition(Delivery.DeliveryStatus currentStatus, Delivery.DeliveryStatus newStatus) {
         if (currentStatus == Delivery.DeliveryStatus.Cancelled) {

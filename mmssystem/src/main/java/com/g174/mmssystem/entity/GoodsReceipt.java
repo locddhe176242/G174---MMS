@@ -105,4 +105,3 @@ public class GoodsReceipt {
         updatedAt = LocalDateTime.now();
     }
 }
-
