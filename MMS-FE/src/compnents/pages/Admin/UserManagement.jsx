@@ -250,8 +250,8 @@ const UserManagement = () => {
   };
 
   const validateForm = () => {
-    if (!formData.email.endsWith('@mms.com')) {
-      toast.error('Email phải có đuôi @mms.com');
+    if (!formData.email.endsWith('@gmail.com')) {
+      toast.error('Email phải có đuôi @gmail.com');
       return false;
     }
 
@@ -555,12 +555,12 @@ const UserManagement = () => {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      placeholder="nguyen.van.a@mms.com"
+                      placeholder="nguyen.van.a@gmail.com"
                       autoComplete="off"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                       required
                     />
-                    <p className="text-xs text-slate-500 mt-1">Email phải có đuôi @mms.com</p>
+                    <p className="text-xs text-slate-500 mt-1">Email phải có đuôi @gmail.com</p>
                   </div>
 
                   <div>

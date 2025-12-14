@@ -76,7 +76,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 .receiptNo(receiptNo)
                 .purchaseOrder(purchaseOrder)
                 .warehouse(warehouse)
-                .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate() : LocalDateTime.now())
+                .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate().toLocalDateTime() : LocalDateTime.now())
                 .status(GoodsReceipt.GoodsReceiptStatus.Pending)
                 .sourceType(GoodsReceipt.SourceType.Purchase)
                 .createdBy(createdBy)
@@ -171,7 +171,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 .sourceType(GoodsReceipt.SourceType.SalesReturn)
                 .returnOrder(inboundOrder.getReturnOrder())
                 .warehouse(warehouse)
-                .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate() : LocalDateTime.now())
+                .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate().toLocalDateTime() : LocalDateTime.now())
                 .status(GoodsReceipt.GoodsReceiptStatus.Pending)
                 .createdBy(createdBy)
                 .createdAt(LocalDateTime.now())
@@ -499,7 +499,6 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 log.info("Updated Return Order {} goods_receipt_status to Completed", returnOrder.getRoId());
             }
 
-            // Update Sales Return Inbound Order status to Completed
             List<SalesReturnInboundOrder> inboundOrders = salesReturnInboundOrderRepository.findByReturnOrderId(returnOrder.getRoId());
             for (SalesReturnInboundOrder sri : inboundOrders) {
                 if (sri.getStatus() != SalesReturnInboundOrder.Status.Completed &&

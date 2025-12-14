@@ -54,4 +54,18 @@ public interface ARInvoiceRepository extends JpaRepository<ARInvoice, Integer> {
             "WHERE ar.customer.customerId = :customerId AND ar.deletedAt IS NULL " +
             "ORDER BY ar.createdAt DESC")
     Page<ARInvoice> findByCustomerIdOrderByDateDesc(@Param("customerId") Integer customerId, Pageable pageable);
+    
+    /**
+     * Tìm tất cả AR Invoice của một Sales Order (chưa bị xóa)
+     * Dùng để check dependencies khi update/delete Sales Order
+     */
+    @Query("SELECT ar FROM ARInvoice ar WHERE ar.salesOrder.soId = :soId AND ar.deletedAt IS NULL")
+    List<ARInvoice> findBySalesOrder_SoIdAndDeletedAtIsNull(@Param("soId") Integer soId);
+    
+    /**
+     * Tìm tất cả AR Invoice của một Delivery (chưa bị xóa)
+     * Dùng để check dependencies khi update/delete Delivery
+     */
+    @Query("SELECT ar FROM ARInvoice ar WHERE ar.delivery.deliveryId = :deliveryId AND ar.deletedAt IS NULL")
+    List<ARInvoice> findByDelivery_DeliveryIdAndDeletedAtIsNull(@Param("deliveryId") Integer deliveryId);
 }

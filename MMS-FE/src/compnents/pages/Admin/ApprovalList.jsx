@@ -4,10 +4,10 @@ import { toast } from "react-toastify";
 import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import purchaseQuotationService from "../../../api/purchaseQuotationService";
 import purchaseOrderService from "../../../api/purchaseOrderService";
-import salesQuotationService from "../../../api/salesQuotationService";
 import salesOrderService from "../../../api/salesOrderService";
 import apInvoiceService from "../../../api/apInvoiceService";
 import invoiceService from "../../../api/invoiceService";
+import { goodIssueService } from "../../../api/goodIssueService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 
@@ -336,31 +336,6 @@ export default function ApprovalList() {
         }
       }
 
-      // Fetch Sales Quotations (Pending)
-      if (type === "all" || type === "sales") {
-        try {
-          const sqData = await salesQuotationService.getAllQuotations({ status: "Pending" });
-          if (Array.isArray(sqData)) {
-            sqData.forEach(item => {
-              const docId = item.quotationId || item.quotation_id || item.id;
-              if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "Sales Quotation",
-                  documentTypeCode: "SQ",
-                  id: docId,
-                  number: item.quotationNo || item.quotation_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.customerName || item.customer_name || item.customer,
-                  totalAmount: item.totalAmount || item.total_amount || 0,
-                });
-              }
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching sales quotations:", err);
-        }
-      }
 
       // Fetch Sales Orders (Pending approval)
       if (type === "all" || type === "sales") {
@@ -385,6 +360,33 @@ export default function ApprovalList() {
           }
         } catch (err) {
           console.error("Error fetching sales orders:", err);
+        }
+      }
+
+      // Fetch Good Issues (Pending)
+      if (type === "all" || type === "sales") {
+        try {
+          const giData = await goodIssueService.getGoodIssuesWithPagination(0, 100, sort);
+          if (giData && giData.content && Array.isArray(giData.content)) {
+            const pendingGIs = giData.content.filter(item => item.status === "Pending");
+            pendingGIs.forEach(item => {
+              const docId = item.issueId || item.issue_id || item.id;
+              if (docId) {
+                allDocuments.push({
+                  ...item,
+                  documentType: "Good Issue",
+                  documentTypeCode: "GI",
+                  id: docId,
+                  number: item.issueNo || item.issue_no || item.number,
+                  createdDate: item.createdAt || item.created_at || item.createdDate,
+                  requesterName: item.createdByName || item.created_by_name || item.createdBy || "-",
+                  totalAmount: 0, // Good Issue không có tổng giá trị
+                });
+              }
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching good issues:", err);
         }
       }
 
@@ -484,14 +486,14 @@ export default function ApprovalList() {
         case "API":
           await apInvoiceService.approveInvoice(selectedDocument.id, approverId);
           break;
-        case "SQ":
-          await salesQuotationService.changeStatus(selectedDocument.id, "Approved");
-          break;
         case "SO":
           await salesOrderService.changeApprovalStatus(selectedDocument.id, "Approved");
           break;
         case "ARI":
           await invoiceService.approveInvoice(selectedDocument.id, approverId);
+          break;
+        case "GI":
+          await goodIssueService.approveGoodIssue(selectedDocument.id, approverId);
           break;
         default:
           throw new Error("Unknown document type");
@@ -544,14 +546,14 @@ export default function ApprovalList() {
         case "API":
           await apInvoiceService.rejectInvoice(selectedDocument.id, approverId, rejectReason);
           break;
-        case "SQ":
-          await salesQuotationService.changeStatus(selectedDocument.id, "Rejected");
-          break;
         case "SO":
           await salesOrderService.changeApprovalStatus(selectedDocument.id, "Rejected");
           break;
         case "ARI":
           await invoiceService.rejectInvoice(selectedDocument.id, approverId, rejectReason);
+          break;
+        case "GI":
+          await goodIssueService.rejectGoodIssue(selectedDocument.id, approverId, rejectReason);
           break;
         default:
           throw new Error("Unknown document type");
@@ -596,9 +598,9 @@ export default function ApprovalList() {
       case "PQ": return `/purchase/purchase-quotations/${doc.id}`;
       case "PO": return `/purchase/purchase-orders/${doc.id}`;
       case "API": return `/purchase/ap-invoices/${doc.id}`;
-      case "SQ": return `/sales/quotations/${doc.id}`;
       case "SO": return `/sales/orders/${doc.id}`;
       case "ARI": return `/sales/invoices/${doc.id}`;
+      case "GI": return `/sales/good-issues/${doc.id}`;
       default: return "#";
     }
   };

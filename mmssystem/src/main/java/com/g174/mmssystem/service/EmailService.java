@@ -96,7 +96,7 @@ public class EmailService {
                         </div>
                         
                         <div class="warning">
-                            ⚠️ Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email hoặc liên hệ bộ phận hỗ trợ ngay lập tức.
+                            Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email hoặc liên hệ bộ phận hỗ trợ ngay lập tức.
                         </div>
                         
                         <p>Trân trọng,<br><strong>Đội ngũ MMS System</strong></p>
@@ -360,7 +360,7 @@ public class EmailService {
         html.append("<p style='margin: 5px 0;'>📞 Hotline: 1900-xxxx</p>");
         html.append("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dee2e6;'>");
         html.append("<p style='font-size: 12px; color: #868e96; margin: 10px 0;'>");
-        html.append("⚠️ Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
+        html.append("Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
         html.append("</p>");
         html.append("</div>");
         
@@ -621,7 +621,7 @@ public class EmailService {
         html.append("<p style='margin: 5px 0;'>📞 Hotline: 1900-xxxx</p>");
         html.append("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dee2e6;'>");
         html.append("<p style='font-size: 12px; color: #868e96; margin: 10px 0;'>");
-        html.append("⚠️ Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
+        html.append("Email này được gửi tự động từ hệ thống MMS. Vui lòng không trả lời trực tiếp email này.");
         html.append("</p>");
         html.append("</div>");
         

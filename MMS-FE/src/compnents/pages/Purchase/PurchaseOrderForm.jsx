@@ -762,7 +762,7 @@ export default function PurchaseOrderForm() {
                         console.log(`   Product ID extracted: ${productId}`);
                         
                         if (!productId) {
-                            console.warn(`   ⚠️ No product ID found for item ${idx}`);
+                            console.warn(`   No product ID found for item ${idx}`);
                             return null;
                         }
 
@@ -824,7 +824,7 @@ export default function PurchaseOrderForm() {
             const vendorExists = vendors.find(v => Number(v.value) === vendorIdNum);
             
             if (!vendorExists) {
-                console.warn("⚠️ Vendor not found in current list, but will proceed with import:", {
+                console.warn("Vendor not found in current list, but will proceed with import:", {
                     vendorId,
                     vendorIdNum,
                     total_vendors: vendors.length

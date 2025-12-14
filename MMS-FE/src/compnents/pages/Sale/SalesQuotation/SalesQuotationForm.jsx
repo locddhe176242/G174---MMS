@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { salesQuotationService } from "../../../../api/salesQuotationService";
 import customerService from "../../../../api/customerService";
 import apiClient from "../../../../api/apiClient";
+import { hasRole } from "../../../../api/authService";
 
 const STATUS_LABELS = {
   Draft: "Nháp",
@@ -100,6 +101,7 @@ export default function SalesQuotationForm() {
   const [products, setProducts] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
   const [originalStatus, setOriginalStatus] = useState("Draft");
+  const [quotationData, setQuotationData] = useState(null); // Lưu thông tin quotation để biết status
 
   const [formData, setFormData] = useState({
     quotationNo: "",
@@ -206,6 +208,11 @@ export default function SalesQuotationForm() {
           })) || [DEFAULT_ITEM],
       });
       setOriginalStatus(quotation.status || "Draft");
+      
+      // Lưu quotationData để biết status
+      setQuotationData({
+        status: quotation.status || "Draft",
+      });
     } catch (error) {
       console.error("Không thể tải báo giá:", error);
       toast.error("Không thể tải báo giá");
@@ -407,6 +414,10 @@ export default function SalesQuotationForm() {
         if (formData.status && formData.status !== originalStatus) {
           await salesQuotationService.changeStatus(id, formData.status);
         }
+        // Cập nhật quotationData sau khi update
+        setQuotationData({
+          status: formData.status || "Draft",
+        });
         toast.success("Đã cập nhật báo giá");
       } else {
         const created = await salesQuotationService.createQuotation(payload);
@@ -414,9 +425,18 @@ export default function SalesQuotationForm() {
         if (newId && formData.status && formData.status !== "Draft") {
           await salesQuotationService.changeStatus(newId, formData.status);
         }
+        // Cập nhật quotationData sau khi tạo
+        setQuotationData({
+          status: formData.status || "Draft",
+        });
         toast.success("Đã tạo báo giá");
       }
-      navigate("/sales/quotations");
+      // Reload quotation để cập nhật UI
+      if (isEdit) {
+        await loadQuotation();
+      } else {
+        navigate("/sales/quotations");
+      }
     } catch (error) {
       console.error("Không thể lưu báo giá:", error);
       const message =
@@ -429,6 +449,36 @@ export default function SalesQuotationForm() {
     }
   };
 
+  const handleSendToCustomer = async () => {
+    if (!isEdit || !id) {
+      toast.error("Chỉ có thể gửi báo giá đã được lưu");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await salesQuotationService.changeStatus(id, "Active");
+      setQuotationData({
+        status: "Active",
+      });
+      setFormData((prev) => ({ ...prev, status: "Active" }));
+      setOriginalStatus("Active");
+      toast.success("Đã gửi báo giá cho khách hàng");
+      await loadQuotation(); // Reload để cập nhật UI
+    } catch (error) {
+      console.error("Không thể gửi báo giá:", error);
+      toast.error(error?.response?.data?.message || "Lỗi gửi báo giá");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Kiểm tra xem có thể edit không
+  // Nếu status = Active, chỉ Manager mới được edit
+  const isActive = quotationData?.status === "Active" || formData.status === "Active";
+  const isDraft = quotationData?.status === "Draft" || formData.status === "Draft";
+  const isManager = hasRole("MANAGER") || hasRole("ROLE_MANAGER");
+  const canEdit = !isEdit || !isActive || isManager;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -439,12 +489,61 @@ export default function SalesQuotationForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
-            </h1>
+      <div className="bg-white shadow-sm">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
+              </h1>
+              {isEdit && quotationData && (
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    isDraft
+                      ? "bg-gray-100 text-gray-700"
+                      : isActive
+                      ? "bg-blue-100 text-blue-700"
+                      : quotationData.status === "Converted"
+                      ? "bg-green-100 text-green-700"
+                      : quotationData.status === "Cancelled"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {isDraft
+                    ? "Nháp"
+                    : isActive
+                    ? "Đang mở"
+                    : quotationData.status === "Converted"
+                    ? "Đã chuyển đổi"
+                    : quotationData.status === "Cancelled"
+                    ? "Đã hủy"
+                    : quotationData.status === "Expired"
+                    ? "Hết hạn"
+                    : quotationData.status}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-500">
+              Nhập thông tin chung và danh sách sản phẩm báo giá
+            </p>
+            {isActive && !isManager && (
+              <p className="text-sm text-yellow-600 mt-1">
+                Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {isEdit && isDraft && (
+              <button
+                type="button"
+                onClick={handleSendToCustomer}
+                disabled={submitting}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {submitting ? "Đang gửi..." : "Gửi cho khách"}
+              </button>
+            )}
             <button
               onClick={() => navigate("/sales/quotations")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
@@ -452,7 +551,6 @@ export default function SalesQuotationForm() {
               ← Quay lại
             </button>
           </div>
-          <div className="border-t border-gray-200" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-6">
@@ -473,6 +571,7 @@ export default function SalesQuotationForm() {
                     }
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Ví dụ: SQ-20231125-0001"
+                    disabled={!canEdit}
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -490,12 +589,7 @@ export default function SalesQuotationForm() {
                     }
                     options={customers}
                     isClearable
-                    menuPortalTarget={
-                      typeof window !== "undefined" ? document.body : null
-                    }
-                    menuPosition="fixed"
-                    menuShouldScrollIntoView={false}
-                    styles={selectStyles}
+                    isDisabled={!canEdit}
                   />
                   {validationErrors.customerId && (
                     <p className="text-sm text-red-600 mt-1">
@@ -515,7 +609,8 @@ export default function SalesQuotationForm() {
                     }
                     onChange={(date) => handleDateChange("quotationDate", date)}
                     dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    disabled={!canEdit}
                   />
                   {validationErrors.quotationDate && (
                     <p className="text-sm text-red-600 mt-1">
@@ -537,28 +632,13 @@ export default function SalesQuotationForm() {
                         ? new Date(formData.quotationDate)
                         : null
                     }
+                    disabled={!canEdit}
                   />
                   {validationErrors.validUntil && (
                     <p className="text-sm text-red-600 mt-1">
                       {validationErrors.validUntil}
                     </p>
                   )}
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600">Trạng thái</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      handleInputChange("status", e.target.value)
-                    }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
@@ -570,6 +650,7 @@ export default function SalesQuotationForm() {
                     }
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="VD: Thanh toán trong 30 ngày"
+                    disabled={!canEdit}
                   />
                 </div>
                 <div>
@@ -582,6 +663,7 @@ export default function SalesQuotationForm() {
                     }
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="VD: Giao tại kho khách hàng"
+                    disabled={!canEdit}
                   />
                 </div>
                 <div>
@@ -592,7 +674,44 @@ export default function SalesQuotationForm() {
                     onChange={(e) => handleInputChange("notes", e.target.value)}
                     className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Thông tin bổ sung cho báo giá"
+                    disabled={!canEdit}
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+              <div>
+                <label className="text-sm text-gray-600">Thuế (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.taxRate}
+                  disabled={!canEdit}
+                  onChange={(e) =>
+                    handleInputChange("taxRate", e.target.value)
+                  }
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+                <div className="flex justify-between">
+                  <span>Tạm tính</span>
+                  <span className="font-semibold">
+                    {currencyFormatter(totals.subtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Chiết khấu dòng</span>
+                  <span>{currencyFormatter(totals.discountTotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Thuế</span>
+                  <span>{currencyFormatter(totals.taxAmount)}</span>
+                </div>
+                <div className="flex justify-between text-base font-semibold text-gray-900">
+                  <span>Tổng cộng</span>
+                  <span>{currencyFormatter(totals.totalAmount)}</span>
                 </div>
               </div>
             </div>
@@ -606,7 +725,8 @@ export default function SalesQuotationForm() {
               <button
                 type="button"
                 onClick={addItem}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={!canEdit}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 + Thêm sản phẩm
               </button>
@@ -650,10 +770,7 @@ export default function SalesQuotationForm() {
                             }
                             options={products}
                             isClearable
-                            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
-                            menuPosition="fixed"
-                            menuShouldScrollIntoView={false}
-                            styles={compactSelectStyles}
+                            isDisabled={!canEdit}
                           />
                           {validationErrors.itemDetails?.[index]?.productId && (
                             <p className="text-xs text-red-600 mt-1">
@@ -668,7 +785,8 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "uom", e.target.value)
                             }
-                            className="w-24 border border-gray-300 rounded px-2 py-1"
+                            className="w-24 border rounded px-2 py-1"
+                            disabled={!canEdit}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -679,7 +797,8 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "quantity", e.target.value)
                             }
-                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
+                            className="w-24 border rounded px-2 py-1 text-right"
+                            disabled={!canEdit}
                           />
                           {validationErrors.itemDetails?.[index]?.quantity && (
                             <p className="text-xs text-red-600 mt-1">
@@ -699,7 +818,8 @@ export default function SalesQuotationForm() {
                                 normalizeNumberInput(e.target.value)
                               )
                             }
-                            className="w-32 border border-gray-300 rounded px-3 py-1 text-right tracking-wide"
+                            className="w-32 border rounded px-3 py-1 text-right tracking-wide"
+                            disabled={!canEdit}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -718,6 +838,7 @@ export default function SalesQuotationForm() {
                             }
                             className="w-28 border border-gray-300 rounded px-2 py-1 text-right"
                             placeholder="0"
+                            disabled={!canEdit}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -728,7 +849,8 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", e.target.value)
                             }
-                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
+                            className="w-24 border rounded px-2 py-1 text-right"
+                            disabled={!canEdit}
                           />
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
@@ -739,7 +861,8 @@ export default function SalesQuotationForm() {
                             <button
                               type="button"
                               onClick={() => removeItem(index)}
-                              className="text-red-600 hover:underline"
+                              disabled={!canEdit}
+                              className="text-red-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Xóa
                             </button>
@@ -804,8 +927,8 @@ export default function SalesQuotationForm() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              disabled={submitting || !canEdit}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới"}
             </button>

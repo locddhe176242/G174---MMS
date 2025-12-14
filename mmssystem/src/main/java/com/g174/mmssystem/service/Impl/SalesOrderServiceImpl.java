@@ -46,6 +46,8 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     private final WarehouseRepository warehouseRepository;
     private final UserRepository userRepository;
     private final SalesOrderMapper salesOrderMapper;
+    private final DeliveryRepository deliveryRepository;
+    private final ARInvoiceRepository arInvoiceRepository;
 
     @Override
     public SalesOrderResponseDTO createOrder(SalesOrderRequestDTO request) {
@@ -55,8 +57,8 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
 
         SalesOrder order = salesOrderMapper.toEntity(request, customer, quotation, currentUser);
         order.setSoNo(generateOrderNo());
-        order.setStatus(SalesOrder.OrderStatus.Pending);
-        order.setApprovalStatus(SalesOrder.ApprovalStatus.Pending);
+        order.setStatus(SalesOrder.OrderStatus.Draft);
+        order.setApprovalStatus(SalesOrder.ApprovalStatus.Draft);
 
         List<SalesOrderItem> items = buildItems(order, request.getItems());
         order.getItems().clear();
@@ -72,8 +74,44 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     public SalesOrderResponseDTO updateOrder(Integer id, SalesOrderRequestDTO request) {
         SalesOrder order = getOrderEntity(id);
 
+        // Check 1: Khóa khi đang chờ duyệt
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Pending) {
+            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đang chờ phê duyệt");
+        }
+
+        // Check 2: Không cho sửa khi đã được duyệt (trừ Manager)
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            boolean isManager = authentication != null && 
+                    authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+            
+            if (!isManager) {
+                throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã được phê duyệt. Chỉ Manager mới có quyền sửa.");
+            }
+            
+            // Log warning cho Manager
+            log.warn("Manager {} đang chỉnh sửa đơn hàng đã được phê duyệt: {}", 
+                    getCurrentUser().getEmail(), order.getSoNo());
+        }
+
+        // Check 3: Không cho sửa khi đã hoàn tất hoặc đã hủy
         if (order.getStatus() == SalesOrder.OrderStatus.Fulfilled || order.getStatus() == SalesOrder.OrderStatus.Cancelled) {
             throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã hoàn tất hoặc đã hủy");
+        }
+
+        // Check 4: Không cho sửa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
+        List<Delivery> deliveries = deliveryRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
+        boolean hasActiveDelivery = deliveries.stream()
+                .anyMatch(d -> d.getStatus() != Delivery.DeliveryStatus.Cancelled);
+        if (hasActiveDelivery) {
+            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã có phiếu giao hàng");
+        }
+
+        // Check 5: Không cho sửa khi đã có AR Invoice
+        List<ARInvoice> invoices = arInvoiceRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
+        if (!invoices.isEmpty()) {
+            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã có hóa đơn");
         }
 
         Customer customer = getCustomer(request.getCustomerId());
@@ -131,6 +169,42 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     @Override
     public void deleteOrder(Integer id) {
         SalesOrder order = getOrderEntity(id);
+
+        // Check 1: Khóa khi đang chờ duyệt
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Pending) {
+            throw new IllegalStateException("Không thể xóa đơn hàng đang chờ phê duyệt");
+        }
+
+        // Check 2: Không cho xóa khi đã được duyệt (trừ Manager)
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            boolean isManager = authentication != null && 
+                    authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+            
+            if (!isManager) {
+                throw new IllegalStateException("Không thể xóa đơn hàng đã được phê duyệt. Chỉ Manager mới có quyền xóa.");
+            }
+            
+            // Log warning cho Manager
+            log.warn("Manager {} đang xóa đơn hàng đã được phê duyệt: {}", 
+                    getCurrentUser().getEmail(), order.getSoNo());
+        }
+
+        // Check 3: Không cho xóa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
+        List<Delivery> deliveries = deliveryRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
+        boolean hasActiveDelivery = deliveries.stream()
+                .anyMatch(d -> d.getStatus() != Delivery.DeliveryStatus.Cancelled);
+        if (hasActiveDelivery) {
+            throw new IllegalStateException("Không thể xóa đơn hàng đã có phiếu giao hàng");
+        }
+
+        // Check 4: Không cho xóa khi đã có AR Invoice
+        List<ARInvoice> invoices = arInvoiceRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
+        if (!invoices.isEmpty()) {
+            throw new IllegalStateException("Không thể xóa đơn hàng đã có hóa đơn");
+        }
+
         order.setDeletedAt(Instant.now());
         salesOrderRepository.save(order);
     }
@@ -170,11 +244,41 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     }
 
     @Override
+    public SalesOrderResponseDTO submitForApproval(Integer id) {
+        SalesOrder order = getOrderEntity(id);
+
+        // Check: Phải ở Draft mới được submit
+        if (order.getApprovalStatus() != SalesOrder.ApprovalStatus.Draft) {
+            throw new IllegalStateException("Chỉ có thể yêu cầu duyệt khi đơn hàng ở trạng thái Draft");
+        }
+
+        // Chuyển sang Pending
+        order.setApprovalStatus(SalesOrder.ApprovalStatus.Pending);
+
+        // Tự động chuyển status sang Pending nếu đang Draft
+        if (order.getStatus() == SalesOrder.OrderStatus.Draft) {
+            order.setStatus(SalesOrder.OrderStatus.Pending);
+        }
+
+        SalesOrder saved = salesOrderRepository.save(order);
+        List<SalesOrderItem> items = salesOrderItemRepository.findBySalesOrder_SoId(id);
+        return salesOrderMapper.toResponse(saved, items);
+    }
+
+    @Override
     public SalesOrderResponseDTO createFromQuotation(Integer quotationId) {
         SalesQuotation quotation = getQuotation(quotationId);
         if (quotation.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Báo giá không tồn tại");
         }
+
+        // Check: Quotation phải ở Draft hoặc Active
+        if (quotation.getStatus() != SalesQuotation.QuotationStatus.Draft &&
+            quotation.getStatus() != SalesQuotation.QuotationStatus.Active) {
+            throw new IllegalStateException(
+                "Chỉ có thể tạo đơn hàng từ báo giá ở trạng thái Draft hoặc Active");
+        }
+
         Customer customer = quotation.getCustomer();
         User currentUser = getCurrentUser();
 
@@ -186,8 +290,8 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         order.setPaymentTerms(quotation.getPaymentTerms());
         order.setNotes(quotation.getNotes());
         order.setSoNo(generateOrderNo());
-        order.setStatus(SalesOrder.OrderStatus.Pending);
-        order.setApprovalStatus(SalesOrder.ApprovalStatus.Pending);
+        order.setStatus(SalesOrder.OrderStatus.Draft);
+        order.setApprovalStatus(SalesOrder.ApprovalStatus.Draft);
         order.setCreatedBy(currentUser);
         order.setUpdatedBy(currentUser);
 
@@ -212,6 +316,11 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         recalcTotals(order, items);
 
         SalesOrder saved = salesOrderRepository.save(order);
+
+        // Sau khi tạo Sales Order thành công, chuyển Quotation sang Converted
+        quotation.setStatus(SalesQuotation.QuotationStatus.Converted);
+        salesQuotationRepository.save(quotation);
+
         return salesOrderMapper.toResponse(saved, items);
     }
 

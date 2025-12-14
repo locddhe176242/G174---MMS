@@ -216,7 +216,7 @@ public class WarehouseServiceImpl implements IWarehouseService {
                         .orElseThrow(() -> new ResourceNotFoundException("Default admin user not found (ID=1)"));
             }
         } catch (Exception ex) {
-            log.warn("⚠️ Could not resolve user: {}", ex.getMessage());
+            log.warn("Could not resolve user: {}", ex.getMessage());
             return null;
         }
     }

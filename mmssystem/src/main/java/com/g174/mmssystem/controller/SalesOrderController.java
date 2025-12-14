@@ -128,6 +128,18 @@ public class SalesOrderController {
         return ResponseEntity.ok(salesOrderService.changeApprovalStatus(id, approvalStatus));
     }
 
+    @PostMapping("/{id}/submit-for-approval")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "SUBMIT_SALES_ORDER_FOR_APPROVAL",
+            activityType = "SALES_MANAGEMENT",
+            description = "Gửi yêu cầu duyệt đơn bán hàng ID: #{#id}",
+            entityId = "#{#id}"
+    )
+    public ResponseEntity<SalesOrderResponseDTO> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(salesOrderService.submitForApproval(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(

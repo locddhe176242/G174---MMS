@@ -25,4 +25,6 @@ public interface IDeliveryService {
     DeliveryResponseDTO changeStatus(Integer id, String status);
 
     DeliveryResponseDTO createFromSalesOrder(Integer salesOrderId);
+
+    DeliveryResponseDTO submitToWarehouse(Integer id);
 }

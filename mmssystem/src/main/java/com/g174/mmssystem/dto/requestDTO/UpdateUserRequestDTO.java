@@ -14,7 +14,7 @@ public class UpdateUserRequestDTO {
 
     @NotBlank(message = "Email không được để trống")
     @Email(message = "Email không hợp lệ")
-    @Pattern(regexp = ".*@mms\\.com$", message = "Email phải có đuôi @mms.com")
+    @Pattern(regexp = ".*@gmail\\.com$", message = "Email phải có đuôi @gmail.com")
     private String email;
 
     @NotBlank(message = "Mã nhân viên không được để trống")

@@ -35,6 +35,11 @@ export const deliveryService = {
     return response.data;
   },
 
+  submitToWarehouse: async (id) => {
+    const response = await apiClient.post(`${BASE_PATH}/${id}/submit-to-warehouse`);
+    return response.data;
+  },
+
   deleteDelivery: async (id) => {
     const response = await apiClient.delete(`${BASE_PATH}/${id}`);
     return response.data;

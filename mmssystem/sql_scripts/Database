@@ -247,20 +247,6 @@ CREATE TABLE Warehouses (
     INDEX idx_warehouse_status (status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE Storage_Areas (
-    storage_id INT AUTO_INCREMENT PRIMARY KEY,
-    warehouse_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    status ENUM('Available', 'Full') DEFAULT 'Available',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE CASCADE,
-    INDEX idx_storage_warehouse (warehouse_id),
-    INDEX idx_storage_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE Warehouse_Stock (
     warehouse_id INT NOT NULL,
     product_id INT NOT NULL,
@@ -680,7 +666,7 @@ CREATE TABLE Sales_Quotations (
     subtotal DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
-    status ENUM('Draft', 'Active', 'Converted', 'Cancelled', 'Expired') DEFAULT 'Active',
+    status ENUM('Draft', 'Active', 'Converted', 'Cancelled', 'Expired') DEFAULT 'Draft',
     created_by INT,
     updated_by INT,
     notes TEXT,
@@ -719,8 +705,8 @@ CREATE TABLE Sales_Orders (
     customer_id INT NOT NULL,
     sq_id INT,
     order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('Pending', 'Approved', 'Fulfilled', 'Cancelled') DEFAULT 'Pending',
-    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    status ENUM('Draft', 'Pending', 'Approved', 'Fulfilled', 'Cancelled') DEFAULT 'Draft',
+    approval_status ENUM('Draft', 'Pending', 'Approved', 'Rejected') DEFAULT 'Draft',
     approver_id INT,
     approved_at DATETIME,
     shipping_address TEXT,
@@ -813,6 +799,52 @@ CREATE TABLE Delivery_Items (
     INDEX idx_di_delivery (delivery_id),
     INDEX idx_di_product (product_id),
     INDEX idx_di_soi (soi_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE Good_Issues (
+    issue_id INT AUTO_INCREMENT PRIMARY KEY,
+    issue_no VARCHAR(30) UNIQUE NOT NULL,
+    delivery_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    issue_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('Draft', 'Pending', 'Approved', 'Rejected') DEFAULT 'Draft',
+    created_by INT,
+    approved_by INT,
+    approved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
+    notes TEXT,
+    CONSTRAINT fk_gi_delivery
+      FOREIGN KEY (delivery_id) REFERENCES Deliveries(delivery_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gi_warehouse
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gi_created_by
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gi_approved_by
+      FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    INDEX idx_gi_no (issue_no),
+    INDEX idx_gi_status (status, deleted_at),
+    INDEX idx_gi_delivery (delivery_id),
+    INDEX idx_gi_warehouse (warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE Good_Issue_Items (
+    gii_id INT AUTO_INCREMENT PRIMARY KEY,
+    issue_id INT NOT NULL,
+    di_id INT NOT NULL,
+    product_id INT NOT NULL,
+    issued_qty DECIMAL(18, 2) NOT NULL,
+    remark TEXT,
+    CONSTRAINT fk_gii_issue
+      FOREIGN KEY (issue_id) REFERENCES Good_Issues(issue_id) ON DELETE CASCADE,
+    CONSTRAINT fk_gii_delivery_item
+      FOREIGN KEY (di_id) REFERENCES Delivery_Items(di_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gii_product
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    INDEX idx_gii_issue (issue_id),
+    INDEX idx_gii_product (product_id),
+    INDEX idx_gii_delivery_item (di_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE AR_Invoices (
@@ -1060,67 +1092,6 @@ CREATE TABLE IF NOT EXISTS credit_note_items (
 
 
 -- =====================================================
--- INVENTORY MANAGEMENT
--- =====================================================
-
-CREATE TABLE Stock_Transfers (
-    transfer_id INT AUTO_INCREMENT PRIMARY KEY,
-    from_warehouse_id INT,
-    to_warehouse_id INT,
-    product_id INT NOT NULL,
-    quantity DECIMAL(18, 2) NOT NULL,
-    transfer_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    transfer_type VARCHAR(100),
-    status ENUM('Pending', 'Shipped', 'Received', 'Cancelled') DEFAULT 'Pending',
-    created_by INT,
-    updated_by INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (from_warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE SET NULL,
-    FOREIGN KEY (to_warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE SET NULL,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
-    FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    INDEX idx_transfer_status (status, deleted_at),
-    INDEX idx_transfer_from (from_warehouse_id),
-    INDEX idx_transfer_to (to_warehouse_id),
-    INDEX idx_transfer_product (product_id),
-    INDEX idx_transfer_date (transfer_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE Inventory_Checks (
-    check_id INT AUTO_INCREMENT PRIMARY KEY,
-    warehouse_id INT NOT NULL,
-    checked_by INT,
-    check_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('Pending', 'Completed', 'Cancelled') DEFAULT 'Pending',
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE CASCADE,
-    FOREIGN KEY (checked_by) REFERENCES Users(user_id) ON DELETE SET NULL,
-    INDEX idx_check_status (status, deleted_at),
-    INDEX idx_check_warehouse (warehouse_id),
-    INDEX idx_check_date (check_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE Inventory_Check_Items (
-    ici_id INT AUTO_INCREMENT PRIMARY KEY,
-    check_id INT NOT NULL,
-    product_id INT NOT NULL,
-    expected_qty DECIMAL(18, 2) NOT NULL,
-    actual_qty DECIMAL(18, 2) NOT NULL,
-    discrepancy DECIMAL(18, 2) AS (actual_qty - expected_qty) STORED,
-    note TEXT,
-    FOREIGN KEY (check_id) REFERENCES Inventory_Checks(check_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
-    INDEX idx_ici_check (check_id),
-    INDEX idx_ici_product (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- =====================================================
 -- REPORTING & LOGGING
 -- =====================================================
 
@@ -1181,7 +1152,6 @@ CREATE INDEX idx_sales_orders_customer_status ON Sales_Orders(customer_id, statu
 
 -- Inventory tracking indexes
 CREATE INDEX idx_warehouse_stock_product ON Warehouse_Stock(product_id, quantity);
-CREATE INDEX idx_stock_transfers_product_date ON Stock_Transfers(product_id, transfer_date);
 
 -- Activity logging indexes for audit trails
 CREATE INDEX idx_activity_logs_user_date ON Activity_Logs(user_id, log_date);

@@ -56,6 +56,9 @@ import SalesOrderDetail from "./compnents/pages/Sale/SalesOrder/SalesOrderDetail
 import DeliveryList from "./compnents/pages/Sale/Delivery/DeliveryList.jsx";
 import DeliveryForm from "./compnents/pages/Sale/Delivery/DeliveryForm.jsx";
 import DeliveryDetail from "./compnents/pages/Sale/Delivery/DeliveryDetail.jsx";
+import GoodIssueList from "./compnents/pages/Sale/GoodIssue/GoodIssueList.jsx";
+import GoodIssueForm from "./compnents/pages/Sale/GoodIssue/GoodIssueForm.jsx";
+import GoodIssueDetail from "./compnents/pages/Sale/GoodIssue/GoodIssueDetail.jsx";
 import ReturnOrderList from "./compnents/pages/Sale/ReturnOrder/ReturnOrderList.jsx";
 import ReturnOrderForm from "./compnents/pages/Sale/ReturnOrder/ReturnOrderForm.jsx";
 import ReturnOrderDetail from "./compnents/pages/Sale/ReturnOrder/ReturnOrderDetail.jsx";
@@ -170,6 +173,10 @@ function App() {
                 <Route path="/sales/deliveries/new" element={<DeliveryForm />} />
                 <Route path="/sales/deliveries/:id" element={<DeliveryDetail />} />
                 <Route path="/sales/deliveries/:id/edit" element={<DeliveryForm />} />
+                <Route path="/sales/good-issues" element={<GoodIssueList />} />
+                <Route path="/sales/good-issues/new" element={<GoodIssueForm />} />
+                <Route path="/sales/good-issues/:id" element={<GoodIssueDetail />} />
+                <Route path="/sales/good-issues/:id/edit" element={<GoodIssueForm />} />
                 <Route path="/sales/return-orders" element={<ReturnOrderList />} />
                 <Route path="/sales/return-orders/new" element={<ReturnOrderForm />} />
                 <Route path="/sales/return-orders/:id" element={<ReturnOrderDetail />} />

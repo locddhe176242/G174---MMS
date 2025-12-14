@@ -26,5 +26,7 @@ public interface ISalesOrderService {
 
     SalesOrderResponseDTO changeApprovalStatus(Integer id, String approvalStatus);
 
+    SalesOrderResponseDTO submitForApproval(Integer id);
+
     SalesOrderResponseDTO createFromQuotation(Integer quotationId);
 }
