@@ -101,6 +101,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 -- Menu con của Warehouse (parent_id = 6)
 (14, 'warehouse-list', 'Danh sách kho', '/warehouse', 'warehouse', 6, 16),
 (15, 'goods-receipt', 'Phiếu nhập kho', '/purchase/goods-receipts', 'receipt', 6, 17),
+(30, 'good-issues', 'Phiếu xuất kho', '/sales/good-issues', 'export', 6, 18),
 
 -- Menu con của Purchase (parent_id = 7)
 (16, 'purchase-requisition', 'Phiếu yêu cầu mua hàng', '/purchase/purchase-requisitions', 'document', 7, 18),
@@ -130,12 +131,12 @@ ON DUPLICATE KEY UPDATE
   display_order = new_menu.display_order;
 
 -- ==================== 8. ROLE_MENUS ====================
--- MANAGER (role_id = 1): Có tất cả menus (1-29)
+-- MANAGER (role_id = 1): Có tất cả menus (1-30)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
 (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19),
 (1, 20), (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27), (1, 28),
-(1, 29)
+(1, 29), (1, 30)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
@@ -194,7 +195,7 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- WAREHOUSE (role_id = 5): Dashboard, Danh mục, Sản phẩm, Kho (Danh sách kho + Phiếu nhập kho), Xuất hàng (view), Báo cáo
+-- WAREHOUSE (role_id = 5): Dashboard, Danh mục, Sản phẩm, Kho (Danh sách kho + Phiếu nhập kho + Phiếu xuất kho), Xuất hàng (view), Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 1),   -- Dashboard
 (5, 2),   -- Categories
@@ -204,6 +205,7 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 11),  -- Reports
 (5, 14),  -- Warehouse List
 (5, 15),  -- Goods Receipt
+(5, 30),  -- Good Issues
 (5, 21),  -- Sales Orders (view)
 (5, 22),  -- Deliveries
 (5, 23),  -- Return Orders
@@ -289,7 +291,14 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 (47, 'invoice.create', 'Tạo hóa đơn', 'invoice', 'create'),
 (48, 'invoice.edit', 'Sửa hóa đơn', 'invoice', 'edit'),
 (49, 'invoice.delete', 'Xóa hóa đơn', 'invoice', 'delete'),
-(50, 'invoice.payment', 'Thêm thanh toán cho hóa đơn', 'invoice', 'payment')
+(50, 'invoice.payment', 'Thêm thanh toán cho hóa đơn', 'invoice', 'payment'),
+
+-- Good Issue permissions (56-60)
+(56, 'good_issue.view', 'Xem phiếu xuất kho', 'good_issue', 'view'),
+(57, 'good_issue.create', 'Tạo phiếu xuất kho', 'good_issue', 'create'),
+(58, 'good_issue.edit', 'Sửa phiếu xuất kho', 'good_issue', 'edit'),
+(59, 'good_issue.delete', 'Xóa phiếu xuất kho', 'good_issue', 'delete'),
+(60, 'good_issue.approve', 'Phê duyệt phiếu xuất kho', 'good_issue', 'approve')
 AS new_perm
 ON DUPLICATE KEY UPDATE
   permission_name = new_perm.permission_name,
@@ -323,7 +332,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Credit Note permissions (41-45)
 (1, 41), (1, 42), (1, 43), (1, 44), (1, 45),
 -- Invoice permissions (46-50)
-(1, 46), (1, 47), (1, 48), (1, 49), (1, 50)
+(1, 46), (1, 47), (1, 48), (1, 49), (1, 50),
+-- Good Issue permissions (56-60)
+(1, 56), (1, 57), (1, 58), (1, 59), (1, 60)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -347,7 +358,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Sales Return Inbound Order permissions: view, create, edit
 (2, 51), (2, 52), (2, 53),
 -- Credit Note permissions: view, create, edit
-(2, 41), (2, 42), (2, 43)
+(2, 41), (2, 42), (2, 43),
+-- Good Issue permissions: view (để xem phiếu xuất kho)
+(2, 56)
 -- Không có Invoice permissions (do Kế toán quản lý)
 AS new_rp
 ON DUPLICATE KEY UPDATE
@@ -390,7 +403,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Credit Note permissions: view, create, edit, status
 (4, 41), (4, 42), (4, 43), (4, 45),
 -- Invoice permissions: view, create, edit, payment
-(4, 46), (4, 47), (4, 48), (4, 50)
+(4, 46), (4, 47), (4, 48), (4, 50),
+-- Good Issue permissions: view (để xem phiếu xuất kho)
+(4, 56)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -412,7 +427,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Return Order permissions: view, create, edit, status
 (5, 36), (5, 37), (5, 38), (5, 40),
 -- Sales Return Inbound Order permissions: view, create, edit
-(5, 51), (5, 52), (5, 53)
+(5, 51), (5, 52), (5, 53),
+-- Good Issue permissions: view, create, edit, approve (quản lý xuất kho)
+(5, 56), (5, 57), (5, 58), (5, 60)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;

@@ -642,7 +642,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                         </table>
                         
                         <div class="note">
-                            <strong>⚠️ Lưu ý:</strong>
+                            <strong>Lưu ý:</strong>
                             <ul style="margin: 10px 0 0 0; padding-left: 20px;">
                                 <li>Vui lòng xác nhận đơn hàng trong vòng 24 giờ</li>
                                 <li>Giao hàng đúng thời hạn cam kết</li>

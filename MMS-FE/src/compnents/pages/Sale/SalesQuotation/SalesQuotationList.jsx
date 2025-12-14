@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { salesQuotationService } from "../../../../api/salesQuotationService";
+import { hasRole } from "../../../../api/authService";
 import Pagination from "../../../common/Pagination";
 
 const STATUS_LABELS = {
@@ -319,20 +320,26 @@ export default function SalesQuotationList() {
                           >
                             Xem
                           </button>
-                          <button
-                            onClick={() =>
-                              navigate(`/sales/quotations/${quotation.quotationId}/edit`)
-                            }
-                            className="text-green-600 hover:underline"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDelete(quotation.quotationId)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Xóa
-                          </button>
+                          {/* Chỉ hiển thị nút Sửa nếu status không phải Active, hoặc nếu Active thì phải là Manager */}
+                          {(!quotation.status || quotation.status !== "Active" || hasRole("MANAGER") || hasRole("ROLE_MANAGER")) && (
+                            <button
+                              onClick={() =>
+                                navigate(`/sales/quotations/${quotation.quotationId}/edit`)
+                              }
+                              className="text-green-600 hover:underline"
+                            >
+                              Sửa
+                            </button>
+                          )}
+                          {/* Chỉ hiển thị nút Xóa nếu status không phải Active, hoặc nếu Active thì phải là Manager */}
+                          {(!quotation.status || quotation.status !== "Active" || hasRole("MANAGER") || hasRole("ROLE_MANAGER")) && (
+                            <button
+                              onClick={() => handleDelete(quotation.quotationId)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

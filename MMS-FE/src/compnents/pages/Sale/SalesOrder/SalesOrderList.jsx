@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { salesOrderService } from "../../../../api/salesOrderService";
+import { hasRole } from "../../../../api/authService";
 import Pagination from "../../../common/Pagination";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
+  { value: "Draft", label: "Nháp" },
   { value: "Pending", label: "Chờ xử lý" },
   { value: "Approved", label: "Đã duyệt" },
   { value: "Fulfilled", label: "Đã hoàn thành" },
@@ -14,6 +16,7 @@ const STATUS_OPTIONS = [
 
 const APPROVAL_OPTIONS = [
   { value: "", label: "Tất cả phê duyệt" },
+  { value: "Draft", label: "Nháp" },
   { value: "Pending", label: "Chờ phê duyệt" },
   { value: "Approved", label: "Đã phê duyệt" },
   { value: "Rejected", label: "Từ chối" },
@@ -21,6 +24,7 @@ const APPROVAL_OPTIONS = [
 
 const getStatusLabel = (status) => {
   const statusMap = {
+    Draft: "Nháp",
     Pending: "Chờ xử lý",
     Approved: "Đã duyệt",
     Fulfilled: "Đã hoàn thành",
@@ -31,6 +35,7 @@ const getStatusLabel = (status) => {
 
 const getApprovalStatusLabel = (approvalStatus) => {
   const approvalMap = {
+    Draft: "Nháp",
     Pending: "Chờ phê duyệt",
     Approved: "Đã phê duyệt",
     Rejected: "Từ chối",
@@ -40,6 +45,8 @@ const getApprovalStatusLabel = (approvalStatus) => {
 
 const getStatusColor = (status) => {
   switch (status) {
+    case "Draft":
+      return "bg-gray-100 text-gray-700";
     case "Pending":
       return "bg-yellow-100 text-yellow-700";
     case "Approved":
@@ -55,6 +62,8 @@ const getStatusColor = (status) => {
 
 const getApprovalStatusColor = (approvalStatus) => {
   switch (approvalStatus) {
+    case "Draft":
+      return "bg-gray-100 text-gray-700";
     case "Pending":
       return "bg-yellow-100 text-yellow-700";
     case "Approved":
@@ -378,20 +387,42 @@ export default function SalesOrderList() {
                           >
                             Xem
                           </button>
-                          <button
-                            onClick={() =>
-                              navigate(`/sales/orders/${order.orderId || order.soId}/edit`)
-                            }
-                            className="text-green-600 hover:underline"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDelete(order.orderId || order.soId)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Xóa
-                          </button>
+                          {/* Chỉ hiển thị nút Sửa nếu:
+                              - approvalStatus = Draft: tất cả user
+                              - approvalStatus = Pending: chỉ Manager
+                              - approvalStatus = Approved: chỉ Manager
+                              - approvalStatus = Rejected: tất cả user
+                          */}
+                          {(order.approvalStatus === "Draft" || 
+                            order.approvalStatus === "Rejected" || 
+                            (order.approvalStatus === "Pending" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER"))) ||
+                            (order.approvalStatus === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                            <button
+                              onClick={() =>
+                                navigate(`/sales/orders/${order.orderId || order.soId}/edit`)
+                              }
+                              className="text-green-600 hover:underline"
+                            >
+                              Sửa
+                            </button>
+                          )}
+                          {/* Chỉ hiển thị nút Xóa nếu:
+                              - approvalStatus = Draft: tất cả user
+                              - approvalStatus = Pending: chỉ Manager
+                              - approvalStatus = Approved: chỉ Manager
+                              - approvalStatus = Rejected: tất cả user
+                          */}
+                          {(order.approvalStatus === "Draft" || 
+                            order.approvalStatus === "Rejected" || 
+                            (order.approvalStatus === "Pending" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER"))) ||
+                            (order.approvalStatus === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                            <button
+                              onClick={() => handleDelete(order.orderId || order.soId)}
+                              className="text-red-600 hover:underline"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Getter
@@ -28,8 +28,8 @@ public class GoodsReceiptRequestDTO {
     @NotNull(message = "Warehouse ID là bắt buộc")
     private Integer warehouseId;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS]", shape = JsonFormat.Shape.STRING)
-    private LocalDateTime receivedDate;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS][XXX]", shape = JsonFormat.Shape.STRING)
+    private OffsetDateTime receivedDate;
 
     private Integer createdById;
 

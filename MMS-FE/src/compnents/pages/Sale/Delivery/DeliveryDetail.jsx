@@ -237,7 +237,7 @@ export default function DeliveryDetail() {
               <p>Quy trình: Draft → Picked → Shipped → Delivered</p>
               {data.status === "Shipped" && (
                 <p className="text-yellow-600 mt-1">
-                  ⚠️ Khi chuyển sang "Delivered", hệ thống sẽ tự động cập nhật ngày giao thực tế
+                  Khi chuyển sang "Delivered", hệ thống sẽ tự động cập nhật ngày giao thực tế
                 </p>
               )}
             </div>

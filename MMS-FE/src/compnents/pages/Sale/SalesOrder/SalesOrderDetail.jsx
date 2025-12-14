@@ -37,7 +37,6 @@ export default function SalesOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [approvalLoading, setApprovalLoading] = useState(false);
   const [data, setData] = useState(null);
 
   const fetchOrder = async () => {
@@ -59,24 +58,6 @@ export default function SalesOrderDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleApprovalStatus = async (newApprovalStatus) => {
-    if (approvalLoading) return;
-    if (data?.approvalStatus !== "Pending") {
-      toast.info("Đơn hàng đã được xử lý phê duyệt");
-      return;
-    }
-    setApprovalLoading(true);
-    try {
-      await salesOrderService.changeApprovalStatus(id, newApprovalStatus);
-      toast.success("Đã cập nhật trạng thái phê duyệt");
-      fetchOrder();
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể cập nhật trạng thái phê duyệt");
-    } finally {
-      setApprovalLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -178,39 +159,6 @@ export default function SalesOrderDetail() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Phê duyệt</h3>
-              <span className="text-sm text-gray-500">
-                {getApprovalStatusLabel(data.approvalStatus)}
-              </span>
-            </div>
-            {data.approvalStatus === "Pending" ? (
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => handleApprovalStatus("Approved")}
-                  disabled={approvalLoading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {approvalLoading ? "Đang xử lý..." : "Duyệt đơn"}
-                </button>
-                <button
-                  onClick={() => handleApprovalStatus("Rejected")}
-                  disabled={approvalLoading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {approvalLoading ? "Đang xử lý..." : "Từ chối"}
-                </button>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-600">
-                Đơn hàng đã được {data.approvalStatus === "Approved" ? "duyệt" : "từ chối"}.
-              </p>
-            )}
-          </div>
-
-        </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">

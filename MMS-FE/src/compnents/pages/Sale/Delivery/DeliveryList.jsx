@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { deliveryService } from "../../../../api/deliveryService";
 import Pagination from "../../../common/Pagination";
+import { hasRole } from "../../../../api/authService";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
@@ -297,18 +298,30 @@ export default function DeliveryList() {
                           >
                             Xem
                           </button>
-                          <button
-                            onClick={() => navigate(`/sales/deliveries/${delivery.deliveryId}/edit`)}
-                            className="text-green-600 hover:underline"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDelete(delivery.deliveryId)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Xóa
-                          </button>
+                          {/* Chỉ hiển thị nút Sửa/Xóa nếu:
+                              - status = Draft/Picked: tất cả user
+                              - status = Shipped/Delivered: chỉ Manager
+                              - status = Cancelled: không cho sửa/xóa
+                          */}
+                          {(delivery.status === "Draft" || 
+                            delivery.status === "Picked" || 
+                            ((delivery.status === "Shipped" || delivery.status === "Delivered") && 
+                             (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                            <>
+                              <button
+                                onClick={() => navigate(`/sales/deliveries/${delivery.deliveryId}/edit`)}
+                                className="text-green-600 hover:underline"
+                              >
+                                Sửa
+                              </button>
+                              <button
+                                onClick={() => handleDelete(delivery.deliveryId)}
+                                className="text-red-600 hover:underline"
+                              >
+                                Xóa
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

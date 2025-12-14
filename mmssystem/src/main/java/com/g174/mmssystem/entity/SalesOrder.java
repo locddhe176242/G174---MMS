@@ -104,11 +104,11 @@ public class SalesOrder {
     private Instant deletedAt;
 
     public enum OrderStatus {
-        Pending, Approved, Fulfilled, Cancelled
+        Draft, Pending, Approved, Fulfilled, Cancelled
     }
 
     public enum ApprovalStatus {
-        Pending, Approved, Rejected
+        Draft, Pending, Approved, Rejected
     }
 
     @PrePersist

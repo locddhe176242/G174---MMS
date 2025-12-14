@@ -99,6 +99,18 @@ public class DeliveryController {
         return ResponseEntity.ok(deliveryService.updateDelivery(id, request));
     }
 
+    @PostMapping("/{id}/submit-to-warehouse")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "SUBMIT_DELIVERY_TO_WAREHOUSE",
+            activityType = "SALES_MANAGEMENT",
+            description = "Submit phiếu giao hàng ID: #{#id} cho kho xử lý",
+            entityId = "#{#id}"
+    )
+    public ResponseEntity<DeliveryResponseDTO> submitToWarehouse(@PathVariable Integer id) {
+        return ResponseEntity.ok(deliveryService.submitToWarehouse(id));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     @LogActivity(

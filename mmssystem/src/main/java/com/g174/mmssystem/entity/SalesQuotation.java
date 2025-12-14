@@ -73,7 +73,7 @@ public class SalesQuotation {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private QuotationStatus status = QuotationStatus.Active;
+    private QuotationStatus status = QuotationStatus.Draft;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

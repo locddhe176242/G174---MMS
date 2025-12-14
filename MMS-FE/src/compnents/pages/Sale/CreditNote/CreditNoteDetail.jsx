@@ -222,7 +222,7 @@ export default function CreditNoteDetail() {
               <p>Quy trình: Draft → Issued → Applied</p>
               {data.status === "Issued" && (
                 <p className="text-yellow-600 mt-1">
-                  ⚠️ Khi chuyển sang "Issued", hệ thống sẽ tự động cập nhật balance của Invoice
+                  Khi chuyển sang "Issued", hệ thống sẽ tự động cập nhật balance của Invoice
                 </p>
               )}
             </div>

@@ -194,7 +194,7 @@ export default function GoodsReceiptForm() {
                             // Chỉ hiển thị status nếu đã nhập một phần (received > 0 nhưng < ordered)
                             let statusLabel = "";
                             if (totalReceived > 0 && totalReceived < totalOrdered) {
-                                statusLabel = `⚠️ Nhập thiếu (${totalReceived}/${totalOrdered})`;
+                                statusLabel = `Nhập thiếu (${totalReceived}/${totalOrdered})`;
                             } else if (totalReceived >= totalOrdered) {
                                 statusLabel = "✅ Hoàn tất";
                             }
@@ -570,18 +570,24 @@ export default function GoodsReceiptForm() {
                     return;
                 }
 
-                // Format date properly for Spring Boot LocalDateTime
+                // Format date properly for Spring Boot OffsetDateTime
+                // Backend expects: yyyy-MM-dd'T'HH:mm:ss[.SSS][XXX] (with timezone)
                 let formattedDate = null;
                 if (formData.received_date) {
                     if (formData.received_date instanceof Date) {
-                        // Format as yyyy-MM-ddTHH:mm:ss (Spring Boot default format)
+                        // Format as yyyy-MM-ddTHH:mm:ss with timezone offset
                         const year = formData.received_date.getFullYear();
                         const month = String(formData.received_date.getMonth() + 1).padStart(2, '0');
                         const day = String(formData.received_date.getDate()).padStart(2, '0');
                         const hours = String(formData.received_date.getHours()).padStart(2, '0');
                         const minutes = String(formData.received_date.getMinutes()).padStart(2, '0');
                         const seconds = String(formData.received_date.getSeconds()).padStart(2, '0');
-                        formattedDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+                        // Get timezone offset (e.g., +07:00)
+                        const tzOffset = -formData.received_date.getTimezoneOffset();
+                        const offsetHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+                        const offsetMinutes = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+                        const offsetSign = tzOffset >= 0 ? '+' : '-';
+                        formattedDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetSign}${offsetHours}:${offsetMinutes}`;
                     } else {
                         formattedDate = formData.received_date;
                     }
@@ -677,11 +683,33 @@ export default function GoodsReceiptForm() {
                 }
             } else {
                 // Purchase mode
+                // Format date properly for Spring Boot OffsetDateTime
+                let formattedDate = null;
+                if (formData.received_date) {
+                    if (formData.received_date instanceof Date) {
+                        // Format as yyyy-MM-ddTHH:mm:ss with timezone offset
+                        const year = formData.received_date.getFullYear();
+                        const month = String(formData.received_date.getMonth() + 1).padStart(2, '0');
+                        const day = String(formData.received_date.getDate()).padStart(2, '0');
+                        const hours = String(formData.received_date.getHours()).padStart(2, '0');
+                        const minutes = String(formData.received_date.getMinutes()).padStart(2, '0');
+                        const seconds = String(formData.received_date.getSeconds()).padStart(2, '0');
+                        // Get timezone offset (e.g., +07:00)
+                        const tzOffset = -formData.received_date.getTimezoneOffset();
+                        const offsetHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+                        const offsetMinutes = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+                        const offsetSign = tzOffset >= 0 ? '+' : '-';
+                        formattedDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetSign}${offsetHours}:${offsetMinutes}`;
+                    } else {
+                        formattedDate = formData.received_date;
+                    }
+                }
+                
                 const payload = {
                     receiptNo: formData.receipt_no,
                     orderId: formData.order_id,
                     warehouseId: formData.warehouse_id,
-                    receivedDate: formData.received_date instanceof Date ? formData.received_date.toISOString() : formData.received_date,
+                    receivedDate: formattedDate,
                     status: formData.status,
                     items: formData.items.map((item, index) => {
                         console.log(`Item ${index}:`, item);

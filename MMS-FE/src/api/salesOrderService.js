@@ -35,6 +35,11 @@ export const salesOrderService = {
     return response.data;
   },
 
+  submitForApproval: async (id) => {
+    const response = await apiClient.post(`${BASE_PATH}/${id}/submit-for-approval`);
+    return response.data;
+  },
+
   deleteOrder: async (id) => {
     const response = await apiClient.delete(`${BASE_PATH}/${id}`);
     return response.data;

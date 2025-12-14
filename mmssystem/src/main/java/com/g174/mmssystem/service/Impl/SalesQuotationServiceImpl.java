@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 public class SalesQuotationServiceImpl implements ISalesQuotationService {
 
     private final SalesQuotationRepository quotationRepository;
+    private final com.g174.mmssystem.repository.SalesOrderRepository salesOrderRepository;
     private final SalesQuotationItemRepository itemRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
@@ -85,6 +86,28 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         if (quotation.getStatus() == SalesQuotation.QuotationStatus.Converted ||
                 quotation.getStatus() == SalesQuotation.QuotationStatus.Cancelled) {
             throw new IllegalStateException("Không thể chỉnh sửa báo giá ở trạng thái " + quotation.getStatus());
+        }
+
+        // Check: Nếu status = Active (đã gửi khách), chỉ Manager mới được sửa
+        if (quotation.getStatus() == SalesQuotation.QuotationStatus.Active) {
+            User currentUser = getCurrentUser();
+            if (currentUser == null) {
+                throw new IllegalStateException("Không xác định được người dùng hiện tại");
+            }
+            
+            // Check role Manager
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            boolean isManager = authentication != null && 
+                    authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+            
+            if (!isManager) {
+                throw new IllegalStateException("Báo giá đã gửi khách, chỉ Manager mới được sửa");
+            }
+            
+            // Log warning
+            log.warn("Manager {} đang chỉnh sửa báo giá đã gửi khách: {}", 
+                    currentUser.getEmail(), quotation.getQuotationNo());
         }
 
         Customer customer = getCustomer(request.getCustomerId());
@@ -144,6 +167,30 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
     public void deleteQuotation(Integer id) {
         SalesQuotation quotation = quotationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sales Quotation not found with id: " + id));
+
+        // Check 1: Không cho xóa khi đã Converted (đã tạo Sales Order)
+        if (quotation.getStatus() == SalesQuotation.QuotationStatus.Converted) {
+            throw new IllegalStateException("Không thể xóa báo giá đã chuyển thành đơn hàng");
+        }
+
+        // Check 2: Nếu đã có Sales Order được tạo từ Quotation này
+        List<com.g174.mmssystem.entity.SalesOrder> orders = salesOrderRepository.findBySalesQuotationId(id);
+        if (!orders.isEmpty()) {
+            throw new IllegalStateException("Không thể xóa báo giá đã có đơn hàng được tạo từ báo giá này");
+        }
+
+        // Check 3: Nếu status = Active (đã gửi khách), chỉ Manager mới được xóa
+        if (quotation.getStatus() == SalesQuotation.QuotationStatus.Active) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            boolean isManager = authentication != null && 
+                    authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+            
+            if (!isManager) {
+                throw new IllegalStateException("Báo giá đã gửi khách, chỉ Manager mới được xóa");
+            }
+        }
+
         quotation.setDeletedAt(Instant.now());
         quotationRepository.save(quotation);
     }
