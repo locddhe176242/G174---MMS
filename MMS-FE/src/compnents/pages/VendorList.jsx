@@ -17,12 +17,12 @@ export default function VendorList() {
   const [sortField, setSortField] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState("desc");
   
-  // State cho popup xác nhận xóa
+ 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Helper function để tránh nested ternary
+
   const getPaginationButtonClass = (isActive) => {
     if (isActive) {
       return "px-3 py-1 border rounded-md bg-black text-white border-black";
@@ -30,19 +30,15 @@ export default function VendorList() {
     return "px-3 py-1 border rounded-md border-gray-300 hover:bg-gray-50";
   };
 
-  // Handle sort
   const handleSort = (field) => {
     if (sortField === field) {
-      // Toggle direction if same field
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      // New field, default to asc
       setSortField(field);
       setSortDirection("asc");
     }
   };
 
-  // Get sort icon
   const getSortIcon = (field) => {
     if (sortField !== field) {
       return (
@@ -67,7 +63,6 @@ export default function VendorList() {
     }
   };
 
-  // Fetch vendors
   const fetchVendors = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc") => {
     try {
       setLoading(true);
@@ -109,18 +104,15 @@ export default function VendorList() {
     fetchVendors(0, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle page change
   const handlePageChange = (newPage) => {
     fetchVendors(newPage, searchKeyword, sortField, sortDirection);
   };
 
-  // Handle delete button click - mở popup xác nhận
   const handleDeleteClick = (vendor) => {
     setVendorToDelete(vendor);
     setShowDeleteModal(true);
   };
 
-  // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     if (!vendorToDelete) return;
 
@@ -139,20 +131,17 @@ export default function VendorList() {
     }
   };
 
-  // Handle delete cancel
   const handleDeleteCancel = () => {
     setShowDeleteModal(false);
     setVendorToDelete(null);
   };
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("vi-VN");
   };
 
-  // Format address - chỉ hiển thị tỉnh/thành phố
   const formatMainAddress = (address) => {
     if (!address) return "Chưa có địa chỉ";
     
@@ -165,7 +154,6 @@ export default function VendorList() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -180,15 +168,10 @@ export default function VendorList() {
         </div>
       </div>
 
-      {/* Main Content */}
+
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm">
-          {/* Section Header */}
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Danh sách nhà cung cấp</h2>
-          </div>
 
-          {/* Search and Filter */}
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <form onSubmit={handleSearch} className="flex items-center gap-4">
@@ -211,17 +194,9 @@ export default function VendorList() {
                   Tìm kiếm
                 </button>
               </form>
-
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                </svg>
-                Bộ lọc
-              </button>
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -236,9 +211,6 @@ export default function VendorList() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left">
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort("vendorId")}
@@ -292,9 +264,6 @@ export default function VendorList() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {vendors.map((vendor) => (
                     <tr key={vendor.vendorId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <input type="checkbox" className="rounded border-gray-300" />
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {vendor.vendorId?.toString().padStart(3, '0')}
                       </td>
@@ -313,32 +282,32 @@ export default function VendorList() {
                         {formatDate(vendor.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => navigate(`/vendors/${vendor.vendorId}`)}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
                             title="Xem chi tiết"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
                           <button
                             onClick={() => navigate(`/vendors/${vendor.vendorId}/edit`)}
-                            className="text-green-600 hover:text-green-900"
+                            className="group p-2.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-green-200 hover:border-green-300"
                             title="Chỉnh sửa"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
                           <button
                             onClick={() => handleDeleteClick(vendor)}
-                            className="text-red-600 hover:text-red-900"
+                            className="group p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-red-200 hover:border-red-300"
                             title="Xóa"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>
@@ -351,7 +320,6 @@ export default function VendorList() {
             )}
           </div>
 
-          {/* Pagination */}
           {!loading && !error && vendors.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
@@ -396,7 +364,6 @@ export default function VendorList() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">

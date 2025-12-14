@@ -162,11 +162,8 @@ export default function SalesReturnInboundOrderList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Đơn nhập hàng lại (từ đơn trả hàng)
+              Đơn nhập hàng lại
             </h1>
-            <p className="text-gray-500">
-              Theo dõi các yêu cầu nhập lại hàng khách trả (Sales Return Inbound).
-            </p>
           </div>
           <button
             onClick={() => navigate("/sales/return-inbound-orders/new")}

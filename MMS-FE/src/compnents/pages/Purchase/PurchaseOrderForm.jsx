@@ -993,9 +993,6 @@ export default function PurchaseOrderForm() {
             <div className="container mx-auto px-4 py-6">
                 <div className="max-w-5xl mx-auto">
                     <div className="bg-white rounded-lg shadow-sm">
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-900">Thông tin Đơn hàng mua</h2>
-                        </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-8">
                             {error && (
@@ -1139,9 +1136,6 @@ export default function PurchaseOrderForm() {
                                         step="0.01"
                                         placeholder="VD: 2 (giảm 2%)"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        💡 Chiết khấu áp dụng trước khi tính thuế
-                                    </p>
                                 </div>
                                 
                                 <div>
@@ -1165,9 +1159,6 @@ export default function PurchaseOrderForm() {
                                         step="0.01"
                                         placeholder="0"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        💡 Thuế tính trên tổng sau tất cả chiết khấu
-                                    </p>
                                 </div>
                             </div>
 

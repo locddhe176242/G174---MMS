@@ -161,9 +161,6 @@ export default function SalesQuotationList() {
             <h1 className="text-2xl font-bold text-gray-900">
               Quản lý báo giá bán hàng
             </h1>
-            <p className="text-gray-500">
-              Theo dõi và quản lý báo giá cho khách hàng
-            </p>
           </div>
           <button
             onClick={() => navigate("/sales/quotations/new")}
@@ -260,9 +257,6 @@ export default function SalesQuotationList() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Người tạo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Người cập nhật
-                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Tổng tiền
                     </th>
@@ -295,30 +289,23 @@ export default function SalesQuotationList() {
                         <div className="font-semibold">
                           {quotation.createdByDisplay || "—"}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {quotation.updatedByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.updatedAt)}
-                        </div>
                       </td>
                       <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">
                         {formatCurrency(quotation.totalAmount)}
                       </td>
                       <td className="px-6 py-3 text-sm">
-                        <div className="flex items-center gap-3 justify-center">
+                        <div className="flex items-center gap-1 justify-center">
                           <button
                             onClick={() =>
                               navigate(`/sales/quotations/${quotation.quotationId}`)
                             }
-                            className="text-blue-600 hover:underline"
+                            className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
+                            title="Xem chi tiết"
                           >
-                            Xem
+                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
                           </button>
                           {/* Chỉ hiển thị nút Sửa nếu status không phải Active, hoặc nếu Active thì phải là Manager */}
                           {(!quotation.status || quotation.status !== "Active" || hasRole("MANAGER") || hasRole("ROLE_MANAGER")) && (

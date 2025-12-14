@@ -5,43 +5,39 @@ import {warehouseService} from "../../../api/warehouseService.js";
 import Pagination from "../../common/Pagination.jsx";
 
 export default function WarehouseList() {
-    const [warehouses, setWarehouses] = useState([]); // Lưu trữ danh sách kho hàng
-    const [loading, setLoading] = useState(true);  // Quản lý trạng thái loading khi fetch data
-    const [error, setError] = useState(null); // Lưu trữ thông báo lỗi nếu có
+    const [warehouses, setWarehouses] = useState([]); 
+    const [loading, setLoading] = useState(true);  
+    const [error, setError] = useState(null); 
 
-    const [searchKeyword, setSearchKeyword] = useState("");// Từ khóa tìm kiếm
-    const [currentPage, setCurrentPage] = useState(0); // Trang hiện tại (bắt đầu từ 0)
-    const [totalPages, setTotalPages] = useState(0);// Tổng số trang
-    const [totalElements, setTotalElements] = useState(0);// Tổng số phần tử
-    const [pageSize, setPageSize] = useState(10);// Số phần tử trên mỗi trang
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [currentPage, setCurrentPage] = useState(0); 
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalElements, setTotalElements] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
 
-    //  States cho bộ lọc
-    const [filterNameOrCode, setFilterNameOrCode] = useState(""); // Lọc theo tên hoặc mã
-    const [filterStatus, setFilterStatus] = useState("All"); // Lọc theo trạng thái (All/Active/Inactive)
+    const [filterNameOrCode, setFilterNameOrCode] = useState(""); 
+    const [filterStatus, setFilterStatus] = useState("All"); 
 
-    // Confirm modal state
     const [confirmState, setConfirmState] = useState({
-        open: false, // Trạng thái hiển thị modal
-        action: null, // Hành động (deactivate/restore)
-        warehouseId: null,  // ID của kho cần thực hiện hành động
-        message: "", // Thông báo xác nhận
+        open: false, 
+        action: null, 
+        warehouseId: null,  
+        message: "", 
     });
 
-    // Toast state
     const [toast, setToast] = useState({
-        open: false, // Trạng thái hiển thị toast
-        message: "",  // Nội dung thông báo
-        type: "success" // Loại thông báo (success/error)
+        open: false, 
+        message: "",  
+        type: "success" 
     }); 
 
-    //Hàm fetch dữ liệu kho
     const fetchWarehouses = async (
-        page = 0, // Trang cần lấy
-        keyword = "", // Từ khóa tìm kiếm
-        statusFilter = "All", // Bộ lọc trạng thái
-        nameOrCodeFilter = "", // Bộ lọc tên/mã
-        useClientFilter = false, // Có sử dụng filter ở client không
-        customPageSize = pageSize // Số phần tử trên trang
+        page = 0, 
+        keyword = "",
+        statusFilter = "All", 
+        nameOrCodeFilter = "", 
+        useClientFilter = false, 
+        customPageSize = pageSize
     ) => {
         try {
             setLoading(true);
@@ -92,14 +88,11 @@ export default function WarehouseList() {
         }
     };
 
-
-
     useEffect(() => {
         setCurrentPage(0);
         fetchWarehouses(0, searchKeyword, filterStatus, filterNameOrCode);
     }, [pageSize]);
 
-    // Xử lý tìm kiếm
     const handleSearch = (e) => {
         e.preventDefault();
 
@@ -108,13 +101,11 @@ export default function WarehouseList() {
         setFilterStatus("All");
     };
 
-     // Xử lý đổi trang
     const handlePageChange = (newPage) => {
         const useClientFilter = Boolean(filterNameOrCode.trim() || (filterStatus && filterStatus !== "All"));
         fetchWarehouses(newPage, searchKeyword, filterStatus, filterNameOrCode, useClientFilter);
     };
 
-    // Xử lý thay đổi số phần tử/trang
     const handlePageSizeChange = (newSize) => {
         setPageSize(newSize);
         setCurrentPage(0);
@@ -199,11 +190,7 @@ export default function WarehouseList() {
 
             <div className="container mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">Danh sách kho</h2>
-                    </div>
 
-                    {/* Confirm Modal */}
                     {confirmState.open && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center">
                             <div className="absolute inset-0 bg-black/30" onClick={closeConfirm}></div>
@@ -226,7 +213,6 @@ export default function WarehouseList() {
                         </div>
                     )}
 
-                    {/* Toast */}
                     {toast.open && (
                         <div className="fixed top-6 right-6 z-[1000] animate-fade-in-down">
                             <div
@@ -260,7 +246,6 @@ export default function WarehouseList() {
                             </form>
 
                             <div className="flex items-center gap-4">
-                                {/* Filters: name/code + status + apply/reset */}
                                 <div className="flex items-center gap-2">
                                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                                             className="px-3 py-2 border border-gray-300 rounded-lg">
@@ -278,14 +263,6 @@ export default function WarehouseList() {
                                     </button>
                                 </div>
 
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"/>
-                                    </svg>
-                                    Bộ lọc
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -347,38 +324,34 @@ export default function WarehouseList() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(w.createdAt)}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{w.createdBy?.username || w.createdBy?.email || ""}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <Link to={`/warehouse/${w.warehouseId}/edit`} title="Sửa"
-                                                      className="p-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900">
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor"
-                                                         viewBox="0 0 24 24" aria-hidden="true">
-                                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                                              strokeWidth="1.5"
-                                                              d="M16.862 4.487l1.651 1.651m-9.193 9.193l-3.32.553.553-3.32 8.64-8.64a1.875 1.875 0 112.652 2.652l-8.652 8.652z"/>
+                                            <div className="flex items-center gap-1">
+                                                <Link to={`/warehouse/${w.warehouseId}`} title="Xem chi tiết"
+                                                      className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300">
+                                                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                </Link>
+                                                <Link to={`/warehouse/${w.warehouseId}/edit`} title="Chỉnh sửa"
+                                                      className="group p-2.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-green-200 hover:border-green-300">
+                                                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
                                                 </Link>
                                                 {w.status === "Active" ? (
                                                     <button onClick={() => openConfirm("deactivate", w.warehouseId)}
                                                             title="Vô hiệu hoá"
-                                                            className="p-2 rounded-md hover:bg-red-50 text-red-600 hover:text-red-700">
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor"
-                                                             viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path strokeLinecap="round" strokeLinejoin="round"
-                                                                  strokeWidth="1.5"
-                                                                  d="M12 3a9 9 0 100 18 9 9 0 000-18zm5 9H7"/>
+                                                            className="group p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-red-200 hover:border-red-300">
+                                                        <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
                                                     </button>
                                                 ) : (
                                                     <button onClick={() => openConfirm("restore", w.warehouseId)}
                                                             title="Khôi phục"
-                                                            className="p-2 rounded-md hover:bg-green-50 text-green-600 hover:text-green-700">
-                                                        <svg className="w-6 h-6 text-green-400 dark:text-green-400"
-                                                             aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
-                                                             width="24" height="24" fill="currentColor"
-                                                             viewBox="0 0 24 24">
-                                                            <path fillRule="evenodd"
-                                                                  d="M15 7a2 2 0 1 1 4 0v4a1 1 0 1 0 2 0V7a4 4 0 0 0-8 0v3H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2V7Zm-5 6a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1Z"
-                                                                  clipRule="evenodd"/>
+                                                            className="group p-2.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-green-200 hover:border-green-300">
+                                                        <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                                         </svg>
                                                     </button>
                                                 )}
