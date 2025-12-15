@@ -1,6 +1,7 @@
 package com.g174.mmssystem.service.IService;
 
 import com.g174.mmssystem.dto.responseDTO.DebtTransactionResponseDTO;
+import com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -24,6 +25,11 @@ public interface IDebtManagementService {
      * @return Page chứa danh sách DebtTransactionResponseDTO
      */
     Page<DebtTransactionResponseDTO> searchDebtTransactions(String keyword, Pageable pageable);
+
+    /**
+     * Tổng hợp công nợ theo tháng hiện tại (group by KH/NCC)
+     */
+    Page<DebtSummaryRowDTO> getCurrentMonthSummary(Pageable pageable);
 }
 
 
