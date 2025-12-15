@@ -84,6 +84,8 @@ import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
 import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
 import UserManagement from "./compnents/pages/Admin/UserManagement";
 import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.jsx";
+import DebtManagementList from "./compnents/pages/DebtManagementList.jsx";
+import DebtManagementDetail from "./compnents/pages/DebtManagementDetail.jsx";
 
 
 
@@ -197,6 +199,10 @@ function App() {
                 <Route path="/reports" element={<ReportList />} />
                 <Route path="/reports/generate" element={<GenerateReport />} />
                 <Route path="/reports/:id" element={<ReportDetail />} />
+
+                {/**Debt Management Routes */}
+                <Route path="/debt-management" element={<DebtManagementList />} />
+                <Route path="/debt-management/detail/:code" element={<DebtManagementDetail />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 
