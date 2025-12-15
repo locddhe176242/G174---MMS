@@ -31,6 +31,16 @@ export const debtManagementService = {
   },
 
   /**
+   * Lấy danh sách tổng hợp công nợ theo tháng hiện tại (group by KH/NCC)
+   */
+  getMonthlySummary: async (page = 0, size = 10) => {
+    const response = await apiClient.get("/debt-transactions/summary/page", {
+      params: { page, size }
+    });
+    return response.data;
+  },
+
+  /**
    * Lấy tất cả giao dịch công nợ (không phân trang)
    * @returns {Promise} Response chứa danh sách tất cả transactions
    */
