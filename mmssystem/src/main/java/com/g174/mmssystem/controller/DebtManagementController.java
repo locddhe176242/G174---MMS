@@ -54,6 +54,16 @@ public class DebtManagementController {
         Page<DebtTransactionResponseDTO> response = debtManagementService.searchDebtTransactions(keyword, pageable);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Tổng hợp công nợ theo tháng hiện tại (group by KH/NCC)
+     */
+    @GetMapping("/summary/page")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT','SALE','PURCHASE')")
+    public ResponseEntity<Page<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO>> getMonthlySummary(Pageable pageable) {
+        Page<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> response = debtManagementService.getCurrentMonthSummary(pageable);
+        return ResponseEntity.ok(response);
+    }
 }
 
 
