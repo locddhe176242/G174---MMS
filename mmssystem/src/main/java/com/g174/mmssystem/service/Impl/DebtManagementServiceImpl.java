@@ -15,9 +15,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +67,62 @@ public class DebtManagementServiceImpl implements IDebtManagementService {
 
         // Paginate manually
         return paginateTransactions(allTransactions, pageable);
+    }
+
+    @Override
+    public Page<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> getCurrentMonthSummary(Pageable pageable) {
+        LocalDate now = LocalDate.now();
+        LocalDate from = now.withDayOfMonth(1);
+        LocalDate to = from.plusMonths(1).minusDays(1);
+
+        List<DebtTransactionResponseDTO> allTransactions = combineAllTransactions(null);
+
+        // filter by current month
+        List<DebtTransactionResponseDTO> inPeriod = allTransactions.stream()
+                .filter(t -> t.getTransactionDate() != null
+                        && !t.getTransactionDate().isBefore(from)
+                        && !t.getTransactionDate().isAfter(to))
+                .toList();
+
+        Map<String, com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> map = new HashMap<>();
+        for (DebtTransactionResponseDTO t : inPeriod) {
+            String code = t.getCustomerVendorCode();
+            if (code == null) continue;
+            String key = (t.getCustomerVendorType() != null ? t.getCustomerVendorType() : "") + "|" + code;
+            var row = map.get(key);
+            if (row == null) {
+                row = com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO.builder()
+                        .customerVendorCode(code)
+                        .customerVendorType(t.getCustomerVendorType())
+                        .customerVendorName(t.getCustomerVendorName())
+                        .totalDebit(BigDecimal.ZERO)
+                        .totalCredit(BigDecimal.ZERO)
+                        .balance(BigDecimal.ZERO)
+                        .build();
+                map.put(key, row);
+            }
+
+            BigDecimal debit = t.getDebitAmount() != null ? t.getDebitAmount() : BigDecimal.ZERO;
+            BigDecimal credit = t.getCreditAmount() != null ? t.getCreditAmount() : BigDecimal.ZERO;
+            row.setTotalDebit(row.getTotalDebit().add(debit));
+            row.setTotalCredit(row.getTotalCredit().add(credit));
+            row.setBalance(row.getTotalDebit().subtract(row.getTotalCredit()));
+        }
+
+        List<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> rows = new ArrayList<>(map.values());
+
+        // sort by code asc as default
+        rows.sort(Comparator.comparing(com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO::getCustomerVendorCode, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        int page = pageable.getPageNumber();
+        int size = pageable.getPageSize();
+        int start = page * size;
+        int end = Math.min(start + size, rows.size());
+        List<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> content = start < rows.size()
+                ? rows.subList(start, end)
+                : Collections.emptyList();
+
+        return new PageImpl<>(content, pageable, rows.size());
     }
 
     /**
