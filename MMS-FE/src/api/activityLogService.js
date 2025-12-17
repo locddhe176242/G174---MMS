@@ -57,6 +57,19 @@ export const activityLogService = {
       console.error(`Lỗi lấy thống kê activity cho user ${userId}:`, error);
       throw error;
     }
+  },
+
+  // Lấy hoạt động gần đây cỡa toàn hệ thống (nhiều users/roles)
+  getRecentSystemActivityLogs: async (limit = 10) => {
+    try {
+      const response = await apiClient.get('/activity-logs/recent', {
+        params: { limit }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi lấy recent system activity logs:', error);
+      throw error;
+    }
   }
 };
 

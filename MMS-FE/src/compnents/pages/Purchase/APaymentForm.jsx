@@ -334,35 +334,22 @@ export default function APaymentForm() {
                         <span className="text-red-500 ml-1">*</span>
                       )}
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={formData.referenceNo}
-                        onChange={(e) => handleInputChange("referenceNo", e.target.value)}
-                        className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          validationErrors.referenceNo ? "border-red-500" : "border-gray-300"
-                        }`}
-                        placeholder={formData.method === "Bank Transfer" ? "Nhập mã giao dịch ngân hàng" : "VD: TT001, HD123..."}
-                      />
-                      <button
-                        type="button"
-                        onClick={generateReferenceNo}
-                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 whitespace-nowrap"
-                        title="Tự động tạo mã"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Tự động tạo
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      value={formData.referenceNo}
+                      onChange={(e) => handleInputChange("referenceNo", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        validationErrors.referenceNo ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder={formData.method === "Bank Transfer" ? "Nhập mã giao dịch ngân hàng" : "VD: TT001, HD123..."}
+                    />
                     {validationErrors.referenceNo && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.referenceNo}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
                       {formData.method === "Bank Transfer" 
                         ? "Bắt buộc nhập mã giao dịch ngân hàng để đối soát"
-                        : "Nhấn \"Tự động tạo\" để tạo mã hoặc nhập mã giao dịch ngân hàng"
+                        : "Nhập mã tham chiếu hoặc mã giao dịch ngân hàng"
                       }
                     </p>
                   </div>

@@ -64,8 +64,8 @@ export default function GoodsReceiptList() {
 
     const getStatusBadge = (status) => {
         const map = {
-            Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
-            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
+            Pending: { label: "Chờ xác nhận", color: "bg-yellow-100 text-yellow-800" },
+            Approved: { label: "Đã nhập kho", color: "bg-green-100 text-green-800" },
             Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
         };
         const statusInfo = map[status] || { label: status || "Chờ duyệt", color: "bg-gray-100 text-gray-800" };
@@ -312,29 +312,29 @@ export default function GoodsReceiptList() {
                                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                                     </svg>
                                                 </div>
-                                            ) : receipt.totalReceivedQty && receipt.totalOrderedQty ? (
+                                            ) : receipt.totalReceivedQty && receipt.totalExpectedQty ? (
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between text-xs mb-1">
-                                                        <span className="font-medium">{receipt.totalReceivedQty}/{receipt.totalOrderedQty}</span>
+                                                        <span className="font-medium">{receipt.totalReceivedQty}/{receipt.totalExpectedQty}</span>
                                                         <span className="text-gray-500">
-                                                            {Math.round((receipt.totalReceivedQty / receipt.totalOrderedQty) * 100)}%
+                                                            {Math.round((receipt.totalReceivedQty / receipt.totalExpectedQty) * 100)}%
                                                         </span>
                                                     </div>
                                                     <div className="w-full bg-gray-200 rounded-full h-2">
                                                         <div 
                                                             className={`h-2 rounded-full ${
-                                                                receipt.totalReceivedQty >= receipt.totalOrderedQty 
+                                                                receipt.totalReceivedQty >= receipt.totalExpectedQty 
                                                                     ? 'bg-green-500' 
                                                                     : 'bg-blue-500'
                                                             }`}
                                                             style={{ 
-                                                                width: `${Math.min((receipt.totalReceivedQty / receipt.totalOrderedQty) * 100, 100)}%` 
+                                                                width: `${Math.min((receipt.totalReceivedQty / receipt.totalExpectedQty) * 100, 100)}%` 
                                                             }}
                                                         ></div>
                                                     </div>
-                                                    {receipt.totalReceivedQty < receipt.totalOrderedQty && (
+                                                    {receipt.totalReceivedQty < receipt.totalExpectedQty && (
                                                         <span className="text-xs text-orange-600 mt-1 block">
-                                                            Còn {receipt.totalOrderedQty - receipt.totalReceivedQty}
+                                                            Còn {receipt.totalExpectedQty - receipt.totalReceivedQty}
                                                         </span>
                                                     )}
                                                 </div>
@@ -393,7 +393,7 @@ export default function GoodsReceiptList() {
                                                 )}
                                                 {(receipt.status === "Approved" || receipt.hasInvoice) && (
                                                     <span className="text-xs text-gray-500 italic">
-                                                        {receipt.hasInvoice ? "Đã có hóa đơn" : "Đã phê duyệt"}
+                                                        {receipt.hasInvoice ? "Đã có hóa đơn" : "Đã nhập kho"}
                                                     </span>
                                                 )}
                                             </div>

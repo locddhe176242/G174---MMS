@@ -78,7 +78,7 @@ public class UserController {
     @LogActivity(
             action = "UPDATE_USER",
             activityType = "PROFILE_UPDATE",
-            description = "Cập nhật thông tin user: #{#request.fullName} - Email: #{#request.email}",
+            description = "Cập nhật thông tin user",
             entityId = "#{#userId}"
     )
     public ResponseEntity<Map<String, Object>> updateUser(
@@ -102,7 +102,7 @@ public class UserController {
     @LogActivity(
             action = "RESET_PASSWORD",
             activityType = "PASSWORD_CHANGE",
-            description = "Admin đặt lại mật khẩu cho user ID: #{#userId}",
+            description = "Admin đặt lại mật khẩu cho user",
             entityId = "#{#userId}"
     )
     public ResponseEntity<Map<String, Object>> resetPassword(
@@ -125,7 +125,7 @@ public class UserController {
     @LogActivity(
             action = "TOGGLE_USER_STATUS",
             activityType = "ACCOUNT_MANAGEMENT",
-            description = "Thay đổi trạng thái user ID: #{#userId}",
+            description = "Thay đổi trạng thái user",
             entityId = "#{#userId}"
     )
     public ResponseEntity<Map<String, Object>> toggleStatus(@PathVariable Integer userId) {
@@ -146,7 +146,7 @@ public class UserController {
     @LogActivity(
             action = "DELETE_USER",
             activityType = "ACCOUNT_MANAGEMENT",
-            description = "Xóa tài khoản user ID: #{#userId}",
+            description = "Xóa tài khoản user",
             entityId = "#{#userId}"
     )
     public ResponseEntity<Map<String, Object>> softDeleteUser(@PathVariable Integer userId) {
@@ -167,7 +167,7 @@ public class UserController {
     @LogActivity(
             action = "RESTORE_USER",
             activityType = "ACCOUNT_MANAGEMENT",
-            description = "Khôi phục tài khoản user ID: #{#userId}",
+            description = "Khôi phục tài khoản user",
             entityId = "#{#userId}"
     )
     public ResponseEntity<Map<String, Object>> restoreUser(@PathVariable Integer userId) {

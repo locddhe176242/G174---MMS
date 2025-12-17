@@ -79,7 +79,9 @@ export const translatePQStatus = (status) => {
 // Goods Receipt Status
 export const translateGRStatus = (status) => {
   const statusMap = {
-    'Pending': 'Chờ xử lý',
+    'Pending': 'Chờ xác nhận',
+    'Approved': 'Đã nhập kho',
+    'Rejected': 'Từ chối',
     'Completed': 'Hoàn thành',
     'Cancelled': 'Đã hủy',
     'Draft': 'Bản nháp'
@@ -122,6 +124,7 @@ export const getStatusColor = (status) => {
     'Pending': 'bg-yellow-100 text-yellow-800',
     'Chờ xử lý': 'bg-yellow-100 text-yellow-800',
     'Chờ duyệt': 'bg-yellow-100 text-yellow-800',
+    'Chờ xác nhận': 'bg-yellow-100 text-yellow-800',
     'Processing': 'bg-blue-100 text-blue-800',
     'Đang xử lý': 'bg-blue-100 text-blue-800',
     'Draft': 'bg-gray-100 text-gray-800',

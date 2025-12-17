@@ -23,19 +23,19 @@ public class ARInvoiceController {
     private final IARInvoiceService arInvoiceService;
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     public ResponseEntity<List<ARInvoiceListResponseDTO>> getAllInvoices() {
         return ResponseEntity.ok(arInvoiceService.getAllInvoices());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     public ResponseEntity<ARInvoiceResponseDTO> getInvoice(@PathVariable Integer id) {
         return ResponseEntity.ok(arInvoiceService.getInvoiceById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     @LogActivity(action = "CREATE_INVOICE", activityType = "SALES_MANAGEMENT", 
             description = "Tạo hóa đơn mới cho khách hàng ID: #{#request.customerId}",
             entityId = "#{#result.body.invoiceId}")
@@ -45,7 +45,7 @@ public class ARInvoiceController {
     }
 
     @PostMapping("/from-delivery/{deliveryId}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     @LogActivity(action = "CREATE_INVOICE_FROM_DELIVERY", activityType = "SALES_MANAGEMENT", 
             description = "Tạo hóa đơn từ Delivery ID: #{#deliveryId}",
             entityId = "#{#result.body.invoiceId}")
@@ -55,7 +55,7 @@ public class ARInvoiceController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     @LogActivity(action = "UPDATE_INVOICE", activityType = "SALES_MANAGEMENT", 
             description = "Cập nhật hóa đơn ID: #{#id}",
             entityId = "#{#id}")
@@ -66,7 +66,7 @@ public class ARInvoiceController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(action = "DELETE_INVOICE", activityType = "SALES_MANAGEMENT", 
             description = "Xóa hóa đơn ID: #{#id}",
             entityId = "#{#id}")
@@ -76,7 +76,7 @@ public class ARInvoiceController {
     }
 
     @PostMapping("/{id}/payments")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     @LogActivity(action = "ADD_INVOICE_PAYMENT", activityType = "SALES_MANAGEMENT", 
             description = "Thêm thanh toán cho hóa đơn ID: #{#id}",
             entityId = "#{#id}")
@@ -88,7 +88,7 @@ public class ARInvoiceController {
     }
 
     @GetMapping("/{id}/payments")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','ACCOUNTING')")
     public ResponseEntity<List<ARPaymentResponseDTO>> getPayments(@PathVariable Integer id) {
         return ResponseEntity.ok(arInvoiceService.getPaymentsByInvoiceId(id));
     }

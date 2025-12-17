@@ -21,6 +21,22 @@ public class DashboardStatsDTO {
     // Low stock products
     private List<LowStockProduct> lowStockProducts;
     
+    // Monthly import/export statistics
+    private List<MonthlyImportExport> monthlyImportExport;
+    
+    // Top warehouses by revenue
+    private List<WarehouseRevenue> topWarehouses;
+    
+    // Warehouse pending tasks (for WAREHOUSE role)
+    private List<PendingInboundDelivery> pendingInboundDeliveries;
+    private List<PendingDelivery> pendingDeliveries;
+    private WarehouseActivity todayActivity;
+    
+    // Accounting data (for ACCOUNTING role)
+    private List<PendingAPInvoice> pendingAPInvoices;
+    private List<OverdueARInvoice> overdueARInvoices;
+    private AccountingSummary accountingSummary;
+    
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -68,5 +84,104 @@ public class DashboardStatsDTO {
         private Long minStock;
         private Double stockPercentage;
         private String status; // "Cực thấp", "Cần bổ sung", "Thời trang"
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MonthlyImportExport {
+        private String month; // Format: "2024-01"
+        private Long importQuantity;
+        private BigDecimal importValue;
+        private Long exportQuantity;
+        private BigDecimal exportValue;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WarehouseRevenue {
+        private Integer warehouseId;
+        private String warehouseName;
+        private String warehouseCode;
+        private BigDecimal totalRevenue;
+        private Long totalOrders;
+        private Long totalQuantity;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PendingInboundDelivery {
+        private Integer inboundDeliveryId;
+        private String inboundDeliveryNo;
+        private String purchaseOrderNo;
+        private String vendorName;
+        private Integer totalItems;
+        private String status;
+        private String expectedDate;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PendingDelivery {
+        private Integer deliveryId;
+        private String deliveryNo;
+        private String salesOrderNo;
+        private String customerName;
+        private Integer totalItems;
+        private String status;
+        private String expectedDate;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WarehouseActivity {
+        private Long todayGoodsReceipts;
+        private Long todayGoodIssues;
+        private Long pendingGoodsReceipts;
+        private Long pendingGoodIssues;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PendingAPInvoice {
+        private Integer apInvoiceId;
+        private String invoiceNo;
+        private String vendorName;
+        private BigDecimal totalAmount;
+        private BigDecimal balanceAmount;
+        private String dueDate;
+        private String status;
+        private Integer daysUntilDue;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OverdueARInvoice {
+        private Integer arInvoiceId;
+        private String invoiceNo;
+        private String customerName;
+        private BigDecimal totalAmount;
+        private BigDecimal balanceAmount;
+        private String dueDate;
+        private String status;
+        private Integer daysOverdue;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AccountingSummary {
+        private BigDecimal totalAccountsPayable;
+        private BigDecimal totalAccountsReceivable;
+        private Integer pendingAPInvoicesCount;
+        private Integer overdueARInvoicesCount;
+        private BigDecimal upcomingPayments7Days;
+        private BigDecimal overdueReceivables;
     }
 }

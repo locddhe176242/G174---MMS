@@ -85,6 +85,9 @@ export default function APaymentList() {
       // Get all payments from all invoices
       const response = await apPaymentService.getAllPayments(page, pageSize, sortFieldValue, sortDirectionValue, keyword);
       
+      console.log('Payment response:', response);
+      console.log('First payment:', response.content?.[0]);
+      
       setPayments(response.content || []);
       setTotalPages(response.totalPages || 0);
       setTotalElements(response.totalElements || 0);
@@ -177,6 +180,12 @@ export default function APaymentList() {
                 {getSortIcon("amount")}
               </div>
             </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              TRẠNG THÁI
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              LÝ DO
+            </th>
             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
               HÀNH ĐỘNG
             </th>
@@ -189,8 +198,8 @@ export default function APaymentList() {
                 {formatDate(payment.paymentDate)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-900 cursor-pointer">
-                <button onClick={() => navigate(`/purchase/ap-invoices/${payment.invoiceId}`)}>
-                  {payment.invoiceNo || `INV-${payment.invoiceId}`}
+                <button onClick={() => navigate(`/purchase/ap-invoices/${payment.apInvoiceId || payment.invoiceId}`)}>
+                  {payment.invoiceNo || `INV-${payment.apInvoiceId || payment.invoiceId}`}
                 </button>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -212,12 +221,32 @@ export default function APaymentList() {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold text-green-600">
                 {formatCurrency(payment.amount)}
               </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {payment.status ? (
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    payment.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                    payment.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                    payment.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {payment.status === 'Completed' ? 'Hoàn thành' :
+                     payment.status === 'Pending' ? 'Chờ xử lý' :
+                     payment.status === 'Cancelled' ? 'Đã hủy' :
+                     payment.status}
+                  </span>
+                ) : '-'}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                <div className="truncate" title={payment.remark || payment.remarks}>
+                  {payment.remark || payment.remarks || '-'}
+                </div>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div className="flex items-center justify-center gap-1">
                   <button
-                    onClick={() => navigate(`/purchase/ap-invoices/${payment.invoiceId}`)}
+                    onClick={() => navigate(`/purchase/ap-payments/${payment.apPaymentId}`)}
                     className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
-                    title="Xem hóa đơn"
+                    title="Xem chi tiết thanh toán"
                   >
                     <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

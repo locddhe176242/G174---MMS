@@ -20,5 +20,16 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Integer>, Jp
      */
     @Query("SELECT d FROM Delivery d WHERE d.salesOrder.soId = :soId AND d.deletedAt IS NULL")
     List<Delivery> findBySalesOrder_SoIdAndDeletedAtIsNull(@Param("soId") Integer soId);
+    
+    /**
+     * Tìm pending deliveries với JOIN FETCH để tránh lazy loading
+     */
+    @Query("SELECT d FROM Delivery d " +
+           "LEFT JOIN FETCH d.salesOrder so " +
+           "LEFT JOIN FETCH so.customer " +
+           "WHERE d.deletedAt IS NULL " +
+           "AND (d.status = 'Draft' OR d.status = 'Picked') " +
+           "ORDER BY d.createdAt DESC")
+    List<Delivery> findPendingDeliveriesWithDetails();
 }
 

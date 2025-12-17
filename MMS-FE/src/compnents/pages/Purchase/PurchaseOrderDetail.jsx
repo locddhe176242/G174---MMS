@@ -301,10 +301,10 @@ export default function PurchaseOrderDetail() {
                             )}
                             {canCreateGR && (
                                 <button
-                                    onClick={() => navigate(`/purchase/goods-receipts/new?po_id=${id}`)}
+                                    onClick={() => navigate(`/purchase/inbound-deliveries/new?po_id=${id}`)}
                                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                                 >
-                                    Tạo phiếu nhập kho
+                                    Tạo kế hoạch nhận hàng
                                 </button>
                             )}
                             {normalizedApprovalStatus === "Approved" && data?.hasGoodsReceipt && (
@@ -371,6 +371,7 @@ export default function PurchaseOrderDetail() {
                                             <tr className="text-left text-gray-500 border-b">
                                                 <th className="py-3 pr-4">#</th>
                                                 <th className="py-3 pr-4">Mã SP</th>
+                                                <th className="py-3 pr-4">Tên sản phẩm</th>
                                                 <th className="py-3 pr-4">ĐVT</th>
                                                 <th className="py-3 pr-4">Số lượng</th>
                                                 <th className="py-3 pr-4">Đơn giá</th>
@@ -388,6 +389,9 @@ export default function PurchaseOrderDetail() {
                                                         <td className="py-3 pr-4">{index + 1}</td>
                                                         <td className="py-3 pr-4">
                                         {getProductCode(item)}
+                                                        </td>
+                                                        <td className="py-3 pr-4">
+                                                            {item.productName || item.product_name || "-"}
                                                         </td>
                                                         <td className="py-3 pr-4">
                                                             {item.uom || "-"}
@@ -410,47 +414,103 @@ export default function PurchaseOrderDetail() {
                                                             {formatCurrency(item.tax_amount || item.taxAmount || 0)}
                                                         </td>
                                                         <td className="py-3 pr-0 text-right font-medium">
-                                                            {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || item.unitPrice || 0))}
+                                                            {formatCurrency(itemTotal)}
                                                         </td>
                                                     </tr>
                                                 );
                                             })}
                                             </tbody>
                                             <tfoot>
-                                            <tr className="border-t font-semibold bg-gray-50">
-                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
-                                                    Tổng trước thuế:
-                                                </td>
-                                                <td className="py-3 pr-0 text-right">
-                                                    {formatCurrency(totalBeforeTax)}
-                                                </td>
-                                            </tr>
-                                            <tr className="border-t font-semibold bg-gray-50">
-                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
-                                                    Tổng thuế:
-                                                </td>
-                                                <td className="py-3 pr-0 text-right">
-                                                    {formatCurrency(taxAmount)}
-                                                </td>
-                                            </tr>
-                                            {data.headerDiscount > 0 && (
-                                                <tr className="border-t font-semibold bg-gray-50">
-                                                    <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
-                                                        Chiết khấu tổng đơn ({data.headerDiscount}%):
-                                                    </td>
-                                                    <td className="py-3 pr-0 text-right text-red-600">
-                                                        -{formatCurrency(Math.round(totalBeforeTax * (data.headerDiscount / 100) * 100) / 100)}
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            <tr className="border-t-2 font-semibold bg-gray-100">
-                                                <td colSpan={8} className="py-3 pr-4 text-right whitespace-nowrap">
-                                                    Tổng cộng:
-                                                </td>
-                                                <td className="py-3 pr-0 text-right">
-                                                    {formatCurrency(totalAfterTax)}
-                                                </td>
-                                            </tr>
+                                            {(() => {
+                                                // Tính toán các giá trị
+                                                const subtotal = items.reduce((sum, item) => {
+                                                    const qty = Number(item.quantity || 0);
+                                                    const price = Number(item.unit_price || item.unitPrice || 0);
+                                                    return sum + (qty * price);
+                                                }, 0);
+                                                
+                                                const itemDiscounts = items.reduce((sum, item) => {
+                                                    const qty = Number(item.quantity || 0);
+                                                    const price = Number(item.unit_price || item.unitPrice || 0);
+                                                    const discountPercent = Number(item.discount_percent || item.discountPercent || 0);
+                                                    return sum + (qty * price * discountPercent / 100);
+                                                }, 0);
+                                                
+                                                const afterItemDiscount = subtotal - itemDiscounts;
+                                                const headerDiscountAmount = Math.round(afterItemDiscount * (data.headerDiscount || 0) / 100 * 100) / 100;
+                                                const afterHeaderDiscount = afterItemDiscount - headerDiscountAmount;
+                                                const totalTax = taxAmount;
+                                                const finalTotal = totalAfterTax;
+                                                
+                                                return (
+                                                    <>
+                                                        <tr className="border-t bg-gray-50">
+                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                Tạm tính:
+                                                            </td>
+                                                            <td className="py-3 pr-0 text-right">
+                                                                {formatCurrency(subtotal)}
+                                                            </td>
+                                                        </tr>
+                                                        {itemDiscounts > 0 && (
+                                                            <>
+                                                                <tr className="bg-gray-50">
+                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                        Chiết khấu sản phẩm:
+                                                                    </td>
+                                                                    <td className="py-3 pr-0 text-right text-red-600">
+                                                                        {formatCurrency(itemDiscounts)}
+                                                                    </td>
+                                                                </tr>
+                                                                <tr className="bg-gray-50">
+                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                        Tổng sau chiết khấu sản phẩm:
+                                                                    </td>
+                                                                    <td className="py-3 pr-0 text-right">
+                                                                        {formatCurrency(afterItemDiscount)}
+                                                                    </td>
+                                                                </tr>
+                                                            </>
+                                                        )}
+                                                        {data.headerDiscount > 0 && (
+                                                            <>
+                                                                <tr className="bg-gray-50">
+                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                        Chiết khấu tổng đơn ({data.headerDiscount}%):
+                                                                    </td>
+                                                                    <td className="py-3 pr-0 text-right text-red-600">
+                                                                        {formatCurrency(headerDiscountAmount)}
+                                                                    </td>
+                                                                </tr>
+                                                                <tr className="bg-gray-50">
+                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                        Tiền sau khi chiết khấu tổng đơn:
+                                                                    </td>
+                                                                    <td className="py-3 pr-0 text-right">
+                                                                        {formatCurrency(afterHeaderDiscount)}
+                                                                    </td>
+                                                                </tr>
+                                                            </>
+                                                        )}
+                                                        <tr className="bg-gray-50">
+                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                Thuế:
+                                                            </td>
+                                                            <td className="py-3 pr-0 text-right">
+                                                                {formatCurrency(totalTax)}
+                                                            </td>
+                                                        </tr>
+                                                        <tr className="border-t-2 font-semibold bg-gray-100">
+                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                Tổng cộng:
+                                                            </td>
+                                                            <td className="py-3 pr-0 text-right">
+                                                                {formatCurrency(finalTotal)}
+                                                            </td>
+                                                        </tr>
+                                                    </>
+                                                );
+                                            })()}
                                             </tfoot>
                                         </table>
                                     </div>

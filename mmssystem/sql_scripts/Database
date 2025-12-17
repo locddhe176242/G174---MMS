@@ -490,10 +490,73 @@ CREATE TABLE Purchase_Order_Items (
     INDEX idx_poi_qty_tracking (order_id, received_qty, invoiced_qty)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =====================================================
+-- INBOUND DELIVERY (CHỨNG TỪ YÊU CẦU NHẬN HÀNG)
+-- =====================================================
+
+CREATE TABLE Inbound_Deliveries (
+    inbound_delivery_id INT AUTO_INCREMENT PRIMARY KEY,
+    inbound_delivery_no VARCHAR(30) UNIQUE NOT NULL,
+    order_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    planned_date DATETIME,
+    vendor_id INT NOT NULL,
+    shipping_address TEXT,
+    status ENUM('Draft', 'Pending', 'Completed', 'Cancelled') DEFAULT 'Draft',
+    notes TEXT,
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
+
+    CONSTRAINT fk_inbound_delivery_order 
+      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_inbound_delivery_warehouse 
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_inbound_delivery_vendor 
+      FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_inbound_delivery_created_by 
+      FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_inbound_delivery_updated_by 
+      FOREIGN KEY (updated_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+
+    INDEX idx_inbound_delivery_no (inbound_delivery_no),
+    INDEX idx_inbound_delivery_status (status, deleted_at),
+    INDEX idx_inbound_delivery_order (order_id),
+    INDEX idx_inbound_delivery_warehouse (warehouse_id),
+    INDEX idx_inbound_delivery_planned_date (planned_date),
+    INDEX idx_inbound_delivery_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE Inbound_Delivery_Items (
+    idi_id INT AUTO_INCREMENT PRIMARY KEY,
+    inbound_delivery_id INT NOT NULL,
+    poi_id INT NOT NULL,
+    product_id INT NOT NULL,
+    expected_qty DECIMAL(18, 2) NOT NULL,
+    uom VARCHAR(50),
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_idi_inbound_delivery 
+      FOREIGN KEY (inbound_delivery_id) REFERENCES Inbound_Deliveries(inbound_delivery_id) ON DELETE CASCADE,
+    CONSTRAINT fk_idi_poi 
+      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_idi_product 
+      FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+
+    INDEX idx_idi_inbound_delivery (inbound_delivery_id),
+    INDEX idx_idi_poi (poi_id),
+    INDEX idx_idi_product (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Chi tiết sản phẩm trong đơn nhận hàng';
+
 CREATE TABLE Goods_Receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_no VARCHAR(30) UNIQUE NOT NULL,
-    order_id INT NULL,
+    -- GR cho Purchase flow: BẮT BUỘC từ Inbound Delivery
+    inbound_delivery_id INT NULL,
     warehouse_id INT NOT NULL,
     received_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
@@ -507,8 +570,8 @@ CREATE TABLE Goods_Receipts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME DEFAULT NULL,
-    CONSTRAINT fk_gr_order
-      FOREIGN KEY (order_id) REFERENCES Purchase_Orders(order_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gr_inbound_delivery
+      FOREIGN KEY (inbound_delivery_id) REFERENCES Inbound_Deliveries(inbound_delivery_id) ON DELETE RESTRICT,
     CONSTRAINT fk_gr_warehouse
       FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
     CONSTRAINT fk_gr_created_by
@@ -517,17 +580,21 @@ CREATE TABLE Goods_Receipts (
       FOREIGN KEY (approved_by) REFERENCES Users(user_id) ON DELETE SET NULL,
     INDEX idx_gr_no (receipt_no),
     INDEX idx_gr_status (status, deleted_at),
-    INDEX idx_gr_order (order_id),
+    INDEX idx_gr_inbound_delivery (inbound_delivery_id),
     INDEX idx_gr_warehouse (warehouse_id),
     INDEX idx_gr_return_order (ro_id),
-    INDEX idx_gr_source_type (source_type)
+    INDEX idx_gr_source_type (source_type),
+    -- Constraint: Purchase flow PHẢI có inbound_delivery_id
+    CONSTRAINT chk_gr_source_purchase 
+      CHECK (source_type != 'Purchase' OR inbound_delivery_id IS NOT NULL)
+    -- Note: CHECK constraint cho SalesReturn sẽ được thêm sau khi FK được tạo
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Goods_Receipt_Items (
     gri_id INT AUTO_INCREMENT PRIMARY KEY,
     receipt_id INT NOT NULL,
-    -- Dùng cho trường hợp nhập mua (purchase)
-    poi_id INT NULL,
+    -- Dùng cho trường hợp nhập mua (purchase) - tham chiếu Inbound Delivery Item
+    idi_id INT NULL,
     -- Dùng cho trường hợp nhập hàng trả bán (sales return) - FK sẽ được thêm sau khi return_order_items được tạo
     roi_id INT NULL,
     product_id INT NOT NULL,
@@ -536,11 +603,12 @@ CREATE TABLE Goods_Receipt_Items (
     remark TEXT,
     CONSTRAINT fk_gri_receipt
       FOREIGN KEY (receipt_id) REFERENCES Goods_Receipts(receipt_id) ON DELETE CASCADE,
-    CONSTRAINT fk_gri_poi
-      FOREIGN KEY (poi_id) REFERENCES Purchase_Order_Items(poi_id) ON DELETE SET NULL,
+    CONSTRAINT fk_gri_idi
+      FOREIGN KEY (idi_id) REFERENCES Inbound_Delivery_Items(idi_id) ON DELETE SET NULL,
     CONSTRAINT fk_gri_product
       FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
     INDEX idx_gri_receipt (receipt_id),
+    INDEX idx_gri_idi (idi_id),
     INDEX idx_gri_product (product_id),
     INDEX idx_gri_return_item (roi_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -659,10 +727,10 @@ CREATE TABLE Sales_Quotations (
     quotation_no VARCHAR(30) UNIQUE NOT NULL,
     customer_id INT NOT NULL,
     quotation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    valid_until DATE,
     payment_terms VARCHAR(255),
     delivery_terms VARCHAR(255),
-    header_discount DECIMAL(18, 2) DEFAULT 0,
+    header_discount_percent DECIMAL(18, 2) DEFAULT 0,
+    header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     subtotal DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
@@ -705,12 +773,14 @@ CREATE TABLE Sales_Orders (
     customer_id INT NOT NULL,
     sq_id INT,
     order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('Draft', 'Pending', 'Approved', 'Fulfilled', 'Cancelled') DEFAULT 'Draft',
-    approval_status ENUM('Draft', 'Pending', 'Approved', 'Rejected') DEFAULT 'Draft',
+    status ENUM('Draft', 'Approved', 'Fulfilled', 'Cancelled') DEFAULT 'Draft',
+    approval_status ENUM('Draft', 'Approved') DEFAULT 'Draft',
     approver_id INT,
     approved_at DATETIME,
     shipping_address TEXT,
     payment_terms VARCHAR(255),
+    header_discount_percent DECIMAL(5, 2) DEFAULT 0,
+    header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     subtotal DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
@@ -807,7 +877,7 @@ CREATE TABLE Good_Issues (
     delivery_id INT NOT NULL,
     warehouse_id INT NOT NULL,
     issue_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('Draft', 'Pending', 'Approved', 'Rejected') DEFAULT 'Draft',
+    status ENUM('Draft', 'Approved') DEFAULT 'Draft',
     created_by INT,
     approved_by INT,
     approved_at DATETIME,
@@ -856,6 +926,8 @@ CREATE TABLE AR_Invoices (
     invoice_date DATE DEFAULT (CURRENT_DATE()),
     due_date DATE,
     subtotal DECIMAL(18, 2) DEFAULT 0,
+    header_discount_percent DECIMAL(5, 2) DEFAULT 0,
+    header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
     balance_amount DECIMAL(18, 2) DEFAULT 0,
@@ -934,7 +1006,7 @@ CREATE TABLE IF NOT EXISTS return_orders (
     invoice_id INT,
     warehouse_id INT NOT NULL,
     return_date DATETIME,
-    status ENUM('Draft', 'Approved', 'Rejected', 'Completed', 'Cancelled') DEFAULT 'Draft',
+    status ENUM('Draft', 'Approved', 'Completed', 'Cancelled') DEFAULT 'Draft',
     -- Trạng thái liên quan tới phiếu nhập kho cho đơn trả hàng
     goods_receipt_status ENUM('None','Pending','Completed') DEFAULT 'None',
     receipt_id INT,
@@ -1053,6 +1125,8 @@ CREATE TABLE IF NOT EXISTS credit_notes (
     reason TEXT,
     notes TEXT,
     subtotal DECIMAL(18, 2) DEFAULT 0,
+    header_discount_percent DECIMAL(5, 2) DEFAULT 0,
+    header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
     created_by INT,

@@ -42,6 +42,9 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, In
     @Query("SELECT po FROM PurchaseOrder po WHERE po.purchaseQuotation.pqId = :pqId AND po.deletedAt IS NULL")
     List<PurchaseOrder> findByPqId(@Param("pqId") Integer pqId);
 
+    @Query("SELECT po FROM PurchaseOrder po WHERE po.purchaseQuotation.rfq.rfqId = :rfqId AND po.deletedAt IS NULL")
+    List<PurchaseOrder> findByRfqId(@Param("rfqId") Integer rfqId);
+
     @Query("SELECT DISTINCT po FROM PurchaseOrder po " +
            "LEFT JOIN FETCH po.items i " +
            "LEFT JOIN FETCH i.product " +

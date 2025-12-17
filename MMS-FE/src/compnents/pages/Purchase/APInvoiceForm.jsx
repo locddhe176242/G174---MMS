@@ -61,7 +61,8 @@ export default function APInvoiceForm() {
     };
   };
 
-  const totalBeforeTax = useMemo(() => {
+  // Tổng chưa chiết khấu (qty × price)
+  const totalSubtotal = useMemo(() => {
     if (!Array.isArray(formData.items)) return 0;
     return formData.items.reduce((sum, it) => {
       const calc = calculateItemTotal(it);
@@ -92,19 +93,34 @@ export default function APInvoiceForm() {
   }, [totalAfterLineDiscount, formData.header_discount]);
 
   const taxAmount = useMemo(() => {
-    if (!Array.isArray(formData.items)) return 0;
-    // Thuế tính trên tổng sau khi trừ TẤT CẢ chiết khấu (line discount + header discount)
-    const baseAmount = totalAfterLineDiscount - headerDiscountAmount;
-    // Lấy tax rate trung bình hoặc tax rate của dòng đầu tiên (thường các dòng cùng tax rate)
-    const taxRate = formData.items.length > 0 ? (Number(formData.items[0].tax_rate || 0) / 100) : 0;
-    return baseAmount * taxRate;
-  }, [formData.items, totalAfterLineDiscount, headerDiscountAmount]);
+    if (!Array.isArray(formData.items) || formData.items.length === 0) return 0;
+    
+    // Calculate header discount ratio
+    const headerDiscountPercent = Number(formData.header_discount || 0) / 100;
+    
+    // Tính thuế cho từng dòng sau khi áp dụng cả 2 loại chiết khấu
+    return formData.items.reduce((sum, item) => {
+      const calc = calculateItemTotal(item);
+      const lineAfterDiscount = calc.amountAfterDiscount;
+      // Sau chiết khấu header (áp dụng tỷ lệ)
+      const lineAfterHeaderDiscount = lineAfterDiscount * (1 - headerDiscountPercent);
+      // Thuế của dòng
+      const taxRate = Number(item.tax_rate || 0) / 100;
+      const lineTax = lineAfterHeaderDiscount * taxRate;
+      
+      return sum + lineTax;
+    }, 0);
+  }, [formData.items, formData.header_discount]);
+
+  // totalBeforeTax = Tổng sau tất cả chiết khấu nhưng TRƯỚC thuế
+  const totalBeforeTax = useMemo(() => {
+    return totalAfterLineDiscount - headerDiscountAmount;
+  }, [totalAfterLineDiscount, headerDiscountAmount]);
 
   const totalAmount = useMemo(() => {
-    // Công thức chuẩn ERP: Tổng = (Tổng sau CK dòng - CK tổng đơn) + Thuế
-    // Thuế đã được tính trên số tiền sau tất cả chiết khấu
-    return totalAfterLineDiscount - headerDiscountAmount + taxAmount;
-  }, [totalAfterLineDiscount, headerDiscountAmount, taxAmount]);
+    // Công thức: Tổng sau chiết khấu + Thuế
+    return totalBeforeTax + taxAmount;
+  }, [totalBeforeTax, taxAmount]);
 
   const balanceAmount = useMemo(() => {
     return totalAmount; // Initially balance = total, will be updated when payments are made
@@ -744,13 +760,13 @@ export default function APInvoiceForm() {
                       <thead>
                         <tr className="text-left text-gray-500 border-b">
                           <th className="py-3 pr-4">#</th>
-                          <th className="py-3 pr-4">Mã SP</th>
-                          <th className="py-3 pr-4 text-center">ĐVT</th>
-                          <th className="py-3 pr-4 text-right">Số lượng</th>
-                          <th className="py-3 pr-4 text-right">Đơn giá</th>
-                          <th className="py-3 pr-4 text-center">CK (%)</th>
+                          <th className="py-3 pr-4">Sản phẩm</th>
+                          <th className="py-3 pr-4 text-right">SL yêu cầu</th>
+                          <th className="py-3 pr-4 text-right">Đơn giá/Sản phẩm(VND)</th>
+                          <th className="py-3 pr-4 text-center">Chiết Khấu (%)</th>
+                          <th className="py-3 pr-4 text-center">Thuế (%)</th>
+                          <th className="py-3 pr-4">Ghi chú</th>
                           <th className="py-3 pr-4 text-right">Thành tiền</th>
-                          <th className="py-3 pr-4 text-center">Hành động</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -763,104 +779,28 @@ export default function APInvoiceForm() {
                             <tr key={index} className="border-t hover:bg-gray-50">
                               <td className="py-3 pr-4">{index + 1}</td>
                               <td className="py-3 pr-4">
-                                {isFromGR ? (
-                                  <span className="text-gray-900">{item.description || "-"}</span>
-                                ) : (
-                                  <>
-
-                                    <input
-                                      type="text" // Mã sản phẩm
-                                      value={item.description}
-                                      onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                                      className={`w-full px-2 py-1 border rounded text-sm ${itemErr.description ? "border-red-500" : "border-gray-300"}`}
-                                      placeholder="Mã sản phẩm"
-                                    />
-                                    {itemErr.description && (
-                                      <p className="text-red-500 text-xs mt-1">{itemErr.description}</p>
-                                    )}
-                                  </>
-                                )}
-                              </td>
-                              <td className="py-3 pr-4">
-                                {isFromGR ? (
-                                  <span>{item.uom || "-"}</span>
-                                ) : (
-                                  <input
-                                    type="text" // Đơn vị tính
-                                    value={item.uom || ""}
-                                    onChange={(e) => handleItemChange(index, "uom", e.target.value)}
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                    placeholder="ĐVT"
-                                  />
-                                )}
+                                <div className="font-medium">{item.description || "-"}</div>
+                                <div className="text-xs text-gray-500">SKU: {item.product_code || "-"}</div>
                               </td>
                               <td className="py-3 pr-4 text-right">
-                                {isFromGR ? (
-                                  <span>{Number(item.quantity || 0).toLocaleString()}</span>
-                                ) : (
-                                  <>
-                                    <input
-                                      type="number" // Số lượng
-                                      value={item.quantity}
-                                      onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
-                                      className={`w-20 px-2 py-1 border rounded text-sm text-right ${itemErr.quantity ? "border-red-500" : "border-gray-300"}`}
-                                      min="1"
-                                      step="1"
-                                    />
-                                    {itemErr.quantity && (
-                                      <p className="text-red-500 text-xs mt-1">{itemErr.quantity}</p>
-                                    )}
-                                  </>
-                                )}
+                                <span>{Number(item.quantity || 0).toLocaleString()}</span>
                               </td>
                               <td className="py-3 pr-4 text-right">
-                                {isFromGR ? (
-                                  <span>{formatCurrency(item.unit_price || 0)}</span>
-                                ) : (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={formatNumberInput(item.unit_price)}
-                                      onChange={(e) => handleItemChange(index, "unit_price", parseNumberInput(e.target.value))}
-                                      className={`w-32 px-2 py-1 border rounded text-sm text-right ${itemErr.unit_price ? "border-red-500" : "border-gray-300"}`}
-                                      placeholder="0"
-                                    />
-                                    {itemErr.unit_price && (
-                                      <p className="text-red-500 text-xs mt-1">{itemErr.unit_price}</p>
-                                    )}
-                                  </>
-                                )}
+                                <span>{formatCurrency(item.unit_price || 0)}</span>
                               </td>
                               <td className="py-3 pr-4 text-center">
-                                {isFromGR ? (
-                                  <span className={item.discount_percent ? "text-green-600 font-medium" : ""}>
-                                    {Number(item.discount_percent || 0).toFixed(2)}%
-                                  </span>
-                                ) : (
-                                  <input
-                                    type="number"
-                                    value={item.discount_percent || 0}
-                                    onChange={(e) => handleItemChange(index, "discount_percent", parseFloat(e.target.value) || 0)}
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-center"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                  />
-                                )}
+                                <span className={item.discount_percent ? "text-green-600 font-medium" : ""}>
+                                  {Number(item.discount_percent || 0).toFixed(2)}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4 text-center">
+                                <span>{Number(item.tax_rate || 0).toFixed(2)}</span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="text-sm text-gray-600">{item.remark || "-"}</span>
                               </td>
                               <td className="py-3 pr-4 text-right font-medium">
                                 {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || 0))}
-                              </td>
-                              <td className="py-3 pr-4 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => removeItem(index)}
-                                  disabled={isFromGR}
-                                  className={`text-sm font-medium ${isFromGR ? "text-gray-400 cursor-not-allowed" : "text-red-600 hover:text-red-800"}`}
-                                  title={isFromGR ? "Không thể xóa dòng khi import từ GR" : "Xóa dòng"}
-                                >
-                                  Xoá
-                                </button>
                               </td>
                             </tr>
                           );
@@ -881,7 +821,7 @@ export default function APInvoiceForm() {
                               Chiết khấu sản phẩm:
                             </td>
                             <td className="py-3 pr-4 text-right text-red-600">
-                              -{formatCurrency(totalDiscount)}
+                              {formatCurrency(totalDiscount)}
                             </td>
                           </tr>
                         )}
@@ -900,7 +840,7 @@ export default function APInvoiceForm() {
                                 Chiết khấu tổng đơn ({formData.header_discount}%):
                               </td>
                               <td className="py-3 pr-4 text-right text-red-600">
-                                -{formatCurrency(headerDiscountAmount)}
+                                {formatCurrency(headerDiscountAmount)}
                               </td>
                             </tr>
                             <tr className="border-t font-semibold bg-gray-50">
@@ -915,7 +855,7 @@ export default function APInvoiceForm() {
                         )}
                         <tr className="border-t font-semibold bg-gray-50">
                           <td colSpan="7" className="py-3 pr-4 text-right whitespace-nowrap">
-                            Thuế VAT ({formData.items.length > 0 ? formData.items[0].tax_rate || 0 : 0}%):
+                            Thuế:
                           </td>
                           <td className="py-3 pr-4 text-right">
                             {formatCurrency(taxAmount)}

@@ -80,7 +80,7 @@ public class SalesQuotationController {
     @LogActivity(
             action = "UPDATE_SALES_QUOTATION",
             activityType = "SALES_MANAGEMENT",
-            description = "Cập nhật báo giá ID: #{#id}",
+            description = "Cập nhật báo giá bán hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesQuotationResponseDTO> updateQuotation(
@@ -94,7 +94,7 @@ public class SalesQuotationController {
     @LogActivity(
             action = "CHANGE_SALES_QUOTATION_STATUS",
             activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái báo giá ID: #{#id} sang #{#status}",
+            description = "Đổi trạng thái báo giá bán hàng sang #{#status}",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesQuotationResponseDTO> changeStatus(
@@ -108,7 +108,7 @@ public class SalesQuotationController {
     @LogActivity(
             action = "DELETE_SALES_QUOTATION",
             activityType = "SALES_MANAGEMENT",
-            description = "Xóa báo giá ID: #{#id}",
+            description = "Xóa báo giá bán hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> deleteQuotation(@PathVariable Integer id) {

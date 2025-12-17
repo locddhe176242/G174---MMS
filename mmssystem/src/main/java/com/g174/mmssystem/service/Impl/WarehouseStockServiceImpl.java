@@ -32,7 +32,7 @@ public class WarehouseStockServiceImpl implements IWarehouseStockService {
     @Override
     @Transactional(readOnly = true)
     public List<WarehouseStockResponseDTO> getStockByWarehouseId(Integer warehouseId) {
-        List<WarehouseStock> stocks = warehouseStockRepository.findByWarehouseId(warehouseId);
+        List<WarehouseStock> stocks = warehouseStockRepository.findByWarehouseIdWithProductAndCategory(warehouseId);
         return stocks.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -168,13 +168,19 @@ public class WarehouseStockServiceImpl implements IWarehouseStockService {
     }
 
     private WarehouseStockResponseDTO convertToDTO(WarehouseStock stock) {
+        Product product = stock.getProduct();
         return WarehouseStockResponseDTO.builder()
                 .warehouseId(stock.getWarehouseId())
                 .warehouseCode(stock.getWarehouse() != null ? stock.getWarehouse().getCode() : null)
                 .warehouseName(stock.getWarehouse() != null ? stock.getWarehouse().getName() : null)
                 .productId(stock.getProductId())
-                .productSku(stock.getProduct() != null ? stock.getProduct().getSku() : null)
-                .productName(stock.getProduct() != null ? stock.getProduct().getName() : null)
+                .productSku(product != null ? product.getSku() : null)
+                .productName(product != null ? product.getName() : null)
+                .productUom(product != null ? product.getUom() : null)
+                .productSellingPrice(product != null ? product.getSellingPrice() : null)
+                .productPurchasePrice(product != null ? product.getPurchasePrice() : null)
+                .productCategoryName(product != null && product.getCategory() != null ? product.getCategory().getName() : null)
+                .productStatus(product != null && product.getStatus() != null ? product.getStatus().name() : null)
                 .quantity(stock.getQuantity())
                 .build();
     }

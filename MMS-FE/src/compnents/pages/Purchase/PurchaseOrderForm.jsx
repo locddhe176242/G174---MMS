@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
@@ -48,6 +48,7 @@ export default function PurchaseOrderForm() {
 
     const [vendors, setVendors] = useState([]);
     const [loadingVendors, setLoadingVendors] = useState(false);
+    const quotationLoadedRef = useRef(false);
     const [products, setProducts] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
@@ -65,6 +66,11 @@ export default function PurchaseOrderForm() {
         const storedUser = getCurrentUser();
         return storedUser?.userId || storedUser?.user_id || storedUser?.id || null;
     }, [currentUser]);
+
+    const paymentTermsOptions = [
+        { value: 'COD - Thanh toán sau khi nhận hàng và giao hàng', label: 'COD - Thanh toán sau khi nhận hàng và giao hàng' },
+        { value: 'Net 30 - Thanh toán trong 30 ngày', label: 'Net 30 - Thanh toán trong 30 ngày' },
+    ];
 
     // Import Quotation state
     const [showImportModal, setShowImportModal] = useState(false);
@@ -93,7 +99,8 @@ export default function PurchaseOrderForm() {
         };
     }, []);
 
-    const totalBeforeTax = useMemo(() => {
+    // Tổng chưa chiết khấu (qty × price) - dùng để hiển thị "Tạm tính"
+    const totalSubtotal = useMemo(() => {
         if (!Array.isArray(formData.items)) return 0;
         return formData.items.reduce((sum, it) => {
             const qty = Number(it.quantity || 0);
@@ -132,22 +139,45 @@ export default function PurchaseOrderForm() {
         return round(totalAfterLineDiscount * (discountPercent / 100));
     }, [totalAfterLineDiscount, formData.header_discount]);
 
+    // totalBeforeTax = Tổng sau tất cả chiết khấu nhưng TRƯỚC thuế
+    const totalBeforeTax = useMemo(() => {
+        const round = (v) => Math.round(v * 100) / 100;
+        // Công thức: Tổng sau CK dòng - CK header
+        return round(totalAfterLineDiscount - headerDiscountAmount);
+    }, [totalAfterLineDiscount, headerDiscountAmount]);
+
     const totalTax = useMemo(() => {
         const round = (v) => Math.round(v * 100) / 100;
-        if (!Array.isArray(formData.items)) return 0;
-        // Thuế tính trên tổng sau khi trừ TẤT CẢ chiết khấu (line discount + header discount)
-        const baseAmount = round(totalAfterLineDiscount - headerDiscountAmount);
-        // Lấy tax rate trung bình hoặc tax rate của dòng đầu tiên
-        const taxRate = formData.items.length > 0 ? (Number(formData.items[0].tax_rate || 0) / 100) : 0;
-        return round(baseAmount * taxRate);
-    }, [formData.items, totalAfterLineDiscount, headerDiscountAmount]);
+        if (!Array.isArray(formData.items) || formData.items.length === 0) return 0;
+        
+        // Calculate header discount ratio
+        const headerDiscountPercent = Number(formData.header_discount || 0) / 100;
+        
+        // Tính thuế cho từng dòng sau khi áp dụng cả 2 loại chiết khấu
+        return formData.items.reduce((sum, item) => {
+            const qty = Number(item.quantity || 0);
+            const price = Number(item.unit_price || 0);
+            const lineDiscountPercent = Number(item.discount_percent || 0) / 100;
+            const taxRate = Number(item.tax_rate || 0) / 100;
+            
+            // Subtotal của dòng
+            const lineSubtotal = qty * price;
+            // Sau chiết khấu dòng
+            const lineAfterDiscount = lineSubtotal * (1 - lineDiscountPercent);
+            // Sau chiết khấu header (áp dụng tỷ lệ)
+            const lineAfterHeaderDiscount = lineAfterDiscount * (1 - headerDiscountPercent);
+            // Thuế của dòng
+            const lineTax = lineAfterHeaderDiscount * taxRate;
+            
+            return sum + round(lineTax);
+        }, 0);
+    }, [formData.items, formData.header_discount]);
 
     const totalAfterTax = useMemo(() => {
         const round = (v) => Math.round(v * 100) / 100;
-        // Công thức: Tổng = (Tổng sau CK dòng - CK tổng đơn) + Thuế
-        // Thuế đã được tính trên số tiền sau tất cả chiết khấu
-        return round(totalAfterLineDiscount - headerDiscountAmount + totalTax);
-    }, [totalAfterLineDiscount, headerDiscountAmount, totalTax]);
+        // Công thức: Tổng sau chiết khấu + Thuế
+        return round(totalBeforeTax + totalTax);
+    }, [totalBeforeTax, totalTax]);
 
     const selectedVendor = useMemo(() => {
         if (!formData.vendor_id || vendors.length === 0) return null;
@@ -191,8 +221,9 @@ export default function PurchaseOrderForm() {
                 // Check if importing from quotation
                 const urlParams = new URLSearchParams(window.location.search);
                 const quotationId = urlParams.get('quotation_id');
-                if (quotationId) {
+                if (quotationId && !quotationLoadedRef.current) {
                     console.log('Loading quotation data for ID:', quotationId);
+                    quotationLoadedRef.current = true;
                     await loadQuotationData(quotationId);
                 }
             }
@@ -382,12 +413,29 @@ export default function PurchaseOrderForm() {
                 return;
             }
 
+            // Extract additional fields from quotation
+            const deliveryTerms = data.deliveryTerms || data.delivery_terms || "";
+            const paymentTerms = data.paymentTerms || data.payment_terms || "";
+            const leadTimeDays = data.leadTimeDays || data.lead_time_days || 0;
+            const shippingAddress = data.shippingAddress || data.shipping_address || "";
+            
+            // Calculate delivery date based on leadTimeDays
+            let deliveryDate = null;
+            if (leadTimeDays > 0) {
+                const today = new Date();
+                today.setDate(today.getDate() + leadTimeDays);
+                deliveryDate = today;
+            }
+
             setFormData((prev) => ({ 
                 ...prev, 
                 items: mapped,
                 vendor_id: vendorId,
                 pq_id: quotationId,
-                header_discount: Number(data.headerDiscount || 0)
+                header_discount: Number(data.headerDiscount || data.header_discount || 0),
+                payment_terms: paymentTerms,
+                delivery_date: deliveryDate,
+                shipping_address: shippingAddress || deliveryTerms
             }));
             setIsImportedFromPQ(true); // Set readonly mode khi import từ PQ
             toast.success(`Đã tải ${mapped.length} sản phẩm từ báo giá`);
@@ -548,7 +596,10 @@ export default function PurchaseOrderForm() {
             const product = selectedOption.product;
             const currentItem = formData.items[index];
             
-            handleItemChange(index, "product_id", product.product_id || product.id);
+            const productId = product.product_id || product.productId || product.id;
+            console.log('Selected product:', product, 'productId:', productId);
+            
+            handleItemChange(index, "product_id", productId);
             handleItemChange(index, "productCode", product.sku || product.productCode || "");
             handleItemChange(index, "productName", product.name || "");
             handleItemChange(index, "uom", product.uom || product.unit || "");
@@ -577,8 +628,9 @@ export default function PurchaseOrderForm() {
         } else {
             const itemErrs = formData.items.map((it) => {
                 const e = {};
+                // Allow manual entry: product_id OR productName OR productCode (at least one)
                 if (!it.product_id && !it.productName?.trim() && !it.productCode?.trim()) {
-                    e.productName = "Chọn sản phẩm";
+                    e.product_id = "Phải chọn sản phẩm hoặc nhập thông tin sản phẩm";
                 }
                 if (!it.quantity || Number(it.quantity) <= 0) {
                     e.quantity = "Số lượng phải > 0";
@@ -624,12 +676,12 @@ export default function PurchaseOrderForm() {
                 statusValue: pq.status?.value
             })));
 
-            // Filter: Chỉ hiển thị báo giá đã được Approved và chưa được sử dụng để tạo PO
+            // Filter: Hiển thị báo giá đã được Approved hoặc Pending (để có thể chọn lại sau khi xóa PO)
             const approvedQuotations = allList.filter(pq => {
                 const status = typeof pq.status === 'string' ? pq.status : pq.status?.name || pq.status?.value;
-                // Chỉ lấy các báo giá đã được phê duyệt (case-insensitive)
+                // Lấy các báo giá đã được phê duyệt hoặc đang chờ (case-insensitive)
                 const normalizedStatus = status?.toString().toUpperCase();
-                return normalizedStatus === 'APPROVED';
+                return normalizedStatus === 'APPROVED' || normalizedStatus === 'PENDING';
             });
 
             console.log("Approved quotations found:", approvedQuotations.length);
@@ -1097,13 +1149,15 @@ export default function PurchaseOrderForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Điều khoản thanh toán
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={formData.payment_terms}
-                                            onChange={(e) => handleInputChange("payment_terms", e.target.value)}
-                                            disabled={isImportedFromPQ}
-                                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isImportedFromPQ ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                            placeholder="VD: Net 30, COD, ..."
+                                        <Select
+                                            options={paymentTermsOptions}
+                                            value={formData.payment_terms ? { value: formData.payment_terms, label: formData.payment_terms } : null}
+                                            onChange={(option) => handleInputChange("payment_terms", option ? option.value : "")}
+                                            isDisabled={isImportedFromPQ}
+                                            placeholder="Chọn điều khoản thanh toán"
+                                            className="react-select-container"
+                                            classNamePrefix="react-select"
+                                            isClearable
                                         />
                                     </div>
                                 </div>
@@ -1321,7 +1375,7 @@ export default function PurchaseOrderForm() {
                                                     Tạm tính:
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-2 font-semibold">
-                                                    {formatCurrency(totalBeforeTax)}
+                                                    {formatCurrency(totalSubtotal)}
                                                 </td>
                                                 <td className="border border-gray-200"></td>
                                             </tr>
@@ -1331,7 +1385,7 @@ export default function PurchaseOrderForm() {
                                                         Chiết khấu sản phẩm:
                                                     </td>
                                                     <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
-                                                        -{formatCurrency(totalDiscount)}
+                                                        {formatCurrency(totalDiscount)}
                                                     </td>
                                                     <td className="border border-gray-200"></td>
                                                 </tr>
@@ -1352,7 +1406,7 @@ export default function PurchaseOrderForm() {
                                                             Chiết khấu tổng đơn ({formData.header_discount}%):
                                                         </td>
                                                         <td className="border border-gray-200 px-4 py-2 font-semibold text-red-600">
-                                                            -{formatCurrency(headerDiscountAmount)}
+                                                            {formatCurrency(headerDiscountAmount)}
                                                         </td>
                                                         <td className="border border-gray-200"></td>
                                                     </tr>

@@ -4,6 +4,7 @@ import com.g174.mmssystem.entity.Warehouse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,6 +19,9 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
 
     List<Warehouse> findAll();
     Page<Warehouse> findAll(Pageable pageable);
+    
+    @Query("SELECT w FROM Warehouse w WHERE w.deletedAt IS NULL")
+    List<Warehouse> findAllActive();
 
     List<Warehouse> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCaseOrLocationContainingIgnoreCaseAndDeletedAtIsNull(
             String name, String code, String location);

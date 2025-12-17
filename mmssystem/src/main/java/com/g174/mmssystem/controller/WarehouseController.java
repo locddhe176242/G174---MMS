@@ -40,20 +40,20 @@ public class WarehouseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<List<WarehouseResponseDTO>> getAllWarehouses() {
         return ResponseEntity.ok(service.getAllWarehouses());
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<Page<WarehouseResponseDTO>> getAllWarehousesPaged(Pageable pageable) {
         return ResponseEntity.ok(service.getAllWarehouses(pageable));
     }
 
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<WarehouseResponseDTO> getWarehouseById(@PathVariable Integer id) {
         return ResponseEntity.ok(service.getWarehouseById(id));
     }
@@ -79,7 +79,7 @@ public class WarehouseController {
     @LogActivity(
             action = "DEACTIVATE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Vô hiệu hóa kho ID: #{#id}",
+            description = "Vô hiệu hóa kho",
             entityId = "#{#id}"
     )
     public ResponseEntity<WarehouseResponseDTO> deactivateWarehouse(@PathVariable Integer id) {
@@ -92,7 +92,7 @@ public class WarehouseController {
     @LogActivity(
             action = "RESTORE_WAREHOUSE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Khôi phục kho ID: #{#id}",
+            description = "Khôi phục kho",
             entityId = "#{#id}"
     )
     public ResponseEntity<WarehouseResponseDTO> restoreWarehouse(@PathVariable Integer id) {
@@ -101,7 +101,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<List<WarehouseResponseDTO>> searchWarehouses(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         return ResponseEntity.ok(service.searchWarehouses(keyword));
@@ -109,7 +109,7 @@ public class WarehouseController {
 
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<Page<WarehouseResponseDTO>> searchWarehousesPaged(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -125,7 +125,7 @@ public class WarehouseController {
 
 
     @GetMapping("/exists/{code}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<Boolean> checkWarehouseCodeExists(@PathVariable String code) {
         return ResponseEntity.ok(service.existsByCode(code));
     }

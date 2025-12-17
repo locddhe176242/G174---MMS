@@ -13,7 +13,9 @@ public class GoodsReceiptItemResponseDTO {
     private Integer griId;
     private Integer receiptId;
 
-    private Integer poiId;
+    // For Purchase flow
+    private Integer idiId;
+    // For SalesReturn flow
     private Integer roiId;
     
     private Integer productId;

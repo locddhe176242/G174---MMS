@@ -27,6 +27,7 @@ public class APInvoiceResponseDTO {
     private LocalDate invoiceDate;
     private LocalDate dueDate;
     private BigDecimal subtotal;
+    private BigDecimal headerDiscount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private BigDecimal balanceAmount;

@@ -4,7 +4,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import { getProducts } from "../../../api/productService";
-import { hasRole } from "../../../api/authService";
 
 /**
  * Stat component - Hiển thị một metric với label và value
@@ -28,10 +27,7 @@ export default function PurchaseRequisitionDetail() {
     const [err, setErr] = useState(null); // Error state
     
     // Popup states
-    const [showApproveModal, setShowApproveModal] = useState(false);
-    const [showRejectModal, setShowRejectModal] = useState(false);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
-    const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
     // ==================== HELPER FUNCTIONS ====================
@@ -227,51 +223,6 @@ export default function PurchaseRequisitionDetail() {
         }
     };
 
-    /**
-     * Xử lý approve phiếu yêu cầu
-     */
-    const handleApprove = async () => {
-        try {
-            setIsProcessing(true);
-            await purchaseRequisitionService.approveRequisition(id);
-            toast.success("Đã duyệt phiếu yêu cầu thành công!");
-            setShowApproveModal(false);
-            // Reload data
-            const detailData = await purchaseRequisitionService.getRequisitionById(id);
-            setData(detailData);
-        } catch (error) {
-            console.error("Error approving requisition:", error);
-            toast.error(error.response?.data?.message || "Không thể duyệt phiếu yêu cầu");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    /**
-     * Xử lý reject phiếu yêu cầu
-     */
-    const handleReject = async () => {
-        if (!rejectReason.trim()) {
-            toast.error("Vui lòng nhập lý do từ chối");
-            return;
-        }
-        try {
-            setIsProcessing(true);
-            await purchaseRequisitionService.rejectRequisition(id, rejectReason);
-            toast.success("Đã từ chối phiếu yêu cầu thành công!");
-            setShowRejectModal(false);
-            setRejectReason("");
-            // Reload data
-            const detailData = await purchaseRequisitionService.getRequisitionById(id);
-            setData(detailData);
-        } catch (error) {
-            console.error("Error rejecting requisition:", error);
-            toast.error(error.response?.data?.message || "Không thể từ chối phiếu yêu cầu");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
     // ==================== RENDER ====================
     // Loading state
     if (loading) return <div className="p-6">Đang tải...</div>;
@@ -285,9 +236,6 @@ export default function PurchaseRequisitionDetail() {
     const items = data.items || [];
     const totalItems = items.length;
     const totalQuantity = items.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0);
-
-    // Check if user can approve (must be MANAGER and status is Pending)
-    const canApprove = hasRole('MANAGER') && (data.approvalStatus === 'Pending' || data.status === 'Pending');
     
     // Check if user can submit (must be requester and status is Draft)
     const canSubmit = (data.approvalStatus === 'Draft' || data.status === 'Draft');
@@ -319,29 +267,6 @@ export default function PurchaseRequisitionDetail() {
                         </svg>
                         Gửi yêu cầu
                     </button>
-                )}
-                {/* Approve/Reject buttons - chỉ hiển thị nếu user là approver và status là Pending */}
-                {canApprove && (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowApproveModal(true)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm font-medium flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Duyệt
-                        </button>
-                        <button
-                            onClick={() => setShowRejectModal(true)}
-                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-sm font-medium flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Từ chối
-                        </button>
-                    </div>
                 )}
             </div>
 
@@ -629,90 +554,6 @@ export default function PurchaseRequisitionDetail() {
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
                             >
                                 {isProcessing ? "Đang xử lý..." : "Xác nhận gửi"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ==================== APPROVE MODAL ==================== */}
-            {showApproveModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-                        <div className="flex items-center mb-4">
-                            <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <h3 className="ml-3 text-lg font-semibold text-gray-900">
-                                Xác nhận duyệt phiếu yêu cầu
-                            </h3>
-                        </div>
-                        <p className="text-gray-600 mb-6">
-                            Bạn có chắc chắn muốn duyệt phiếu yêu cầu <strong>{data.requisitionNo}</strong> không?
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowApproveModal(false)}
-                                disabled={isProcessing}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={handleApprove}
-                                disabled={isProcessing}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
-                            >
-                                {isProcessing ? "Đang xử lý..." : "Xác nhận duyệt"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ==================== REJECT MODAL ==================== */}
-            {showRejectModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-                        <div className="flex items-center mb-4">
-                            <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <h3 className="ml-3 text-lg font-semibold text-gray-900">
-                                Từ chối phiếu yêu cầu
-                            </h3>
-                        </div>
-                        <p className="text-gray-600 mb-4">
-                            Vui lòng nhập lý do từ chối phiếu yêu cầu <strong>{data.requisitionNo}</strong>:
-                        </p>
-                        <textarea
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            placeholder="Nhập lý do từ chối..."
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                        />
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => {
-                                    setShowRejectModal(false);
-                                    setRejectReason("");
-                                }}
-                                disabled={isProcessing}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={handleReject}
-                                disabled={isProcessing || !rejectReason.trim()}
-                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isProcessing ? "Đang xử lý..." : "Xác nhận từ chối"}
                             </button>
                         </div>
                     </div>

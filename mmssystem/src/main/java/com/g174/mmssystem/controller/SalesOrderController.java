@@ -90,7 +90,7 @@ public class SalesOrderController {
     @LogActivity(
             action = "UPDATE_SALES_ORDER",
             activityType = "SALES_MANAGEMENT",
-            description = "Cập nhật đơn bán hàng ID: #{#id}",
+            description = "Cập nhật đơn bán hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesOrderResponseDTO> updateOrder(
@@ -104,7 +104,7 @@ public class SalesOrderController {
     @LogActivity(
             action = "CHANGE_SALES_ORDER_STATUS",
             activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái đơn bán hàng ID: #{#id} - Status: #{#status}, ApprovalStatus: #{#approvalStatus}",
+            description = "Đổi trạng thái đơn bán hàng - Status: #{#status}, ApprovalStatus: #{#approvalStatus}",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesOrderResponseDTO> changeStatus(
@@ -119,7 +119,7 @@ public class SalesOrderController {
     @LogActivity(
             action = "CHANGE_SALES_ORDER_APPROVAL_STATUS",
             activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái phê duyệt đơn bán hàng ID: #{#id} sang #{#approvalStatus}",
+            description = "Đổi trạng thái phê duyệt đơn bán hàng sang #{#approvalStatus}",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesOrderResponseDTO> changeApprovalStatus(
@@ -133,7 +133,7 @@ public class SalesOrderController {
     @LogActivity(
             action = "SUBMIT_SALES_ORDER_FOR_APPROVAL",
             activityType = "SALES_MANAGEMENT",
-            description = "Gửi yêu cầu duyệt đơn bán hàng ID: #{#id}",
+            description = "Gửi yêu cầu duyệt đơn bán hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<SalesOrderResponseDTO> submitForApproval(@PathVariable Integer id) {
@@ -145,7 +145,7 @@ public class SalesOrderController {
     @LogActivity(
             action = "DELETE_SALES_ORDER",
             activityType = "SALES_MANAGEMENT",
-            description = "Xóa đơn bán hàng ID: #{#id}",
+            description = "Xóa đơn bán hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {

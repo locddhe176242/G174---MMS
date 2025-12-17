@@ -45,7 +45,7 @@ public class VendorController {
     }
 
     @GetMapping("/{vendorId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<VendorResponseDTO> getVendorById(@PathVariable Integer vendorId) {
         log.info("REST: Fetching vendor with ID: {}", vendorId);
 
@@ -54,7 +54,7 @@ public class VendorController {
     }
 
     @GetMapping("/code/{vendorCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<VendorResponseDTO> getVendorByCode(@PathVariable String vendorCode) {
         log.info("REST: Fetching vendor with code: {}", vendorCode);
 
@@ -63,7 +63,7 @@ public class VendorController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<List<VendorResponseDTO>> getAllVendors() {
         log.info("REST: Fetching all vendors");
 
@@ -72,7 +72,7 @@ public class VendorController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<Page<VendorResponseDTO>> getAllVendorsWithPagination(Pageable pageable) {
         log.info("REST: Fetching vendors with pagination - page: {}, size: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
@@ -82,7 +82,7 @@ public class VendorController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<List<VendorResponseDTO>> searchVendors(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("REST: Searching vendors with keyword: '{}'", keyword);
@@ -92,7 +92,7 @@ public class VendorController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<Page<VendorResponseDTO>> searchVendorsWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -108,7 +108,7 @@ public class VendorController {
     @LogActivity(
             action = "UPDATE_VENDOR",
             activityType = "VENDOR_MANAGEMENT",
-            description = "Cập nhật nhà cung cấp ID: #{#vendorId}",
+            description = "Cập nhật nhà cung cấp",
             entityId = "#{#vendorId}"
     )
     public ResponseEntity<VendorResponseDTO> updateVendor(
@@ -126,7 +126,7 @@ public class VendorController {
     @LogActivity(
             action = "DELETE_VENDOR",
             activityType = "VENDOR_MANAGEMENT",
-            description = "Xóa nhà cung cấp ID: #{#vendorId}",
+            description = "Xóa nhà cung cấp",
             entityId = "#{#vendorId}"
     )
     public ResponseEntity<Void> deleteVendor(@PathVariable Integer vendorId) {
@@ -141,7 +141,7 @@ public class VendorController {
     @LogActivity(
             action = "RESTORE_VENDOR",
             activityType = "VENDOR_MANAGEMENT",
-            description = "Khôi phục nhà cung cấp ID: #{#vendorId}",
+            description = "Khôi phục nhà cung cấp",
             entityId = "#{#vendorId}"
     )
     public ResponseEntity<VendorResponseDTO> restoreVendor(@PathVariable Integer vendorId) {
@@ -154,7 +154,7 @@ public class VendorController {
     }
 
     @GetMapping("/exists/{vendorCode}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<Map<String, Boolean>> checkVendorCodeExists(@PathVariable String vendorCode) {
         log.info("REST: Checking if vendor code exists: {}", vendorCode);
 
@@ -175,7 +175,7 @@ public class VendorController {
     }
 
     @GetMapping("/{vendorId}/balance")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<Map<String, Object>> getVendorBalance(@PathVariable Integer vendorId) {
         log.info("REST: Fetching balance for vendor ID: {}", vendorId);
         Map<String, Object> balance = vendorService.getVendorBalance(vendorId);

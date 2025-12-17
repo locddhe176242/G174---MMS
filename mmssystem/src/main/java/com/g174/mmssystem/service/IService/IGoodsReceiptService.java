@@ -22,7 +22,7 @@ public interface IGoodsReceiptService {
     
     Page<GoodsReceiptResponseDTO> searchReceipts(String keyword, Pageable pageable);
     
-    List<GoodsReceiptResponseDTO> getReceiptsByOrderId(Integer orderId);
+    List<GoodsReceiptResponseDTO> getReceiptsByInboundDeliveryId(Integer inboundDeliveryId);
     
     List<GoodsReceiptResponseDTO> getReceiptsByWarehouseId(Integer warehouseId);
     

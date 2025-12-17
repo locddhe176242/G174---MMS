@@ -49,7 +49,7 @@ public class ReturnOrderController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     @LogActivity(action = "UPDATE_RETURN_ORDER", activityType = "SALES_MANAGEMENT", 
-            description = "Cập nhật đơn trả hàng ID: #{#id}",
+            description = "Cập nhật đơn trả hàng",
             entityId = "#{#id}")
     public ResponseEntity<ReturnOrderResponseDTO> updateReturnOrder(
             @PathVariable Integer id,
@@ -60,7 +60,7 @@ public class ReturnOrderController {
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     @LogActivity(action = "CHANGE_RETURN_ORDER_STATUS", activityType = "SALES_MANAGEMENT", 
-            description = "Thay đổi trạng thái đơn trả hàng ID: #{#id} sang #{#status}",
+            description = "Thay đổi trạng thái đơn trả hàng sang #{#status}",
             entityId = "#{#id}")
     public ResponseEntity<ReturnOrderResponseDTO> changeStatus(
             @PathVariable Integer id,
@@ -71,7 +71,7 @@ public class ReturnOrderController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(action = "DELETE_RETURN_ORDER", activityType = "SALES_MANAGEMENT", 
-            description = "Xóa đơn trả hàng ID: #{#id}",
+            description = "Xóa đơn trả hàng",
             entityId = "#{#id}")
     public ResponseEntity<Void> deleteReturnOrder(@PathVariable Integer id) {
         returnOrderService.deleteReturnOrder(id);

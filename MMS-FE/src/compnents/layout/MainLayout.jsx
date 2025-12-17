@@ -1,14 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
+import { dashboardService } from "../../api/dashboardService";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { user, logout } = useAuthStore();
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const { user, logout, roles } = useAuthStore();
   console.log('MainLayout user:', user);
+  const isWarehouse = roles && roles.includes('WAREHOUSE');
+
+  useEffect(() => {
+    // Fetch pending tasks count for warehouse role
+    if (isWarehouse) {
+      fetchPendingTasksCount();
+      // Refresh every 5 minutes
+      const interval = setInterval(fetchPendingTasksCount, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isWarehouse]);
+
+  const fetchPendingTasksCount = async () => {
+    try {
+      const data = await dashboardService.getDashboardStats();
+      const inboundCount = data?.pendingInboundDeliveries?.length || 0;
+      const deliveryCount = data?.pendingDeliveries?.length || 0;
+      setPendingTasksCount(inboundCount + deliveryCount);
+    } catch (error) {
+      console.error("Error fetching pending tasks:", error);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -25,6 +49,7 @@ export default function MainLayout() {
         userEmail={user?.email || "Người dùng"}
         avatarUrl={user?.avatarUrl || null}
         onLogout={handleLogout}
+        pendingTasksCount={pendingTasksCount}
       />
 
       <div className="flex flex-1 relative">

@@ -57,6 +57,28 @@ const VendorQuotationForm = () => {
         { value: 'Net 30 - Thanh toán trong 30 ngày', label: 'Net 30 - Thanh toán trong 30 ngày' },
     ];
 
+    // Auto-calculate lead time days when validUntil changes
+    useEffect(() => {
+        if (formData.validUntil && formData.pqDate) {
+            const startDate = new Date(formData.pqDate);
+            const endDate = new Date(formData.validUntil);
+            
+            // Reset time part to calculate only date difference
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(0, 0, 0, 0);
+            
+            const timeDiff = endDate - startDate;
+            const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff >= 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    leadTimeDays: daysDiff
+                }));
+            }
+        }
+    }, [formData.validUntil, formData.pqDate]);
+
     // Check if delivery terms requires shipping cost
     const requiresShippingCost = (deliveryTerms) => {
         if (!deliveryTerms) return true; // Default allow shipping cost
@@ -119,9 +141,17 @@ const VendorQuotationForm = () => {
         // 5. Tiền sau khi trừ CK tổng đơn
         const amountAfterAllDiscounts = round(totalAfterLineDiscount - headerDiscountAmount);
 
-        // 6. Thuế (tính trên số tiền sau khi trừ TẤT CẢ chiết khấu)
-        const taxRate = formData.items.length > 0 ? (Number(formData.items[0].taxRate || 0) / 100) : 0;
-        const tax = round(amountAfterAllDiscounts * taxRate);
+        // 6. Thuế (tính TỪNG DÒNG trên số tiền sau khi trừ TẤT CẢ chiết khấu)
+        const tax = formData.items.reduce((sum, item) => {
+            const calc = calculateItemTotal(item);
+            const lineAfterDiscount = calc.amountAfterDiscount;
+            // Sau chiết khấu header (áp dụng tỷ lệ)
+            const lineAfterHeaderDiscount = lineAfterDiscount * (1 - headerDiscountPercent / 100);
+            // Thuế của dòng
+            const taxRate = Number(item.taxRate || 0) / 100;
+            const lineTax = lineAfterHeaderDiscount * taxRate;
+            return sum + round(lineTax);
+        }, 0);
 
         // 7. Phí vận chuyển (không chịu thuế, không chịu CK)
         const shipping = round(Number(formData.shippingCost || 0));
@@ -412,6 +442,14 @@ const VendorQuotationForm = () => {
             errors.validUntil = 'Ngày nhận hàng dự kiến là bắt buộc';
         }
 
+        if (!formData.deliveryTerms || formData.deliveryTerms.trim() === '') {
+            errors.deliveryTerms = 'Điều khoản giao hàng là bắt buộc';
+        }
+
+        if (!formData.paymentTerms || formData.paymentTerms.trim() === '') {
+            errors.paymentTerms = 'Điều khoản thanh toán là bắt buộc';
+        }
+
         if (formData.items.length === 0) {
             errors.items = 'Danh mục sản phẩm từ RFQ không được để trống';
         }
@@ -504,7 +542,7 @@ const VendorQuotationForm = () => {
 
             await purchaseQuotationService.createQuotation(payload, createdById);
             toast.success('Tạo báo giá thành công!');
-            navigate(`/purchase/rfqs/${rfqId}`);
+            navigate(rfqId ? `/purchase/rfqs/${rfqId}` : '/purchase/vendor-quotations');
         } catch (error) {
             console.error('Error submitting form:', error);
             console.error('Error response:', error?.response?.data); // Debug log
@@ -537,7 +575,13 @@ const VendorQuotationForm = () => {
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
                     <button
-                        onClick={() => navigate(`/purchase/rfqs/${rfqId}`)}
+                        onClick={() => {
+                            if (rfqId) {
+                                navigate(`/purchase/rfqs/${rfqId}`);
+                            } else {
+                                navigate('/purchase/rfqs');
+                            }
+                        }}
                         className="text-gray-600 hover:text-gray-800"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -644,10 +688,10 @@ const VendorQuotationForm = () => {
                             <input
                                 type="number"
                                 value={formData.leadTimeDays || ''}
-                                onChange={(e) => handleInputChange('leadTimeDays', e.target.value ? parseInt(e.target.value) : null)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                min="0"
-                                placeholder="Số ngày"
+                                readOnly
+                                disabled
+                                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-700 rounded-md cursor-not-allowed"
+                                placeholder="Tự động tính từ ngày nhận hàng"
                             />
                         </div>
 
@@ -669,7 +713,7 @@ const VendorQuotationForm = () => {
                         {/* Delivery Terms */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Điều khoản giao hàng
+                                Điều khoản giao hàng <span className="text-red-500">*</span>
                             </label>
                             <CreatableSelect
                                 isClearable
@@ -679,15 +723,18 @@ const VendorQuotationForm = () => {
                                 placeholder="Chọn hoặc nhập điều khoản giao hàng..."
                                 formatCreateLabel={(inputValue) => `Nhập: "${inputValue}"`}
                                 noOptionsMessage={() => "Không có lựa chọn"}
-                                className="react-select-container"
+                                className={`react-select-container ${validationErrors.deliveryTerms ? 'border-red-500' : ''}`}
                                 classNamePrefix="react-select"
                             />
+                            {validationErrors.deliveryTerms && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.deliveryTerms}</p>
+                            )}
                         </div>
 
                         {/* Payment Terms */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Điều khoản thanh toán
+                                Điều khoản thanh toán <span className="text-red-500">*</span>
                             </label>
                             <CreatableSelect
                                 isClearable
@@ -697,9 +744,12 @@ const VendorQuotationForm = () => {
                                 placeholder="Chọn hoặc nhập điều khoản thanh toán..."
                                 formatCreateLabel={(inputValue) => `Nhập: "${inputValue}"`}
                                 noOptionsMessage={() => "Không có lựa chọn"}
-                                className="react-select-container"
+                                className={`react-select-container ${validationErrors.paymentTerms ? 'border-red-500' : ''}`}
                                 classNamePrefix="react-select"
                             />
+                            {validationErrors.paymentTerms && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.paymentTerms}</p>
+                            )}
                         </div>
 
                         {/* Header Discount */}
@@ -776,8 +826,8 @@ const VendorQuotationForm = () => {
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">#</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm </th>
                                         <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">SL yêu cầu</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn giá báo</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">CK (%)</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn giá/Sản phẩm(VND)</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Chiết Khấu (%)</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Thuế (%)</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Thành tiền</th>
@@ -870,7 +920,7 @@ const VendorQuotationForm = () => {
                                             Chiết khấu sản phẩm:
                                         </td>
                                         <td className="px-4 py-3 text-sm text-red-600">
-                                            -{formatCurrency(calculateTotals.totalDiscount)}
+                                            {formatCurrency(calculateTotals.totalDiscount)}
                                         </td>
                                     </tr>
                                 )}
@@ -889,7 +939,7 @@ const VendorQuotationForm = () => {
                                                 Chiết khấu tổng đơn ({formData.headerDiscount}%):
                                             </td>
                                             <td className="px-4 py-3 text-sm text-red-600">
-                                                -{formatCurrency(calculateTotals.headerDiscountAmount || 0)}
+                                                {formatCurrency(calculateTotals.headerDiscountAmount || 0)}
                                             </td>
                                         </tr>
                                         <tr className="bg-gray-50 border-t border-gray-200">
@@ -940,7 +990,7 @@ const VendorQuotationForm = () => {
                 <div className="flex justify-end gap-4">
                     <button
                         type="button"
-                        onClick={() => navigate(`/purchase/rfqs/${rfqId}`)}
+                        onClick={() => navigate(rfqId ? `/purchase/rfqs/${rfqId}` : '/purchase/rfqs')}
                         className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition"
                     >
                         Hủy

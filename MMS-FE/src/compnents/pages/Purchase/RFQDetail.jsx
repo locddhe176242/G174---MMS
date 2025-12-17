@@ -24,6 +24,7 @@ export default function RFQDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [isManager, setIsManager] = useState(false);
+  const [canCompareQuotations, setCanCompareQuotations] = useState(false);
 
   // Check if user is MANAGER
   useEffect(() => {
@@ -33,6 +34,13 @@ export default function RFQDetail() {
       role === 'MANAGER' || role === 'ROLE_MANAGER' || role?.name === 'MANAGER'
     );
     setIsManager(hasManagerRole);
+    
+    // Check if user can compare quotations (PURCHASE or MANAGER)
+    const canCompare = userRoles.some(role => 
+      role === 'PURCHASE' || role === 'ROLE_PURCHASE' || role?.name === 'PURCHASE' ||
+      role === 'MANAGER' || role === 'ROLE_MANAGER' || role?.name === 'MANAGER'
+    );
+    setCanCompareQuotations(canCompare);
   }, []);
 
   // Helpers
@@ -286,8 +294,8 @@ export default function RFQDetail() {
                   </button>
                 );
               })()}
-              {/* Nút so sánh báo giá - chỉ MANAGER mới thấy */}
-              {isManager && (
+              {/* Nút so sánh báo giá - PURCHASE và MANAGER đều thấy */}
+              {canCompareQuotations && (
                 <button
                   onClick={() => navigate(`/purchase/rfqs/${id}/compare-quotations`)}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

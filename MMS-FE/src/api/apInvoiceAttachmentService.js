@@ -43,6 +43,20 @@ export const apInvoiceAttachmentService = {
     return response.data;
   },
 
+  // Lấy view URL (để xem file inline)
+  getViewUrl: async (attachmentId) => {
+    const response = await apiClient.get(`${AP_INVOICE_ATTACHMENT_API}/${attachmentId}/view-url`);
+    return response.data;
+  },
+
+  // Tải file dưới dạng blob để xem trong modal
+  viewFile: async (attachmentId) => {
+    const response = await apiClient.get(`${AP_INVOICE_ATTACHMENT_API}/${attachmentId}/view`, {
+      responseType: 'blob'
+    });
+    return response;
+  },
+
   // Xóa attachment
   deleteAttachment: async (attachmentId) => {
     const response = await apiClient.delete(`${AP_INVOICE_ATTACHMENT_API}/${attachmentId}`);

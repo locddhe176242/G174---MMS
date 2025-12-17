@@ -17,6 +17,7 @@ public class APInvoiceItemResponseDTO {
     private String description;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal taxRate;
     private BigDecimal lineTotal;
     private String productName;

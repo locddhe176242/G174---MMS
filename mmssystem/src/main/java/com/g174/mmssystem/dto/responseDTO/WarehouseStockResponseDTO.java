@@ -18,5 +18,10 @@ public class WarehouseStockResponseDTO {
     private Integer productId;
     private String productSku;
     private String productName;
+    private String productUom;
+    private BigDecimal productSellingPrice;
+    private BigDecimal productPurchasePrice;
+    private String productCategoryName;
+    private String productStatus;
     private BigDecimal quantity;
 }

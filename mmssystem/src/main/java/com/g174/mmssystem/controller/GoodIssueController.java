@@ -79,7 +79,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/{issueId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<GoodIssueResponseDTO> getIssueById(@PathVariable Integer issueId) {
         log.info("REST: Fetching good issue ID: {}", issueId);
 
@@ -88,7 +88,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodIssueResponseDTO>> getAllIssuesPaged(Pageable pageable) {
         log.info("REST: Fetching good issues with pagination");
 
@@ -97,7 +97,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodIssueResponseDTO>> searchIssuesPaged(
             @RequestParam String keyword,
             Pageable pageable) {
@@ -108,7 +108,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/delivery/{deliveryId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','SALE','ACCOUNTING')")
     public ResponseEntity<List<GoodIssueResponseDTO>> getIssuesByDeliveryId(@PathVariable Integer deliveryId) {
         log.info("REST: Fetching good issues for Delivery ID: {}", deliveryId);
 
@@ -117,7 +117,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/warehouse/{warehouseId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<GoodIssueResponseDTO>> getIssuesByWarehouseId(@PathVariable Integer warehouseId) {
         log.info("REST: Fetching good issues for Warehouse ID: {}", warehouseId);
 
@@ -130,7 +130,7 @@ public class GoodIssueController {
     @LogActivity(
             action = "UPDATE_GOOD_ISSUE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Cập nhật phiếu xuất kho ID: #{#issueId}",
+            description = "Cập nhật phiếu xuất kho",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> updateIssue(
@@ -156,7 +156,7 @@ public class GoodIssueController {
     @LogActivity(
             action = "SUBMIT_GOOD_ISSUE_FOR_APPROVAL",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Gửi yêu cầu duyệt phiếu xuất kho ID: #{#issueId}",
+            description = "Gửi yêu cầu duyệt phiếu xuất kho",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> submitForApproval(
@@ -181,7 +181,7 @@ public class GoodIssueController {
     @LogActivity(
             action = "APPROVE_GOOD_ISSUE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Duyệt phiếu xuất kho ID: #{#issueId}",
+            description = "Duyệt phiếu xuất kho",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> approveIssue(
@@ -198,7 +198,7 @@ public class GoodIssueController {
     @LogActivity(
             action = "REJECT_GOOD_ISSUE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Từ chối phiếu xuất kho ID: #{#issueId}",
+            description = "Từ chối phiếu xuất kho",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> rejectIssue(
@@ -216,7 +216,7 @@ public class GoodIssueController {
     @LogActivity(
             action = "DELETE_GOOD_ISSUE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Xóa phiếu xuất kho ID: #{#issueId}",
+            description = "Xóa phiếu xuất kho",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> deleteIssue(@PathVariable Integer issueId) {

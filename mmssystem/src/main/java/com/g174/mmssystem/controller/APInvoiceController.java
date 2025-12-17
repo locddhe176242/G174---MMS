@@ -28,7 +28,7 @@ public class APInvoiceController {
     private final IAPInvoiceService apInvoiceService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "CREATE_AP_INVOICE",
             activityType = "ACCOUNTANT_MANAGEMENT",
@@ -41,11 +41,11 @@ public class APInvoiceController {
     }
 
     @PostMapping("/from-goods-receipt/{receiptId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "CREATE_AP_INVOICE_FROM_GR",
             activityType = "ACCOUNTANT_MANAGEMENT",
-            description = "Tạo hóa đơn từ phiếu nhập kho ID: #{#receiptId}",
+            description = "Tạo hóa đơn từ phiếu nhập kho",
             entityId = "#{#result.body.apInvoiceId}"
     )
     public ResponseEntity<APInvoiceResponseDTO> createInvoiceFromGoodsReceipt(@PathVariable Integer receiptId) {
@@ -54,21 +54,21 @@ public class APInvoiceController {
     }
 
     @GetMapping("/{invoiceId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<APInvoiceResponseDTO> getInvoiceById(@PathVariable Integer invoiceId) {
         APInvoiceResponseDTO response = apInvoiceService.getInvoiceById(invoiceId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> getAllInvoices() {
         List<APInvoiceResponseDTO> response = apInvoiceService.getAllInvoices();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/paged")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<Page<APInvoiceResponseDTO>> getAllInvoicesPaged(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -82,14 +82,14 @@ public class APInvoiceController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> searchInvoices(@RequestParam String keyword) {
         List<APInvoiceResponseDTO> response = apInvoiceService.searchInvoices(keyword);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search/paged")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<Page<APInvoiceResponseDTO>> searchInvoicesPaged(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
@@ -101,39 +101,39 @@ public class APInvoiceController {
     }
 
     @GetMapping("/vendor/{vendorId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> getInvoicesByVendorId(@PathVariable Integer vendorId) {
         List<APInvoiceResponseDTO> response = apInvoiceService.getInvoicesByVendorId(vendorId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/purchase-order/{orderId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> getInvoicesByOrderId(@PathVariable Integer orderId) {
         List<APInvoiceResponseDTO> response = apInvoiceService.getInvoicesByOrderId(orderId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/goods-receipt/{receiptId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> getInvoicesByReceiptId(@PathVariable Integer receiptId) {
         List<APInvoiceResponseDTO> response = apInvoiceService.getInvoicesByReceiptId(receiptId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<List<APInvoiceResponseDTO>> getInvoicesByStatus(@PathVariable APInvoice.APInvoiceStatus status) {
         List<APInvoiceResponseDTO> response = apInvoiceService.getInvoicesByStatus(status);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{invoiceId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "UPDATE_AP_INVOICE",
             activityType = "ACCOUNTANT_MANAGEMENT",
-            description = "Cập nhật hóa đơn phải trả ID: #{#invoiceId}",
+            description = "Cập nhật hóa đơn phải trả",
             entityId = "#{#invoiceId}"
     )
     public ResponseEntity<APInvoiceResponseDTO> updateInvoice(
@@ -144,11 +144,11 @@ public class APInvoiceController {
     }
 
     @DeleteMapping("/{invoiceId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "DELETE_AP_INVOICE",
             activityType = "ACCOUNTANT_MANAGEMENT",
-            description = "Xóa hóa đơn phải trả ID: #{#invoiceId}",
+            description = "Xóa hóa đơn phải trả",
             entityId = "#{#invoiceId}"
     )
     public ResponseEntity<APInvoiceResponseDTO> deleteInvoice(@PathVariable Integer invoiceId) {
@@ -157,14 +157,14 @@ public class APInvoiceController {
     }
 
     @GetMapping("/check-invoice-no")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<Boolean> checkInvoiceNoExists(@RequestParam String invoiceNo) {
         boolean exists = apInvoiceService.existsByInvoiceNo(invoiceNo);
         return ResponseEntity.ok(exists);
     }
 
     @GetMapping("/generate-invoice-no")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<Map<String, String>> generateInvoiceNo() {
         String invoiceNo = apInvoiceService.generateInvoiceNo();
         return ResponseEntity.ok(Map.of("invoiceNo", invoiceNo));

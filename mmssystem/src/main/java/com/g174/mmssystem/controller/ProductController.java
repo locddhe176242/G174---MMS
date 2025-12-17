@@ -25,7 +25,7 @@ public class ProductController {
     private final IProductService productService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<ProductResponseDTO>> getProducts(
             @RequestParam(required = false) String keyword) {
         try {
@@ -43,7 +43,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<ProductResponseDTO> getProduct(@PathVariable Integer id) {
         try {
             ProductResponseDTO product = productService.getProduct(id);
@@ -121,7 +121,7 @@ public class ProductController {
     @LogActivity(
             action = "DELETE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
-            description = "Xóa sản phẩm ID: #{#id}",
+            description = "Xóa sản phẩm",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> deleteProduct(@PathVariable Integer id) {
@@ -142,7 +142,7 @@ public class ProductController {
     @LogActivity(
             action = "RESTORE_PRODUCT",
             activityType = "PRODUCT_MANAGEMENT",
-            description = "Khôi phục sản phẩm ID: #{#id}",
+            description = "Khôi phục sản phẩm",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> restoreProduct(@PathVariable Integer id) {

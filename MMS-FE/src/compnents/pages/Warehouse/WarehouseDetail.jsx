@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { warehouseService } from "../../../api/warehouseService.js";
+import { warehouseStockService } from "../../../api/warehouseStockService.js";
 import dayjs from "dayjs";
-import {Card, Spin, Alert, Descriptions, Tag} from "antd";
+import {Card, Spin, Alert, Descriptions, Tag, Table} from "antd";
 
 export default function WarehouseDetail() {
     const { id } = useParams();
     const [warehouse, setWarehouse] = useState(null);
+    const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
@@ -15,6 +18,8 @@ export default function WarehouseDetail() {
             try {
                 const data = await warehouseService.getWarehouseById(id);
                 setWarehouse(data);
+                // Fetch products in warehouse
+                await fetchWarehouseProducts();
             } catch (err) {
                 console.error("Lỗi khi tải chi tiết kho:", err);
                 setError("Không thể tải dữ liệu kho.");
@@ -24,6 +29,18 @@ export default function WarehouseDetail() {
         };
         fetchWarehouse();
     }, [id]);
+
+    const fetchWarehouseProducts = async () => {
+        try {
+            setLoadingProducts(true);
+            const stockData = await warehouseStockService.getStockByWarehouse(id);
+            setProducts(stockData || []);
+        } catch (err) {
+            console.error("Lỗi khi tải danh sách sản phẩm:", err);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
 
     const formatDate = (dateString) => {
         if (!dateString) return "";
@@ -118,6 +135,112 @@ export default function WarehouseDetail() {
                             {warehouse.updatedBy?.email || "—"}
                         </Descriptions.Item>
                     </Descriptions>
+                </Card>
+
+                {/* Tổng số sản phẩm */}
+                <Card 
+                    title={
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg font-semibold">Sản phẩm trong kho</span>
+                            <Tag color="blue" className="text-base px-3 py-1">
+                                Tổng: {products.length} sản phẩm
+                            </Tag>
+                        </div>
+                    }
+                    className="mt-6"
+                    bordered={false}
+                >
+                    {loadingProducts ? (
+                        <div className="text-center py-8">
+                            <Spin tip="Đang tải danh sách sản phẩm..." />
+                        </div>
+                    ) : products.length === 0 ? (
+                        <Alert message="Chưa có sản phẩm nào trong kho này" type="info" showIcon />
+                    ) : (
+                        <Table
+                            dataSource={products}
+                            rowKey={(record) => `${record.warehouseId}-${record.productId}`}
+                            pagination={{ 
+                                pageSize: 10,
+                                showTotal: (total) => `Tổng ${total} sản phẩm`,
+                                showSizeChanger: true,
+                                pageSizeOptions: ['10', '20', '50', '100']
+                            }}
+                            columns={[
+                                {
+                                    title: 'Mã sản phẩm',
+                                    dataIndex: 'productSku',
+                                    key: 'sku',
+                                    width: 150,
+                                    render: (text) => <span className="font-mono font-semibold">{text || '—'}</span>
+                                },
+                                {
+                                    title: 'Tên sản phẩm',
+                                    dataIndex: 'productName',
+                                    key: 'name',
+                                    width: 300,
+                                    render: (text) => <span className="font-medium">{text || '—'}</span>
+                                },
+                                {
+                                    title: 'Danh mục',
+                                    dataIndex: 'productCategoryName',
+                                    key: 'category',
+                                    width: 150,
+                                    render: (text) => (
+                                        <Tag color="purple">{text || 'Chưa phân loại'}</Tag>
+                                    )
+                                },
+                                {
+                                    title: 'Số lượng',
+                                    dataIndex: 'quantity',
+                                    key: 'quantity',
+                                    width: 120,
+                                    align: 'right',
+                                    render: (quantity) => (
+                                        <span className={`font-bold ${
+                                            quantity > 100 ? 'text-green-600' : 
+                                            quantity > 50 ? 'text-orange-600' : 
+                                            'text-red-600'
+                                        }`}>
+                                            {parseFloat(quantity).toLocaleString('vi-VN')}
+                                        </span>
+                                    )
+                                },
+                                {
+                                    title: 'Đơn vị',
+                                    dataIndex: 'productUom',
+                                    key: 'uom',
+                                    width: 100,
+                                    render: (text) => text || '—'
+                                },
+                                {
+                                    title: 'Giá bán',
+                                    dataIndex: 'productSellingPrice',
+                                    key: 'sellingPrice',
+                                    width: 150,
+                                    align: 'right',
+                                    render: (price) => price 
+                                        ? `${parseFloat(price).toLocaleString('vi-VN')} đ`
+                                        : '—'
+                                },
+                                {
+                                    title: 'Trạng thái',
+                                    dataIndex: 'productStatus',
+                                    key: 'status',
+                                    width: 120,
+                                    render: (status) => {
+                                        const statusMap = {
+                                            'IN_STOCK': { label: 'Còn hàng', color: 'green' },
+                                            'OUT_OF_STOCK': { label: 'Hết hàng', color: 'red' },
+                                            'DISCONTINUED': { label: 'Ngừng kinh doanh', color: 'gray' }
+                                        };
+                                        const statusInfo = statusMap[status] || { label: status, color: 'default' };
+                                        return <Tag color={statusInfo.color}>{statusInfo.label}</Tag>;
+                                    }
+                                }
+                            ]}
+                        />
+                    )}
                 </Card>
             </div>
         </div>

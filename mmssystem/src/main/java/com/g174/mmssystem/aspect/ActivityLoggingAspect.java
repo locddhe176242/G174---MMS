@@ -110,8 +110,40 @@ public class ActivityLoggingAspect {
 
             context.setVariable("result", result);
 
-            Expression expression = parser.parseExpression(description);
-            return expression.getValue(context, String.class);
+            // Handle #{#variable} format - replace with actual values
+            String processedDescription = description;
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("#\\{#(\\w+)\\}");
+            java.util.regex.Matcher matcher = pattern.matcher(description);
+            
+            while (matcher.find()) {
+                String varName = matcher.group(1);
+                try {
+                    Expression expression = parser.parseExpression("#" + varName);
+                    Object value = expression.getValue(context);
+                    processedDescription = processedDescription.replace(matcher.group(0), 
+                            value != null ? value.toString() : "");
+                } catch (Exception ex) {
+                    log.debug("Cannot resolve variable: {}", varName);
+                }
+            }
+            
+            // Also handle #{#result.body.xxx} format
+            pattern = java.util.regex.Pattern.compile("#\\{#(result\\.[^}]+)\\}");
+            matcher = pattern.matcher(processedDescription);
+            
+            while (matcher.find()) {
+                String expr = matcher.group(1);
+                try {
+                    Expression expression = parser.parseExpression("#" + expr);
+                    Object value = expression.getValue(context);
+                    processedDescription = processedDescription.replace(matcher.group(0), 
+                            value != null ? value.toString() : "");
+                } catch (Exception ex) {
+                    log.debug("Cannot resolve expression: {}", expr);
+                }
+            }
+            
+            return processedDescription;
 
         } catch (Exception e) {
             log.warn("Error evaluating description expression: {}", e.getMessage());

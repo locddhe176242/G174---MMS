@@ -83,7 +83,7 @@ public class PurchaseRequisitionController {
     @PutMapping("/{requisitionId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "UPDATE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Cập nhật yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Cập nhật yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> updateRequisition(
             @PathVariable Long requisitionId,
@@ -103,7 +103,7 @@ public class PurchaseRequisitionController {
     @PostMapping("/{requisitionId}/submit")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "SUBMIT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Gửi yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Gửi yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> submitRequisition(@PathVariable Long requisitionId) {
         log.info("API: Submit purchase requisition ID: {}", requisitionId);
@@ -118,7 +118,7 @@ public class PurchaseRequisitionController {
     @PutMapping("/{requisitionId}/approve")
     @PreAuthorize("hasAnyRole('MANAGER')")
     @LogActivity(action = "APPROVE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Phê duyệt yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Phê duyệt yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> approveRequisition(@PathVariable Long requisitionId) {
         log.info("API: Approve purchase requisition ID: {}", requisitionId);
@@ -133,7 +133,7 @@ public class PurchaseRequisitionController {
     @PutMapping("/{requisitionId}/reject")
     @PreAuthorize("hasAnyRole('MANAGER')")
     @LogActivity(action = "REJECT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Từ chối yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Từ chối yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> rejectRequisition(
             @PathVariable Long requisitionId,
@@ -150,7 +150,7 @@ public class PurchaseRequisitionController {
     @PutMapping("/{requisitionId}/close")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "CLOSE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Đóng yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Đóng yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> closeRequisition(@PathVariable Long requisitionId) {
         log.info("API: Close purchase requisition ID: {}", requisitionId);
@@ -161,7 +161,7 @@ public class PurchaseRequisitionController {
     @PutMapping("/{requisitionId}/convert")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "CONVERT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Chuyển đổi yêu cầu mua hàng ID: #{#requisitionId} thành RFQ",
+            description = "Chuyển đổi yêu cầu mua hàng thành RFQ",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> convertRequisition(@PathVariable Long requisitionId) {
         log.info("API: Convert purchase requisition ID: {} to RFQ", requisitionId);
@@ -172,7 +172,7 @@ public class PurchaseRequisitionController {
     @DeleteMapping("/{requisitionId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "DELETE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
-            description = "Xóa yêu cầu mua hàng ID: #{#requisitionId}",
+            description = "Xóa yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
     public ResponseEntity<PurchaseRequisitionResponseDTO> deleteRequisition(@PathVariable Long requisitionId) {
         log.info("API: Xóa purchase requisition ID: {}", requisitionId);

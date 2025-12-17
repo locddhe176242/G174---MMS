@@ -22,7 +22,7 @@ public class WarehouseStockController {
      * Lấy danh sách stock trong một warehouse
      */
     @GetMapping("/warehouse/{warehouseId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<List<WarehouseStockResponseDTO>> getStockByWarehouse(
             @PathVariable Integer warehouseId) {
         List<WarehouseStockResponseDTO> stocks = warehouseStockService.getStockByWarehouseId(warehouseId);
@@ -33,7 +33,7 @@ public class WarehouseStockController {
      * Lấy stock của một product trong một warehouse cụ thể
      */
     @GetMapping("/warehouse/{warehouseId}/product/{productId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<WarehouseStockResponseDTO> getStockByWarehouseAndProduct(
             @PathVariable Integer warehouseId,
             @PathVariable Integer productId) {
@@ -45,7 +45,7 @@ public class WarehouseStockController {
      * Lấy tổng số lượng của một product trong tất cả warehouses
      */
     @GetMapping("/product/{productId}/total-quantity")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<BigDecimal> getTotalQuantityByProduct(@PathVariable Integer productId) {
         BigDecimal totalQuantity = warehouseStockService.getTotalQuantityByProductId(productId);
         return ResponseEntity.ok(totalQuantity);
@@ -55,7 +55,7 @@ public class WarehouseStockController {
      * Lấy số lượng của một product trong một warehouse cụ thể (trả về số, không phải object)
      */
     @GetMapping("/warehouse/{warehouseId}/product/{productId}/quantity")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','PURCHASE','SALE','ACCOUNTING')")
     public ResponseEntity<BigDecimal> getQuantityByWarehouseAndProduct(
             @PathVariable Integer warehouseId,
             @PathVariable Integer productId) {
@@ -71,7 +71,7 @@ public class WarehouseStockController {
     @LogActivity(
             action = "UPDATE_WAREHOUSE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
-            description = "Cập nhật stock - Warehouse ID: #{#warehouseId}, Product ID: #{#productId}",
+            description = "Cập nhật số lượng tồn kho",
             entityId = "#{#warehouseId + '-' + #productId}"
     )
     public ResponseEntity<WarehouseStockResponseDTO> updateStock(
@@ -90,7 +90,7 @@ public class WarehouseStockController {
     @LogActivity(
             action = "INCREASE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
-            description = "Nhập kho - Warehouse ID: #{#warehouseId}, Product ID: #{#productId}, Số lượng: #{#quantity}",
+            description = "Nhập kho",
             entityId = "#{#warehouseId + '-' + #productId}"
     )
     public ResponseEntity<WarehouseStockResponseDTO> increaseStock(
@@ -109,7 +109,7 @@ public class WarehouseStockController {
     @LogActivity(
             action = "DECREASE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
-            description = "Xuất kho - Warehouse ID: #{#warehouseId}, Product ID: #{#productId}, Số lượng: #{#quantity}",
+            description = "Xuất kho",
             entityId = "#{#warehouseId + '-' + #productId}"
     )
     public ResponseEntity<WarehouseStockResponseDTO> decreaseStock(
@@ -128,7 +128,7 @@ public class WarehouseStockController {
     @LogActivity(
             action = "CREATE_OR_UPDATE_STOCK",
             activityType = "INVENTORY_MANAGEMENT",
-            description = "Tạo/Cập nhật stock - Warehouse ID: #{#warehouseId}, Product ID: #{#productId}",
+            description = "Tạo/Cập nhật tồn kho",
             entityId = "#{#warehouseId + '-' + #productId}"
     )
     public ResponseEntity<WarehouseStockResponseDTO> createOrUpdateStock(

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,22 +44,40 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final SalesReturnInboundOrderItemRepository salesReturnInboundOrderItemRepository;
     private final ReturnOrderRepository returnOrderRepository;
     private final ReturnOrderItemRepository returnOrderItemRepository;
+    private final InboundDeliveryRepository inboundDeliveryRepository;
+    private final InboundDeliveryItemRepository inboundDeliveryItemRepository;
 
+    /**
+     * Tạo Goods Receipt từ Inbound Delivery (Purchase flow)
+     * Flow: PO → Inbound Delivery → Goods Receipt
+     */
     @Override
     @Transactional
     public GoodsReceiptResponseDTO createReceipt(GoodsReceiptRequestDTO dto, Integer createdById) {
-        log.info("Creating goods receipt for Order ID: {}, Warehouse ID: {}", dto.getOrderId(), dto.getWarehouseId());
+        log.info("Creating goods receipt from Inbound Delivery ID: {}, Warehouse ID: {}", 
+                dto.getInboundDeliveryId(), dto.getWarehouseId());
 
-        // Validate and load entities
-        PurchaseOrder purchaseOrder = orderRepository.findById(dto.getOrderId())
-                .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + dto.getOrderId()));
+        // Validate Inbound Delivery
+        InboundDelivery inboundDelivery = inboundDeliveryRepository.findById(dto.getInboundDeliveryId())
+                .filter(id -> id.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("Inbound Delivery not found with ID: " + dto.getInboundDeliveryId()));
 
-        // Allow multiple GRs for partial deliveries - removed the single GR restriction
-        log.info("Allowing multiple goods receipts for PO {} to support partial deliveries", dto.getOrderId());
+        // Validate status: Inbound Delivery must be Pending (chờ nhập kho)
+        if (inboundDelivery.getStatus() != InboundDelivery.InboundDeliveryStatus.Pending &&
+            inboundDelivery.getStatus() != InboundDelivery.InboundDeliveryStatus.Completed) {
+            throw new IllegalStateException("Inbound Delivery must be Pending status to create Goods Receipt");
+        }
+
+        // For partial delivery: Allow multiple Goods Receipts for the same Inbound Delivery
+        // Don't check if already has approved receipt - user can create multiple GRs to receive items in batches
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + dto.getWarehouseId()));
+
+        // Validate warehouse matches Inbound Delivery warehouse
+        if (!warehouse.getWarehouseId().equals(inboundDelivery.getWarehouse().getWarehouseId())) {
+            throw new IllegalArgumentException("Warehouse must match Inbound Delivery warehouse");
+        }
 
         User createdBy = userRepository.findById(createdById)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
@@ -74,7 +93,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         // Create receipt entity
         GoodsReceipt receipt = GoodsReceipt.builder()
                 .receiptNo(receiptNo)
-                .purchaseOrder(purchaseOrder)
+                .inboundDelivery(inboundDelivery)
                 .warehouse(warehouse)
                 .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate().toLocalDateTime() : LocalDateTime.now())
                 .status(GoodsReceipt.GoodsReceiptStatus.Pending)
@@ -84,22 +103,35 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        // Create items
+        // Load Inbound Delivery items
+        List<InboundDeliveryItem> inboundItems = inboundDeliveryItemRepository.findByInboundDeliveryId(dto.getInboundDeliveryId());
+        if (inboundItems == null || inboundItems.isEmpty()) {
+            throw new IllegalStateException("Inbound Delivery has no items");
+        }
+
+        // Create items from DTO
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             List<GoodsReceiptItem> items = dto.getItems().stream()
                     .map(itemDto -> {
-                        PurchaseOrderItem poi = orderItemRepository.findById(itemDto.getPoiId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order Item not found with ID: " + itemDto.getPoiId()));
+                        InboundDeliveryItem idiItem = inboundItems.stream()
+                                .filter(idi -> idi.getIdiId().equals(itemDto.getIdiId()))
+                                .findFirst()
+                                .orElseThrow(() -> new ResourceNotFoundException("Inbound Delivery Item not found with ID: " + itemDto.getIdiId()));
 
                         Product product = productRepository.findById(itemDto.getProductId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
 
+                        // Validate received qty <= expected qty
+                        if (itemDto.getReceivedQty().compareTo(idiItem.getExpectedQty()) > 0) {
+                            throw new IllegalArgumentException("Received quantity cannot exceed expected quantity");
+                        }
+
                         return GoodsReceiptItem.builder()
                                 .goodsReceipt(receipt)
-                                .purchaseOrderItem(poi)
+                                .inboundDeliveryItem(idiItem)
                                 .product(product)
                                 .receivedQty(itemDto.getReceivedQty())
-                                .acceptedQty(itemDto.getAcceptedQty() != null ? itemDto.getAcceptedQty() : BigDecimal.ZERO)
+                                .acceptedQty(itemDto.getAcceptedQty() != null ? itemDto.getAcceptedQty() : itemDto.getReceivedQty())
                                 .remark(itemDto.getRemark())
                                 .build();
                     })
@@ -108,6 +140,10 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         }
 
         GoodsReceipt saved = receiptRepository.save(receipt);
+        
+        // DO NOT update Inbound Delivery status here - it will be updated when GR is approved
+        // Status will change to Completed only when all items are fully received
+
         GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
                 .orElse(saved);
 
@@ -335,22 +371,39 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         log.info("Fetching goods receipts with pagination and relations");
 
         Page<GoodsReceipt> receipts = receiptRepository.findAllActiveWithRelations(pageable);
+        
+        // Load all approved receipts for progress calculation
+        List<GoodsReceipt> allApprovedReceipts = receiptRepository.findAllApprovedWithItems();
+        
         return receipts.map(receipt -> {
-            // Ensure PO items are loaded for progress calculation
-            if (receipt.getPurchaseOrder() != null && receipt.getPurchaseOrder().getOrderId() != null) {
-                PurchaseOrder po = orderRepository.findByIdWithRelations(receipt.getPurchaseOrder().getOrderId())
-                    .orElse(receipt.getPurchaseOrder());
-                receipt.setPurchaseOrder(po);
-            }
-            
             GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
             dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
+            
+            // Calculate total received quantity from ALL approved GRs for this Inbound Delivery
+            if (receipt.getInboundDelivery() != null) {
+                Integer inboundDeliveryId = receipt.getInboundDelivery().getInboundDeliveryId();
+                
+                // Sum all received qty from approved GRs for this Inbound Delivery
+                double totalReceived = allApprovedReceipts.stream()
+                        .filter(gr -> gr.getInboundDelivery() != null && 
+                                     gr.getInboundDelivery().getInboundDeliveryId().equals(inboundDeliveryId))
+                        .flatMap(gr -> gr.getItems().stream())
+                        .mapToDouble(item -> item.getReceivedQty() != null ? item.getReceivedQty().doubleValue() : 0.0)
+                        .sum();
+                
+                dto.setTotalReceivedQty(totalReceived);
+                
+                // The totalExpectedQty is already set by mapper from InboundDelivery items
+            }
+            
             return dto;
         });
     }
     
     private boolean checkIfReceiptHasInvoice(Integer receiptId) {
-        return !apInvoiceRepository.findByReceiptId(receiptId).isEmpty();
+        // Only count active invoices (not Cancelled)
+        return apInvoiceRepository.findByReceiptId(receiptId).stream()
+                .anyMatch(inv -> inv.getStatus() != com.g174.mmssystem.entity.APInvoice.APInvoiceStatus.Cancelled);
     }
 
     @Override
@@ -366,14 +419,38 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         log.info("Searching goods receipts with keyword: {} and pagination", keyword);
 
         Page<GoodsReceipt> receipts = receiptRepository.searchReceipts(keyword, pageable);
-        return receipts.map(receiptMapper::toResponseDTO);
+        
+        // Load all approved receipts for progress calculation
+        List<GoodsReceipt> allApprovedReceipts = receiptRepository.findAllApprovedWithItems();
+        
+        return receipts.map(receipt -> {
+            GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
+            dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
+            
+            // Calculate total received quantity from ALL approved GRs for this Inbound Delivery
+            if (receipt.getInboundDelivery() != null) {
+                Integer inboundDeliveryId = receipt.getInboundDelivery().getInboundDeliveryId();
+                
+                // Sum all received qty from approved GRs for this Inbound Delivery
+                double totalReceived = allApprovedReceipts.stream()
+                        .filter(gr -> gr.getInboundDelivery() != null && 
+                                     gr.getInboundDelivery().getInboundDeliveryId().equals(inboundDeliveryId))
+                        .flatMap(gr -> gr.getItems().stream())
+                        .mapToDouble(item -> item.getReceivedQty() != null ? item.getReceivedQty().doubleValue() : 0.0)
+                        .sum();
+                
+                dto.setTotalReceivedQty(totalReceived);
+            }
+            
+            return dto;
+        });
     }
 
     @Override
-    public List<GoodsReceiptResponseDTO> getReceiptsByOrderId(Integer orderId) {
-        log.info("Fetching goods receipts for Order ID: {}", orderId);
+    public List<GoodsReceiptResponseDTO> getReceiptsByInboundDeliveryId(Integer inboundDeliveryId) {
+        log.info("Fetching goods receipts for Inbound Delivery ID: {}", inboundDeliveryId);
 
-        List<GoodsReceipt> receipts = receiptRepository.findByOrderId(orderId);
+        List<GoodsReceipt> receipts = receiptRepository.findByInboundDeliveryId(inboundDeliveryId);
         return receiptMapper.toResponseDTOList(receipts);
     }
 
@@ -400,18 +477,26 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
 
         // Update items if provided
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            receipt.getItems().clear();
-            List<GoodsReceiptItem> items = dto.getItems().stream()
+            // Remove existing items one by one to avoid orphan removal issues
+            if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
+                // Create a copy to avoid ConcurrentModificationException
+                List<GoodsReceiptItem> itemsToRemove = new ArrayList<>(receipt.getItems());
+                receipt.getItems().clear();
+                // The orphan removal will handle deletion
+            }
+            
+            // Create new items
+            List<GoodsReceiptItem> newItems = dto.getItems().stream()
                     .map(itemDto -> {
-                        PurchaseOrderItem poi = orderItemRepository.findById(itemDto.getPoiId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order Item not found with ID: " + itemDto.getPoiId()));
+                        InboundDeliveryItem idi = inboundDeliveryItemRepository.findById(itemDto.getIdiId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Inbound Delivery Item not found with ID: " + itemDto.getIdiId()));
 
                         Product product = productRepository.findById(itemDto.getProductId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
 
                         return GoodsReceiptItem.builder()
                                 .goodsReceipt(receipt)
-                                .purchaseOrderItem(poi)
+                                .inboundDeliveryItem(idi)
                                 .product(product)
                                 .receivedQty(itemDto.getReceivedQty())
                                 .acceptedQty(itemDto.getAcceptedQty() != null ? itemDto.getAcceptedQty() : BigDecimal.ZERO)
@@ -419,7 +504,9 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                                 .build();
                     })
                     .collect(Collectors.toList());
-            receipt.setItems(items);
+            
+            // Add new items to the existing collection
+            receipt.getItems().addAll(newItems);
         }
 
         receipt.setUpdatedAt(LocalDateTime.now());
@@ -467,11 +554,12 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         
         // Handle based on source type
         if (saved.getSourceType() == GoodsReceipt.SourceType.Purchase) {
-            // Update PO Items: Track received quantities
+            // Update PO Items: Track received quantities through Inbound Delivery Items
             log.info("Updating PO items received_qty for {} GRN items", savedWithItems.getItems().size());
             for (GoodsReceiptItem grItem : savedWithItems.getItems()) {
-                PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
-                if (poItem != null) {
+                InboundDeliveryItem idiItem = grItem.getInboundDeliveryItem();
+                if (idiItem != null && idiItem.getPurchaseOrderItem() != null) {
+                    PurchaseOrderItem poItem = idiItem.getPurchaseOrderItem();
                     BigDecimal acceptedQty = grItem.getAcceptedQty();
                     BigDecimal currentReceived = poItem.getReceivedQty() != null ? poItem.getReceivedQty() : BigDecimal.ZERO;
                     BigDecimal newReceived = currentReceived.add(acceptedQty);
@@ -549,10 +637,56 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         
         log.info("Goods receipt approved successfully, items and warehouse stock updated");
 
+        // Check if Inbound Delivery is fully received and update status
+        if (saved.getSourceType() == GoodsReceipt.SourceType.Purchase && saved.getInboundDelivery() != null) {
+            InboundDelivery inboundDelivery = saved.getInboundDelivery();
+            
+            // Load Inbound Delivery items to avoid lazy loading exception
+            List<InboundDeliveryItem> inboundItems = inboundDeliveryItemRepository.findByInboundDeliveryId(
+                    inboundDelivery.getInboundDeliveryId());
+            
+            // Load all approved GRs for this Inbound Delivery
+            List<GoodsReceipt> allApprovedReceipts = receiptRepository.findAllApprovedWithItems();
+            
+            // Check if all items are fully received
+            boolean allItemsFullyReceived = true;
+            for (InboundDeliveryItem idiItem : inboundItems) {
+                BigDecimal expectedQty = idiItem.getExpectedQty() != null ? idiItem.getExpectedQty() : BigDecimal.ZERO;
+                
+                // Sum received qty from all approved GRs for this item
+                BigDecimal totalReceived = allApprovedReceipts.stream()
+                        .filter(gr -> gr.getInboundDelivery() != null && 
+                                     gr.getInboundDelivery().getInboundDeliveryId().equals(inboundDelivery.getInboundDeliveryId()))
+                        .flatMap(gr -> gr.getItems().stream())
+                        .filter(gri -> gri.getInboundDeliveryItem() != null && 
+                                      gri.getInboundDeliveryItem().getIdiId().equals(idiItem.getIdiId()))
+                        .map(gri -> gri.getReceivedQty() != null ? gri.getReceivedQty() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+                if (totalReceived.compareTo(expectedQty) < 0) {
+                    allItemsFullyReceived = false;
+                    break;
+                }
+            }
+            
+            // Update Inbound Delivery status if all items are fully received
+            if (allItemsFullyReceived) {
+                log.info("All items fully received for Inbound Delivery {}. Updating status to Completed", 
+                         inboundDelivery.getInboundDeliveryId());
+                inboundDelivery.setStatus(InboundDelivery.InboundDeliveryStatus.Completed);
+                inboundDeliveryRepository.save(inboundDelivery);
+            } else {
+                log.info("Inbound Delivery {} has partial receipt. Status remains Pending", 
+                         inboundDelivery.getInboundDeliveryId());
+            }
+        }
+
         // Auto-create AP Invoice only for Purchase (not for SalesReturn)
         if (saved.getSourceType() == GoodsReceipt.SourceType.Purchase) {
             // Check PO completion status after receiving items
-            PurchaseOrder purchaseOrder = saved.getPurchaseOrder();
+            // Access PO through InboundDelivery
+            PurchaseOrder purchaseOrder = saved.getInboundDelivery() != null ? 
+                    saved.getInboundDelivery().getPurchaseOrder() : null;
             
             if (purchaseOrder != null) {
                 // Reload PO with items to check completion status
@@ -650,9 +784,10 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             throw new IllegalStateException("Không thể xóa phiếu nhập kho đã được phê duyệt");
         }
 
-        // Validate: Cannot delete if has invoice
-        boolean hasInvoice = !apInvoiceRepository.findByReceiptId(receiptId).isEmpty();
-        if (hasInvoice) {
+        // Validate: Cannot delete if has active invoice (not Cancelled)
+        boolean hasActiveInvoice = apInvoiceRepository.findByReceiptId(receiptId).stream()
+                .anyMatch(inv -> inv.getStatus() != com.g174.mmssystem.entity.APInvoice.APInvoiceStatus.Cancelled);
+        if (hasActiveInvoice) {
             throw new IllegalStateException("Không thể xóa phiếu nhập kho đã có hóa đơn");
         }
 

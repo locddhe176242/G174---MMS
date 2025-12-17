@@ -107,7 +107,7 @@ public class PurchaseQuotationController {
     @LogActivity(
             action = "UPDATE_PURCHASE_QUOTATION",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Cập nhật báo giá mua hàng ID: #{#pqId}",
+            description = "Cập nhật báo giá mua hàng",
             entityId = "#{#pqId}"
     )
     public ResponseEntity<PurchaseQuotationResponseDTO> updateQuotation(
@@ -129,11 +129,11 @@ public class PurchaseQuotationController {
     }
 
     @PutMapping("/{pqId}/approve")
-    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "APPROVE_PURCHASE_QUOTATION",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Duyệt báo giá mua hàng ID: #{#pqId}",
+            description = "Duyệt báo giá mua hàng",
             entityId = "#{#pqId}"
     )
     public ResponseEntity<PurchaseQuotationResponseDTO> approveQuotation(
@@ -150,7 +150,7 @@ public class PurchaseQuotationController {
     @LogActivity(
             action = "REJECT_PURCHASE_QUOTATION",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Từ chối báo giá mua hàng ID: #{#pqId}",
+            description = "Từ chối báo giá mua hàng",
             entityId = "#{#pqId}"
     )
     public ResponseEntity<PurchaseQuotationResponseDTO> rejectQuotation(
@@ -168,7 +168,7 @@ public class PurchaseQuotationController {
     @LogActivity(
             action = "DELETE_PURCHASE_QUOTATION",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Xóa báo giá mua hàng ID: #{#pqId}",
+            description = "Xóa báo giá mua hàng",
             entityId = "#{#pqId}"
     )
     public ResponseEntity<PurchaseQuotationResponseDTO> deleteQuotation(@PathVariable Integer pqId) {

@@ -108,6 +108,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (17, 'rfq', 'Yêu cầu báo giá', '/purchase/rfqs', 'quote', 7, 19),
 (18, 'purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 7, 20),
 (19, 'purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 7, 21),
+(31, 'inbound-delivery', 'Kế hoạch nhận hàng', '/purchase/inbound-deliveries', 'delivery', 7, 22),
 
 -- Menu con của Sales (parent_id = 8)
 (20, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 8, 22),
@@ -131,22 +132,23 @@ ON DUPLICATE KEY UPDATE
   display_order = new_menu.display_order;
 
 -- ==================== 8. ROLE_MENUS ====================
--- MANAGER (role_id = 1): Có tất cả menus (1-30)
+-- MANAGER (role_id = 1): Có tất cả menus (1-31)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
 (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19),
 (1, 20), (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27), (1, 28),
-(1, 29), (1, 30)
+(1, 29), (1, 30), (1, 31)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- SALE (role_id = 2): Dashboard, Khách hàng, Nhà cung cấp, Sản phẩm, Xuất hàng (+ menu con), Báo cáo
+-- SALE (role_id = 2): Dashboard, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (view Good Issues), Xuất hàng (+ menu con), Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 1),   -- Dashboard
 (2, 3),   -- Customers
 (2, 4),   -- Vendors
 (2, 5),   -- Products
+(2, 6),   -- Warehouse (parent) - để hiển thị menu con Good Issues
 (2, 8),   -- Sales
 (2, 11),  -- Reports
 (2, 20),  -- Sales Quotations
@@ -154,12 +156,13 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 22),  -- Deliveries
 (2, 23),  -- Return Orders
 (2, 24),  -- Credit Notes
-(2, 25)   -- Sales Return Inbound Orders
+(2, 25),  -- Sales Return Inbound Orders
+(2, 30)   -- Good Issues (Phiếu xuất kho) - để xem trạng thái xuất kho
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- PURCHASE (role_id = 3): Dashboard, Danh mục, Nhà cung cấp, Sản phẩm, Nhập hàng (PR, RFQ, PQ, PO), Báo cáo
+-- PURCHASE (role_id = 3): Dashboard, Danh mục, Nhà cung cấp, Sản phẩm, Nhập hàng (PR, RFQ, PQ, PO, Inbound Delivery), Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (3, 1),   -- Dashboard
 (3, 2),   -- Categories
@@ -170,23 +173,24 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (3, 16),  -- Purchase Requisition
 (3, 17),  -- RFQ
 (3, 18),  -- Purchase Quotation
-(3, 19)   -- Purchase Order
+(3, 19),  -- Purchase Order
+(3, 31)   -- Inbound Delivery
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- ACCOUNTING (role_id = 4): Dashboard, Khách hàng, Nhà cung cấp, Kế toán (AP/AR Invoices + Payments), Phê duyệt, Báo cáo
+-- ACCOUNTING (role_id = 4): Dashboard, Danh mục, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (Phiếu nhập kho), Kế toán (AP/AR Invoices + Payments), Phê duyệt, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (4, 1),   -- Dashboard
+(4, 2),   -- Categories
 (4, 3),   -- Customers
 (4, 4),   -- Vendors
+(4, 5),   -- Products
+(4, 6),   -- Warehouse (parent) - để hiển thị menu con Goods Receipt
 (4, 9),   -- Accounting
 (4, 10),  -- Approval
 (4, 11),  -- Reports
-(4, 20),  -- Sales Quotations (view)
-(4, 21),  -- Sales Orders (view + approve)
-(4, 22),  -- Deliveries (view)
-(4, 24),  -- Credit Notes
+(4, 15),  -- Goods Receipt (Phiếu nhập kho) - để xem và tạo hóa đơn
 (4, 26),  -- Accounting - AP Invoices
 (4, 27),  -- Accounting - AR Invoices
 (4, 28),  -- Accounting - AP Payments
@@ -195,17 +199,19 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- WAREHOUSE (role_id = 5): Dashboard, Danh mục, Sản phẩm, Kho (Danh sách kho + Phiếu nhập kho + Phiếu xuất kho), Xuất hàng (view), Báo cáo
+-- WAREHOUSE (role_id = 5): Dashboard, Danh mục, Sản phẩm, Kho (Danh sách kho + Phiếu nhập kho + Phiếu xuất kho), Nhập hàng (Inbound Delivery), Xuất hàng (view), Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 1),   -- Dashboard
 (5, 2),   -- Categories
 (5, 5),   -- Products
 (5, 6),   -- Warehouse
+(5, 7),   -- Purchase (parent) - để hiển thị menu con Inbound Delivery
 (5, 8),   -- Sales (view)
 (5, 11),  -- Reports
 (5, 14),  -- Warehouse List
 (5, 15),  -- Goods Receipt
 (5, 30),  -- Good Issues
+(5, 31),  -- Inbound Delivery - để tạo Goods Receipt từ Inbound Delivery
 (5, 21),  -- Sales Orders (view)
 (5, 22),  -- Deliveries
 (5, 23),  -- Return Orders
@@ -298,7 +304,21 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 (57, 'good_issue.create', 'Tạo phiếu xuất kho', 'good_issue', 'create'),
 (58, 'good_issue.edit', 'Sửa phiếu xuất kho', 'good_issue', 'edit'),
 (59, 'good_issue.delete', 'Xóa phiếu xuất kho', 'good_issue', 'delete'),
-(60, 'good_issue.approve', 'Phê duyệt phiếu xuất kho', 'good_issue', 'approve')
+(60, 'good_issue.approve', 'Phê duyệt phiếu xuất kho', 'good_issue', 'approve'),
+
+-- Inbound Delivery permissions (61-65)
+(61, 'inbound_delivery.view', 'Xem đơn nhận hàng', 'inbound_delivery', 'view'),
+(62, 'inbound_delivery.create', 'Tạo đơn nhận hàng', 'inbound_delivery', 'create'),
+(63, 'inbound_delivery.edit', 'Sửa đơn nhận hàng', 'inbound_delivery', 'edit'),
+(64, 'inbound_delivery.delete', 'Xóa đơn nhận hàng', 'inbound_delivery', 'delete'),
+(65, 'inbound_delivery.status', 'Thay đổi trạng thái đơn nhận hàng', 'inbound_delivery', 'status'),
+
+-- Goods Receipt permissions (66-70)
+(66, 'goods_receipt.view', 'Xem phiếu nhập kho', 'goods_receipt', 'view'),
+(67, 'goods_receipt.create', 'Tạo phiếu nhập kho', 'goods_receipt', 'create'),
+(68, 'goods_receipt.edit', 'Sửa phiếu nhập kho', 'goods_receipt', 'edit'),
+(69, 'goods_receipt.delete', 'Xóa phiếu nhập kho', 'goods_receipt', 'delete'),
+(70, 'goods_receipt.approve', 'Phê duyệt phiếu nhập kho', 'goods_receipt', 'approve')
 AS new_perm
 ON DUPLICATE KEY UPDATE
   permission_name = new_perm.permission_name,
@@ -334,7 +354,11 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Invoice permissions (46-50)
 (1, 46), (1, 47), (1, 48), (1, 49), (1, 50),
 -- Good Issue permissions (56-60)
-(1, 56), (1, 57), (1, 58), (1, 59), (1, 60)
+(1, 56), (1, 57), (1, 58), (1, 59), (1, 60),
+-- Inbound Delivery permissions (61-65)
+(1, 61), (1, 62), (1, 63), (1, 64), (1, 65),
+-- Goods Receipt permissions (66-70)
+(1, 66), (1, 67), (1, 68), (1, 69), (1, 70)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -378,8 +402,12 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (3, 11), (3, 12), (3, 13), (3, 15),
 -- Purchase permissions: view, create, edit (không có delete, approve)
 (3, 21), (3, 22), (3, 23),
--- Warehouse permissions: view, import
-(3, 26), (3, 27)
+-- Warehouse permissions: chỉ view (PURCHASE không có quyền nhập kho - do WAREHOUSE quản lý)
+(3, 26),
+-- Inbound Delivery permissions: view, create, edit, status
+(3, 61), (3, 62), (3, 63), (3, 65),
+-- Goods Receipt permissions: view (để theo dõi phiếu nhập kho)
+(3, 66)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -392,20 +420,16 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (4, 1),
 -- Vendor permissions: chỉ view
 (4, 6),
--- Sales permissions: view, approve
-(4, 16), (4, 20),
+-- Product permissions: chỉ view (để xem sản phẩm khi tạo hóa đơn)
+(4, 11),
 -- Purchase permissions: view, approve
 (4, 21), (4, 25),
--- Delivery permissions: view
-(4, 31),
--- Return Order permissions: view
-(4, 36),
--- Credit Note permissions: view, create, edit, status
-(4, 41), (4, 42), (4, 43), (4, 45),
 -- Invoice permissions: view, create, edit, payment
 (4, 46), (4, 47), (4, 48), (4, 50),
 -- Good Issue permissions: view (để xem phiếu xuất kho)
-(4, 56)
+(4, 56),
+-- Goods Receipt permissions: view (để xem phiếu nhập kho và tạo hóa đơn)
+(4, 66)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -429,7 +453,11 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Sales Return Inbound Order permissions: view, create, edit
 (5, 51), (5, 52), (5, 53),
 -- Good Issue permissions: view, create, edit, approve (quản lý xuất kho)
-(5, 56), (5, 57), (5, 58), (5, 60)
+(5, 56), (5, 57), (5, 58), (5, 60),
+-- Inbound Delivery permissions: view, create, edit, status
+(5, 61), (5, 62), (5, 63), (5, 65),
+-- Goods Receipt permissions: view, create, edit, approve (quản lý nhập kho)
+(5, 66), (5, 67), (5, 68), (5, 70)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
