@@ -60,10 +60,12 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
                         salesOrder.getCustomer().getCustomerId());
                 // Tìm Invoice có liên kết với Delivery này hoặc SalesOrder này
                 invoice = invoices.stream()
-                        .filter(inv -> inv.getDelivery() != null && inv.getDelivery().getDeliveryId().equals(delivery.getDeliveryId()))
+                        .filter(inv -> inv.getDelivery() != null
+                                && inv.getDelivery().getDeliveryId().equals(delivery.getDeliveryId()))
                         .findFirst()
                         .orElse(invoices.stream()
-                                .filter(inv -> inv.getSalesOrder() != null && inv.getSalesOrder().getSoId().equals(salesOrder.getSoId()))
+                                .filter(inv -> inv.getSalesOrder() != null
+                                        && inv.getSalesOrder().getSoId().equals(salesOrder.getSoId()))
                                 .findFirst()
                                 .orElse(null));
             }
@@ -74,7 +76,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
 
         ReturnOrder returnOrder = returnOrderMapper.toEntity(request, delivery, invoice, warehouse, currentUser);
         returnOrder.setReturnNo(generateReturnNo());
-        returnOrder.setStatus(ReturnOrder.ReturnStatus.Draft);
+        // Tự động approve khi tạo (giống Good Issue)
+        returnOrder.setStatus(ReturnOrder.ReturnStatus.Approved);
 
         List<ReturnOrderItem> items = buildItems(returnOrder, request.getItems(), delivery);
         returnOrder.getItems().clear();
@@ -88,9 +91,11 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     public ReturnOrderResponseDTO updateReturnOrder(Integer id, ReturnOrderRequestDTO request) {
         ReturnOrder returnOrder = getReturnOrderEntity(id);
 
-        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Approved ||
+        // Chỉ cho phép chỉnh sửa khi ở trạng thái Draft hoặc Approved (Manager có thể
+        // sửa cả Approved)
+        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Completed ||
                 returnOrder.getStatus() == ReturnOrder.ReturnStatus.Cancelled) {
-            throw new IllegalStateException("Không thể chỉnh sửa đơn trả hàng đã được duyệt hoặc đã hủy");
+            throw new IllegalStateException("Không thể chỉnh sửa đơn trả hàng đã hoàn thành hoặc đã hủy");
         }
 
         Warehouse warehouse = getWarehouse(request.getWarehouseId());
@@ -118,11 +123,14 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReturnOrderListResponseDTO> getAllReturnOrders(Integer deliveryId, Integer invoiceId, String status, String keyword) {
+    public List<ReturnOrderListResponseDTO> getAllReturnOrders(Integer deliveryId, Integer invoiceId, String status,
+            String keyword) {
         List<ReturnOrder> returnOrders = returnOrderRepository.findAll().stream()
                 .filter(ro -> ro.getDeletedAt() == null)
-                .filter(ro -> deliveryId == null || (ro.getDelivery() != null && ro.getDelivery().getDeliveryId().equals(deliveryId)))
-                .filter(ro -> invoiceId == null || (ro.getInvoice() != null && ro.getInvoice().getArInvoiceId().equals(invoiceId)))
+                .filter(ro -> deliveryId == null
+                        || (ro.getDelivery() != null && ro.getDelivery().getDeliveryId().equals(deliveryId)))
+                .filter(ro -> invoiceId == null
+                        || (ro.getInvoice() != null && ro.getInvoice().getArInvoiceId().equals(invoiceId)))
                 .filter(ro -> status == null || status.isEmpty() || ro.getStatus().name().equals(status))
                 .filter(ro -> keyword == null || keyword.isEmpty() ||
                         (ro.getReturnNo() != null && ro.getReturnNo().toLowerCase().contains(keyword.toLowerCase())))
@@ -137,8 +145,9 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     public void deleteReturnOrder(Integer id) {
         ReturnOrder returnOrder = getReturnOrderEntity(id);
 
-        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Approved) {
-            throw new IllegalStateException("Không thể xóa đơn trả hàng đã được duyệt");
+        // Chỉ cho phép xóa khi ở trạng thái Draft hoặc Approved (chưa Completed)
+        if (returnOrder.getStatus() == ReturnOrder.ReturnStatus.Completed) {
+            throw new IllegalStateException("Không thể xóa đơn trả hàng đã hoàn thành");
         }
 
         returnOrder.setDeletedAt(Instant.now());
@@ -164,7 +173,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
         return returnOrderMapper.toResponse(saved, items);
     }
 
-    private List<ReturnOrderItem> buildItems(ReturnOrder returnOrder, List<ReturnOrderItemRequestDTO> requestItems, Delivery delivery) {
+    private List<ReturnOrderItem> buildItems(ReturnOrder returnOrder, List<ReturnOrderItemRequestDTO> requestItems,
+            Delivery delivery) {
         if (requestItems == null || requestItems.isEmpty()) {
             throw new IllegalArgumentException("Cần ít nhất một dòng sản phẩm trả lại");
         }
@@ -172,7 +182,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
         List<ReturnOrderItem> items = new ArrayList<>();
         for (ReturnOrderItemRequestDTO dto : requestItems) {
             DeliveryItem deliveryItem = deliveryItemRepository.findById(dto.getDeliveryItemId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Delivery Item ID " + dto.getDeliveryItemId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy Delivery Item ID " + dto.getDeliveryItemId()));
 
             // Validate: số lượng trả lại không được vượt quá số lượng đã giao
             BigDecimal alreadyReturned = getAlreadyReturnedQty(deliveryItem.getDiId());
@@ -184,7 +195,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
             }
 
             Product product = productRepository.findById(dto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
             Warehouse warehouse = getWarehouse(dto.getWarehouseId());
 
             ReturnOrderItem item = returnOrderMapper.toItemEntity(returnOrder, dto, deliveryItem, product, warehouse);
@@ -205,15 +217,22 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
             throw new IllegalStateException("Không thể thay đổi trạng thái của đơn trả hàng đã hủy");
         }
 
+        if (currentStatus == ReturnOrder.ReturnStatus.Completed) {
+            throw new IllegalStateException("Không thể thay đổi trạng thái của đơn trả hàng đã hoàn thành");
+        }
+
         switch (currentStatus) {
             case Draft:
+                // Draft có thể chuyển sang Approved hoặc Cancelled
                 if (newStatus != ReturnOrder.ReturnStatus.Approved && newStatus != ReturnOrder.ReturnStatus.Cancelled) {
                     throw new IllegalStateException("Chỉ có thể chuyển từ Draft sang Approved hoặc Cancelled");
                 }
                 break;
             case Approved:
-                if (newStatus != ReturnOrder.ReturnStatus.Cancelled) {
-                    throw new IllegalStateException("Đơn trả hàng đã được duyệt, chỉ có thể hủy");
+                // Approved có thể chuyển sang Completed hoặc Cancelled
+                if (newStatus != ReturnOrder.ReturnStatus.Completed
+                        && newStatus != ReturnOrder.ReturnStatus.Cancelled) {
+                    throw new IllegalStateException("Chỉ có thể chuyển từ Approved sang Completed hoặc Cancelled");
                 }
                 break;
             default:
@@ -261,7 +280,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
             return null;
         }
         return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
     }
 
     private ReturnOrder.ReturnStatus parseStatus(String status) {
@@ -287,4 +307,3 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
         return candidate;
     }
 }
-

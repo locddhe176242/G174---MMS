@@ -8,49 +8,27 @@ import Pagination from "../../../common/Pagination";
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
   { value: "Draft", label: "Nháp" },
-  { value: "Pending", label: "Chờ xử lý" },
-  { value: "Approved", label: "Đã duyệt" },
+  { value: "Approved", label: "Đã gửi khách" },
   { value: "Fulfilled", label: "Đã hoàn thành" },
   { value: "Cancelled", label: "Đã hủy" },
-];
-
-const APPROVAL_OPTIONS = [
-  { value: "", label: "Tất cả phê duyệt" },
-  { value: "Draft", label: "Nháp" },
-  { value: "Pending", label: "Chờ phê duyệt" },
-  { value: "Approved", label: "Đã phê duyệt" },
-  { value: "Rejected", label: "Từ chối" },
 ];
 
 const getStatusLabel = (status) => {
   const statusMap = {
     Draft: "Nháp",
-    Pending: "Chờ xử lý",
-    Approved: "Đã duyệt",
+    Approved: "Đã gửi khách",
     Fulfilled: "Đã hoàn thành",
     Cancelled: "Đã hủy",
   };
   return statusMap[status] || status;
 };
 
-const getApprovalStatusLabel = (approvalStatus) => {
-  const approvalMap = {
-    Draft: "Nháp",
-    Pending: "Chờ phê duyệt",
-    Approved: "Đã phê duyệt",
-    Rejected: "Từ chối",
-  };
-  return approvalMap[approvalStatus] || approvalStatus;
-};
-
 const getStatusColor = (status) => {
   switch (status) {
     case "Draft":
       return "bg-gray-100 text-gray-700";
-    case "Pending":
-      return "bg-yellow-100 text-yellow-700";
     case "Approved":
-      return "bg-blue-100 text-blue-700";
+      return "bg-green-100 text-green-700";
     case "Fulfilled":
       return "bg-green-100 text-green-700";
     case "Cancelled":
@@ -92,7 +70,6 @@ export default function SalesOrderList() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [sortField, setSortField] = useState("createdAt");
@@ -104,7 +81,6 @@ export default function SalesOrderList() {
       const response = await salesOrderService.getAllOrders({
         keyword: searchTerm || undefined,
         status: statusFilter || undefined,
-        approvalStatus: approvalStatusFilter || undefined,
       });
       const list = Array.isArray(response) ? response : response?.content || response?.data || [];
       setOrders(list);
@@ -128,11 +104,9 @@ export default function SalesOrderList() {
         (order.orderNo || "").toLowerCase().includes(term) ||
         (order.customerName || "").toLowerCase().includes(term);
       const matchesStatus = !statusFilter || order.status === statusFilter;
-      const matchesApprovalStatus =
-        !approvalStatusFilter || order.approvalStatus === approvalStatusFilter;
-      return matchesKeyword && matchesStatus && matchesApprovalStatus;
+      return matchesKeyword && matchesStatus;
     });
-  }, [orders, searchTerm, statusFilter, approvalStatusFilter]);
+  }, [orders, searchTerm, statusFilter]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -213,6 +187,7 @@ export default function SalesOrderList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn bán hàng</h1>
+            <p className="text-gray-500">Theo dõi đơn bán hàng và trạng thái thực hiện</p>
           </div>
           <button
             onClick={() => navigate("/sales/orders/new")}
@@ -246,20 +221,6 @@ export default function SalesOrderList() {
                 className="px-3 py-2 border rounded-lg"
               >
                 {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={approvalStatusFilter}
-                onChange={(e) => {
-                  setApprovalStatusFilter(e.target.value);
-                  setCurrentPage(0);
-                }}
-                className="px-3 py-2 border rounded-lg"
-              >
-                {APPROVAL_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -303,14 +264,11 @@ export default function SalesOrderList() {
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Phê duyệt
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       <button
                         onClick={() => changeSort("orderDate")}
                         className="flex items-center gap-1"
                       >
-                        Ngày đơn {getSortIcon("orderDate")}
+                        Ngày tạo đơn {getSortIcon("orderDate")}
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -345,15 +303,6 @@ export default function SalesOrderList() {
                           {getStatusLabel(order.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getApprovalStatusColor(
-                            order.approvalStatus
-                          )}`}
-                        >
-                          {getApprovalStatusLabel(order.approvalStatus)}
-                        </span>
-                      </td>
                       <td className="px-6 py-3 text-sm text-gray-700">
                         {formatDate(order.orderDate)}
                       </td>
@@ -377,55 +326,38 @@ export default function SalesOrderList() {
                         {formatCurrency(order.totalAmount)}
                       </td>
                       <td className="px-6 py-3 text-sm">
-                        <div className="flex items-center gap-1 justify-center">
+                        <div className="flex items-center gap-3 justify-center">
                           <button
                             onClick={() =>
                               navigate(`/sales/orders/${order.orderId || order.soId}`)
                             }
-                            className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
-                            title="Xem chi tiết"
+                            className="text-blue-600 hover:underline"
                           >
-                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
+                            Xem
                           </button>
-                          {/* Chỉ hiển thị nút Sửa nếu:
-                              - approvalStatus = Draft: tất cả user
-                              - approvalStatus = Pending: chỉ Manager
-                              - approvalStatus = Approved: chỉ Manager
-                              - approvalStatus = Rejected: tất cả user
-                          */}
-                          {(order.approvalStatus === "Draft" || 
-                            order.approvalStatus === "Rejected" || 
-                            (order.approvalStatus === "Pending" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER"))) ||
-                            (order.approvalStatus === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
-                            <button
-                              onClick={() =>
-                                navigate(`/sales/orders/${order.orderId || order.soId}/edit`)
-                              }
-                              className="text-green-600 hover:underline"
-                            >
-                              Sửa
-                            </button>
-                          )}
-                          {/* Chỉ hiển thị nút Xóa nếu:
-                              - approvalStatus = Draft: tất cả user
-                              - approvalStatus = Pending: chỉ Manager
-                              - approvalStatus = Approved: chỉ Manager
-                              - approvalStatus = Rejected: tất cả user
-                          */}
-                          {(order.approvalStatus === "Draft" || 
-                            order.approvalStatus === "Rejected" || 
-                            (order.approvalStatus === "Pending" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER"))) ||
-                            (order.approvalStatus === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
-                            <button
-                              onClick={() => handleDelete(order.orderId || order.soId)}
-                              className="text-red-600 hover:underline"
-                            >
-                              Xóa
-                            </button>
-                          )}
+                          {/* Không cho sửa/xóa khi đơn đã có Delivery hoặc AR Invoice */}
+                          {!order.hasDelivery &&
+                            !order.hasInvoice &&
+                            (order.approvalStatus === "Draft" ||
+                              (order.approvalStatus === "Approved" &&
+                                (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    navigate(`/sales/orders/${order.orderId || order.soId}/edit`)
+                                  }
+                                  className="text-green-600 hover:underline"
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(order.orderId || order.soId)}
+                                  className="text-red-600 hover:underline"
+                                >
+                                  Xóa
+                                </button>
+                              </>
+                            )}
                         </div>
                       </td>
                     </tr>

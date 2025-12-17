@@ -16,14 +16,13 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "sales_orders",
-        indexes = {
-                @Index(name = "idx_so_status", columnList = "status"),
-                @Index(name = "idx_so_approval", columnList = "approval_status"),
-                @Index(name = "idx_so_customer", columnList = "customer_id"),
-                @Index(name = "idx_so_sq", columnList = "sq_id"),
-                @Index(name = "idx_so_approver", columnList = "approver_id")
-        })
+@Table(name = "sales_orders", indexes = {
+        @Index(name = "idx_so_status", columnList = "status"),
+        @Index(name = "idx_so_approval", columnList = "approval_status"),
+        @Index(name = "idx_so_customer", columnList = "customer_id"),
+        @Index(name = "idx_so_sq", columnList = "sq_id"),
+        @Index(name = "idx_so_approver", columnList = "approver_id")
+})
 public class SalesOrder {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +71,16 @@ public class SalesOrder {
     @DecimalMax(value = "999999999999999.99", inclusive = true)
     @Column(name = "subtotal", precision = 18, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "100.0", inclusive = true)
+    @Column(name = "header_discount_percent", precision = 5, scale = 2)
+    private BigDecimal headerDiscountPercent = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "999999999999999.99", inclusive = true)
+    @Column(name = "header_discount_amount", precision = 18, scale = 2)
+    private BigDecimal headerDiscountAmount = BigDecimal.ZERO;
 
     @DecimalMin(value = "0.0", inclusive = true)
     @DecimalMax(value = "999999999999999.99", inclusive = true)

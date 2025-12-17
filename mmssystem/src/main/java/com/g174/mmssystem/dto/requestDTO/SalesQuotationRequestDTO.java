@@ -19,8 +19,6 @@ public class SalesQuotationRequestDTO {
 
     private LocalDate quotationDate;
 
-    private LocalDate validUntil;
-
     @Size(max = 255)
     private String paymentTerms;
 
@@ -28,7 +26,7 @@ public class SalesQuotationRequestDTO {
     private String deliveryTerms;
 
     @DecimalMin(value = "0.0", inclusive = true)
-    private BigDecimal headerDiscount = BigDecimal.ZERO;
+    private BigDecimal headerDiscountPercent = BigDecimal.ZERO;
 
     private String notes;
 

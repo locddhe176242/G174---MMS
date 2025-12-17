@@ -623,6 +623,8 @@ CREATE TABLE AP_Invoices (
     invoice_date DATE,
     due_date DATE,
     subtotal DECIMAL(18, 2) DEFAULT 0,
+    header_discount_percent DECIMAL(18, 2) DEFAULT 0,
+    header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     tax_amount DECIMAL(18, 2) DEFAULT 0,
     total_amount DECIMAL(18, 2) DEFAULT 0,
     balance_amount DECIMAL(18, 2) DEFAULT 0,

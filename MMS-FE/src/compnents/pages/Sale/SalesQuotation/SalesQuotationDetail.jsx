@@ -26,12 +26,43 @@ export default function SalesQuotationDetail() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [summary, setSummary] = useState({
+    grossSubtotal: 0,
+    lineDiscountTotal: 0,
+    headerDiscountPercent: 0,
+    headerDiscountAmount: 0,
+    taxTotal: 0,
+    total: 0,
+  });
 
   useEffect(() => {
     (async () => {
       try {
         const response = await salesQuotationService.getQuotationById(id);
         setData(response);
+
+        // Tổng tiền lấy theo đúng số backend đã tính (đảm bảo thống nhất với list & Sales Order)
+        const grossSubtotal = response.items?.reduce((sum, item) => {
+          const qty = Number(item.quantity || 0);
+          const price = Number(item.unitPrice || 0);
+          return sum + qty * price;
+        }, 0) || 0;
+
+        const lineDiscountTotal =
+          response.items?.reduce(
+            (sum, item) => sum + Number(item.discountAmount || 0),
+            0
+          ) || 0;
+
+        setSummary({
+          grossSubtotal,
+          lineDiscountTotal,
+          headerDiscountPercent: Number(response.headerDiscountPercent || 0),
+          headerDiscountAmount: Number(response.headerDiscountAmount || 0),
+          taxTotal: Number(response.taxAmount || 0),
+          total: Number(response.totalAmount || 0),
+        });
       } catch (error) {
         console.error(error);
         toast.error("Không thể tải báo giá");
@@ -54,6 +85,55 @@ export default function SalesQuotationDetail() {
     return null;
   }
 
+  const getDiscountPercent = (item) => {
+    const qty = Number(item.quantity || 0);
+    const price = Number(item.unitPrice || 0);
+    const base = qty * price;
+    const discount = Number(item.discountAmount || 0);
+    if (base <= 0 || discount <= 0) return "0%";
+    const percent = (discount / base) * 100;
+    const formatted = percent % 1 === 0 ? percent.toString() : percent.toFixed(2);
+    return `${formatted}%`;
+  };
+
+    const handleSendToCustomer = async () => {
+      try {
+        setActionLoading(true);
+        await salesQuotationService.changeStatus(id, "Active");
+        toast.success("Đã gửi báo giá cho khách hàng");
+        // Reload
+        const response = await salesQuotationService.getQuotationById(id);
+        setData(response);
+      } catch (error) {
+        console.error(error);
+        toast.error(error?.response?.data?.message || "Không thể gửi báo giá");
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+    const handleCloneToDraft = async () => {
+      if (!window.confirm("Tạo bản nháp mới từ báo giá này? Bản gốc giữ nguyên.")) {
+        return;
+      }
+      try {
+        setActionLoading(true);
+        const cloned = await salesQuotationService.cloneQuotation(id);
+        const newId = cloned?.quotationId ?? cloned?.id;
+        toast.success("Đã tạo bản nháp mới từ báo giá");
+        if (newId) {
+          navigate(`/sales/quotations/${newId}/edit`);
+        } else {
+          navigate("/sales/quotations");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error(error?.response?.data?.message || "Không thể nhân bản báo giá");
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
@@ -73,6 +153,24 @@ export default function SalesQuotationDetail() {
             >
               Chỉnh sửa
             </button>
+            {data.status === "Draft" && (
+              <button
+                onClick={handleSendToCustomer}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {actionLoading ? "Đang gửi..." : "Gửi cho khách"}
+              </button>
+            )}
+            {data.status === "Active" && (
+              <button
+                onClick={handleCloneToDraft}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {actionLoading ? "Đang xử lý..." : "Tạo bản nháp mới"}
+              </button>
+            )}
             <button
               onClick={() => navigate("/sales/quotations")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
@@ -101,10 +199,6 @@ export default function SalesQuotationDetail() {
                 {formatDate(data.quotationDate)}
               </li>
               <li>
-                <span className="text-gray-500">Hạn báo giá:</span>{" "}
-                {formatDate(data.validUntil)}
-              </li>
-              <li>
                 <span className="text-gray-500">Điều khoản thanh toán:</span>{" "}
                 {data.paymentTerms || "—"}
               </li>
@@ -122,53 +216,28 @@ export default function SalesQuotationDetail() {
               <li>
                 <span className="text-gray-500">Tạm tính:</span>{" "}
                 <span className="font-semibold">
-                  {formatCurrency(data.subtotal)}
+                  {formatCurrency(summary.grossSubtotal)}
                 </span>
               </li>
               <li>
-                <span className="text-gray-500">Chiết khấu:</span>{" "}
-                {formatCurrency(data.headerDiscount)}
+                <span className="text-gray-500">Chiết khấu dòng:</span>{" "}
+                {formatCurrency(summary.lineDiscountTotal)}
+              </li>
+              <li>
+                <span className="text-gray-500">Chiết khấu chung:</span>{" "}
+                <span className="font-semibold">
+                  {`${Number(summary.headerDiscountPercent || 0)}%`} (
+                  {formatCurrency(summary.headerDiscountAmount)})
+                </span>
               </li>
               <li>
                 <span className="text-gray-500">Thuế:</span>{" "}
-                {formatCurrency(data.taxAmount)}
+                {formatCurrency(summary.taxTotal)}
               </li>
               <li className="text-lg font-bold text-gray-900">
-                Tổng cộng: {formatCurrency(data.totalAmount)}
+                Tổng cộng: {formatCurrency(summary.total)}
               </li>
             </ul>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">
-            Theo dõi
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700">
-            <div>
-              <div className="text-gray-500 uppercase text-xs tracking-wide">
-                Người tạo
-              </div>
-              <div className="font-semibold text-gray-900">
-                {data.createdByDisplay || data.createdBy || "—"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {formatDateTime(data.createdAt)}
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 text-sm text-gray-700">
-            <div>
-              <div className="text-gray-500 uppercase text-xs tracking-wide">
-                Người cập nhật
-              </div>
-              <div className="font-semibold text-gray-900">
-                {data.updatedByDisplay || data.updatedBy || "—"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {formatDateTime(data.updatedAt)}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -226,7 +295,7 @@ export default function SalesQuotationDetail() {
                       {formatCurrency(item.unitPrice)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {formatCurrency(item.discountAmount)}
+                    {getDiscountPercent(item)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {item.taxRate ? `${item.taxRate}%` : "0%"}

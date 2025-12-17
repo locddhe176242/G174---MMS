@@ -28,12 +28,7 @@ public class GoodIssueController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "CREATE_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Tạo phiếu xuất kho: #{#result.body.issueNo}",
-            entityId = "#{#result.body.issueId}"
-    )
+    @LogActivity(action = "CREATE_GOOD_ISSUE", activityType = "WAREHOUSE_MANAGEMENT", description = "Tạo phiếu xuất kho: #{#result.body.issueNo}", entityId = "#{#result.body.issueId}")
     public ResponseEntity<GoodIssueResponseDTO> createIssue(
             @Valid @RequestBody GoodIssueRequestDTO requestDTO,
             @RequestParam(required = false) Integer createdById) {
@@ -43,7 +38,8 @@ public class GoodIssueController {
         // Get current user ID if not provided
         if (createdById == null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+            if (auth != null
+                    && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
                 createdById = 1; // Placeholder - implement based on your auth system
             }
         }
@@ -54,12 +50,7 @@ public class GoodIssueController {
 
     @PostMapping("/from-delivery/{deliveryId}")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "CREATE_GOOD_ISSUE_FROM_DELIVERY",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Tạo phiếu xuất kho từ Delivery ID: #{#deliveryId}, Issue No: #{#result.body.issueNo}",
-            entityId = "#{#result.body.issueId}"
-    )
+    @LogActivity(action = "CREATE_GOOD_ISSUE_FROM_DELIVERY", activityType = "WAREHOUSE_MANAGEMENT", description = "Tạo phiếu xuất kho từ Delivery ID: #{#deliveryId}, Issue No: #{#result.body.issueNo}", entityId = "#{#result.body.issueId}")
     public ResponseEntity<GoodIssueResponseDTO> createIssueFromDelivery(
             @PathVariable Integer deliveryId,
             @Valid @RequestBody GoodIssueRequestDTO requestDTO,
@@ -69,7 +60,8 @@ public class GoodIssueController {
         // Get current user ID if not provided
         if (createdById == null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+            if (auth != null
+                    && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
                 createdById = 1; // Placeholder
             }
         }
@@ -142,7 +134,8 @@ public class GoodIssueController {
         // Get current user ID if not provided
         if (updatedById == null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+            if (auth != null
+                    && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
                 updatedById = 1; // Placeholder
             }
         }
@@ -153,21 +146,17 @@ public class GoodIssueController {
 
     @PostMapping("/{issueId}/submit-for-approval")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "SUBMIT_GOOD_ISSUE_FOR_APPROVAL",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Gửi yêu cầu duyệt phiếu xuất kho",
-            entityId = "#{#issueId}"
-    )
+    @LogActivity(action = "COMPLETE_GOOD_ISSUE", activityType = "WAREHOUSE_MANAGEMENT", description = "Hoàn tất phiếu xuất kho ID: #{#issueId}", entityId = "#{#issueId}")
     public ResponseEntity<GoodIssueResponseDTO> submitForApproval(
             @PathVariable Integer issueId,
             @RequestParam(required = false) Integer submittedById) {
-        log.info("REST: Submitting good issue ID: {} for approval", issueId);
+        log.info("REST: Completing good issue ID: {}", issueId);
 
         // Get current user ID if not provided
         if (submittedById == null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+            if (auth != null
+                    && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
                 submittedById = 1; // Placeholder
             }
         }
@@ -176,49 +165,9 @@ public class GoodIssueController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{issueId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "APPROVE_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Duyệt phiếu xuất kho",
-            entityId = "#{#issueId}"
-    )
-    public ResponseEntity<GoodIssueResponseDTO> approveIssue(
-            @PathVariable Integer issueId,
-            @RequestParam Integer approverId) {
-        log.info("REST: Approving good issue ID: {} by approver ID: {}", issueId, approverId);
-
-        GoodIssueResponseDTO response = issueService.approveIssue(issueId, approverId);
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/{issueId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "REJECT_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Từ chối phiếu xuất kho",
-            entityId = "#{#issueId}"
-    )
-    public ResponseEntity<GoodIssueResponseDTO> rejectIssue(
-            @PathVariable Integer issueId,
-            @RequestParam Integer approverId,
-            @RequestParam(required = false) String reason) {
-        log.info("REST: Rejecting good issue ID: {} by approver ID: {}", issueId, approverId);
-
-        GoodIssueResponseDTO response = issueService.rejectIssue(issueId, approverId, reason);
-        return ResponseEntity.ok(response);
-    }
-
     @DeleteMapping("/{issueId}")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "DELETE_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Xóa phiếu xuất kho",
-            entityId = "#{#issueId}"
-    )
+    @LogActivity(action = "DELETE_GOOD_ISSUE", activityType = "WAREHOUSE_MANAGEMENT", description = "Xóa phiếu xuất kho ID: #{#issueId}", entityId = "#{#issueId}")
     public ResponseEntity<GoodIssueResponseDTO> deleteIssue(@PathVariable Integer issueId) {
         log.info("REST: Deleting good issue ID: {}", issueId);
 

@@ -39,36 +39,6 @@ const normalizeNumberInput = (rawValue) => {
   return cleaned ? parseFloat(cleaned) : 0;
 };
 
-const selectStyles = {
-  control: (base, state) => ({
-    ...base,
-    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
-    boxShadow: "none",
-    minHeight: "40px",
-    "&:hover": {
-      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
-    },
-  }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (base) => ({ ...base, zIndex: 9999 }),
-};
-
-const compactSelectStyles = {
-  control: (base, state) => ({
-    ...base,
-    fontSize: "0.875rem",
-    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
-    boxShadow: "none",
-    minHeight: "36px",
-    "&:hover": {
-      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
-    },
-  }),
-  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (base) => ({ ...base, zIndex: 9999 }),
-};
-
 export default function CreditNoteForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -91,6 +61,7 @@ export default function CreditNoteForm() {
     invoiceId: "",
     returnOrderId: null,
     creditNoteDate: new Date(),
+    commonDiscountRate: 0, // Chiết khấu chung (%)
     reason: "",
     notes: "",
     items: [defaultItem()],
@@ -202,6 +173,7 @@ export default function CreditNoteForm() {
         invoiceId: data.invoiceId,
         returnOrderId: data.returnOrderId || null,
         creditNoteDate: data.creditNoteDate ? new Date(data.creditNoteDate) : new Date(),
+        commonDiscountRate: Number(data.headerDiscountPercent || data.header_discount_percent || 0),
         reason: data.reason || "",
         notes: data.notes || "",
         items:
@@ -397,13 +369,29 @@ export default function CreditNoteForm() {
   };
 
   const totals = useMemo(() => {
-    const subtotal = formData.items.reduce((sum, item) => {
+    // 1. Tổng tiền hàng (gross)
+    const gross = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
-      const discount = Number(item.discountAmount || 0);
-      return sum + Math.max(qty * price - discount, 0);
+      return sum + qty * price;
     }, 0);
 
+    // 2. Tổng chiết khấu từng sản phẩm (line discount)
+    const lineDiscount = formData.items.reduce((sum, item) => {
+      return sum + Number(item.discountAmount || 0);
+    }, 0);
+
+    // 3. Tổng sau chiết khấu từng sản phẩm
+    const subtotalBeforeHeader = gross - lineDiscount;
+
+    // 4. Chiết khấu chung (header discount)
+    const headerDiscountPercent = Number(formData.commonDiscountRate || 0);
+    const headerDiscount = subtotalBeforeHeader * (headerDiscountPercent / 100);
+
+    // 5. Tổng sau chiết khấu chung
+    const subtotalAfterHeader = subtotalBeforeHeader - headerDiscount;
+
+    // 6. Thuế (đã được tính trên từng dòng sau line discount)
     const tax = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
@@ -413,14 +401,20 @@ export default function CreditNoteForm() {
       return sum + (taxable * taxRate) / 100;
     }, 0);
 
-    const total = subtotal + tax;
+    // 7. Tổng cộng
+    const total = subtotalAfterHeader + tax;
 
     return {
-      subtotal,
+      gross,
+      lineDiscount,
+      subtotalBeforeHeader,
+      headerDiscountPercent,
+      headerDiscount,
+      subtotalAfterHeader,
       tax,
       total,
     };
-  }, [formData.items]);
+  }, [formData.items, formData.commonDiscountRate]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -455,6 +449,7 @@ export default function CreditNoteForm() {
     invoiceId: formData.invoiceId,
     returnOrderId: formData.returnOrderId || null,
     creditNoteDate: formData.creditNoteDate ? formData.creditNoteDate.toISOString().slice(0, 10) : null,
+    headerDiscountPercent: Number(formData.commonDiscountRate || 0),
     reason: formData.reason || null,
     notes: formData.notes || null,
     items: formData.items.map((item) => ({
@@ -505,180 +500,199 @@ export default function CreditNoteForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Cập nhật Credit Note" : "Tạo Credit Note mới"}
-            </h1>
-            <button
-              onClick={() => navigate("/sales/credit-notes")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-            >
-              ← Quay lại
-            </button>
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {isEdit ? "Cập nhật Credit Note" : "Tạo Credit Note mới"}
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  {isEdit ? "Cập nhật thông tin Credit Note" : "Nhập thông tin Credit Note"}
+                </p>
+              </div>
+              <button
+                onClick={() => navigate("/sales/credit-notes")}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                ← Quay lại
+              </button>
+            </div>
           </div>
-          <div className="border-t border-gray-200" />
-        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-            {/* Thông tin Credit Note */}
-            <div className="grid grid-cols-1 gap-6">
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin Credit Note</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-600">
-                      Invoice <span className="text-red-500">*</span>
-                    </label>
-                    {isEdit ? (
-                      <input
-                        type="text"
-                        value={selectedInvoice?.invoiceNo || ""}
-                        disabled
-                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-                      />
-                    ) : (
-                      <div className="mt-1 flex flex-col lg:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={selectedInvoice?.invoiceNo || ""}
-                          readOnly
-                          placeholder="Chọn Invoice"
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceModalOpen(true)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
-                          >
-                            Chọn
-                          </button>
-                          {selectedInvoice && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoice(null);
-                                handleInputChange("invoiceId", "");
-                              }}
-                              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-red-600"
-                            >
-                              Xóa
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {errors.invoiceId && (
-                      <p className="text-sm text-red-600 mt-1">{errors.invoiceId}</p>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-600">Return Order</label>
-                    {!isEdit ? (
-                      <div className="mt-1 flex flex-col lg:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={selectedReturnOrder?.returnNo || ""}
-                          readOnly
-                          placeholder="Chọn Return Order (tùy chọn)"
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setReturnOrderModalOpen(true)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
-                          >
-                            Chọn
-                          </button>
-                          {selectedReturnOrder && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedReturnOrder(null);
-                                  handleInputChange("returnOrderId", null);
-                                }}
-                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-red-600"
-                              >
-                                Xóa
-                              </button>
-                              <button
-                                type="button"
-                                onClick={loadFromReturnOrder}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                              >
-                                Tạo từ RO
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <input
-                        type="text"
-                        value={selectedReturnOrder?.returnNo || ""}
-                        disabled
-                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-                      />
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Ngày Credit Note</label>
-                    <DatePicker
-                      selected={formData.creditNoteDate}
-                      onChange={(date) => handleDateChange("creditNoteDate", date)}
-                      dateFormat="dd/MM/yyyy"
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm text-gray-600">Lý do</label>
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Invoice <span className="text-red-500">*</span>
+                </label>
+                {isEdit ? (
+                  <input
+                    type="text"
+                    value={selectedInvoice?.invoiceNo || ""}
+                    disabled
+                    className="w-full border rounded-lg px-3 py-2 bg-gray-100"
+                  />
+                ) : (
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      value={formData.reason}
-                      onChange={(e) => handleInputChange("reason", e.target.value)}
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Nhập lý do điều chỉnh"
+                      value={selectedInvoice?.invoiceNo || ""}
+                      readOnly
+                      placeholder="Chọn Invoice"
+                      className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceModalOpen(true)}
+                      className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                    >
+                      Chọn
+                    </button>
+                    {selectedInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedInvoice(null);
+                          handleInputChange("invoiceId", "");
+                        }}
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600"
+                      >
+                        Xóa
+                      </button>
+                    )}
                   </div>
+                )}
+                {errors.invoiceId && (
+                  <p className="text-red-500 text-xs mt-1">{errors.invoiceId}</p>
+                )}
+              </div>
 
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-600">Ghi chú</label>
-                    <textarea
-                      rows={3}
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange("notes", e.target.value)}
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Thông tin bổ sung"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Return Order
+                </label>
+                {!isEdit ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={selectedReturnOrder?.returnNo || ""}
+                      readOnly
+                      placeholder="Chọn Return Order (tùy chọn)"
+                      className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setReturnOrderModalOpen(true)}
+                      className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                    >
+                      Chọn
+                    </button>
+                    {selectedReturnOrder && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedReturnOrder(null);
+                          handleInputChange("returnOrderId", null);
+                        }}
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                    {selectedReturnOrder && (
+                      <button
+                        type="button"
+                        onClick={loadFromReturnOrder}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
+                        Tạo từ RO
+                      </button>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={selectedReturnOrder?.returnNo || ""}
+                    disabled
+                    className="w-full border rounded-lg px-3 py-2 bg-gray-100"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ngày Credit Note
+                </label>
+                <DatePicker
+                  selected={formData.creditNoteDate}
+                  onChange={(date) => handleDateChange("creditNoteDate", date)}
+                  dateFormat="dd/MM/yyyy"
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lý do
+                </label>
+                <input
+                  type="text"
+                  value={formData.reason}
+                  onChange={(e) => handleInputChange("reason", e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="Nhập lý do điều chỉnh"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chiết khấu chung (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.commonDiscountRate}
+                  onChange={(e) => handleInputChange("commonDiscountRate", parseFloat(e.target.value) || 0)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="0"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  💡 Chiết khấu áp dụng sau khi trừ chiết khấu từng sản phẩm
+                </p>
               </div>
             </div>
 
-            {/* Danh sách sản phẩm */}
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+              <textarea
+                rows={3}
+                value={formData.notes}
+                onChange={(e) => handleInputChange("notes", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Thông tin bổ sung"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
                 <button
                   type="button"
                   onClick={addItem}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   + Thêm sản phẩm
                 </button>
               </div>
+
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left">#</th>
                       <th className="px-4 py-3 text-left">Sản phẩm</th>
                       <th className="px-4 py-3 text-left">ĐVT</th>
                       <th className="px-4 py-3 text-right">Số lượng</th>
@@ -689,7 +703,7 @@ export default function CreditNoteForm() {
                       <th className="px-4 py-3 text-center">#</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y">
                     {formData.items.map((item, index) => {
                       const baseTotal = Number(item.quantity || 0) * Number(item.unitPrice || 0);
                       const discount = Number(item.discountAmount || 0);
@@ -700,18 +714,13 @@ export default function CreditNoteForm() {
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
-                          <td className="px-4 py-3 w-64">
+                          <td className="px-4 py-3">
                             <Select
                               placeholder="Chọn sản phẩm"
                               value={products.find((opt) => opt.value === item.productId)}
                               onChange={(option) => handleProductSelect(index, option)}
                               options={products}
                               isClearable
-                              menuPortalTarget={typeof window !== "undefined" ? document.body : null}
-                              menuPosition="fixed"
-                              menuShouldScrollIntoView={false}
-                              styles={compactSelectStyles}
                             />
                             {itemError.productId && (
                               <p className="text-xs text-red-600 mt-1">{itemError.productId}</p>
@@ -722,7 +731,7 @@ export default function CreditNoteForm() {
                               type="text"
                               value={item.uom}
                               onChange={(e) => handleItemChange(index, "uom", e.target.value)}
-                              className="w-24 border border-gray-300 rounded px-2 py-1"
+                              className="w-24 border rounded px-2 py-1"
                             />
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -733,7 +742,7 @@ export default function CreditNoteForm() {
                               onChange={(e) =>
                                 handleItemChange(index, "quantity", normalizeNumberInput(e.target.value))
                               }
-                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
+                              className="w-24 border rounded px-2 py-1 text-right"
                             />
                             {itemError.quantity && (
                               <p className="text-xs text-red-600 mt-1">{itemError.quantity}</p>
@@ -747,7 +756,7 @@ export default function CreditNoteForm() {
                               onChange={(e) =>
                                 handleItemChange(index, "unitPrice", normalizeNumberInput(e.target.value))
                               }
-                              className="w-32 border border-gray-300 rounded px-3 py-1 text-right tracking-wide"
+                              className="w-32 border rounded px-3 py-1 text-right tracking-wide"
                             />
                             {itemError.unitPrice && (
                               <p className="text-xs text-red-600 mt-1">{itemError.unitPrice}</p>
@@ -761,7 +770,7 @@ export default function CreditNoteForm() {
                               onChange={(e) =>
                                 handleItemChange(index, "discountAmount", normalizeNumberInput(e.target.value))
                               }
-                              className="w-28 border border-gray-300 rounded px-2 py-1 text-right"
+                              className="w-28 border rounded px-2 py-1 text-right"
                             />
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -772,7 +781,7 @@ export default function CreditNoteForm() {
                               step="0.01"
                               value={item.taxRate}
                               onChange={(e) => handleItemChange(index, "taxRate", e.target.value)}
-                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right"
+                              className="w-24 border rounded px-2 py-1 text-right"
                             />
                           </td>
                           <td className="px-4 py-3 text-right font-medium">
@@ -797,9 +806,9 @@ export default function CreditNoteForm() {
               </div>
             </div>
 
-            {/* Thuế và tổng cộng */}
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tổng quan tiền tệ</h3>
+              <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
                   <span>Tạm tính</span>
                   <span className="font-semibold">{formatCurrency(totals.subtotal)}</span>
@@ -808,30 +817,72 @@ export default function CreditNoteForm() {
                   <span>Thuế</span>
                   <span>{formatCurrency(totals.tax)}</span>
                 </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900">
+                <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t">
                   <span>Tổng cộng</span>
                   <span>{formatCurrency(totals.total)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+            {/* Tổng quan tiền tệ */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tổng quan tiền tệ</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tổng tiền hàng:</span>
+                  <span className="font-medium">{formatCurrency(totals.gross)}</span>
+                </div>
+                {totals.lineDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Chiết khấu sản phẩm:</span>
+                    <span>-{formatCurrency(totals.lineDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tổng sau chiết khấu sản phẩm:</span>
+                  <span className="font-medium">{formatCurrency(totals.subtotalBeforeHeader)}</span>
+                </div>
+                {totals.headerDiscountPercent > 0 && (
+                  <>
+                    <div className="flex justify-between text-green-600">
+                      <span>Chiết khấu chung ({totals.headerDiscountPercent}%):</span>
+                      <span>-{formatCurrency(totals.headerDiscount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tổng sau chiết khấu chung:</span>
+                      <span className="font-medium">{formatCurrency(totals.subtotalAfterHeader)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Thuế VAT:</span>
+                  <span className="font-medium">{formatCurrency(totals.tax)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-300">
+                  <span className="text-lg font-semibold text-gray-900">Tổng cộng:</span>
+                  <span className="text-lg font-bold text-blue-600">{formatCurrency(totals.total)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
               <button
                 type="button"
                 onClick={() => navigate("/sales/credit-notes")}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Hủy
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
               >
                 {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo mới"}
               </button>
             </div>
           </form>
+        </div>
       </div>
 
       <InvoicePickerModal
@@ -1092,4 +1143,3 @@ const ReturnOrderPickerModal = ({
     </div>
   );
 };
-

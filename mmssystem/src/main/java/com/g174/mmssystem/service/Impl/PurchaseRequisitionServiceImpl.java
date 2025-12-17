@@ -62,7 +62,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             }
             // Validate items
             if (dto.getItems() == null || dto.getItems().isEmpty()) {
-                throw new IllegalArgumentException("Danh sách sản phẩm không được để trống khi status không phải Draft");
+                throw new IllegalArgumentException(
+                        "Danh sách sản phẩm không được để trống khi status không phải Draft");
             }
             // Validate each item
             for (var item : dto.getItems()) {
@@ -168,7 +169,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition savedWithRelations = requisitionRepository.findByIdWithRelations(saved.getRequisitionId())
                 .orElse(saved);
 
-        log.info("Purchase requisition created successfully with ID: {} and number: {}", saved.getRequisitionId(), saved.getRequisitionNo());
+        log.info("Purchase requisition created successfully with ID: {} and number: {}", saved.getRequisitionId(),
+                saved.getRequisitionNo());
         return requisitionMapper.toResponseDTO(savedWithRelations);
     }
 
@@ -177,14 +179,16 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         log.info("Fetching purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findByIdWithRelations(requisitionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         return requisitionMapper.toResponseDTO(requisition);
     }
 
     @Override
     public List<PurchaseRequisitionResponseDTO> getAllRequisitions() {
-        throw new UnsupportedOperationException("getAllRequisitions() without pagination is not supported. Please use getAllRequisitions(Pageable) instead.");
+        throw new UnsupportedOperationException(
+                "getAllRequisitions() without pagination is not supported. Please use getAllRequisitions(Pageable) instead.");
     }
 
     @Override
@@ -205,7 +209,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     }
 
     @Override
-    public Page<PurchaseRequisitionResponseDTO> getAllRequisitionsByStatus(RequisitionStatus status, Pageable pageable) {
+    public Page<PurchaseRequisitionResponseDTO> getAllRequisitionsByStatus(RequisitionStatus status,
+            Pageable pageable) {
         log.info("Fetching purchase requisitions with status: {} and pagination", status);
 
         // Fetch page without relations first
@@ -223,7 +228,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     public List<PurchaseRequisitionResponseDTO> searchRequisitions(String keyword) {
-        throw new UnsupportedOperationException("searchRequisitions() without pagination is not supported. Please use searchRequisitions(String, Pageable) instead.");
+        throw new UnsupportedOperationException(
+                "searchRequisitions() without pagination is not supported. Please use searchRequisitions(String, Pageable) instead.");
     }
 
     @Override
@@ -245,17 +251,19 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
     @Override
     @Transactional
-    public PurchaseRequisitionResponseDTO updateRequisition(Long requisitionId, PurchaseRequisitionRequestDTO dto, Integer updatedById) {
+    public PurchaseRequisitionResponseDTO updateRequisition(Long requisitionId, PurchaseRequisitionRequestDTO dto,
+            Integer updatedById) {
         log.info("Cập nhật purchase requisition ID: {}", requisitionId);
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy purchase requisition với ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy purchase requisition với ID: " + requisitionId));
 
         // Check if requisition can be updated (only if status is Draft or Pending)
         if (requisition.getStatus() == RequisitionStatus.Approved ||
-            requisition.getStatus() == RequisitionStatus.Rejected ||
-            requisition.getStatus() == RequisitionStatus.Cancelled) {
+                requisition.getStatus() == RequisitionStatus.Rejected ||
+                requisition.getStatus() == RequisitionStatus.Cancelled) {
             throw new IllegalStateException("Không thể cập nhật requisition khi status là " + requisition.getStatus());
         }
 
@@ -267,7 +275,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         if (requisition.getStatus() == RequisitionStatus.Pending) {
             if (!requisition.getRequester().getId().equals(updatedById)) {
                 // Cho phép tạm thời, nhưng log warning
-                log.warn("User {} đang chỉnh sửa PR {} không phải do họ tạo khi status là Pending", updatedById, requisitionId);
+                log.warn("User {} đang chỉnh sửa PR {} không phải do họ tạo khi status là Pending", updatedById,
+                        requisitionId);
             }
         }
 
@@ -282,7 +291,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             // Validate items
             List<PurchaseRequisitionItemRequestDTO> items = dto.getItems();
             if (items == null || items.isEmpty()) {
-                throw new IllegalArgumentException("Danh sách sản phẩm không được để trống khi status không phải Draft");
+                throw new IllegalArgumentException(
+                        "Danh sách sản phẩm không được để trống khi status không phải Draft");
             }
             // Validate each item
             for (var item : items) {
@@ -317,7 +327,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         }
 
         // Update items
-        // Nếu status = Draft, cho phép items null hoặc empty (giữ nguyên items cũ nếu không có items mới)
+        // Nếu status = Draft, cho phép items null hoặc empty (giữ nguyên items cũ nếu
+        // không có items mới)
         if (dto.getItems() != null) {
             // Với orphanRemoval, cần xóa items cũ trước khi thêm mới
             // Sử dụng removeAll để tránh lỗi orphan deletion
@@ -403,7 +414,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Pending) {
             throw new IllegalStateException("Only pending requisitions can be approved");
@@ -424,7 +436,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         // Check if user has APPROVER role
         boolean hasApproverRole = approver.getUserRoles().stream()
                 .anyMatch(ur -> "APPROVER".equalsIgnoreCase(ur.getRole().getRoleName()));
-        
+
         if (!hasApproverRole) {
             log.warn("User {} does not have APPROVER role", approverId);
             // Có thể throw exception hoặc chỉ log warning tùy business logic
@@ -440,8 +452,10 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             log.info("Approver belongs to department: {}", approver.getDepartment().getDepartmentName());
             // Có thể thêm logic check department cụ thể nếu cần
             // String deptName = approver.getDepartment().getDepartmentName();
-            // if (!"Purchase".equalsIgnoreCase(deptName) && !"Management".equalsIgnoreCase(deptName)) {
-            //     throw new IllegalStateException("User's department is not authorized to approve purchase requisitions");
+            // if (!"Purchase".equalsIgnoreCase(deptName) &&
+            // !"Management".equalsIgnoreCase(deptName)) {
+            // throw new IllegalStateException("User's department is not authorized to
+            // approve purchase requisitions");
             // }
         }
 
@@ -465,7 +479,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Pending) {
             throw new IllegalStateException("Only pending requisitions can be rejected");
@@ -486,7 +501,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         // Check if user has APPROVER role
         boolean hasApproverRole = approver.getUserRoles().stream()
                 .anyMatch(ur -> "APPROVER".equalsIgnoreCase(ur.getRole().getRoleName()));
-        
+
         if (!hasApproverRole) {
             log.warn("User {} does not have APPROVER role", approverId);
         }
@@ -518,7 +533,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Draft) {
             throw new IllegalStateException("Only draft requisitions can be submitted");
@@ -552,7 +568,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         // Check if RFQ has been created
         List<RFQ> rfqs = rfqRepository.findByRequisitionId(requisitionId);
@@ -571,9 +588,9 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                         if (pos != null && !pos.isEmpty()) {
                             // Check if any PO has been processed (status is Completed or Sent)
                             boolean hasProcessedPO = pos.stream()
-                                    .anyMatch(po -> po.getStatus() != null && 
-                                            (po.getStatus() == PurchaseOrderStatus.Completed || 
-                                             po.getStatus() == PurchaseOrderStatus.Sent));
+                                    .anyMatch(po -> po.getStatus() != null &&
+                                            (po.getStatus() == PurchaseOrderStatus.Completed ||
+                                                    po.getStatus() == PurchaseOrderStatus.Sent));
                             if (hasProcessedPO) {
                                 hasPO = true;
                                 break;
@@ -581,12 +598,14 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
                         }
                     }
                 }
-                if (hasPO) break;
+                if (hasPO)
+                    break;
             }
         }
 
         if (!hasRFQ && !hasPO) {
-            throw new IllegalStateException("Không thể đóng purchase requisition: Chưa tạo RFQ hoặc chưa xử lý xong PO");
+            throw new IllegalStateException(
+                    "Không thể đóng purchase requisition: Chưa tạo RFQ hoặc chưa xử lý xong PO");
         }
 
         requisition.setStatus(RequisitionStatus.Cancelled); // Or create a "Closed" status if needed
@@ -607,7 +626,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         // Check current status - must be Approved
         if (requisition.getStatus() != RequisitionStatus.Approved) {
@@ -632,7 +652,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() != null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId + " or not deleted"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId + " or not deleted"));
 
         requisition.setDeletedAt(null);
         PurchaseRequisition saved = requisitionRepository.save(requisition);
@@ -648,7 +669,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + requisitionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Requisition not found with ID: " + requisitionId));
 
         // ERP rule: only Draft PRs can be deleted
         if (requisition.getStatus() != RequisitionStatus.Draft) {
@@ -670,7 +692,8 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
     @Override
     public String generateRequisitionNo() {
         String prefix = "PR" + java.time.Year.now().getValue();
-        java.util.Optional<PurchaseRequisition> lastRequisition = requisitionRepository.findTopByRequisitionNoStartingWithOrderByRequisitionNoDesc(prefix);
+        java.util.Optional<PurchaseRequisition> lastRequisition = requisitionRepository
+                .findTopByRequisitionNoStartingWithOrderByRequisitionNoDesc(prefix);
 
         int nextNumber = 1;
         if (lastRequisition.isPresent()) {
@@ -687,7 +710,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         String requisitionNo;
         int maxAttempts = 100;
         int attempts = 0;
-        
+
         do {
             requisitionNo = String.format("%s%04d", prefix, nextNumber);
             if (!requisitionRepository.existsByRequisitionNo(requisitionNo)) {
@@ -695,14 +718,13 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             }
             nextNumber++;
             attempts++;
-            
+
             if (attempts >= maxAttempts) {
                 log.error("Could not generate unique Requisition number after {} attempts", maxAttempts);
                 throw new RuntimeException("Không thể tạo mã phiếu yêu cầu duy nhất. Vui lòng thử lại sau.");
             }
         } while (true);
-        
+
         return requisitionNo;
     }
 }
-

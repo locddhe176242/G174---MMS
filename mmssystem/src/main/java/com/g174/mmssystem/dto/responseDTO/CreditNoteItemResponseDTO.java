@@ -19,6 +19,7 @@ public class CreditNoteItemResponseDTO {
 
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal discountAmount;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
@@ -26,4 +27,3 @@ public class CreditNoteItemResponseDTO {
 
     private String note;
 }
-
