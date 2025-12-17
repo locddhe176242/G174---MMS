@@ -31,9 +31,12 @@ public class ARInvoiceListResponseDTO {
     private BigDecimal totalAmount;
     private BigDecimal balanceAmount;
 
+    // Dùng cho UI: hóa đơn đã có thanh toán / credit note hay chưa
+    private Boolean hasPayment;
+    private Boolean hasCreditNote;
+
     private Instant createdAt;
     private String createdByDisplay;
     private Instant updatedAt;
     private String updatedByDisplay;
 }
-

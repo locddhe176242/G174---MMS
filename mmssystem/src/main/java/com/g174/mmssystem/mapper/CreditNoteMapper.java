@@ -22,8 +22,11 @@ public class CreditNoteMapper {
         CreditNote creditNote = new CreditNote();
         creditNote.setInvoice(invoice);
         creditNote.setReturnOrder(returnOrder);
-        creditNote.setCreditNoteDate(dto.getCreditNoteDate() != null ?
-                dto.getCreditNoteDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC) : java.time.Instant.now());
+        creditNote.setCreditNoteDate(dto.getCreditNoteDate() != null
+                ? dto.getCreditNoteDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC)
+                : java.time.Instant.now());
+        creditNote.setHeaderDiscountPercent(
+                dto.getHeaderDiscountPercent() != null ? dto.getHeaderDiscountPercent() : BigDecimal.ZERO);
         creditNote.setReason(dto.getReason());
         creditNote.setNotes(dto.getNotes());
         creditNote.setCreatedBy(currentUser);
@@ -34,6 +37,9 @@ public class CreditNoteMapper {
     public void updateEntity(CreditNote creditNote, CreditNoteRequestDTO dto, User currentUser) {
         if (dto.getCreditNoteDate() != null) {
             creditNote.setCreditNoteDate(dto.getCreditNoteDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
+        }
+        if (dto.getHeaderDiscountPercent() != null) {
+            creditNote.setHeaderDiscountPercent(dto.getHeaderDiscountPercent());
         }
         creditNote.setReason(dto.getReason());
         creditNote.setNotes(dto.getNotes());
@@ -94,6 +100,8 @@ public class CreditNoteMapper {
                 .customerName(getCustomerName(customer))
                 .creditNoteDate(creditNote.getCreditNoteDate())
                 .subtotal(creditNote.getSubtotal())
+                .headerDiscountPercent(creditNote.getHeaderDiscountPercent())
+                .headerDiscountAmount(creditNote.getHeaderDiscountAmount())
                 .taxAmount(creditNote.getTaxAmount())
                 .totalAmount(creditNote.getTotalAmount())
                 .reason(creditNote.getReason())
@@ -145,6 +153,18 @@ public class CreditNoteMapper {
     private CreditNoteItemResponseDTO toItemResponse(CreditNoteItem item) {
         Product product = item.getProduct();
 
+        // Tính discountPercent từ discountAmount
+        BigDecimal discountPercent = BigDecimal.ZERO;
+        if (item.getQuantity() != null && item.getUnitPrice() != null &&
+                item.getDiscountAmount() != null && item.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal subtotal = item.getQuantity().multiply(item.getUnitPrice());
+            if (subtotal.compareTo(BigDecimal.ZERO) > 0) {
+                discountPercent = item.getDiscountAmount()
+                        .divide(subtotal, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100));
+            }
+        }
+
         return CreditNoteItemResponseDTO.builder()
                 .cniId(item.getCniId())
                 .productId(product != null ? product.getProductId() : null)
@@ -154,6 +174,7 @@ public class CreditNoteMapper {
                 .uom(item.getUom())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
+                .discountPercent(discountPercent)
                 .discountAmount(item.getDiscountAmount())
                 .taxRate(item.getTaxRate())
                 .taxAmount(item.getTaxAmount())
@@ -184,4 +205,3 @@ public class CreditNoteMapper {
         return user.getEmail();
     }
 }
-

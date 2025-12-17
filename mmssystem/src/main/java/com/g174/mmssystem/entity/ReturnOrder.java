@@ -12,14 +12,13 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "return_orders",
-        indexes = {
-                @Index(name = "idx_return_order_status", columnList = "status, deleted_at"),
-                @Index(name = "idx_return_order_delivery", columnList = "delivery_id"),
-                @Index(name = "idx_return_order_invoice", columnList = "invoice_id"),
-                @Index(name = "idx_return_order_receipt", columnList = "receipt_id"),
-                @Index(name = "idx_return_order_gr_status", columnList = "goods_receipt_status")
-        })
+@Table(name = "return_orders", indexes = {
+        @Index(name = "idx_return_order_status", columnList = "status, deleted_at"),
+        @Index(name = "idx_return_order_delivery", columnList = "delivery_id"),
+        @Index(name = "idx_return_order_invoice", columnList = "invoice_id"),
+        @Index(name = "idx_return_order_receipt", columnList = "receipt_id"),
+        @Index(name = "idx_return_order_gr_status", columnList = "goods_receipt_status")
+})
 public class ReturnOrder {
 
     @Id
@@ -85,11 +84,10 @@ public class ReturnOrder {
     private List<ReturnOrderItem> items = new ArrayList<>();
 
     public enum ReturnStatus {
-        Draft,      
-        Approved,   
-        Rejected,   
-        Completed, 
-        Cancelled  
+        Draft,
+        Approved,
+        Completed,
+        Cancelled
     }
 
     public enum GoodsReceiptStatus {
@@ -113,4 +111,3 @@ public class ReturnOrder {
         updatedAt = Instant.now();
     }
 }
-

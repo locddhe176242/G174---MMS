@@ -18,6 +18,8 @@ public class CreditNoteRequestDTO {
 
     private LocalDate creditNoteDate;
 
+    private java.math.BigDecimal headerDiscountPercent;
+
     private String reason;
 
     private String notes;
@@ -26,4 +28,3 @@ public class CreditNoteRequestDTO {
     @NotEmpty(message = "Cần ít nhất một dòng sản phẩm")
     private List<CreditNoteItemRequestDTO> items;
 }
-

@@ -8,9 +8,7 @@ import { hasRole } from "../../../../api/authService";
 const getStatusBadge = (status) => {
     const map = {
         Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
-        Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
-        Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
-        Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
+        Approved: { label: "Đã hoàn tất", color: "bg-green-100 text-green-800" },
     };
     const statusInfo = map[status] || { label: status || "Nháp", color: "bg-gray-100 text-gray-800" };
     return (
@@ -326,12 +324,9 @@ export default function GoodIssueList() {
                                                         </button>
                                                         {/* Chỉ hiển thị nút Sửa/Xóa nếu:
                                                             - status = Draft: tất cả user
-                                                            - status = Pending: không hiển thị (đã submit)
                                                             - status = Approved: chỉ Manager
-                                                            - status = Rejected: tất cả user
                                                         */}
                                                         {(issue.status === "Draft" || 
-                                                          issue.status === "Rejected" || 
                                                           (issue.status === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
                                                             <>
                                                                 <button

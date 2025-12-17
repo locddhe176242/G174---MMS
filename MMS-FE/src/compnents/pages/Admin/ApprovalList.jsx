@@ -7,7 +7,6 @@ import purchaseOrderService from "../../../api/purchaseOrderService";
 import salesOrderService from "../../../api/salesOrderService";
 import apInvoiceService from "../../../api/apInvoiceService";
 import invoiceService from "../../../api/invoiceService";
-import { goodIssueService } from "../../../api/goodIssueService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 
@@ -363,32 +362,6 @@ export default function ApprovalList() {
         }
       }
 
-      // Fetch Good Issues (Pending)
-      if (type === "all" || type === "sales") {
-        try {
-          const giData = await goodIssueService.getGoodIssuesWithPagination(0, 100, sort);
-          if (giData && giData.content && Array.isArray(giData.content)) {
-            const pendingGIs = giData.content.filter(item => item.status === "Pending");
-            pendingGIs.forEach(item => {
-              const docId = item.issueId || item.issue_id || item.id;
-              if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "Good Issue",
-                  documentTypeCode: "GI",
-                  id: docId,
-                  number: item.issueNo || item.issue_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.createdByName || item.created_by_name || item.createdBy || "-",
-                  totalAmount: 0, // Good Issue không có tổng giá trị
-                });
-              }
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching good issues:", err);
-        }
-      }
 
       // Note: AP/AR Invoices are handled by Accounting department, not in this approval workflow
 
@@ -492,9 +465,6 @@ export default function ApprovalList() {
         case "ARI":
           await invoiceService.approveInvoice(selectedDocument.id, approverId);
           break;
-        case "GI":
-          await goodIssueService.approveGoodIssue(selectedDocument.id, approverId);
-          break;
         default:
           throw new Error("Unknown document type");
       }
@@ -552,9 +522,6 @@ export default function ApprovalList() {
         case "ARI":
           await invoiceService.rejectInvoice(selectedDocument.id, approverId, rejectReason);
           break;
-        case "GI":
-          await goodIssueService.rejectGoodIssue(selectedDocument.id, approverId, rejectReason);
-          break;
         default:
           throw new Error("Unknown document type");
       }
@@ -600,7 +567,6 @@ export default function ApprovalList() {
       case "API": return `/purchase/ap-invoices/${doc.id}`;
       case "SO": return `/sales/orders/${doc.id}`;
       case "ARI": return `/sales/invoices/${doc.id}`;
-      case "GI": return `/sales/good-issues/${doc.id}`;
       default: return "#";
     }
   };
@@ -1062,4 +1028,3 @@ export default function ApprovalList() {
     </div>
   );
 }
-

@@ -68,6 +68,7 @@ import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail
 import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+import InvoicePrint from "./compnents/pages/Sale/Invoice/InvoicePrint.jsx";
 import SalesReturnInboundOrderList from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderList.jsx";
 import SalesReturnInboundOrderDetail from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderDetail.jsx";
 import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderForm.jsx";
@@ -84,8 +85,6 @@ import PermissionManagement from "./compnents/pages/Admin/PermissionManagement";
 import UserPermissionManagement from "./compnents/pages/Admin/UserPermissionManagement";
 import UserManagement from "./compnents/pages/Admin/UserManagement";
 import DepartmentManagement from "./compnents/pages/Admin/DepartmentManagement.jsx";
-import DebtManagementList from "./compnents/pages/DebtManagementList.jsx";
-import DebtManagementDetail from "./compnents/pages/DebtManagementDetail.jsx";
 
 
 
@@ -97,6 +96,16 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/verify-otp" element={<VerifyOtp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Route in hóa đơn - không có layout */}
+            <Route
+                path="/sales/invoices/:id/print"
+                element={
+                    <ProtectedRoute>
+                        <InvoicePrint />
+                    </ProtectedRoute>
+                }
+            />
 
             <Route
                 element={
@@ -199,10 +208,6 @@ function App() {
                 <Route path="/reports" element={<ReportList />} />
                 <Route path="/reports/generate" element={<GenerateReport />} />
                 <Route path="/reports/:id" element={<ReportDetail />} />
-
-                {/**Debt Management Routes */}
-                <Route path="/debt-management" element={<DebtManagementList />} />
-                <Route path="/debt-management/detail/:code" element={<DebtManagementDetail />} />
 
                 <Route path="/approval" element={<ApprovalList />} />
 

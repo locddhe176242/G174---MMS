@@ -10,6 +10,7 @@ import { salesQuotationService } from "../../../../api/salesQuotationService";
 import { customerService } from "../../../../api/customerService";
 import { getProducts } from "../../../../api/productService";
 import { warehouseService } from "../../../../api/warehouseService";
+import { hasRole } from "../../../../api/authService";
 
 const defaultItem = () => ({
   productId: null,
@@ -48,36 +49,6 @@ const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
   return Number(itemTaxRate || 0);
 };
 
-const selectStyles = {
-  control: (base, state) => ({
-    ...base,
-    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
-    boxShadow: "none",
-    minHeight: "40px",
-    "&:hover": {
-      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
-    },
-  }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (base) => ({ ...base, zIndex: 9999 }),
-};
-
-const compactSelectStyles = {
-  control: (base, state) => ({
-    ...base,
-    fontSize: "0.875rem",
-    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
-    boxShadow: "none",
-    minHeight: "36px",
-    "&:hover": {
-      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
-    },
-  }),
-  valueContainer: (base) => ({ ...base, padding: "2px 8px" }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (base) => ({ ...base, zIndex: 9999 }),
-};
-
 export default function SalesOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -94,6 +65,7 @@ export default function SalesOrderForm() {
   const [quotationLoading, setQuotationLoading] = useState(false);
   const [quotations, setQuotations] = useState([]);
   const [globalTaxRate, setGlobalTaxRate] = useState("");
+  const [commonDiscountRate, setCommonDiscountRate] = useState(0);
   const [orderData, setOrderData] = useState(null);
   const [formData, setFormData] = useState({
     orderNo: "",
@@ -186,7 +158,10 @@ export default function SalesOrderForm() {
       setQuotationLoading(true);
       const response = await salesQuotationService.getAllQuotations();
       const list = Array.isArray(response) ? response : response?.content || response?.data || [];
-      setQuotations(list);
+      // Chỉ cho chọn báo giá đã gửi khách (Active) và CHƯA được chuyển sang Sales Order
+      // (Backend có thể trả hasSalesOrder=true cho dữ liệu cũ còn đang Active)
+      const activeList = list.filter((q) => q.status === "Active" && !q.hasSalesOrder);
+      setQuotations(activeList);
     } catch (error) {
       console.error("Không thể tải danh sách báo giá:", error);
       toast.error("Không thể tải danh sách báo giá");
@@ -203,13 +178,15 @@ export default function SalesOrderForm() {
 
   const filteredQuotations = useMemo(() => {
     const term = quotationSearch.trim().toLowerCase();
-    return quotations.filter((quotation) => {
-      const matchesKeyword =
-        !term ||
-        (quotation.quotationNo || "").toLowerCase().includes(term) ||
-        (quotation.customerName || "").toLowerCase().includes(term);
-      return matchesKeyword;
-    });
+    return quotations
+      .filter((q) => q.status === "Active")
+      .filter((quotation) => {
+        const matchesKeyword =
+          !term ||
+          (quotation.quotationNo || "").toLowerCase().includes(term) ||
+          (quotation.customerName || "").toLowerCase().includes(term);
+        return matchesKeyword;
+      });
   }, [quotations, quotationSearch]);
 
   const loadOrder = async () => {
@@ -241,6 +218,7 @@ export default function SalesOrderForm() {
           note: item.note || "",
         })),
       });
+      setCommonDiscountRate(data.headerDiscountPercent || 0);
       const uniqueTaxRates = new Set((data.items || []).map((item) => item.taxRate ?? ""));
       if (uniqueTaxRates.size === 1) {
         const [onlyRate] = Array.from(uniqueTaxRates);
@@ -284,22 +262,43 @@ export default function SalesOrderForm() {
     try {
       setLoading(true);
       const quotation = await salesQuotationService.getQuotationById(targetId);
+      if (quotation.status !== "Active") {
+        toast.error("Chỉ được chọn báo giá đã gửi khách (Active)");
+        return;
+      }
+
       setFormData((prev) => ({
         ...prev,
         salesQuotationId: quotation.quotationId || targetId,
         customerId: quotation.customerId,
         paymentTerms: quotation.paymentTerms || "",
         notes: quotation.notes || "",
-        items: (quotation.items || []).map((item) => ({
-          productId: item.productId,
-          warehouseId: null,
-          quantity: item.quantity || 1,
-          unitPrice: item.unitPrice || 0,
-          discountPercent: 0,
-          taxRate: item.taxRate || 0,
-          note: item.note || "",
-        })),
+        items: (quotation.items || []).map((item) => {
+          const qty = Number(item.quantity || 0);
+          const price = Number(item.unitPrice || 0);
+          const base = qty * price;
+          const discountAmount = Number(item.discountAmount || 0);
+          const discountPercent =
+            base > 0 ? Math.min((discountAmount / base) * 100, 100) : 0;
+
+          return {
+            productId: item.productId,
+            warehouseId: null,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+            discountPercent,
+            taxRate: item.taxRate || 0,
+            note: item.note || "",
+          };
+        }),
       }));
+
+      // Đồng bộ chiết khấu chung (%) từ báo giá sang đơn bán
+      if (typeof quotation.headerDiscountPercent === "number") {
+        setCommonDiscountRate(quotation.headerDiscountPercent);
+      } else {
+        setCommonDiscountRate(0);
+      }
       setSelectedQuotation({
         value: quotation.quotationId || targetId,
         label: `${quotation.quotationNo || `Báo giá #${quotation.quotationId || targetId}`} - ${
@@ -323,27 +322,63 @@ export default function SalesOrderForm() {
   };
 
   const totals = useMemo(() => {
-    return formData.items.reduce(
+    const result = formData.items.reduce(
       (acc, item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
-        const gross = qty * price;
+        const base = qty * price;
         const discountPercent = Number(item.discountPercent || 0);
+        const lineDiscount = Math.min((base * discountPercent) / 100, base);
+        const lineSubtotal = Math.max(base - lineDiscount, 0); // sau CK dòng
         const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
-        const discount = Math.min((gross * discountPercent) / 100, gross);
-        const taxable = Math.max(gross - discount, 0);
-        const tax = taxable * (taxRate / 100);
-        acc.gross += gross;
-        acc.discount += discount;
-        acc.subtotal += taxable;
-        acc.tax += tax;
+
+        acc.gross += base;
+        acc.lineDiscount += lineDiscount;
+        acc.subtotalBeforeHeader += lineSubtotal;
+        acc.effectiveTaxRates.push({ lineSubtotal, taxRate });
         return acc;
       },
-      { gross: 0, discount: 0, subtotal: 0, tax: 0 }
+      {
+        gross: 0,
+        lineDiscount: 0,
+        subtotalBeforeHeader: 0,
+        effectiveTaxRates: [],
+      }
     );
-  }, [formData.items, globalTaxRate]);
 
-  const totalValue = totals.subtotal + totals.tax;
+    const headerPercent = Number(commonDiscountRate || 0);
+    const headerDiscount = Math.max(
+      (result.subtotalBeforeHeader * headerPercent) / 100,
+      0
+    );
+
+    // Thuế tính trên phần sau khi trừ chiết khấu chung,
+    // phân bổ chiết khấu chung theo tỷ lệ lineSubtotal
+    let taxTotal = 0;
+    const baseForHeader = result.subtotalBeforeHeader || 0;
+    result.effectiveTaxRates.forEach(({ lineSubtotal, taxRate }) => {
+      let allocHeader = 0;
+      if (baseForHeader > 0) {
+        allocHeader = (lineSubtotal * headerDiscount) / baseForHeader;
+      }
+      const taxable = Math.max(lineSubtotal - allocHeader, 0);
+      taxTotal += taxable * (taxRate / 100);
+    });
+
+    const total =
+      result.subtotalBeforeHeader - headerDiscount + taxTotal;
+
+    return {
+      gross: result.gross,
+      lineDiscount: result.lineDiscount,
+      subtotalBeforeHeader: result.subtotalBeforeHeader,
+      headerDiscount,
+      tax: taxTotal,
+      total,
+    };
+  }, [formData.items, globalTaxRate, commonDiscountRate]);
+
+  const totalValue = totals.total;
 
   const handleCustomerChange = (option) => {
     setFormData((prev) => ({ ...prev, customerId: option ? option.value : "" }));
@@ -476,6 +511,7 @@ export default function SalesOrderForm() {
       orderDate: formData.orderDate ? formData.orderDate.toISOString() : null,
       shippingAddress: formData.shippingAddress || null,
       paymentTerms: formData.paymentTerms || null,
+      headerDiscountPercent: Number(commonDiscountRate || 0),
       notes: formData.notes || null,
       items: formData.items.map((item) => ({
         productId: item.productId,
@@ -515,32 +551,32 @@ export default function SalesOrderForm() {
     }
   };
 
-  const handleSubmitForApproval = async () => {
+  const handleSendToCustomer = async () => {
     if (!isEdit || !id) {
-      toast.error("Chỉ có thể gửi duyệt đơn hàng đã được lưu");
+      toast.error("Chỉ có thể gửi đơn hàng đã được lưu");
       return;
     }
     try {
       setSubmitting(true);
-      const result = await salesOrderService.submitForApproval(id);
+      const result = await salesOrderService.sendToCustomer(id);
       setOrderData({
-        approvalStatus: result.approvalStatus || "Pending",
-        status: result.status || "Pending",
+        approvalStatus: result.approvalStatus || "Approved",
+        status: result.status || "Approved",
       });
-      toast.success("Đã gửi yêu cầu duyệt đơn hàng");
-      await loadOrder(); // Reload để cập nhật UI
+      toast.success("Đã gửi đơn hàng cho khách");
+      await loadOrder();
     } catch (error) {
       console.error(error);
-      toast.error(error?.response?.data?.message || "Lỗi gửi yêu cầu duyệt");
+      toast.error(error?.response?.data?.message || "Lỗi gửi đơn hàng cho khách");
     } finally {
       setSubmitting(false);
     }
   };
 
   // Kiểm tra xem có thể edit không
-  const canEdit = !isEdit || !orderData || orderData.approvalStatus !== "Pending";
   const isDraft = orderData?.approvalStatus === "Draft";
-  const isPending = orderData?.approvalStatus === "Pending";
+  const canEdit = !isEdit || isDraft || hasRole("MANAGER") || hasRole("ROLE_MANAGER");
+  const canSendToCustomer = isEdit && isDraft;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -556,58 +592,44 @@ export default function SalesOrderForm() {
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
                     isDraft
                       ? "bg-gray-100 text-gray-700"
-                      : isPending
-                      ? "bg-yellow-100 text-yellow-700"
-                      : orderData.approvalStatus === "Approved"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
+                      : "bg-green-100 text-green-700"
                   }`}
                 >
-                  {isDraft
-                    ? "Nháp"
-                    : isPending
-                    ? "Chờ duyệt"
-                    : orderData.approvalStatus === "Approved"
-                    ? "Đã duyệt"
-                    : "Từ chối"}
+                  {isDraft ? "Nháp" : "Đã gửi khách"}
                 </span>
               )}
             </div>
             <p className="text-gray-500">Nhập thông tin đơn hàng và danh sách sản phẩm</p>
-            {isPending && (
-              <p className="text-sm text-yellow-600 mt-1">
-                Đơn hàng đang chờ duyệt, không thể chỉnh sửa
-              </p>
-            )}
           </div>
           <div className="flex gap-2">
-            {isEdit && isDraft && (
+            {canSendToCustomer && (
               <button
                 type="button"
-                onClick={handleSubmitForApproval}
+                onClick={handleSendToCustomer}
                 disabled={submitting}
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
-                {submitting ? "Đang gửi..." : "Gửi yêu cầu duyệt"}
+                {submitting ? "Đang gửi..." : "Gửi cho khách"}
               </button>
             )}
             <button
+              type="button"
               onClick={() => navigate("/sales/orders")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
               ← Quay lại
             </button>
           </div>
-          <div className="border-t border-gray-200" />
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-          {/* Thông tin đơn hàng */}
-          <div className="grid grid-cols-1 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin đơn hàng</h2>
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4 lg:col-span-2">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Thông tin đơn hàng</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
+                <div>
                   <label className="text-sm text-gray-600">Số đơn</label>
                   <input
                     type="text"
@@ -616,10 +638,10 @@ export default function SalesOrderForm() {
                       formData.orderNo ||
                       (isEdit ? "—" : "Sẽ được tạo tự động sau khi lưu")
                     }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50"
                   />
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label className="text-sm text-gray-600">
                     Khách hàng <span className="text-red-500">*</span>
                   </label>
@@ -633,7 +655,7 @@ export default function SalesOrderForm() {
                     isDisabled={!canEdit}
                   />
                   {errors.customerId && (
-                    <p className="text-sm text-red-600 mt-1">{errors.customerId}</p>
+                    <p className="text-xs text-red-500 mt-1">{errors.customerId}</p>
                   )}
                 </div>
                 <div className="md:col-span-2">
@@ -649,7 +671,7 @@ export default function SalesOrderForm() {
                           : "")
                       }
                       placeholder="Chưa chọn báo giá"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                      className="w-full border rounded-lg px-3 py-2 bg-gray-50"
                     />
                     <div className="flex gap-2">
                       <button
@@ -729,7 +751,19 @@ export default function SalesOrderForm() {
             </div>
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Tổng quan tiền tệ</h2>
-              <label className="text-sm text-gray-600">Thuế (%)</label>
+              <label className="text-sm text-gray-600">Chiết khấu chung (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={commonDiscountRate}
+                onChange={(e) => setCommonDiscountRate(e.target.value)}
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+                placeholder="Áp dụng chiết khấu trên tổng sau CK từng sản phẩm"
+                disabled={!canEdit}
+              />
+              <label className="text-sm text-gray-600 mt-3 block">Thuế (%)</label>
               <input
                 type="number"
                 min="0"
@@ -742,75 +776,79 @@ export default function SalesOrderForm() {
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
                   <span>Tạm tính</span>
-                  <span className="font-semibold">{formatCurrency(totals.gross)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(totals.gross)}
+                  </span>
                 </div>
-                <div>
-                  <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
-                  <input
-                    type="text"
-                    value={formData.paymentTerms}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, paymentTerms: e.target.value }))
-                    }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="VD: Thanh toán trong 30 ngày"
-                  />
+                <div className="flex justify-between">
+                  <span>Chiết khấu dòng</span>
+                  <span>{formatCurrency(totals.lineDiscount)}</span>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-gray-600">Địa chỉ giao hàng</label>
-                  <input
-                    type="text"
-                    value={formData.shippingAddress}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, shippingAddress: e.target.value }))
-                    }
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Nhập địa chỉ giao hàng"
-                  />
+                <div className="flex justify-between">
+                  <span>Chiết khấu chung</span>
+                  <span>{formatCurrency(totals.headerDiscount)}</span>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-gray-600">Ghi chú</label>
-                  <textarea
-                    rows={3}
-                    value={formData.notes}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Thông tin bổ sung cho đơn hàng"
-                  />
+                <div className="flex justify-between">
+                  <span>Thuế</span>
+                  <span>{formatCurrency(totals.tax)}</span>
+                </div>
+                <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t">
+                  <span>Tổng cộng</span>
+                  <span>{formatCurrency(totalValue)}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Danh sách sản phẩm */}
-          <div className="bg-white rounded-lg shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
               <button
                 type="button"
                 onClick={addItem}
                 disabled={!canEdit}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Thêm sản phẩm
+                + Thêm dòng
               </button>
             </div>
+
+            {errors.items && <p className="text-red-500 text-sm mb-2">{errors.items}</p>}
+
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
+              <table className="min-w-full border border-gray-200">
+                <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-3 text-left">#</th>
-                    <th className="px-4 py-3 text-left">Sản phẩm</th>
-                    <th className="px-4 py-3 text-left">Kho</th>
-                    <th className="px-4 py-3 text-right">Số lượng</th>
-                    <th className="px-4 py-3 text-right">Đơn giá</th>
-                    <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
-                    <th className="px-4 py-3 text-right">Thuế (%)</th>
-                    <th className="px-4 py-3 text-right">Thành tiền</th>
-                    <th className="px-4 py-3 text-center">#</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      #
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Sản phẩm
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Kho
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Số lượng
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Đơn giá
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Chiết khấu (%)
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Thuế (%)
+                    </th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Thành tiền
+                    </th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                      Hành động
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {formData.items.map((item, index) => {
                     const itemError = errors.itemDetails?.[index] || {};
                     const qty = Number(item.quantity || 0);
@@ -822,9 +860,9 @@ export default function SalesOrderForm() {
                     const tax = base * (taxRate / 100);
                     const lineTotal = base + tax;
                     return (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
-                        <td className="px-4 py-3 w-64">
+                      <tr key={index} className="border-t">
+                        <td className="px-3 py-2 text-sm text-gray-600">{index + 1}</td>
+                        <td className="px-3 py-2">
                           <Select
                             value={products.find((p) => p.value === item.productId) || null}
                             onChange={(opt) => handleItemSelect(index, opt)}
@@ -834,10 +872,10 @@ export default function SalesOrderForm() {
                             isDisabled={!canEdit}
                           />
                           {itemError.productId && (
-                            <p className="text-xs text-red-600 mt-1">{itemError.productId}</p>
+                            <p className="text-red-500 text-xs">{itemError.productId}</p>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           <Select
                             value={warehouses.find((w) => w.value === item.warehouseId) || null}
                             onChange={(opt) =>
@@ -849,7 +887,7 @@ export default function SalesOrderForm() {
                             isDisabled={!canEdit}
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-2">
                           <input
                             type="number"
                             min="0"
@@ -861,10 +899,10 @@ export default function SalesOrderForm() {
                             disabled={!canEdit}
                           />
                           {itemError.quantity && (
-                            <p className="text-xs text-red-600 mt-1">{itemError.quantity}</p>
+                            <p className="text-red-500 text-xs">{itemError.quantity}</p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-2">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -880,7 +918,7 @@ export default function SalesOrderForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-2">
                           <input
                             type="number"
                             min="0"
@@ -893,10 +931,10 @@ export default function SalesOrderForm() {
                             disabled={!canEdit}
                           />
                           {itemError.discountPercent && (
-                            <p className="text-xs text-red-600 mt-1">{itemError.discountPercent}</p>
+                            <p className="text-red-500 text-xs">{itemError.discountPercent}</p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-2">
                           <input
                             type="number"
                             min="0"
@@ -908,7 +946,7 @@ export default function SalesOrderForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-4 py-3 text-right font-medium">
+                        <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
                           {formatCurrency(lineTotal)}
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -927,23 +965,14 @@ export default function SalesOrderForm() {
                 </tbody>
               </table>
             </div>
-            {errors.items && (
-              <p className="text-sm text-red-600 px-6 py-3">{errors.items}</p>
-            )}
           </div>
 
-          {/* Thuế và tổng cộng */}
-          <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+          <div className="border-t pt-4 flex items-center justify-between">
             <div>
-              <label className="text-sm text-gray-600">Thuế (%)</label>
-              <input
-                type="number"
-                min="0"
-                value={globalTaxRate}
-                onChange={(e) => handleGlobalTaxChange(e.target.value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Áp dụng thuế chung cho toàn bộ sản phẩm"
-              />
+              <div className="text-sm text-gray-500">Tổng dự kiến</div>
+              <div className="text-2xl font-semibold text-gray-900">
+                {formatCurrency(totalValue)}
+              </div>
             </div>
             <div className="flex gap-3">
               <button
@@ -961,23 +990,6 @@ export default function SalesOrderForm() {
                 {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
               </button>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("/sales/orders")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
-            </button>
           </div>
         </form>
       </div>

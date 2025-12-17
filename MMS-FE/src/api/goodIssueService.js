@@ -59,29 +59,11 @@ export const goodIssueService = {
         return apiClient.delete(`${BASE_PATH}/${id}`).then((response) => response.data);
     },
 
-    // Submit for approval
+    // Complete good issue (submit for approval = complete immediately)
     submitForApproval(issueId, submittedById) {
         const config = submittedById ? { params: { submittedById } } : undefined;
         return apiClient
             .post(`${BASE_PATH}/${issueId}/submit-for-approval`, null, config)
-            .then((response) => response.data);
-    },
-
-    // Approve good issue
-    approveGoodIssue(id, approverId) {
-        return apiClient
-            .put(`${BASE_PATH}/${id}/approve`, null, {
-                params: { approverId },
-            })
-            .then((response) => response.data);
-    },
-
-    // Reject good issue
-    rejectGoodIssue(id, approverId, reason) {
-        return apiClient
-            .put(`${BASE_PATH}/${id}/reject`, null, {
-                params: { approverId, reason },
-            })
             .then((response) => response.data);
     },
 
