@@ -30,10 +30,6 @@ public interface IGoodIssueService {
 
     GoodIssueResponseDTO submitForApproval(Integer issueId, Integer submittedById);
 
-    GoodIssueResponseDTO approveIssue(Integer issueId, Integer approverId);
-
-    GoodIssueResponseDTO rejectIssue(Integer issueId, Integer approverId, String reason);
-
     GoodIssueResponseDTO deleteIssue(Integer issueId);
 
     boolean existsByIssueNo(String issueNo);

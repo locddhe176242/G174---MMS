@@ -7,7 +7,6 @@ const getStatusLabel = (status) => {
   const statusMap = {
     Draft: "Nháp",
     Approved: "Đã duyệt",
-    Rejected: "Từ chối",
     Completed: "Hoàn thành",
     Cancelled: "Đã hủy",
   };
@@ -20,8 +19,6 @@ const getStatusColor = (status) => {
       return "bg-gray-100 text-gray-700";
     case "Approved":
       return "bg-blue-100 text-blue-700";
-    case "Rejected":
-      return "bg-red-100 text-red-700";
     case "Completed":
       return "bg-green-100 text-green-700";
     case "Cancelled":
@@ -33,8 +30,8 @@ const getStatusColor = (status) => {
 
 const getNextStatus = (currentStatus) => {
   switch (currentStatus) {
-    case "Draft":
-      return "Approved";
+    case "Approved":
+      return "Completed";
     default:
       return null;
   }
@@ -102,7 +99,7 @@ export default function ReturnOrderDetail() {
 
   const nextStatus = getNextStatus(data.status);
   const canChangeStatus =
-    nextStatus && data.status !== "Cancelled" && data.status !== "Approved";
+    nextStatus && data.status !== "Cancelled" && data.status !== "Completed";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -160,27 +157,6 @@ export default function ReturnOrderDetail() {
                 )}
               </ul>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-                Thông tin kiểm soát
-              </h3>
-              <ul className="space-y-2 text-sm text-gray-700">
-                <li>
-                  <span className="text-gray-500">Người tạo:</span> {data.createdByDisplay || data.createdBy || "—"}
-                </li>
-                <li>
-                  <span className="text-gray-500">Ngày tạo:</span>{" "}
-                  {formatDateTime(data.createdAt)}
-                </li>
-                <li>
-                  <span className="text-gray-500">Người cập nhật:</span> {data.updatedByDisplay || data.updatedBy || "—"}
-                </li>
-                <li>
-                  <span className="text-gray-500">Ngày cập nhật:</span>{" "}
-                  {formatDateTime(data.updatedAt)}
-                </li>
-              </ul>
-            </div>
           </div>
         </div>
 
@@ -190,7 +166,7 @@ export default function ReturnOrderDetail() {
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Thay đổi trạng thái</h3>
               <p className="text-sm text-gray-500">
-                Quy trình: Draft → Approved. Hủy trong trường hợp đơn không còn hiệu lực.
+                Khi đã nhập lại hàng về kho xong thì bấm “Hoàn thành”. Nếu đơn không còn hiệu lực thì bấm “Hủy”.
               </p>
             </div>
             <span

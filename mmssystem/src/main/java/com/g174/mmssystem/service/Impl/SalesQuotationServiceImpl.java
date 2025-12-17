@@ -9,6 +9,8 @@ import com.g174.mmssystem.entity.Product;
 import com.g174.mmssystem.entity.SalesQuotation;
 import com.g174.mmssystem.entity.SalesQuotationItem;
 import com.g174.mmssystem.entity.User;
+import com.g174.mmssystem.entity.Contact;
+import com.g174.mmssystem.entity.SalesOrder;
 import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.SalesQuotationMapper;
 import com.g174.mmssystem.repository.CustomerRepository;
@@ -16,6 +18,7 @@ import com.g174.mmssystem.repository.ProductRepository;
 import com.g174.mmssystem.repository.SalesQuotationItemRepository;
 import com.g174.mmssystem.repository.SalesQuotationRepository;
 import com.g174.mmssystem.repository.UserRepository;
+import com.g174.mmssystem.service.EmailService;
 import com.g174.mmssystem.service.IService.ISalesQuotationService;
 import com.g174.mmssystem.specification.SalesQuotationSpecifications;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +57,7 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final SalesQuotationMapper quotationMapper;
+    private final EmailService emailService;
 
     @Override
     public SalesQuotationResponseDTO createQuotation(SalesQuotationRequestDTO request) {
@@ -68,9 +72,10 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         quotation.getItems().clear();
         quotation.getItems().addAll(items);
 
-        recalcTotals(quotation, items, request.getHeaderDiscount());
+        recalcTotals(quotation, items);
 
         SalesQuotation saved = quotationRepository.save(quotation);
+        // Không gửi email ở bước tạo Draft. Email chỉ gửi khi chuyển sang Active.
         return quotationMapper.toResponseDTO(saved, items);
     }
 
@@ -119,9 +124,11 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         List<SalesQuotationItem> items = buildItems(quotation, request.getItems());
         quotation.getItems().addAll(items);
 
-        recalcTotals(quotation, items, request.getHeaderDiscount());
+        recalcTotals(quotation, items);
 
         SalesQuotation saved = quotationRepository.save(quotation);
+        // Nếu báo giá đang ở trạng thái Active, vẫn KHÔNG tự động gửi lại email khi chỉ update.
+        // Email chỉ gửi lại khi người dùng thực hiện hành động "Gửi cho khách" (changeStatus -> Active).
         return quotationMapper.toResponseDTO(saved, items);
     }
 
@@ -146,7 +153,7 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
                 .and(SalesQuotationSpecifications.keywordLike(keyword));
 
         Page<SalesQuotation> page = quotationRepository.findAll(spec, pageable);
-        return page.map(quotationMapper::toListResponseDTO);
+        return page.map(sq -> enrichListDtoWithSalesOrderInfo(quotationMapper.toListResponseDTO(sq)));
     }
 
     @Override
@@ -160,7 +167,19 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         List<SalesQuotation> quotations = quotationRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "quotationDate"));
         return quotations.stream()
                 .map(quotationMapper::toListResponseDTO)
+                .map(this::enrichListDtoWithSalesOrderInfo)
                 .collect(Collectors.toList());
+    }
+
+    private SalesQuotationListResponseDTO enrichListDtoWithSalesOrderInfo(SalesQuotationListResponseDTO dto) {
+        if (dto == null || dto.getQuotationId() == null) {
+            return dto;
+        }
+        List<SalesOrder> orders = salesOrderRepository.findBySalesQuotationId(dto.getQuotationId());
+        boolean hasSo = orders != null && !orders.isEmpty();
+        dto.setHasSalesOrder(hasSo);
+        dto.setSalesOrderId(hasSo ? orders.get(0).getSoId() : null);
+        return dto;
     }
 
     @Override
@@ -206,7 +225,46 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         quotation.setStatus(newStatus);
         SalesQuotation saved = quotationRepository.save(quotation);
         List<SalesQuotationItem> items = itemRepository.findBySalesQuotation_SqId(id);
+        if (newStatus == SalesQuotation.QuotationStatus.Active) {
+            sendQuotationEmailIfPossible(saved);
+        }
         return quotationMapper.toResponseDTO(saved, items);
+    }
+
+    @Override
+    public SalesQuotationResponseDTO cloneQuotation(Integer id) {
+        SalesQuotation source = quotationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales Quotation not found with id: " + id));
+
+        if (source.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Sales Quotation not found with id: " + id);
+        }
+
+        List<SalesQuotationItem> sourceItems = itemRepository.findBySalesQuotation_SqId(id);
+        User currentUser = getCurrentUser();
+        Customer customer = source.getCustomer();
+
+        SalesQuotation clone = new SalesQuotation();
+        clone.setCustomer(customer);
+        clone.setQuotationNo(generateQuotationNo());
+        clone.setQuotationDate(Instant.now());
+        clone.setValidUntil(source.getValidUntil());
+        clone.setPaymentTerms(source.getPaymentTerms());
+        clone.setDeliveryTerms(source.getDeliveryTerms());
+        clone.setHeaderDiscountPercent(source.getHeaderDiscountPercent());
+        clone.setNotes(source.getNotes());
+        clone.setStatus(SalesQuotation.QuotationStatus.Draft);
+        clone.setCreatedBy(currentUser);
+        clone.setUpdatedBy(currentUser);
+
+        List<SalesQuotationItem> newItems = cloneItems(clone, sourceItems);
+        clone.getItems().clear();
+        clone.getItems().addAll(newItems);
+
+        recalcTotals(clone, newItems);
+
+        SalesQuotation saved = quotationRepository.save(clone);
+        return quotationMapper.toResponseDTO(saved, newItems);
     }
 
     private List<SalesQuotationItem> buildItems(SalesQuotation quotation, List<SalesQuotationItemRequestDTO> requestItems) {
@@ -234,8 +292,121 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
         return items;
     }
 
-    private void recalcTotals(SalesQuotation quotation, List<SalesQuotationItem> items, BigDecimal headerDiscount) {
-        BigDecimal subtotal = BigDecimal.ZERO;
+    private void sendQuotationEmailIfPossible(SalesQuotation quotation) {
+        try {
+            Customer customer = quotation.getCustomer();
+            if (customer == null) {
+                log.warn("Skip sending quotation email: customer is null for quotation {}", quotation.getQuotationNo());
+                return;
+            }
+            Contact contact = customer.getContact();
+            String toEmail = contact != null ? contact.getEmail() : null;
+            if (toEmail == null || toEmail.isBlank()) {
+                log.warn("Skip sending quotation email: customer {} has no contact email", customer.getCustomerCode());
+                return;
+            }
+
+            // Load items to include in email
+            List<SalesQuotationItem> items = itemRepository.findBySalesQuotation_SqId(quotation.getSqId());
+
+            String subject = String.format("[Báo giá %s] Gửi đến khách hàng %s", quotation.getQuotationNo(), customer.getCustomerCode());
+            String htmlBody = buildQuotationEmailBody(quotation, customer, items);
+            emailService.sendHtmlEmail(toEmail.trim(), subject, htmlBody);
+        } catch (Exception e) {
+            log.error("Failed to send quotation email for {}: {}", quotation.getQuotationNo(), e.getMessage(), e);
+        }
+    }
+
+    private String buildQuotationEmailBody(SalesQuotation quotation, Customer customer, List<SalesQuotationItem> items) {
+        String customerName = (customer.getFirstName() + " " + customer.getLastName()).trim();
+        String quotationNo = quotation.getQuotationNo();
+        String total = quotation.getTotalAmount() != null ? quotation.getTotalAmount().toPlainString() : "0";
+
+        StringBuilder rows = new StringBuilder();
+        if (items != null && !items.isEmpty()) {
+            int idx = 1;
+            for (SalesQuotationItem item : items) {
+                String code = item.getProductCode() != null ? item.getProductCode() : "";
+                String name = item.getProductName() != null ? item.getProductName() : "";
+                String qty = item.getQuantity() != null ? item.getQuantity().toPlainString() : "0";
+                String unitPrice = item.getUnitPrice() != null ? item.getUnitPrice().toPlainString() : "0";
+                String discount = item.getDiscountAmount() != null ? item.getDiscountAmount().toPlainString() : "0";
+                String taxRate = item.getTaxRate() != null ? item.getTaxRate().toPlainString() + "%" : "0%";
+                String lineTotal = item.getLineTotal() != null ? item.getLineTotal().toPlainString() : "0";
+
+                rows.append("""
+                        <tr>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:center;">%d</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb;">%s<br/><span style="color:#6b7280; font-size:12px;">%s</span></td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right; font-weight:bold;">%s</td>
+                        </tr>
+                        """.formatted(idx++, code, name, qty, unitPrice, discount, taxRate, lineTotal));
+            }
+        } else {
+            rows.append("""
+                    <tr>
+                      <td colspan="7" style="padding:8px; border:1px solid #e5e7eb; text-align:center; color:#6b7280;">
+                        Không có dòng sản phẩm
+                      </td>
+                    </tr>
+                    """);
+        }
+
+        return String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                  <h2>Gửi báo giá: %s</h2>
+                  <p>Kính gửi %s,</p>
+                  <p>Chúng tôi gửi tới quý khách báo giá số <strong>%s</strong>.</p>
+                  <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:13px;">
+                    <thead>
+                      <tr style="background:#f3f4f6;">
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb;">#</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:left;">Sản phẩm</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Số lượng</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Đơn giá</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Chiết khấu</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thuế</th>
+                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      %s
+                    </tbody>
+                  </table>
+                  <p>Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
+                  <p>Trân trọng,<br/>MMS System</p>
+                </body>
+                </html>
+                """, quotationNo, customerName, quotationNo, total, rows.toString());
+    }
+
+    private List<SalesQuotationItem> cloneItems(SalesQuotation target, List<SalesQuotationItem> sourceItems) {
+        List<SalesQuotationItem> items = new ArrayList<>();
+        for (SalesQuotationItem src : sourceItems) {
+            SalesQuotationItem item = new SalesQuotationItem();
+            item.setSalesQuotation(target);
+            item.setProduct(src.getProduct());
+            item.setProductName(src.getProductName());
+            item.setProductCode(src.getProductCode());
+            item.setUom(src.getUom());
+            item.setQuantity(defaultBigDecimal(src.getQuantity(), BigDecimal.ONE));
+            item.setUnitPrice(defaultBigDecimal(src.getUnitPrice()));
+            item.setDiscountAmount(defaultBigDecimal(src.getDiscountAmount()));
+            item.setTaxRate(defaultBigDecimal(src.getTaxRate()));
+            item.setNote(src.getNote());
+            // taxAmount & lineTotal will be recalculated in recalcTotals
+            items.add(item);
+        }
+        return items;
+    }
+
+    private void recalcTotals(SalesQuotation quotation, List<SalesQuotationItem> items) {
+        BigDecimal lineSubtotalSum = BigDecimal.ZERO; // sau chiết khấu dòng
         BigDecimal taxTotal = BigDecimal.ZERO;
 
         for (SalesQuotationItem item : items) {
@@ -248,31 +419,52 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
                 discount = baseAmount;
             }
 
-            BigDecimal taxable = baseAmount.subtract(discount);
+            BigDecimal lineSubtotal = baseAmount.subtract(discount); // sau CK dòng
+            item.setLineTotal(lineSubtotal); // tạm lưu, sẽ cập nhật sau CK chung + thuế
+
+            lineSubtotalSum = lineSubtotalSum.add(lineSubtotal);
+        }
+
+        BigDecimal headerPercent = defaultBigDecimal(quotation.getHeaderDiscountPercent());
+        BigDecimal headerAmount = lineSubtotalSum.multiply(headerPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        for (SalesQuotationItem item : items) {
+            BigDecimal lineSubtotal = defaultBigDecimal(item.getLineTotal());
+            BigDecimal allocHeader = BigDecimal.ZERO;
+            if (lineSubtotalSum.compareTo(BigDecimal.ZERO) > 0) {
+                allocHeader = lineSubtotal.multiply(headerAmount)
+                        .divide(lineSubtotalSum, 2, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineTaxable = lineSubtotal.subtract(allocHeader);
+            if (lineTaxable.compareTo(BigDecimal.ZERO) < 0) {
+                lineTaxable = BigDecimal.ZERO;
+            }
+
             BigDecimal taxRate = defaultBigDecimal(item.getTaxRate());
-            BigDecimal taxAmount = taxable.multiply(taxRate)
+            BigDecimal taxAmount = lineTaxable.multiply(taxRate)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-            BigDecimal lineTotal = taxable.add(taxAmount);
+            BigDecimal lineTotal = lineTaxable.add(taxAmount);
 
             item.setTaxAmount(taxAmount);
             item.setLineTotal(lineTotal);
 
-            subtotal = subtotal.add(taxable);
             taxTotal = taxTotal.add(taxAmount);
         }
 
-        BigDecimal headerDisc = defaultBigDecimal(headerDiscount);
-        if (headerDisc.compareTo(subtotal) > 0) {
-            headerDisc = subtotal;
-        }
+        BigDecimal subtotal = lineSubtotalSum.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = lineSubtotalSum
+                .subtract(headerAmount)
+                .add(taxTotal)
+                .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal total = subtotal.subtract(headerDisc).add(taxTotal);
-
-        quotation.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
-        quotation.setHeaderDiscount(headerDisc.setScale(2, RoundingMode.HALF_UP));
+        quotation.setSubtotal(subtotal);
+        quotation.setHeaderDiscountPercent(headerPercent.setScale(2, RoundingMode.HALF_UP));
+        quotation.setHeaderDiscountAmount(headerAmount.setScale(2, RoundingMode.HALF_UP));
         quotation.setTaxAmount(taxTotal.setScale(2, RoundingMode.HALF_UP));
-        quotation.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
+        quotation.setTotalAmount(total);
     }
 
     private SalesQuotation.QuotationStatus parseStatus(String status) {

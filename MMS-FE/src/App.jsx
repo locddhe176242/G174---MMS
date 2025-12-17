@@ -68,6 +68,7 @@ import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail
 import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
+import InvoicePrint from "./compnents/pages/Sale/Invoice/InvoicePrint.jsx";
 import SalesReturnInboundOrderList from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderList.jsx";
 import SalesReturnInboundOrderDetail from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderDetail.jsx";
 import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInboundOrder/SalesReturnInboundOrderForm.jsx";
@@ -95,6 +96,16 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/verify-otp" element={<VerifyOtp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Route in hóa đơn - không có layout */}
+            <Route
+                path="/sales/invoices/:id/print"
+                element={
+                    <ProtectedRoute>
+                        <InvoicePrint />
+                    </ProtectedRoute>
+                }
+            />
 
             <Route
                 element={

@@ -18,6 +18,7 @@ public class ARInvoiceItemResponseDTO {
     private String description;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal discountPercent;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
     private BigDecimal lineTotal;

@@ -7,7 +7,8 @@ import Pagination from "../../../common/Pagination";
 
 const STATUS_LABELS = {
   Draft: "Nháp",
-  Active: "Đang mở",
+  Active: "Đã gửi khách",
+  Converted: "Đã chuyển đơn",
   Cancelled: "Đã hủy",
   Expired: "Hết hạn",
 };
@@ -255,9 +256,6 @@ export default function SalesQuotationList() {
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Hạn báo giá
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Người tạo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -288,9 +286,6 @@ export default function SalesQuotationList() {
                       <td className="px-6 py-3 text-sm text-gray-700">
                         {formatDate(quotation.quotationDate)}
                       </td>
-                      <td className="px-6 py-3 text-sm text-gray-700">
-                        {formatDate(quotation.validUntil)}
-                      </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
                         <div className="font-semibold">
                           {quotation.createdByDisplay || "—"}
@@ -320,8 +315,12 @@ export default function SalesQuotationList() {
                           >
                             Xem
                           </button>
-                          {/* Chỉ hiển thị nút Sửa nếu status không phải Active, hoặc nếu Active thì phải là Manager */}
-                          {(!quotation.status || quotation.status !== "Active" || hasRole("MANAGER") || hasRole("ROLE_MANAGER")) && (
+                          {/* Không cho sửa/xóa khi Converted. Nếu Active thì chỉ Manager mới được sửa/xóa. */}
+                          {quotation.status !== "Converted" &&
+                            (!quotation.status ||
+                              quotation.status !== "Active" ||
+                              hasRole("MANAGER") ||
+                              hasRole("ROLE_MANAGER")) && (
                             <button
                               onClick={() =>
                                 navigate(`/sales/quotations/${quotation.quotationId}/edit`)
@@ -331,8 +330,11 @@ export default function SalesQuotationList() {
                               Sửa
                             </button>
                           )}
-                          {/* Chỉ hiển thị nút Xóa nếu status không phải Active, hoặc nếu Active thì phải là Manager */}
-                          {(!quotation.status || quotation.status !== "Active" || hasRole("MANAGER") || hasRole("ROLE_MANAGER")) && (
+                          {quotation.status !== "Converted" &&
+                            (!quotation.status ||
+                              quotation.status !== "Active" ||
+                              hasRole("MANAGER") ||
+                              hasRole("ROLE_MANAGER")) && (
                             <button
                               onClick={() => handleDelete(quotation.quotationId)}
                               className="text-red-600 hover:underline"

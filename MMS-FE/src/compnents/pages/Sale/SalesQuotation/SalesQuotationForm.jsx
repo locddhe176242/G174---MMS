@@ -28,8 +28,9 @@ const DEFAULT_ITEM = {
   uom: "",
   quantity: 1,
   unitPrice: 0,
-  discountRate: 0,
-  taxRate: 0,
+  // null để mặc định dùng chiết khấu/thuế chung
+  discountRate: null,
+  taxRate: null,
 };
 
 const currencyFormatter = (value) =>
@@ -78,10 +79,10 @@ export default function SalesQuotationForm() {
     customerId: null,
     status: "Draft",
     quotationDate: "",
-    validUntil: "",
     paymentTerms: "",
     deliveryTerms: "",
     notes: "",
+    commonDiscountRate: 0, // Chiết khấu áp dụng cho tất cả sản phẩm (trừ dòng có chiết khấu riêng)
     taxRate: 0,
     items: [DEFAULT_ITEM],
   });
@@ -158,7 +159,6 @@ export default function SalesQuotationForm() {
         quotationDate: quotation.quotationDate
           ? quotation.quotationDate.slice(0, 10)
           : "",
-        validUntil: quotation.validUntil ? quotation.validUntil.slice(0, 10) : "",
         paymentTerms: quotation.paymentTerms || "",
         deliveryTerms: quotation.deliveryTerms || "",
         notes: quotation.notes || "",
@@ -171,11 +171,18 @@ export default function SalesQuotationForm() {
             uom: item.uom || "",
             quantity: item.quantity || 1,
             unitPrice: item.unitPrice || item.price || 0,
-            discountRate: item.discountAmount && item.quantity && item.unitPrice
-              ? (Number(item.discountAmount) / (Number(item.quantity) * Number(item.unitPrice))) * 100
-              : 0,
-            taxRate: item.taxRate || 0,
+            discountRate:
+              item.discountAmount && item.quantity && item.unitPrice
+                ? (Number(item.discountAmount) /
+                    (Number(item.quantity) * Number(item.unitPrice))) *
+                  100
+                : null,
+            taxRate:
+              item.taxRate !== null && item.taxRate !== undefined
+                ? item.taxRate
+                : null,
           })) || [DEFAULT_ITEM],
+        commonDiscountRate: Number(quotation.headerDiscountPercent || 0),
       });
       setOriginalStatus(quotation.status || "Draft");
       
@@ -262,6 +269,28 @@ export default function SalesQuotationForm() {
     }));
   };
 
+  const applyCommonDiscountToItems = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      commonDiscountRate: value,
+      items: prev.items.map((item) => ({
+        ...item,
+        discountRate: value,
+      })),
+    }));
+  };
+
+  const applyCommonTaxToItems = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      taxRate: value,
+      items: prev.items.map((item) => ({
+        ...item,
+        taxRate: value,
+      })),
+    }));
+  };
+
   const removeItem = (index) => {
     setFormData((prev) => {
       const items = prev.items.filter((_, idx) => idx !== index);
@@ -279,24 +308,35 @@ export default function SalesQuotationForm() {
     const discount = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
-      const rate = Number(item.discountRate || 0);
+      const hasCustomDiscount =
+        item.discountRate !== null &&
+        item.discountRate !== undefined &&
+        item.discountRate !== "";
+      const rate = hasCustomDiscount
+        ? Number(item.discountRate || 0)
+        : Number(formData.commonDiscountRate || 0);
       const lineTotal = qty * price;
       return sum + (lineTotal * rate) / 100;
     }, 0);
 
     const taxable = Math.max(subtotal - discount, 0);
-    const taxRate = Number(formData.taxRate || 0);
     const taxAmount =
       formData.items.reduce((sum, item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
-        const discountRate = Number(item.discountRate || 0);
+        const hasCustomDiscount =
+          item.discountRate !== null &&
+          item.discountRate !== undefined &&
+          item.discountRate !== "";
+        const discountRate = hasCustomDiscount
+          ? Number(item.discountRate || 0)
+          : Number(formData.commonDiscountRate || 0);
         const lineTotal = qty * price;
         const lineDiscount = (lineTotal * discountRate) / 100;
         const lineBase = Math.max(lineTotal - lineDiscount, 0);
         const itemTaxRate = getEffectiveTaxRate(item.taxRate, formData.taxRate);
         return sum + (lineBase * itemTaxRate) / 100;
-      }, 0) || (taxable * taxRate) / 100;
+      }, 0);
     const total = taxable + Number(taxAmount || 0);
 
     return {
@@ -305,7 +345,7 @@ export default function SalesQuotationForm() {
       taxAmount,
       totalAmount: total,
     };
-  }, [formData.items, formData.taxRate]);
+  }, [formData.items, formData.taxRate, formData.commonDiscountRate]);
 
   const validateForm = () => {
     const errors = {};
@@ -315,8 +355,13 @@ export default function SalesQuotationForm() {
     if (!formData.quotationDate) {
       errors.quotationDate = "Vui lòng chọn ngày báo giá";
     }
-    if (formData.validUntil && formData.validUntil < formData.quotationDate) {
-      errors.validUntil = "Hạn báo giá phải sau ngày báo giá";
+    const commonDisc = Number(formData.commonDiscountRate || 0);
+    if (commonDisc < 0 || commonDisc > 100) {
+      errors.commonDiscountRate = "Chiết khấu chung phải từ 0% đến 100%";
+    }
+    const commonTax = Number(formData.taxRate || 0);
+    if (commonTax < 0) {
+      errors.taxRate = "Thuế chung phải >= 0";
     }
     if (!formData.items || formData.items.length === 0) {
       errors.items = "Cần ít nhất một dòng sản phẩm";
@@ -332,6 +377,26 @@ export default function SalesQuotationForm() {
         if (Number(item.unitPrice || 0) < 0) {
           err.unitPrice = "Đơn giá không hợp lệ";
         }
+        const discountRate = Number(
+          item.discountRate !== null &&
+            item.discountRate !== undefined &&
+            item.discountRate !== ""
+            ? item.discountRate
+            : formData.commonDiscountRate || 0
+        );
+        if (discountRate < 0 || discountRate > 100) {
+          err.discountRate = "Chiết khấu phải từ 0% đến 100%";
+        }
+        const taxRate = Number(
+          item.taxRate !== null &&
+            item.taxRate !== undefined &&
+            item.taxRate !== ""
+            ? item.taxRate
+            : formData.taxRate || 0
+        );
+        if (taxRate < 0) {
+          err.taxRate = "Thuế suất phải >= 0";
+        }
         return err;
       });
       if (itemErrors.some((err) => Object.keys(err).length > 0)) {
@@ -346,11 +411,10 @@ export default function SalesQuotationForm() {
     customerId: formData.customerId,
     status: formData.status,
     quotationDate: formData.quotationDate,
-    validUntil: formData.validUntil || null,
     paymentTerms: formData.paymentTerms || null,
     deliveryTerms: formData.deliveryTerms || null,
     notes: formData.notes || null,
-    headerDiscount: 0,
+    headerDiscountPercent: Number(formData.commonDiscountRate || 0),
     taxRate: Number(formData.taxRate || 0),
     subtotal: totals.subtotal,
     taxAmount: totals.taxAmount,
@@ -362,7 +426,12 @@ export default function SalesQuotationForm() {
       uom: item.uom,
       quantity: Number(item.quantity || 0),
       unitPrice: Number(item.unitPrice || 0),
-      discountPercent: Number(item.discountRate || 0),
+      discountPercent:
+        item.discountRate !== null &&
+        item.discountRate !== undefined &&
+        item.discountRate !== ""
+          ? Number(item.discountRate || 0)
+          : Number(formData.commonDiscountRate || 0),
       taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
     })),
   });
@@ -442,6 +511,32 @@ export default function SalesQuotationForm() {
     }
   };
 
+  const handleCloneToDraft = async () => {
+    if (!isEdit || !id) {
+      toast.error("Chỉ có thể nhân bản từ báo giá đã được lưu");
+      return;
+    }
+    if (!window.confirm("Tạo bản nháp mới từ báo giá này? Bản gốc giữ nguyên.")) {
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const cloned = await salesQuotationService.cloneQuotation(id);
+      const newId = cloned?.quotationId ?? cloned?.id;
+      toast.success("Đã tạo bản nháp mới từ báo giá");
+      if (newId) {
+        navigate(`/sales/quotations/${newId}/edit`);
+      } else {
+        navigate("/sales/quotations");
+      }
+    } catch (error) {
+      console.error("Không thể nhân bản báo giá:", error);
+      toast.error(error?.response?.data?.message || "Không thể nhân bản báo giá");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Kiểm tra xem có thể edit không
   // Nếu status = Active, chỉ Manager mới được edit
   const isActive = quotationData?.status === "Active" || formData.status === "Active";
@@ -512,6 +607,16 @@ export default function SalesQuotationForm() {
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
                 {submitting ? "Đang gửi..." : "Gửi cho khách"}
+              </button>
+            )}
+            {isEdit && isActive && (
+              <button
+                type="button"
+                onClick={handleCloneToDraft}
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {submitting ? "Đang xử lý..." : "Tạo bản nháp mới"}
               </button>
             )}
             <button
@@ -590,28 +695,6 @@ export default function SalesQuotationForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Hạn báo giá</label>
-                  <DatePicker
-                    selected={
-                      formData.validUntil ? new Date(formData.validUntil) : null
-                    }
-                    onChange={(date) => handleDateChange("validUntil", date)}
-                    dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
-                    minDate={
-                      formData.quotationDate
-                        ? new Date(formData.quotationDate)
-                        : null
-                    }
-                    disabled={!canEdit}
-                  />
-                  {validationErrors.validUntil && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {validationErrors.validUntil}
-                    </p>
-                  )}
-                </div>
-                <div>
                   <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
                   <input
                     type="text"
@@ -652,18 +735,51 @@ export default function SalesQuotationForm() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <div>
-                <label className="text-sm text-gray-600">Thuế (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.taxRate}
-                  disabled={!canEdit}
-                  onChange={(e) =>
-                    handleInputChange("taxRate", e.target.value)
-                  }
-                  className="mt-1 w-full border rounded-lg px-3 py-2"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Chiết khấu chung (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.commonDiscountRate}
+                    disabled={!canEdit}
+                    onChange={(e) => applyCommonDiscountToItems(e.target.value)}
+                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                  />
+                  {validationErrors.commonDiscountRate && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {validationErrors.commonDiscountRate}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Áp dụng cho tất cả sản phẩm.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600">
+                    Thuế chung (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.taxRate}
+                    disabled={!canEdit}
+                    onChange={(e) => applyCommonTaxToItems(e.target.value)}
+                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                  />
+                  {validationErrors.taxRate && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {validationErrors.taxRate}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Áp dụng cho tất cả sản phẩm.
+                  </p>
+                </div>
               </div>
               <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
@@ -720,12 +836,24 @@ export default function SalesQuotationForm() {
                   {formData.items.map((item, index) => {
                     const baseTotal =
                       Number(item.quantity || 0) * Number(item.unitPrice || 0);
-                    const discountRate = Number(item.discountRate || 0);
-                    const lineDiscount = (baseTotal * discountRate) / 100;
+                    const hasCustomDiscount =
+                      item.discountRate !== null &&
+                      item.discountRate !== undefined &&
+                      item.discountRate !== "";
+                    const effectiveDiscountRate = hasCustomDiscount
+                      ? Number(item.discountRate || 0)
+                      : Number(formData.commonDiscountRate || 0);
+                    const lineDiscount =
+                      (baseTotal * effectiveDiscountRate) / 100;
                     const taxable = Math.max(baseTotal - lineDiscount, 0);
-                    const lineTax =
-                      (taxable * Number(item.taxRate || formData.taxRate || 0)) /
-                      100;
+                    const hasCustomTax =
+                      item.taxRate !== null &&
+                      item.taxRate !== undefined &&
+                      item.taxRate !== "";
+                    const effectiveTaxRate = hasCustomTax
+                      ? Number(item.taxRate || 0)
+                      : Number(formData.taxRate || 0);
+                    const lineTax = (taxable * effectiveTaxRate) / 100;
                     const lineGrandTotal = taxable + lineTax;
 
                     return (
@@ -793,13 +921,19 @@ export default function SalesQuotationForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
-                            value={item.discountRate}
+                            value={
+                              item.discountRate !== null &&
+                              item.discountRate !== undefined &&
+                              item.discountRate !== ""
+                                ? item.discountRate
+                                : formData.commonDiscountRate || ""
+                            }
                             onChange={(e) =>
                               handleItemChange(
                                 index,
@@ -811,18 +945,34 @@ export default function SalesQuotationForm() {
                             placeholder="0"
                             disabled={!canEdit}
                           />
+                      {validationErrors.itemDetails?.[index]?.discountRate && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {validationErrors.itemDetails[index].discountRate}
+                        </p>
+                      )}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
-                            value={item.taxRate}
+                            value={
+                              item.taxRate !== null &&
+                              item.taxRate !== undefined &&
+                              item.taxRate !== ""
+                                ? item.taxRate
+                                : formData.taxRate || ""
+                            }
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", e.target.value)
                             }
                             className="w-24 border rounded px-2 py-1 text-right"
                             disabled={!canEdit}
                           />
+                      {validationErrors.itemDetails?.[index]?.taxRate && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {validationErrors.itemDetails[index].taxRate}
+                        </p>
+                      )}
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
                           {currencyFormatter(lineGrandTotal)}

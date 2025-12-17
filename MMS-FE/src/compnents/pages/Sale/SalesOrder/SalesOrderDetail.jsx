@@ -8,6 +8,13 @@ const formatCurrency = (value) =>
     Number(value || 0)
   );
 
+const formatPercent = (num) => {
+  if (num === null || num === undefined) return "0%";
+  const n = Number(num);
+  if (Number.isNaN(n)) return "0%";
+  return `${n % 1 === 0 ? n.toString() : n.toFixed(2)}%`;
+};
+
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "—";
 
@@ -16,21 +23,12 @@ const formatDateTime = (value) =>
 
 const getStatusLabel = (status) => {
   const statusMap = {
-    Pending: "Chờ xử lý",
-    Approved: "Đã duyệt",
+    Draft: "Nháp",
+    Approved: "Đã gửi khách",
     Fulfilled: "Đã hoàn thành",
     Cancelled: "Đã hủy",
   };
   return statusMap[status] || status;
-};
-
-const getApprovalStatusLabel = (approvalStatus) => {
-  const approvalMap = {
-    Pending: "Chờ phê duyệt",
-    Approved: "Đã phê duyệt",
-    Rejected: "Từ chối",
-  };
-  return approvalMap[approvalStatus] || approvalStatus;
 };
 
 export default function SalesOrderDetail() {
@@ -38,6 +36,7 @@ export default function SalesOrderDetail() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -57,6 +56,20 @@ export default function SalesOrderDetail() {
     fetchOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const handleSendToCustomer = async () => {
+    try {
+      setActionLoading(true);
+      await salesOrderService.sendToCustomer(id);
+      toast.success("Đã gửi đơn hàng cho khách");
+      await fetchOrder();
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Không thể gửi đơn hàng cho khách");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
 
   if (loading) {
@@ -82,6 +95,15 @@ export default function SalesOrderDetail() {
             <p className="text-gray-500">Khách hàng: {data.customerName || data.customerCode || "—"}</p>
           </div>
           <div className="flex items-center gap-3">
+            {data.approvalStatus === "Draft" && (
+              <button
+                onClick={handleSendToCustomer}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {actionLoading ? "Đang gửi..." : "Gửi cho khách"}
+              </button>
+            )}
             <button
               onClick={() => navigate(`/sales/orders/${id}/edit`)}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
@@ -109,21 +131,21 @@ export default function SalesOrderDetail() {
                 <span className="text-gray-500">Trạng thái:</span>{" "}
                 <span className="font-semibold">{getStatusLabel(data.status)}</span>
               </li>
-              <li>
-                <span className="text-gray-500">Phê duyệt:</span>{" "}
-                <span className="font-semibold">{getApprovalStatusLabel(data.approvalStatus)}</span>
-              </li>
-              {data.approverName && (
-                <li>
-                  <span className="text-gray-500">Người duyệt:</span>{" "}
-                  {data.approverName}
-                </li>
-              )}
-              {data.approvedAt && (
-                <li>
-                  <span className="text-gray-500">Ngày duyệt:</span>{" "}
-                  {formatDateTime(data.approvedAt)}
-                </li>
+              {data.approvalStatus === "Approved" && (
+                <>
+                  {data.approverName && (
+                    <li>
+                      <span className="text-gray-500">Người duyệt:</span>{" "}
+                      {data.approverName}
+                    </li>
+                  )}
+                  {data.approvedAt && (
+                    <li>
+                      <span className="text-gray-500">Ngày duyệt:</span>{" "}
+                      {formatDateTime(data.approvedAt)}
+                    </li>
+                  )}
+                </>
               )}
               <li>
                 <span className="text-gray-500">Ngày đơn:</span>{" "}
@@ -149,6 +171,12 @@ export default function SalesOrderDetail() {
                 {formatCurrency(data.subtotal)}
               </li>
               <li>
+                <span className="text-gray-500">Chiết khấu chung:</span>{" "}
+                <span className="font-semibold">
+                  {formatPercent(data.headerDiscountPercent)} ({formatCurrency(data.headerDiscountAmount)})
+                </span>
+              </li>
+              <li>
                 <span className="text-gray-500">Thuế:</span>{" "}
                 {formatCurrency(data.taxAmount)}
               </li>
@@ -159,28 +187,6 @@ export default function SalesOrderDetail() {
           </div>
         </div>
 
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">
-            Thông tin kiểm soát
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700">
-            <div>
-              <div className="text-gray-500 uppercase text-xs tracking-wide">Người tạo</div>
-              <div className="font-semibold text-gray-900">
-                {data.createdByDisplay || data.createdBy || "—"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">{formatDateTime(data.createdAt)}</div>
-            </div>
-            <div>
-              <div className="text-gray-500 uppercase text-xs tracking-wide">Người cập nhật</div>
-              <div className="font-semibold text-gray-900">
-                {data.updatedByDisplay || data.updatedBy || "—"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">{formatDateTime(data.updatedAt)}</div>
-            </div>
-          </div>
-        </div>
 
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -234,10 +240,17 @@ export default function SalesOrderDetail() {
                       {formatCurrency(item.unitPrice)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {formatCurrency(item.discountAmount)}
+                      {formatPercent(
+                        Number(item.discountAmount || 0) > 0 &&
+                          Number(item.quantity || 0) * Number(item.unitPrice || 0) > 0
+                          ? (Number(item.discountAmount) /
+                              (Number(item.quantity || 0) * Number(item.unitPrice || 0))) *
+                            100
+                          : 0
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {item.taxRate ? `${item.taxRate}%` : "0%"}
+                      {formatPercent(item.taxRate)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                       {formatCurrency(item.lineTotal)}

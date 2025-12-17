@@ -31,6 +31,8 @@ public class ARInvoiceResponseDTO {
     private LocalDate dueDate;
 
     private BigDecimal subtotal;
+    private BigDecimal headerDiscountPercent;
+    private BigDecimal headerDiscountAmount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private BigDecimal balanceAmount;

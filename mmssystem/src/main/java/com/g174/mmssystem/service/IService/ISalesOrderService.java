@@ -16,17 +16,13 @@ public interface ISalesOrderService {
 
     SalesOrderResponseDTO getOrder(Integer id);
 
-    Page<SalesOrderListResponseDTO> getOrders(Integer customerId, String status, String approvalStatus, String keyword, Pageable pageable);
+    Page<SalesOrderListResponseDTO> getOrders(Integer customerId, String status, String keyword, Pageable pageable);
 
-    List<SalesOrderListResponseDTO> getAllOrders(Integer customerId, String status, String approvalStatus, String keyword);
+    List<SalesOrderListResponseDTO> getAllOrders(Integer customerId, String status, String keyword);
 
     void deleteOrder(Integer id);
 
-    SalesOrderResponseDTO changeStatus(Integer id, String status, String approvalStatus);
-
-    SalesOrderResponseDTO changeApprovalStatus(Integer id, String approvalStatus);
-
-    SalesOrderResponseDTO submitForApproval(Integer id);
+    SalesOrderResponseDTO sendToCustomer(Integer id);
 
     SalesOrderResponseDTO createFromQuotation(Integer quotationId);
 }

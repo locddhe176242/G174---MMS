@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/sales/orders")
+@RequestMapping({"/api/sales/orders", "/sales/orders"})
 @RequiredArgsConstructor
 public class SalesOrderController {
 
@@ -29,7 +29,6 @@ public class SalesOrderController {
     public ResponseEntity<Page<SalesOrderListResponseDTO>> listOrders(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -40,7 +39,7 @@ public class SalesOrderController {
         sort = "desc".equalsIgnoreCase(sortDir) ? sort.descending() : sort.ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
         Page<SalesOrderListResponseDTO> result =
-                salesOrderService.getOrders(customerId, status, approvalStatus, keyword, pageable);
+                salesOrderService.getOrders(customerId, status, keyword, pageable);
         return ResponseEntity.ok(result);
     }
 
@@ -49,9 +48,8 @@ public class SalesOrderController {
     public ResponseEntity<List<SalesOrderListResponseDTO>> getAllOrders(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(salesOrderService.getAllOrders(customerId, status, approvalStatus, keyword));
+        return ResponseEntity.ok(salesOrderService.getAllOrders(customerId, status, keyword));
     }
 
     @GetMapping("/{id}")
@@ -99,49 +97,20 @@ public class SalesOrderController {
         return ResponseEntity.ok(salesOrderService.updateOrder(id, request));
     }
 
-    @PatchMapping("/{id}/status")
+    @PostMapping("/{id}/send-to-customer")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
     @LogActivity(
-            action = "CHANGE_SALES_ORDER_STATUS",
+            action = "SEND_SALES_ORDER_TO_CUSTOMER",
             activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái đơn bán hàng ID: #{#id} - Status: #{#status}, ApprovalStatus: #{#approvalStatus}",
+            description = "Gửi đơn bán hàng ID: #{#id} cho khách hàng",
             entityId = "#{#id}"
     )
-    public ResponseEntity<SalesOrderResponseDTO> changeStatus(
-            @PathVariable Integer id,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String approvalStatus) {
-        return ResponseEntity.ok(salesOrderService.changeStatus(id, status, approvalStatus));
-    }
-
-    @PatchMapping("/{id}/approval-status")
-    @PreAuthorize("hasRole('MANAGER')")
-    @LogActivity(
-            action = "CHANGE_SALES_ORDER_APPROVAL_STATUS",
-            activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái phê duyệt đơn bán hàng ID: #{#id} sang #{#approvalStatus}",
-            entityId = "#{#id}"
-    )
-    public ResponseEntity<SalesOrderResponseDTO> changeApprovalStatus(
-            @PathVariable Integer id,
-            @RequestParam String approvalStatus) {
-        return ResponseEntity.ok(salesOrderService.changeApprovalStatus(id, approvalStatus));
-    }
-
-    @PostMapping("/{id}/submit-for-approval")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(
-            action = "SUBMIT_SALES_ORDER_FOR_APPROVAL",
-            activityType = "SALES_MANAGEMENT",
-            description = "Gửi yêu cầu duyệt đơn bán hàng ID: #{#id}",
-            entityId = "#{#id}"
-    )
-    public ResponseEntity<SalesOrderResponseDTO> submitForApproval(@PathVariable Integer id) {
-        return ResponseEntity.ok(salesOrderService.submitForApproval(id));
+    public ResponseEntity<SalesOrderResponseDTO> sendToCustomer(@PathVariable Integer id) {
+        return ResponseEntity.ok(salesOrderService.sendToCustomer(id));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
     @LogActivity(
             action = "DELETE_SALES_ORDER",
             activityType = "SALES_MANAGEMENT",

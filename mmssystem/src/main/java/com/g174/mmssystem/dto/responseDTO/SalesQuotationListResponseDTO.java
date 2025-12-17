@@ -16,6 +16,9 @@ public class SalesQuotationListResponseDTO {
     private SalesQuotation.QuotationStatus status;
     private Integer customerId;
     private String customerName;
+    // Dùng cho UI: báo giá đã được chuyển sang Sales Order hay chưa
+    private Boolean hasSalesOrder;
+    private Integer salesOrderId;
     private LocalDate validUntil;
     private Instant quotationDate;
     private BigDecimal totalAmount;

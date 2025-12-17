@@ -24,6 +24,8 @@ public class SalesOrderResponseDTO {
     private String shippingAddress;
     private String paymentTerms;
     private BigDecimal subtotal;
+    private BigDecimal headerDiscountPercent;
+    private BigDecimal headerDiscountAmount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private String notes;

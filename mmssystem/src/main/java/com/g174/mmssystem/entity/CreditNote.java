@@ -1,6 +1,8 @@
 package com.g174.mmssystem.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -47,6 +49,16 @@ public class CreditNote {
 
     @Column(name = "subtotal", precision = 18, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "100.0", inclusive = true)
+    @Column(name = "header_discount_percent", precision = 5, scale = 2)
+    private BigDecimal headerDiscountPercent = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "999999999999999.99", inclusive = true)
+    @Column(name = "header_discount_amount", precision = 18, scale = 2)
+    private BigDecimal headerDiscountAmount = BigDecimal.ZERO;
 
     @Column(name = "tax_amount", precision = 18, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;

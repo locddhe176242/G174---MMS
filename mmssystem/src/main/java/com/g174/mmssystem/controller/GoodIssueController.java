@@ -154,15 +154,15 @@ public class GoodIssueController {
     @PostMapping("/{issueId}/submit-for-approval")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
-            action = "SUBMIT_GOOD_ISSUE_FOR_APPROVAL",
+            action = "COMPLETE_GOOD_ISSUE",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Gửi yêu cầu duyệt phiếu xuất kho ID: #{#issueId}",
+            description = "Hoàn tất phiếu xuất kho ID: #{#issueId}",
             entityId = "#{#issueId}"
     )
     public ResponseEntity<GoodIssueResponseDTO> submitForApproval(
             @PathVariable Integer issueId,
             @RequestParam(required = false) Integer submittedById) {
-        log.info("REST: Submitting good issue ID: {} for approval", issueId);
+        log.info("REST: Completing good issue ID: {}", issueId);
 
         // Get current user ID if not provided
         if (submittedById == null) {
@@ -173,41 +173,6 @@ public class GoodIssueController {
         }
 
         GoodIssueResponseDTO response = issueService.submitForApproval(issueId, submittedById);
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/{issueId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "APPROVE_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Duyệt phiếu xuất kho ID: #{#issueId}",
-            entityId = "#{#issueId}"
-    )
-    public ResponseEntity<GoodIssueResponseDTO> approveIssue(
-            @PathVariable Integer issueId,
-            @RequestParam Integer approverId) {
-        log.info("REST: Approving good issue ID: {} by approver ID: {}", issueId, approverId);
-
-        GoodIssueResponseDTO response = issueService.approveIssue(issueId, approverId);
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/{issueId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(
-            action = "REJECT_GOOD_ISSUE",
-            activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Từ chối phiếu xuất kho ID: #{#issueId}",
-            entityId = "#{#issueId}"
-    )
-    public ResponseEntity<GoodIssueResponseDTO> rejectIssue(
-            @PathVariable Integer issueId,
-            @RequestParam Integer approverId,
-            @RequestParam(required = false) String reason) {
-        log.info("REST: Rejecting good issue ID: {} by approver ID: {}", issueId, approverId);
-
-        GoodIssueResponseDTO response = issueService.rejectIssue(issueId, approverId, reason);
         return ResponseEntity.ok(response);
     }
 

@@ -10,6 +10,7 @@ import { salesQuotationService } from "../../../../api/salesQuotationService";
 import { customerService } from "../../../../api/customerService";
 import { getProducts } from "../../../../api/productService";
 import { warehouseService } from "../../../../api/warehouseService";
+import { hasRole } from "../../../../api/authService";
 
 const defaultItem = () => ({
   productId: null,
@@ -64,6 +65,7 @@ export default function SalesOrderForm() {
   const [quotationLoading, setQuotationLoading] = useState(false);
   const [quotations, setQuotations] = useState([]);
   const [globalTaxRate, setGlobalTaxRate] = useState("");
+  const [commonDiscountRate, setCommonDiscountRate] = useState(0);
   const [orderData, setOrderData] = useState(null);
   const [formData, setFormData] = useState({
     orderNo: "",
@@ -156,7 +158,10 @@ export default function SalesOrderForm() {
       setQuotationLoading(true);
       const response = await salesQuotationService.getAllQuotations();
       const list = Array.isArray(response) ? response : response?.content || response?.data || [];
-      setQuotations(list);
+      // Chỉ cho chọn báo giá đã gửi khách (Active) và CHƯA được chuyển sang Sales Order
+      // (Backend có thể trả hasSalesOrder=true cho dữ liệu cũ còn đang Active)
+      const activeList = list.filter((q) => q.status === "Active" && !q.hasSalesOrder);
+      setQuotations(activeList);
     } catch (error) {
       console.error("Không thể tải danh sách báo giá:", error);
       toast.error("Không thể tải danh sách báo giá");
@@ -173,13 +178,15 @@ export default function SalesOrderForm() {
 
   const filteredQuotations = useMemo(() => {
     const term = quotationSearch.trim().toLowerCase();
-    return quotations.filter((quotation) => {
-      const matchesKeyword =
-        !term ||
-        (quotation.quotationNo || "").toLowerCase().includes(term) ||
-        (quotation.customerName || "").toLowerCase().includes(term);
-      return matchesKeyword;
-    });
+    return quotations
+      .filter((q) => q.status === "Active")
+      .filter((quotation) => {
+        const matchesKeyword =
+          !term ||
+          (quotation.quotationNo || "").toLowerCase().includes(term) ||
+          (quotation.customerName || "").toLowerCase().includes(term);
+        return matchesKeyword;
+      });
   }, [quotations, quotationSearch]);
 
   const loadOrder = async () => {
@@ -211,6 +218,7 @@ export default function SalesOrderForm() {
           note: item.note || "",
         })),
       });
+      setCommonDiscountRate(data.headerDiscountPercent || 0);
       const uniqueTaxRates = new Set((data.items || []).map((item) => item.taxRate ?? ""));
       if (uniqueTaxRates.size === 1) {
         const [onlyRate] = Array.from(uniqueTaxRates);
@@ -254,22 +262,43 @@ export default function SalesOrderForm() {
     try {
       setLoading(true);
       const quotation = await salesQuotationService.getQuotationById(targetId);
+      if (quotation.status !== "Active") {
+        toast.error("Chỉ được chọn báo giá đã gửi khách (Active)");
+        return;
+      }
+
       setFormData((prev) => ({
         ...prev,
         salesQuotationId: quotation.quotationId || targetId,
         customerId: quotation.customerId,
         paymentTerms: quotation.paymentTerms || "",
         notes: quotation.notes || "",
-        items: (quotation.items || []).map((item) => ({
-          productId: item.productId,
-          warehouseId: null,
-          quantity: item.quantity || 1,
-          unitPrice: item.unitPrice || 0,
-          discountPercent: 0,
-          taxRate: item.taxRate || 0,
-          note: item.note || "",
-        })),
+        items: (quotation.items || []).map((item) => {
+          const qty = Number(item.quantity || 0);
+          const price = Number(item.unitPrice || 0);
+          const base = qty * price;
+          const discountAmount = Number(item.discountAmount || 0);
+          const discountPercent =
+            base > 0 ? Math.min((discountAmount / base) * 100, 100) : 0;
+
+          return {
+            productId: item.productId,
+            warehouseId: null,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+            discountPercent,
+            taxRate: item.taxRate || 0,
+            note: item.note || "",
+          };
+        }),
       }));
+
+      // Đồng bộ chiết khấu chung (%) từ báo giá sang đơn bán
+      if (typeof quotation.headerDiscountPercent === "number") {
+        setCommonDiscountRate(quotation.headerDiscountPercent);
+      } else {
+        setCommonDiscountRate(0);
+      }
       setSelectedQuotation({
         value: quotation.quotationId || targetId,
         label: `${quotation.quotationNo || `Báo giá #${quotation.quotationId || targetId}`} - ${
@@ -293,27 +322,63 @@ export default function SalesOrderForm() {
   };
 
   const totals = useMemo(() => {
-    return formData.items.reduce(
+    const result = formData.items.reduce(
       (acc, item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
-        const gross = qty * price;
+        const base = qty * price;
         const discountPercent = Number(item.discountPercent || 0);
+        const lineDiscount = Math.min((base * discountPercent) / 100, base);
+        const lineSubtotal = Math.max(base - lineDiscount, 0); // sau CK dòng
         const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
-        const discount = Math.min((gross * discountPercent) / 100, gross);
-        const taxable = Math.max(gross - discount, 0);
-        const tax = taxable * (taxRate / 100);
-        acc.gross += gross;
-        acc.discount += discount;
-        acc.subtotal += taxable;
-        acc.tax += tax;
+
+        acc.gross += base;
+        acc.lineDiscount += lineDiscount;
+        acc.subtotalBeforeHeader += lineSubtotal;
+        acc.effectiveTaxRates.push({ lineSubtotal, taxRate });
         return acc;
       },
-      { gross: 0, discount: 0, subtotal: 0, tax: 0 }
+      {
+        gross: 0,
+        lineDiscount: 0,
+        subtotalBeforeHeader: 0,
+        effectiveTaxRates: [],
+      }
     );
-  }, [formData.items, globalTaxRate]);
 
-  const totalValue = totals.subtotal + totals.tax;
+    const headerPercent = Number(commonDiscountRate || 0);
+    const headerDiscount = Math.max(
+      (result.subtotalBeforeHeader * headerPercent) / 100,
+      0
+    );
+
+    // Thuế tính trên phần sau khi trừ chiết khấu chung,
+    // phân bổ chiết khấu chung theo tỷ lệ lineSubtotal
+    let taxTotal = 0;
+    const baseForHeader = result.subtotalBeforeHeader || 0;
+    result.effectiveTaxRates.forEach(({ lineSubtotal, taxRate }) => {
+      let allocHeader = 0;
+      if (baseForHeader > 0) {
+        allocHeader = (lineSubtotal * headerDiscount) / baseForHeader;
+      }
+      const taxable = Math.max(lineSubtotal - allocHeader, 0);
+      taxTotal += taxable * (taxRate / 100);
+    });
+
+    const total =
+      result.subtotalBeforeHeader - headerDiscount + taxTotal;
+
+    return {
+      gross: result.gross,
+      lineDiscount: result.lineDiscount,
+      subtotalBeforeHeader: result.subtotalBeforeHeader,
+      headerDiscount,
+      tax: taxTotal,
+      total,
+    };
+  }, [formData.items, globalTaxRate, commonDiscountRate]);
+
+  const totalValue = totals.total;
 
   const handleCustomerChange = (option) => {
     setFormData((prev) => ({ ...prev, customerId: option ? option.value : "" }));
@@ -446,6 +511,7 @@ export default function SalesOrderForm() {
       orderDate: formData.orderDate ? formData.orderDate.toISOString() : null,
       shippingAddress: formData.shippingAddress || null,
       paymentTerms: formData.paymentTerms || null,
+      headerDiscountPercent: Number(commonDiscountRate || 0),
       notes: formData.notes || null,
       items: formData.items.map((item) => ({
         productId: item.productId,
@@ -485,32 +551,32 @@ export default function SalesOrderForm() {
     }
   };
 
-  const handleSubmitForApproval = async () => {
+  const handleSendToCustomer = async () => {
     if (!isEdit || !id) {
-      toast.error("Chỉ có thể gửi duyệt đơn hàng đã được lưu");
+      toast.error("Chỉ có thể gửi đơn hàng đã được lưu");
       return;
     }
     try {
       setSubmitting(true);
-      const result = await salesOrderService.submitForApproval(id);
+      const result = await salesOrderService.sendToCustomer(id);
       setOrderData({
-        approvalStatus: result.approvalStatus || "Pending",
-        status: result.status || "Pending",
+        approvalStatus: result.approvalStatus || "Approved",
+        status: result.status || "Approved",
       });
-      toast.success("Đã gửi yêu cầu duyệt đơn hàng");
-      await loadOrder(); // Reload để cập nhật UI
+      toast.success("Đã gửi đơn hàng cho khách");
+      await loadOrder();
     } catch (error) {
       console.error(error);
-      toast.error(error?.response?.data?.message || "Lỗi gửi yêu cầu duyệt");
+      toast.error(error?.response?.data?.message || "Lỗi gửi đơn hàng cho khách");
     } finally {
       setSubmitting(false);
     }
   };
 
   // Kiểm tra xem có thể edit không
-  const canEdit = !isEdit || !orderData || orderData.approvalStatus !== "Pending";
   const isDraft = orderData?.approvalStatus === "Draft";
-  const isPending = orderData?.approvalStatus === "Pending";
+  const canEdit = !isEdit || isDraft || hasRole("MANAGER") || hasRole("ROLE_MANAGER");
+  const canSendToCustomer = isEdit && isDraft;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -526,39 +592,24 @@ export default function SalesOrderForm() {
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
                     isDraft
                       ? "bg-gray-100 text-gray-700"
-                      : isPending
-                      ? "bg-yellow-100 text-yellow-700"
-                      : orderData.approvalStatus === "Approved"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
+                      : "bg-green-100 text-green-700"
                   }`}
                 >
-                  {isDraft
-                    ? "Nháp"
-                    : isPending
-                    ? "Chờ duyệt"
-                    : orderData.approvalStatus === "Approved"
-                    ? "Đã duyệt"
-                    : "Từ chối"}
+                  {isDraft ? "Nháp" : "Đã gửi khách"}
                 </span>
               )}
             </div>
             <p className="text-gray-500">Nhập thông tin đơn hàng và danh sách sản phẩm</p>
-            {isPending && (
-              <p className="text-sm text-yellow-600 mt-1">
-                Đơn hàng đang chờ duyệt, không thể chỉnh sửa
-              </p>
-            )}
           </div>
           <div className="flex gap-2">
-            {isEdit && isDraft && (
+            {canSendToCustomer && (
               <button
                 type="button"
-                onClick={handleSubmitForApproval}
+                onClick={handleSendToCustomer}
                 disabled={submitting}
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
-                {submitting ? "Đang gửi..." : "Gửi yêu cầu duyệt"}
+                {submitting ? "Đang gửi..." : "Gửi cho khách"}
               </button>
             )}
             <button
@@ -700,7 +751,19 @@ export default function SalesOrderForm() {
             </div>
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Tổng quan tiền tệ</h2>
-              <label className="text-sm text-gray-600">Thuế (%)</label>
+              <label className="text-sm text-gray-600">Chiết khấu chung (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={commonDiscountRate}
+                onChange={(e) => setCommonDiscountRate(e.target.value)}
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+                placeholder="Áp dụng chiết khấu trên tổng sau CK từng sản phẩm"
+                disabled={!canEdit}
+              />
+              <label className="text-sm text-gray-600 mt-3 block">Thuế (%)</label>
               <input
                 type="number"
                 min="0"
@@ -713,11 +776,17 @@ export default function SalesOrderForm() {
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
                   <span>Tạm tính</span>
-                  <span className="font-semibold">{formatCurrency(totals.gross)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(totals.gross)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Chiết khấu dòng</span>
-                  <span>{formatCurrency(totals.discount)}</span>
+                  <span>{formatCurrency(totals.lineDiscount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Chiết khấu chung</span>
+                  <span>{formatCurrency(totals.headerDiscount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Thuế</span>

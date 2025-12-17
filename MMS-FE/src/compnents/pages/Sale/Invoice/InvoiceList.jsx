@@ -320,22 +320,22 @@ export default function InvoiceList() {
                             >
                               Xem
                             </button>
-                            {inv.status !== "Paid" && inv.status !== "Cancelled" && (
-                              <>
-                                <button
-                                  onClick={() => navigate(`/sales/invoices/${inv.arInvoiceId}/edit`)}
-                                  className="text-green-600 hover:underline"
-                                >
-                                  Sửa
-                                </button>
+                            {/* Hóa đơn gốc không cho sửa; chỉ cho phép xóa khi:
+                                - Chưa Paid/Cancelled
+                                - Không có thanh toán
+                                - Không có Credit Note
+                            */}
+                            {inv.status !== "Paid" &&
+                              inv.status !== "Cancelled" &&
+                              !inv.hasPayment &&
+                              !inv.hasCreditNote && (
                                 <button
                                   onClick={() => handleDelete(inv.arInvoiceId)}
                                   className="text-red-600 hover:underline"
                                 >
                                   Xóa
                                 </button>
-                              </>
-                            )}
+                              )}
                           </div>
                         </td>
                       </tr>

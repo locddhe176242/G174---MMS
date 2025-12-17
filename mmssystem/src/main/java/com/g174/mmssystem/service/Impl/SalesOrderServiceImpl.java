@@ -9,6 +9,7 @@ import com.g174.mmssystem.exception.ResourceNotFoundException;
 import com.g174.mmssystem.mapper.SalesOrderMapper;
 import com.g174.mmssystem.repository.*;
 import com.g174.mmssystem.service.IService.ISalesOrderService;
+import com.g174.mmssystem.service.EmailService;
 import com.g174.mmssystem.specification.SalesOrderSpecifications;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +48,9 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     private final UserRepository userRepository;
     private final SalesOrderMapper salesOrderMapper;
     private final DeliveryRepository deliveryRepository;
+    private final DeliveryItemRepository deliveryItemRepository;
     private final ARInvoiceRepository arInvoiceRepository;
+    private final EmailService emailService;
 
     @Override
     public SalesOrderResponseDTO createOrder(SalesOrderRequestDTO request) {
@@ -67,6 +70,16 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         recalcTotals(order, items);
 
         SalesOrder saved = salesOrderRepository.save(order);
+
+        // Nếu tạo SO có liên kết với SQ thì đánh dấu SQ đã được chuyển đổi
+        if (quotation != null && quotation.getDeletedAt() == null) {
+            if (quotation.getStatus() == SalesQuotation.QuotationStatus.Active ||
+                quotation.getStatus() == SalesQuotation.QuotationStatus.Draft) {
+                quotation.setStatus(SalesQuotation.QuotationStatus.Converted);
+                salesQuotationRepository.save(quotation);
+            }
+        }
+
         return salesOrderMapper.toResponse(saved, items);
     }
 
@@ -74,33 +87,12 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     public SalesOrderResponseDTO updateOrder(Integer id, SalesOrderRequestDTO request) {
         SalesOrder order = getOrderEntity(id);
 
-        // Check 1: Khóa khi đang chờ duyệt
-        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Pending) {
-            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đang chờ phê duyệt");
-        }
-
-        // Check 2: Không cho sửa khi đã được duyệt (trừ Manager)
-        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
-                    authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
-            if (!isManager) {
-                throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã được phê duyệt. Chỉ Manager mới có quyền sửa.");
-            }
-            
-            // Log warning cho Manager
-            log.warn("Manager {} đang chỉnh sửa đơn hàng đã được phê duyệt: {}", 
-                    getCurrentUser().getEmail(), order.getSoNo());
-        }
-
-        // Check 3: Không cho sửa khi đã hoàn tất hoặc đã hủy
+        // Không cho sửa khi đã hoàn tất hoặc đã hủy
         if (order.getStatus() == SalesOrder.OrderStatus.Fulfilled || order.getStatus() == SalesOrder.OrderStatus.Cancelled) {
             throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã hoàn tất hoặc đã hủy");
         }
 
-        // Check 4: Không cho sửa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
+        // Không cho sửa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
         List<Delivery> deliveries = deliveryRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
         boolean hasActiveDelivery = deliveries.stream()
                 .anyMatch(d -> d.getStatus() != Delivery.DeliveryStatus.Cancelled);
@@ -108,10 +100,20 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã có phiếu giao hàng");
         }
 
-        // Check 5: Không cho sửa khi đã có AR Invoice
+        // Không cho sửa khi đã có AR Invoice
         List<ARInvoice> invoices = arInvoiceRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
         if (!invoices.isEmpty()) {
             throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã có hóa đơn");
+        }
+
+        // Nếu đã gửi khách (Approved) và không phải Manager -> chặn
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
+            boolean isManager = isManager();
+            if (!isManager) {
+                throw new IllegalStateException("Đơn hàng đã gửi khách, chỉ Manager mới được sửa.");
+            }
+            log.warn("Manager {} đang chỉnh sửa đơn hàng đã gửi khách: {}",
+                    getCurrentUser().getEmail(), order.getSoNo());
         }
 
         Customer customer = getCustomer(request.getCustomerId());
@@ -128,6 +130,16 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         recalcTotals(order, items);
 
         SalesOrder saved = salesOrderRepository.save(order);
+
+        // Nếu cập nhật SO có liên kết với SQ thì đảm bảo SQ được đánh dấu đã chuyển đổi
+        if (quotation != null && quotation.getDeletedAt() == null) {
+            if (quotation.getStatus() == SalesQuotation.QuotationStatus.Active ||
+                quotation.getStatus() == SalesQuotation.QuotationStatus.Draft) {
+                quotation.setStatus(SalesQuotation.QuotationStatus.Converted);
+                salesQuotationRepository.save(quotation);
+            }
+        }
+
         return salesOrderMapper.toResponse(saved, items);
     }
 
@@ -141,57 +153,85 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SalesOrderListResponseDTO> getOrders(Integer customerId, String status, String approvalStatus, String keyword, Pageable pageable) {
+    public Page<SalesOrderListResponseDTO> getOrders(Integer customerId, String status, String keyword, Pageable pageable) {
         Specification<SalesOrder> spec = Specification.where(SalesOrderSpecifications.notDeleted())
                 .and(SalesOrderSpecifications.hasCustomer(customerId))
                 .and(SalesOrderSpecifications.hasStatus(parseStatus(status)))
-                .and(SalesOrderSpecifications.hasApprovalStatus(parseApprovalStatus(approvalStatus)))
                 .and(SalesOrderSpecifications.keywordLike(keyword));
 
         return salesOrderRepository.findAll(spec, pageable)
-                .map(salesOrderMapper::toListResponse);
+                .map(salesOrderMapper::toListResponse)
+                .map(this::enrichListDtoWithRelations);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<SalesOrderListResponseDTO> getAllOrders(Integer customerId, String status, String approvalStatus, String keyword) {
+    public List<SalesOrderListResponseDTO> getAllOrders(Integer customerId, String status, String keyword) {
         Specification<SalesOrder> spec = Specification.where(SalesOrderSpecifications.notDeleted())
                 .and(SalesOrderSpecifications.hasCustomer(customerId))
                 .and(SalesOrderSpecifications.hasStatus(parseStatus(status)))
-                .and(SalesOrderSpecifications.hasApprovalStatus(parseApprovalStatus(approvalStatus)))
                 .and(SalesOrderSpecifications.keywordLike(keyword));
 
         return salesOrderRepository.findAll(spec).stream()
                 .map(salesOrderMapper::toListResponse)
+                .map(this::enrichListDtoWithRelations)
                 .collect(Collectors.toList());
+    }
+
+    private SalesOrderListResponseDTO enrichListDtoWithRelations(SalesOrderListResponseDTO dto) {
+        if (dto == null || dto.getOrderId() == null) return dto;
+        Integer soId = dto.getOrderId();
+        boolean hasDelivery = !deliveryRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(soId).isEmpty();
+        boolean hasInvoice = !arInvoiceRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(soId).isEmpty();
+        dto.setHasDelivery(hasDelivery);
+        dto.setHasInvoice(hasInvoice);
+        
+        // Check xem đơn hàng đã giao hết hàng chưa (tất cả items đều remainingQty <= 0)
+        boolean isFullyDelivered = true;
+        List<SalesOrderItem> items = salesOrderItemRepository.findBySalesOrder_SoId(soId);
+        if (items != null && !items.isEmpty()) {
+            for (SalesOrderItem item : items) {
+                BigDecimal quantity = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+                BigDecimal deliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(item.getSoiId());
+                if (deliveredQty == null) {
+                    deliveredQty = BigDecimal.ZERO;
+                }
+                BigDecimal remainingQty = quantity.subtract(deliveredQty);
+                if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
+                    isFullyDelivered = false;
+                    break;
+                }
+            }
+        } else {
+            // Nếu không có items thì coi như chưa giao hết
+            isFullyDelivered = false;
+        }
+        dto.setIsFullyDelivered(isFullyDelivered);
+        
+        return dto;
     }
 
     @Override
     public void deleteOrder(Integer id) {
         SalesOrder order = getOrderEntity(id);
+        User currentUser = getCurrentUser();
+        boolean isManager = isManager();
+        SalesQuotation linkedQuotation = order.getSalesQuotation();
+        Integer linkedQuotationId = linkedQuotation != null ? linkedQuotation.getSqId() : null;
 
-        // Check 1: Khóa khi đang chờ duyệt
-        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Pending) {
-            throw new IllegalStateException("Không thể xóa đơn hàng đang chờ phê duyệt");
-        }
-
-        // Check 2: Không cho xóa khi đã được duyệt (trừ Manager)
-        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
-                    authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
-            if (!isManager) {
-                throw new IllegalStateException("Không thể xóa đơn hàng đã được phê duyệt. Chỉ Manager mới có quyền xóa.");
+        // Nếu không phải Manager: chỉ cho xóa SO Draft do chính mình tạo
+        if (!isManager) {
+            if (order.getApprovalStatus() != SalesOrder.ApprovalStatus.Draft) {
+                throw new IllegalStateException("Chỉ có thể xóa đơn hàng ở trạng thái Draft");
             }
-            
-            // Log warning cho Manager
-            log.warn("Manager {} đang xóa đơn hàng đã được phê duyệt: {}", 
-                    getCurrentUser().getEmail(), order.getSoNo());
+            Integer createdById = order.getCreatedBy() != null ? order.getCreatedBy().getId() : null;
+            Integer currentUserId = currentUser != null ? currentUser.getId() : null;
+            if (createdById == null || currentUserId == null || !createdById.equals(currentUserId)) {
+                throw new IllegalStateException("Bạn chỉ có thể xóa đơn hàng Draft do bạn tạo");
+            }
         }
 
-        // Check 3: Không cho xóa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
+        // Không cho xóa khi đã có Delivery (trừ khi tất cả Delivery đều Cancelled)
         List<Delivery> deliveries = deliveryRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
         boolean hasActiveDelivery = deliveries.stream()
                 .anyMatch(d -> d.getStatus() != Delivery.DeliveryStatus.Cancelled);
@@ -199,69 +239,59 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             throw new IllegalStateException("Không thể xóa đơn hàng đã có phiếu giao hàng");
         }
 
-        // Check 4: Không cho xóa khi đã có AR Invoice
+        // Không cho xóa khi đã có AR Invoice
         List<ARInvoice> invoices = arInvoiceRepository.findBySalesOrder_SoIdAndDeletedAtIsNull(id);
         if (!invoices.isEmpty()) {
             throw new IllegalStateException("Không thể xóa đơn hàng đã có hóa đơn");
         }
 
+        // Nếu đã gửi khách (Approved) và không phải Manager -> chặn
+        if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
+            if (!isManager) {
+                throw new IllegalStateException("Đơn hàng đã gửi khách, chỉ Manager mới được xóa.");
+            }
+            log.warn("Manager {} đang xóa đơn hàng đã gửi khách: {}",
+                    getCurrentUser().getEmail(), order.getSoNo());
+        }
+
         order.setDeletedAt(Instant.now());
         salesOrderRepository.save(order);
-    }
 
-    @Override
-    public SalesOrderResponseDTO changeStatus(Integer id, String status, String approvalStatus) {
-        SalesOrder order = getOrderEntity(id);
-        SalesOrder.OrderStatus newStatus = parseStatus(status);
-        SalesOrder.ApprovalStatus newApproval = parseApprovalStatus(approvalStatus);
-
-        if (newStatus != null) {
-            order.setStatus(newStatus);
-        }
-        if (newApproval != null) {
-            order.setApprovalStatus(newApproval);
-            if (newApproval == SalesOrder.ApprovalStatus.Approved) {
-                order.setApprovedAt(Instant.now());
-                order.setApprover(getCurrentUser());
-                // Tự động cập nhật status từ Pending sang Approved khi phê duyệt
-                if (order.getStatus() == SalesOrder.OrderStatus.Pending) {
-                    order.setStatus(SalesOrder.OrderStatus.Approved);
+        // Nếu SO bị xóa và trước đó SQ đã bị đánh dấu Converted, thì cho phép dùng lại SQ
+        // Điều kiện: SQ còn tồn tại và không còn SO active nào khác tham chiếu SQ này
+        if (linkedQuotationId != null) {
+            SalesQuotation quotation = getQuotation(linkedQuotationId);
+            if (quotation.getDeletedAt() == null && quotation.getStatus() == SalesQuotation.QuotationStatus.Converted) {
+                List<SalesOrder> remainingOrders = salesOrderRepository.findBySalesQuotationId(linkedQuotationId);
+                if (remainingOrders == null || remainingOrders.isEmpty()) {
+                    // Trả về Active để có thể import lại sang SO
+                    quotation.setStatus(SalesQuotation.QuotationStatus.Active);
+                    salesQuotationRepository.save(quotation);
                 }
-            } else if (newApproval == SalesOrder.ApprovalStatus.Rejected) {
-                // Tự động chuyển status sang Cancelled khi từ chối
-                order.setStatus(SalesOrder.OrderStatus.Cancelled);
             }
         }
-
-        SalesOrder saved = salesOrderRepository.save(order);
-        List<SalesOrderItem> items = salesOrderItemRepository.findBySalesOrder_SoId(id);
-        return salesOrderMapper.toResponse(saved, items);
     }
 
     @Override
-    public SalesOrderResponseDTO changeApprovalStatus(Integer id, String approvalStatus) {
-        return changeStatus(id, null, approvalStatus);
-    }
-
-    @Override
-    public SalesOrderResponseDTO submitForApproval(Integer id) {
+    public SalesOrderResponseDTO sendToCustomer(Integer id) {
         SalesOrder order = getOrderEntity(id);
 
-        // Check: Phải ở Draft mới được submit
+        // Chỉ gửi khi đang Draft
         if (order.getApprovalStatus() != SalesOrder.ApprovalStatus.Draft) {
-            throw new IllegalStateException("Chỉ có thể yêu cầu duyệt khi đơn hàng ở trạng thái Draft");
+            throw new IllegalStateException("Chỉ có thể gửi khách khi đơn hàng ở trạng thái Draft");
         }
 
-        // Chuyển sang Pending
-        order.setApprovalStatus(SalesOrder.ApprovalStatus.Pending);
-
-        // Tự động chuyển status sang Pending nếu đang Draft
-        if (order.getStatus() == SalesOrder.OrderStatus.Draft) {
-            order.setStatus(SalesOrder.OrderStatus.Pending);
-        }
+        order.setApprovalStatus(SalesOrder.ApprovalStatus.Approved);
+        order.setStatus(SalesOrder.OrderStatus.Approved);
+        order.setApprovedAt(Instant.now());
+        order.setApprover(getCurrentUser());
 
         SalesOrder saved = salesOrderRepository.save(order);
         List<SalesOrderItem> items = salesOrderItemRepository.findBySalesOrder_SoId(id);
+
+        // Gửi email cho khách
+        sendOrderEmailIfPossible(saved, items);
+
         return salesOrderMapper.toResponse(saved, items);
     }
 
@@ -289,6 +319,7 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         order.setShippingAddress(null);
         order.setPaymentTerms(quotation.getPaymentTerms());
         order.setNotes(quotation.getNotes());
+        order.setHeaderDiscountPercent(defaultBigDecimal(quotation.getHeaderDiscountPercent()));
         order.setSoNo(generateOrderNo());
         order.setStatus(SalesOrder.OrderStatus.Draft);
         order.setApprovalStatus(SalesOrder.ApprovalStatus.Draft);
@@ -350,8 +381,90 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         return items;
     }
 
+    private boolean isManager() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null &&
+                authentication.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+    private void sendOrderEmailIfPossible(SalesOrder order, List<SalesOrderItem> items) {
+        try {
+            Customer customer = order.getCustomer();
+            if (customer == null || customer.getContact() == null || !StringUtils.hasText(customer.getContact().getEmail())) {
+                log.warn("Skip sending sales order email: missing customer email for SO {}", order.getSoNo());
+                return;
+            }
+            String toEmail = customer.getContact().getEmail().trim();
+            String subject = String.format("[Sales Order %s] Gửi đơn hàng", order.getSoNo());
+
+            StringBuilder rows = new StringBuilder();
+            int idx = 1;
+            for (SalesOrderItem item : items) {
+                Product product = item.getProduct();
+                String code = product != null && product.getSku() != null ? product.getSku() : "";
+                String name = product != null && product.getName() != null ? product.getName() : "";
+                String qty = item.getQuantity() != null ? item.getQuantity().toPlainString() : "0";
+                String unitPrice = item.getUnitPrice() != null ? item.getUnitPrice().toPlainString() : "0";
+                String discount = item.getDiscountAmount() != null ? item.getDiscountAmount().toPlainString() : "0";
+                String taxRate = item.getTaxRate() != null ? item.getTaxRate().toPlainString() + "%" : "0%";
+                String lineTotal = item.getLineTotal() != null ? item.getLineTotal().toPlainString() : "0";
+
+                rows.append("""
+                        <tr>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:center;">%d</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb;">%s<br/><span style="color:#6b7280; font-size:12px;">%s</span></td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
+                          <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right; font-weight:bold;">%s</td>
+                        </tr>
+                        """.formatted(idx++, code, name, qty, unitPrice, discount, taxRate, lineTotal));
+            }
+
+            String total = order.getTotalAmount() != null ? order.getTotalAmount().toPlainString() : "0";
+            String customerName = (customer.getFirstName() + " " + customer.getLastName()).trim();
+
+            String html = """
+                    <html>
+                    <body style="font-family: Arial, sans-serif; color: #333;">
+                      <h2>Gửi đơn bán hàng: %s</h2>
+                      <p>Kính gửi %s,</p>
+                      <p>Chúng tôi gửi tới quý khách đơn bán hàng số <strong>%s</strong>.</p>
+                      <ul>
+                        <li>Giá trị: <strong>%s</strong></li>
+                      </ul>
+                      <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:13px;">
+                        <thead>
+                          <tr style="background:#f3f4f6;">
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb;">#</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:left;">Sản phẩm</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Số lượng</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Đơn giá</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Chiết khấu</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thuế</th>
+                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thành tiền</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          %s
+                        </tbody>
+                      </table>
+                      <p>Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
+                      <p>Trân trọng,<br/>MMS System</p>
+                    </body>
+                    </html>
+                    """.formatted(order.getSoNo(), customerName, order.getSoNo(), total, rows.toString());
+
+            emailService.sendHtmlEmail(toEmail, subject, html);
+        } catch (Exception e) {
+            log.error("Failed to send sales order email for {}: {}", order.getSoNo(), e.getMessage(), e);
+        }
+    }
+
     private void recalcTotals(SalesOrder order, List<SalesOrderItem> items) {
-        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal lineSubtotalSum = BigDecimal.ZERO; // sau chiết khấu dòng
         BigDecimal taxTotal = BigDecimal.ZERO;
 
         for (SalesOrderItem item : items) {
@@ -364,23 +477,57 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
                 discount = baseAmount;
             }
 
-            BigDecimal taxable = baseAmount.subtract(discount);
+            BigDecimal lineSubtotal = baseAmount.subtract(discount); // sau CK dòng, trước CK chung
+            item.setLineTotal(lineSubtotal); // tạm lưu, sẽ cập nhật lại sau CK chung + thuế
+
+            lineSubtotalSum = lineSubtotalSum.add(lineSubtotal);
+        }
+
+        BigDecimal headerDiscountPercent = defaultBigDecimal(order.getHeaderDiscountPercent());
+        BigDecimal headerDiscountAmount = lineSubtotalSum
+                .multiply(headerDiscountPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        // Phân bổ chiết khấu chung theo tỷ lệ lineSubtotal để tính thuế chính xác
+        for (SalesOrderItem item : items) {
+            BigDecimal lineSubtotal = defaultBigDecimal(item.getLineTotal());
+            BigDecimal allocHeaderDiscount = BigDecimal.ZERO;
+            if (lineSubtotalSum.compareTo(BigDecimal.ZERO) > 0) {
+                allocHeaderDiscount = lineSubtotal
+                        .multiply(headerDiscountAmount)
+                        .divide(lineSubtotalSum, 2, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineTaxable = lineSubtotal.subtract(allocHeaderDiscount);
+            if (lineTaxable.compareTo(BigDecimal.ZERO) < 0) {
+                lineTaxable = BigDecimal.ZERO;
+            }
+
             BigDecimal taxRate = defaultBigDecimal(item.getTaxRate());
-            BigDecimal taxAmount = taxable.multiply(taxRate)
+            BigDecimal taxAmount = lineTaxable.multiply(taxRate)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-            BigDecimal lineTotal = taxable.add(taxAmount);
+            BigDecimal lineTotal = lineTaxable.add(taxAmount);
 
             item.setTaxAmount(taxAmount);
             item.setLineTotal(lineTotal);
 
-            subtotal = subtotal.add(taxable);
             taxTotal = taxTotal.add(taxAmount);
         }
 
-        order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
+        BigDecimal subtotal = lineSubtotalSum.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = lineSubtotalSum
+                .subtract(headerDiscountAmount)
+                .add(taxTotal)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        order.setSubtotal(subtotal);
+        order.setHeaderDiscountAmount(headerDiscountAmount);
         order.setTaxAmount(taxTotal.setScale(2, RoundingMode.HALF_UP));
-        order.setTotalAmount(subtotal.add(taxTotal).setScale(2, RoundingMode.HALF_UP));
+        order.setTotalAmount(total);
+        // Lưu lại để trả ra FE
+        order.setHeaderDiscountAmount(headerDiscountAmount.setScale(2, RoundingMode.HALF_UP));
+        order.setHeaderDiscountPercent(headerDiscountPercent.setScale(2, RoundingMode.HALF_UP));
     }
 
     private SalesOrder getOrderEntity(Integer id) {

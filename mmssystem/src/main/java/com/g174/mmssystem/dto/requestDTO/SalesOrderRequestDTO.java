@@ -22,6 +22,8 @@ public class SalesOrderRequestDTO {
 
     private String paymentTerms;
 
+    private java.math.BigDecimal headerDiscountPercent;
+
     private String notes;
 
     @NotEmpty(message = "Cần ít nhất một dòng sản phẩm")

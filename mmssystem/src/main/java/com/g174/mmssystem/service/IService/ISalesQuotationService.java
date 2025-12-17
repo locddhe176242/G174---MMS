@@ -23,4 +23,9 @@ public interface ISalesQuotationService {
     void deleteQuotation(Integer id);
 
     SalesQuotationResponseDTO changeStatus(Integer id, String status);
+
+    /**
+     * Clone an existing quotation into a new Draft version (used when a sent quotation needs edits).
+     */
+    SalesQuotationResponseDTO cloneQuotation(Integer id);
 }

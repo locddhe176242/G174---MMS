@@ -103,6 +103,18 @@ public class SalesQuotationController {
         return ResponseEntity.ok(salesQuotationService.changeStatus(id, status));
     }
 
+    @PostMapping("/{id}/clone")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(
+            action = "CLONE_SALES_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Nhân bản báo giá ID: #{#id} thành bản nháp mới",
+            entityId = "#{#id}"
+    )
+    public ResponseEntity<SalesQuotationResponseDTO> cloneQuotation(@PathVariable Integer id) {
+        return ResponseEntity.ok(salesQuotationService.cloneQuotation(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(

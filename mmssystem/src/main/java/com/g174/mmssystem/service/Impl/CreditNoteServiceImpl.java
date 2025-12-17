@@ -233,7 +233,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
     }
 
     private void recalcTotals(CreditNote creditNote, List<CreditNoteItem> items) {
-        BigDecimal subtotal = BigDecimal.ZERO;
+        // 1. Tính tổng sau chiết khấu từng dòng (line discount)
+        BigDecimal lineSubtotalSum = BigDecimal.ZERO;
         BigDecimal taxTotal = BigDecimal.ZERO;
 
         for (CreditNoteItem item : items) {
@@ -241,13 +242,27 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
                     .multiply(item.getUnitPrice())
                     .subtract(item.getDiscountAmount())
                     .max(BigDecimal.ZERO);
-            subtotal = subtotal.add(lineSubtotal);
+            lineSubtotalSum = lineSubtotalSum.add(lineSubtotal);
             taxTotal = taxTotal.add(item.getTaxAmount());
         }
 
-        BigDecimal total = subtotal.add(taxTotal);
+        // 2. Áp dụng chiết khấu chung (header discount) trên tổng sau line discount
+        BigDecimal headerDiscountPercent = creditNote.getHeaderDiscountPercent() != null ? 
+                creditNote.getHeaderDiscountPercent() : BigDecimal.ZERO;
+        BigDecimal headerDiscountAmount = lineSubtotalSum
+                .multiply(headerDiscountPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        
+        creditNote.setHeaderDiscountAmount(headerDiscountAmount);
+        
+        // 3. Tính subtotal sau header discount
+        BigDecimal subtotalAfterHeaderDiscount = lineSubtotalSum.subtract(headerDiscountAmount);
+        
+        // 4. Thuế đã được tính trên từng dòng (sau line discount), không cần tính lại
+        // 5. Tổng = subtotal sau header discount + thuế
+        BigDecimal total = subtotalAfterHeaderDiscount.add(taxTotal);
 
-        creditNote.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
+        creditNote.setSubtotal(subtotalAfterHeaderDiscount.setScale(2, RoundingMode.HALF_UP));
         creditNote.setTaxAmount(taxTotal.setScale(2, RoundingMode.HALF_UP));
         creditNote.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
     }

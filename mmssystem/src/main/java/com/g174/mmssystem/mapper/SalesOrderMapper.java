@@ -22,6 +22,11 @@ import java.util.stream.Stream;
 public class SalesOrderMapper {
 
     private final DeliveryItemRepository deliveryItemRepository;
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
+
+    private BigDecimal defaultBigDecimal(BigDecimal value) {
+        return value == null ? ZERO : value;
+    }
 
     public SalesOrder toEntity(SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation, User currentUser) {
         SalesOrder order = new SalesOrder();
@@ -30,6 +35,7 @@ public class SalesOrderMapper {
         order.setOrderDate(dto.getOrderDate() != null ? dto.getOrderDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC) : Instant.now());
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setCreatedBy(currentUser);
         order.setUpdatedBy(currentUser);
@@ -44,6 +50,7 @@ public class SalesOrderMapper {
         }
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setUpdatedBy(currentUser);
     }
@@ -83,6 +90,8 @@ public class SalesOrderMapper {
                 .shippingAddress(order.getShippingAddress())
                 .paymentTerms(order.getPaymentTerms())
                 .subtotal(order.getSubtotal())
+                .headerDiscountPercent(defaultBigDecimal(order.getHeaderDiscountPercent()))
+                .headerDiscountAmount(defaultBigDecimal(order.getHeaderDiscountAmount()))
                 .taxAmount(order.getTaxAmount())
                 .totalAmount(order.getTotalAmount())
                 .notes(order.getNotes())

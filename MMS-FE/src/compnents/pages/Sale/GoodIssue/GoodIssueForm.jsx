@@ -430,7 +430,11 @@ export default function GoodIssueForm() {
       return;
     }
 
-    if (!window.confirm("Bạn có chắc muốn gửi yêu cầu duyệt phiếu xuất kho? Sau khi gửi, bạn sẽ không thể sửa phiếu này nữa.")) {
+    if (
+      !window.confirm(
+        "Xác nhận hoàn tất phiếu xuất kho? Sau khi hoàn tất, hệ thống sẽ trừ tồn kho và bạn sẽ không thể sửa phiếu này"
+      )
+    ) {
       return;
     }
 
@@ -438,8 +442,8 @@ export default function GoodIssueForm() {
       setLoading(true);
       const userId = currentUser?.userId || currentUser?.id || 1;
       await goodIssueService.submitForApproval(id, userId);
-      toast.success("Đã gửi yêu cầu duyệt phiếu xuất kho");
-      // Reload để lấy status mới
+      toast.success("Đã hoàn tất phiếu xuất kho và cập nhật tồn kho");
+      // Reload để lấy status mới (Approved)
       await loadIssue();
     } catch (error) {
       console.error(error);
@@ -541,11 +545,10 @@ export default function GoodIssueForm() {
 
   // Tính toán lock rules
   const isManager = hasRole("MANAGER") || hasRole("ROLE_MANAGER");
-  // Khi tạo mới (issueStatus = undefined/null) hoặc Draft/Rejected: có thể edit
+  // Khi tạo mới (issueStatus = undefined/null) hoặc Draft: có thể edit
   // Khi Approved: chỉ Manager mới edit được
-  // Khi Pending: không edit được
-  const canEditAll = !issueStatus || issueStatus === "Draft" || (issueStatus === "Approved" && isManager) || issueStatus === "Rejected";
-  const canEditFields = !issueStatus || issueStatus === "Draft" || (issueStatus === "Approved" && isManager) || issueStatus === "Rejected";
+  const canEditAll = !issueStatus || issueStatus === "Draft" || (issueStatus === "Approved" && isManager);
+  const canEditFields = !issueStatus || issueStatus === "Draft" || (issueStatus === "Approved" && isManager);
 
   if (loading && isEdit && !formData.deliveryId) {
     return (
@@ -807,7 +810,7 @@ export default function GoodIssueForm() {
                 disabled={loading}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {loading ? "Đang xử lý..." : "Gửi yêu cầu duyệt"}
+                {loading ? "Đang xử lý..." : "Hoàn tất phiếu xuất kho"}
               </button>
             )}
             <button

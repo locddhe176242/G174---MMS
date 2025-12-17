@@ -28,9 +28,23 @@ const buildPriceMapFromSalesOrder = (so) => {
   const map = {};
   so.items.forEach((it) => {
     const key = it.soiId || it.id || it.salesOrderItemId;
+    const unitPrice = toNumber(it.unitPrice || it.unit_price, 0);
+    const quantity = toNumber(it.quantity || 0, 0);
+    const discountAmount = toNumber(it.discountAmount || it.discount_amount || 0, 0);
+    
+    // Tính discountPercent từ discountAmount
+    let discountPercent = 0;
+    if (unitPrice > 0 && quantity > 0 && discountAmount > 0) {
+      const baseAmount = unitPrice * quantity;
+      discountPercent = (discountAmount / baseAmount) * 100;
+    } else {
+      // Fallback: thử lấy discountPercent trực tiếp nếu có
+      discountPercent = toNumber(it.discountPercent || it.discount_percent, 0);
+    }
+    
     const priceObj = {
-      unitPrice: toNumber(it.unitPrice || it.unit_price, 0),
-      discountPercent: toNumber(it.discountPercent || it.discount_percent, 0),
+      unitPrice,
+      discountPercent,
       taxRate: toNumber(it.taxRate || it.tax_rate, 0),
     };
     if (key) map[key] = priceObj;
@@ -56,10 +70,26 @@ const mapDeliveryItems = (delivery, priceMap = {}) => {
         toNumber(it.unitPrice || it.unit_price) ||
         toNumber(it.salesOrderItem?.unitPrice || it.salesOrderItem?.unit_price) ||
         toNumber(priceInfo.unitPrice, 0);
-      const discountPercent =
-        toNumber(it.discountPercent || it.discount_percent, 0) ||
-        toNumber(it.salesOrderItem?.discountPercent || it.salesOrderItem?.discount_percent, 0) ||
-        toNumber(priceInfo.discountPercent, 0);
+      
+      // Tính discountPercent: ưu tiên từ priceMap, sau đó tính từ discountAmount
+      let discountPercent = toNumber(priceInfo.discountPercent, 0);
+      if (discountPercent === 0) {
+        // Thử lấy từ Delivery Item hoặc SalesOrderItem trực tiếp
+        discountPercent = toNumber(it.discountPercent || it.discount_percent, 0) ||
+          toNumber(it.salesOrderItem?.discountPercent || it.salesOrderItem?.discount_percent, 0);
+        
+        // Nếu vẫn = 0, tính từ discountAmount
+        if (discountPercent === 0 && it.salesOrderItem) {
+          const soItem = it.salesOrderItem;
+          const soUnitPrice = toNumber(soItem.unitPrice || soItem.unit_price, 0);
+          const soQuantity = toNumber(soItem.quantity || 0, 0);
+          const soDiscountAmount = toNumber(soItem.discountAmount || soItem.discount_amount, 0);
+          if (soUnitPrice > 0 && soQuantity > 0 && soDiscountAmount > 0) {
+            const soBaseAmount = soUnitPrice * soQuantity;
+            discountPercent = (soDiscountAmount / soBaseAmount) * 100;
+          }
+        }
+      }
       const taxRate =
         toNumber(it.taxRate || it.tax_rate || it.salesOrderItem?.taxRate || it.salesOrderItem?.tax_rate, 0) ||
         toNumber(priceInfo.taxRate, 0);
@@ -93,33 +123,62 @@ const calcItemTotals = (item) => {
 };
 
 // ===== Totals memo =====
-const useTotals = (items) => {
-  const subtotal = useMemo(() => {
+const useTotals = (items, commonDiscountRate = 0) => {
+  // Tổng tiền hàng (gross)
+  const gross = useMemo(() => {
     if (!Array.isArray(items)) return 0;
     return items.reduce((sum, it) => sum + calcItemTotals(it).subtotal, 0);
   }, [items]);
 
-  const totalDiscount = useMemo(() => {
+  // Tổng chiết khấu từng sản phẩm (line discount)
+  const lineDiscount = useMemo(() => {
     if (!Array.isArray(items)) return 0;
     return items.reduce((sum, it) => sum + calcItemTotals(it).discount, 0);
   }, [items]);
 
-  const subtotalAfterDiscount = useMemo(
-    () => subtotal - totalDiscount,
-    [subtotal, totalDiscount]
+  // Tạm tính sau khi trừ chiết khấu từng sản phẩm
+  const subtotalBeforeHeader = useMemo(
+    () => gross - lineDiscount,
+    [gross, lineDiscount]
   );
 
+  // Chiết khấu chung (header discount)
+  const headerDiscount = useMemo(
+    () => subtotalBeforeHeader * (Number(commonDiscountRate || 0) / 100),
+    [subtotalBeforeHeader, commonDiscountRate]
+  );
+
+  // Tính thuế sau khi trừ header discount (phân bổ tỷ lệ cho từng item)
   const taxAmount = useMemo(() => {
-    if (!Array.isArray(items)) return 0;
-    return items.reduce((sum, it) => sum + calcItemTotals(it).tax, 0);
-  }, [items]);
+    if (!Array.isArray(items) || items.length === 0) return 0;
+    if (subtotalBeforeHeader === 0) return 0;
+    
+    return items.reduce((sum, it) => {
+      const calc = calcItemTotals(it);
+      const itemSubtotal = calc.afterDiscount; // Sau khi trừ item discount
+      const itemRatio = subtotalBeforeHeader > 0 ? itemSubtotal / subtotalBeforeHeader : 0;
+      const allocatedHeaderDiscount = headerDiscount * itemRatio;
+      const itemSubtotalAfterHeaderDiscount = itemSubtotal - allocatedHeaderDiscount;
+      const taxRate = Number(it.tax_rate || 0);
+      const itemTax = itemSubtotalAfterHeaderDiscount * (taxRate / 100);
+      return sum + itemTax;
+    }, 0);
+  }, [items, subtotalBeforeHeader, headerDiscount]);
 
+  // Tổng cộng
   const totalAmount = useMemo(
-    () => subtotalAfterDiscount + taxAmount,
-    [subtotalAfterDiscount, taxAmount]
+    () => subtotalBeforeHeader - headerDiscount + taxAmount,
+    [subtotalBeforeHeader, headerDiscount, taxAmount]
   );
 
-  return { subtotal, totalDiscount, subtotalAfterDiscount, taxAmount, totalAmount };
+  return { 
+    gross, 
+    lineDiscount, 
+    subtotalBeforeHeader, 
+    headerDiscount, 
+    taxAmount, 
+    totalAmount 
+  };
 };
 
 export default function InvoiceForm() {
@@ -138,11 +197,13 @@ export default function InvoiceForm() {
     deliveryId: "",
     invoiceDate: new Date(),
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
+    commonDiscountRate: 0, // Chiết khấu chung (%)
     notes: "",
     items: [],
   });
   const [errors, setErrors] = useState({});
-  const { subtotal, subtotalAfterDiscount, taxAmount, totalAmount } = useTotals(formData.items);
+  const { gross, lineDiscount, subtotalBeforeHeader, headerDiscount, taxAmount, totalAmount } = 
+    useTotals(formData.items, formData.commonDiscountRate);
 
   useEffect(() => {
     if (!isEdit) {
@@ -228,6 +289,7 @@ export default function InvoiceForm() {
         deliveryId: data.deliveryId || "",
         invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : new Date(),
         dueDate: data.dueDate ? new Date(data.dueDate) : new Date(),
+        commonDiscountRate: Number(data.headerDiscountPercent || data.header_discount_percent || 0),
         notes: data.notes || "",
         items: mappedItems.length > 0 ? mappedItems : mapDeliveryItems(data.delivery) || [],
       });
@@ -259,10 +321,13 @@ export default function InvoiceForm() {
         fullDelivery.salesOrder?.salesOrderId ||
         fullDelivery.items?.[0]?.salesOrderItem?.soId ||
         fullDelivery.items?.[0]?.salesOrderItem?.salesOrderId;
+      let headerDiscountPercent = 0;
       if (soIdFromDelivery) {
         try {
           const soData = await salesOrderService.getOrderById(soIdFromDelivery);
           priceMap = buildPriceMapFromSalesOrder(soData);
+          // Copy header discount từ Sales Order
+          headerDiscountPercent = Number(soData.headerDiscountPercent || soData.header_discount_percent || 0);
         } catch (err) {
           console.warn("Không thể load Sales Order để map giá:", err);
         }
@@ -271,6 +336,7 @@ export default function InvoiceForm() {
       setFormData((prev) => ({
         ...prev,
         deliveryId: delivery.deliveryId,
+        commonDiscountRate: headerDiscountPercent,
         items: mapDeliveryItems(fullDelivery, priceMap),
       }));
     } catch (error) {
@@ -449,6 +515,26 @@ export default function InvoiceForm() {
                   className={`w-full border rounded-lg px-3 py-2 ${
                     formData.deliveryId ? "bg-gray-100 cursor-not-allowed" : ""
                   }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chiết khấu chung (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.commonDiscountRate || 0}
+                  onChange={(e) => handleInputChange("commonDiscountRate", Number(e.target.value) || 0)}
+                  readOnly={!!formData.deliveryId}
+                  disabled={!!formData.deliveryId}
+                  className={`w-full border rounded-lg px-3 py-2 ${
+                    formData.deliveryId ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -649,12 +735,18 @@ export default function InvoiceForm() {
               <div className="border rounded-lg overflow-hidden">
                 <div className="flex justify-between px-4 py-2 text-sm text-gray-700">
                   <span>Tạm tính:</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                  <span>{formatCurrency(gross)}</span>
                 </div>
                 <div className="flex justify-between px-4 py-2 text-sm text-gray-700 border-t">
                   <span>Tổng sau chiết khấu sản phẩm:</span>
-                  <span>{formatCurrency(subtotalAfterDiscount)}</span>
+                  <span>{formatCurrency(subtotalBeforeHeader)}</span>
                 </div>
+                {headerDiscount > 0 && (
+                  <div className="flex justify-between px-4 py-2 text-sm text-gray-700 border-t">
+                    <span>Chiết khấu chung ({formData.commonDiscountRate || 0}%):</span>
+                    <span>-{formatCurrency(headerDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between px-4 py-2 text-sm text-gray-700 border-t">
                   <span>Thuế VAT:</span>
                   <span>{formatCurrency(taxAmount)}</span>

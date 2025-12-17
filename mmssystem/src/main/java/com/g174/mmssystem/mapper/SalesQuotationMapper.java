@@ -26,10 +26,9 @@ public class SalesQuotationMapper {
         SalesQuotation quotation = new SalesQuotation();
         quotation.setCustomer(customer);
         quotation.setQuotationDate(dto.getQuotationDate() != null ? dto.getQuotationDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC) : Instant.now());
-        quotation.setValidUntil(dto.getValidUntil());
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
-        quotation.setHeaderDiscount(defaultBigDecimal(dto.getHeaderDiscount()));
+        quotation.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         quotation.setNotes(dto.getNotes());
         quotation.setCreatedBy(currentUser);
         quotation.setUpdatedBy(currentUser);
@@ -41,10 +40,9 @@ public class SalesQuotationMapper {
         if (dto.getQuotationDate() != null) {
             quotation.setQuotationDate(dto.getQuotationDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
         }
-        quotation.setValidUntil(dto.getValidUntil());
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
-        quotation.setHeaderDiscount(defaultBigDecimal(dto.getHeaderDiscount()));
+        quotation.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         quotation.setNotes(dto.getNotes());
         quotation.setUpdatedBy(currentUser);
     }
@@ -83,7 +81,8 @@ public class SalesQuotationMapper {
                 .validUntil(quotation.getValidUntil())
                 .paymentTerms(quotation.getPaymentTerms())
                 .deliveryTerms(quotation.getDeliveryTerms())
-                .headerDiscount(quotation.getHeaderDiscount())
+                .headerDiscountPercent(quotation.getHeaderDiscountPercent())
+                .headerDiscountAmount(quotation.getHeaderDiscountAmount())
                 .subtotal(quotation.getSubtotal())
                 .taxAmount(quotation.getTaxAmount())
                 .totalAmount(quotation.getTotalAmount())

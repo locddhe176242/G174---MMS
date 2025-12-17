@@ -161,7 +161,15 @@ export default function InvoiceDetail() {
           >
             ← Quay lại danh sách
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Hóa đơn: {data.invoiceNo}</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-900">Hóa đơn: {data.invoiceNo}</h1>
+            <button
+              onClick={() => navigate(`/sales/invoices/${id}/print`)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              🖨️ In hóa đơn
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

@@ -18,6 +18,8 @@ public class CreditNoteRequestDTO {
 
     private LocalDate creditNoteDate;
 
+    private java.math.BigDecimal headerDiscountPercent;
+
     private String reason;
 
     private String notes;

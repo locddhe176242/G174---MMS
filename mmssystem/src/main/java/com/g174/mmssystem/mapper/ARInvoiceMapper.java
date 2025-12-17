@@ -11,6 +11,7 @@ import com.g174.mmssystem.entity.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,8 @@ public class ARInvoiceMapper {
         invoice.setInvoiceDate(dto.getInvoiceDate() != null ? dto.getInvoiceDate() : java.time.LocalDate.now());
         invoice.setDueDate(dto.getDueDate());
         invoice.setNotes(dto.getNotes());
+        invoice.setHeaderDiscountPercent(dto.getHeaderDiscountPercent() != null ? 
+            dto.getHeaderDiscountPercent() : java.math.BigDecimal.ZERO);
         // createdBy và updatedBy sẽ được set trong service
         return invoice;
     }
@@ -88,6 +91,8 @@ public class ARInvoiceMapper {
                 .invoiceDate(invoice.getInvoiceDate())
                 .dueDate(invoice.getDueDate())
                 .subtotal(invoice.getSubtotal())
+                .headerDiscountPercent(invoice.getHeaderDiscountPercent())
+                .headerDiscountAmount(invoice.getHeaderDiscountAmount())
                 .taxAmount(invoice.getTaxAmount())
                 .totalAmount(invoice.getTotalAmount())
                 .balanceAmount(invoice.getBalanceAmount())
@@ -136,6 +141,18 @@ public class ARInvoiceMapper {
         DeliveryItem deliveryItem = item.getDeliveryItem();
         SalesOrderItem salesOrderItem = item.getSalesOrderItem();
 
+        // Tính discountPercent từ SalesOrderItem
+        BigDecimal discountPercent = BigDecimal.ZERO;
+        if (salesOrderItem != null && salesOrderItem.getDiscountAmount() != null 
+                && salesOrderItem.getQuantity() != null && salesOrderItem.getUnitPrice() != null) {
+            BigDecimal soSubtotal = salesOrderItem.getQuantity().multiply(salesOrderItem.getUnitPrice());
+            if (soSubtotal.compareTo(BigDecimal.ZERO) > 0) {
+                discountPercent = salesOrderItem.getDiscountAmount()
+                        .divide(soSubtotal, 4, java.math.RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100));
+            }
+        }
+
         return ARInvoiceItemResponseDTO.builder()
                 .ariId(item.getAriId())
                 .deliveryItemId(deliveryItem != null ? deliveryItem.getDiId() : null)
@@ -146,6 +163,7 @@ public class ARInvoiceMapper {
                 .description(item.getDescription())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
+                .discountPercent(discountPercent)
                 .taxRate(item.getTaxRate())
                 .taxAmount(item.getTaxAmount())
                 .lineTotal(item.getLineTotal())

@@ -30,6 +30,8 @@ public class CreditNoteResponseDTO {
     private Instant creditNoteDate;
 
     private BigDecimal subtotal;
+    private BigDecimal headerDiscountPercent;
+    private BigDecimal headerDiscountAmount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
 

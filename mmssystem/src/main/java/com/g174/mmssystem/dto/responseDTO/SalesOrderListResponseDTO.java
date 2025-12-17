@@ -16,6 +16,11 @@ public class SalesOrderListResponseDTO {
     private SalesOrder.ApprovalStatus approvalStatus;
     private Integer customerId;
     private String customerName;
+    // Dùng cho UI: đơn hàng đã có Delivery / AR Invoice hay chưa
+    private Boolean hasDelivery;
+    private Boolean hasInvoice;
+    // Đơn hàng đã giao hết hàng chưa (tất cả items đều remainingQty <= 0)
+    private Boolean isFullyDelivered;
     private Instant orderDate;
     private BigDecimal totalAmount;
     private Instant createdAt;

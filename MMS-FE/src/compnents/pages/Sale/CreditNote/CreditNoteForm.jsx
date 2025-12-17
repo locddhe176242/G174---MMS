@@ -61,6 +61,7 @@ export default function CreditNoteForm() {
     invoiceId: "",
     returnOrderId: null,
     creditNoteDate: new Date(),
+    commonDiscountRate: 0, // Chiết khấu chung (%)
     reason: "",
     notes: "",
     items: [defaultItem()],
@@ -172,6 +173,7 @@ export default function CreditNoteForm() {
         invoiceId: data.invoiceId,
         returnOrderId: data.returnOrderId || null,
         creditNoteDate: data.creditNoteDate ? new Date(data.creditNoteDate) : new Date(),
+        commonDiscountRate: Number(data.headerDiscountPercent || data.header_discount_percent || 0),
         reason: data.reason || "",
         notes: data.notes || "",
         items:
@@ -367,13 +369,29 @@ export default function CreditNoteForm() {
   };
 
   const totals = useMemo(() => {
-    const subtotal = formData.items.reduce((sum, item) => {
+    // 1. Tổng tiền hàng (gross)
+    const gross = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
-      const discount = Number(item.discountAmount || 0);
-      return sum + Math.max(qty * price - discount, 0);
+      return sum + qty * price;
     }, 0);
 
+    // 2. Tổng chiết khấu từng sản phẩm (line discount)
+    const lineDiscount = formData.items.reduce((sum, item) => {
+      return sum + Number(item.discountAmount || 0);
+    }, 0);
+
+    // 3. Tổng sau chiết khấu từng sản phẩm
+    const subtotalBeforeHeader = gross - lineDiscount;
+
+    // 4. Chiết khấu chung (header discount)
+    const headerDiscountPercent = Number(formData.commonDiscountRate || 0);
+    const headerDiscount = subtotalBeforeHeader * (headerDiscountPercent / 100);
+
+    // 5. Tổng sau chiết khấu chung
+    const subtotalAfterHeader = subtotalBeforeHeader - headerDiscount;
+
+    // 6. Thuế (đã được tính trên từng dòng sau line discount)
     const tax = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
@@ -383,14 +401,20 @@ export default function CreditNoteForm() {
       return sum + (taxable * taxRate) / 100;
     }, 0);
 
-    const total = subtotal + tax;
+    // 7. Tổng cộng
+    const total = subtotalAfterHeader + tax;
 
     return {
-      subtotal,
+      gross,
+      lineDiscount,
+      subtotalBeforeHeader,
+      headerDiscountPercent,
+      headerDiscount,
+      subtotalAfterHeader,
       tax,
       total,
     };
-  }, [formData.items]);
+  }, [formData.items, formData.commonDiscountRate]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -425,6 +449,7 @@ export default function CreditNoteForm() {
     invoiceId: formData.invoiceId,
     returnOrderId: formData.returnOrderId || null,
     creditNoteDate: formData.creditNoteDate ? formData.creditNoteDate.toISOString().slice(0, 10) : null,
+    headerDiscountPercent: Number(formData.commonDiscountRate || 0),
     reason: formData.reason || null,
     notes: formData.notes || null,
     items: formData.items.map((item) => ({
@@ -620,6 +645,25 @@ export default function CreditNoteForm() {
                   placeholder="Nhập lý do điều chỉnh"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chiết khấu chung (%) <span className="text-gray-500 text-xs font-normal">- Tùy chọn</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.commonDiscountRate}
+                  onChange={(e) => handleInputChange("commonDiscountRate", parseFloat(e.target.value) || 0)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="0"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  💡 Chiết khấu áp dụng sau khi trừ chiết khấu từng sản phẩm
+                </p>
+              </div>
             </div>
 
             <div>
@@ -776,6 +820,47 @@ export default function CreditNoteForm() {
                 <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t">
                   <span>Tổng cộng</span>
                   <span>{formatCurrency(totals.total)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tổng quan tiền tệ */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tổng quan tiền tệ</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tổng tiền hàng:</span>
+                  <span className="font-medium">{formatCurrency(totals.gross)}</span>
+                </div>
+                {totals.lineDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Chiết khấu sản phẩm:</span>
+                    <span>-{formatCurrency(totals.lineDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tổng sau chiết khấu sản phẩm:</span>
+                  <span className="font-medium">{formatCurrency(totals.subtotalBeforeHeader)}</span>
+                </div>
+                {totals.headerDiscountPercent > 0 && (
+                  <>
+                    <div className="flex justify-between text-green-600">
+                      <span>Chiết khấu chung ({totals.headerDiscountPercent}%):</span>
+                      <span>-{formatCurrency(totals.headerDiscount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tổng sau chiết khấu chung:</span>
+                      <span className="font-medium">{formatCurrency(totals.subtotalAfterHeader)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Thuế VAT:</span>
+                  <span className="font-medium">{formatCurrency(totals.tax)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-300">
+                  <span className="text-lg font-semibold text-gray-900">Tổng cộng:</span>
+                  <span className="text-lg font-bold text-blue-600">{formatCurrency(totals.total)}</span>
                 </div>
               </div>
             </div>

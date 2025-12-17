@@ -87,7 +87,6 @@ public class ReturnOrder {
     public enum ReturnStatus {
         Draft,      
         Approved,   
-        Rejected,   
         Completed, 
         Cancelled  
     }

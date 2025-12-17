@@ -100,6 +100,13 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
         request.setCustomerId(customer.getCustomerId());
         request.setInvoiceDate(LocalDate.now());
         request.setDueDate(LocalDate.now().plusDays(30));
+        // Copy header discount từ Sales Order
+        if (salesOrder != null) {
+            request.setHeaderDiscountPercent(salesOrder.getHeaderDiscountPercent() != null ? 
+                salesOrder.getHeaderDiscountPercent() : BigDecimal.ZERO);
+        } else {
+            request.setHeaderDiscountPercent(BigDecimal.ZERO);
+        }
 
         List<ARInvoiceItemRequestDTO> items = buildItemsFromDelivery(delivery);
         request.setItems(items);
@@ -131,7 +138,18 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
         List<ARInvoice> invoices = arInvoiceRepository.findAllActiveInvoices();
         return invoices.stream()
                 .map(arInvoiceMapper::toListResponse)
+                .map(this::enrichListDtoWithRelations)
                 .collect(Collectors.toList());
+    }
+
+    private ARInvoiceListResponseDTO enrichListDtoWithRelations(ARInvoiceListResponseDTO dto) {
+        if (dto == null || dto.getArInvoiceId() == null) return dto;
+        Integer id = dto.getArInvoiceId();
+        boolean hasPayment = !arPaymentRepository.findByInvoice_ArInvoiceIdOrderByPaymentDateDesc(id).isEmpty();
+        boolean hasCreditNote = !creditNoteRepository.findByInvoice_ArInvoiceIdAndDeletedAtIsNull(id).isEmpty();
+        dto.setHasPayment(hasPayment);
+        dto.setHasCreditNote(hasCreditNote);
+        return dto;
     }
 
     @Override
@@ -262,18 +280,48 @@ public class ARInvoiceServiceImpl implements IARInvoiceService {
     }
 
     private void recalcTotals(ARInvoice invoice, List<ARInvoiceItem> items) {
-        BigDecimal subtotal = items.stream()
-                .map(item -> item.getQuantity().multiply(item.getUnitPrice()))
+        // Tính tổng tiền hàng (sau khi trừ chiết khấu từng sản phẩm)
+        BigDecimal lineSubtotalSum = items.stream()
+                .map(item -> {
+                    BigDecimal qty = item.getQuantity();
+                    BigDecimal unitPrice = item.getUnitPrice();
+                    BigDecimal lineSubtotal = qty.multiply(unitPrice);
+                    // Nếu có discount ở item level, trừ đi (tạm thời giả sử không có item discount trong AR Invoice)
+                    return lineSubtotal;
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal taxAmount = items.stream()
-                .map(ARInvoiceItem::getTaxAmount)
+        // Tính chiết khấu chung (header discount)
+        BigDecimal headerDiscountPercent = invoice.getHeaderDiscountPercent() != null ? 
+            invoice.getHeaderDiscountPercent() : BigDecimal.ZERO;
+        BigDecimal headerDiscountAmount = lineSubtotalSum
+                .multiply(headerDiscountPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        // Tính thuế trên phần sau khi trừ header discount
+        BigDecimal subtotalAfterHeaderDiscount = lineSubtotalSum.subtract(headerDiscountAmount);
+        BigDecimal totalTax = items.stream()
+                .map(item -> {
+                    // Tính tỷ lệ của item trong tổng
+                    BigDecimal itemSubtotal = item.getQuantity().multiply(item.getUnitPrice());
+                    BigDecimal itemRatio = lineSubtotalSum.compareTo(BigDecimal.ZERO) > 0 ?
+                        itemSubtotal.divide(lineSubtotalSum, 4, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                    // Phân bổ header discount cho item
+                    BigDecimal allocatedHeaderDiscount = headerDiscountAmount.multiply(itemRatio);
+                    // Tính thuế trên phần sau header discount
+                    BigDecimal itemSubtotalAfterHeaderDiscount = itemSubtotal.subtract(allocatedHeaderDiscount);
+                    BigDecimal taxRate = item.getTaxRate() != null ? item.getTaxRate() : BigDecimal.ZERO;
+                    return itemSubtotalAfterHeaderDiscount
+                            .multiply(taxRate)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalAmount = subtotal.add(taxAmount);
+        BigDecimal totalAmount = subtotalAfterHeaderDiscount.add(totalTax);
 
-        invoice.setSubtotal(subtotal);
-        invoice.setTaxAmount(taxAmount);
+        invoice.setSubtotal(lineSubtotalSum);
+        invoice.setHeaderDiscountAmount(headerDiscountAmount);
+        invoice.setTaxAmount(totalTax);
         invoice.setTotalAmount(totalAmount);
         invoice.setBalanceAmount(totalAmount); // Ban đầu balance = total
     }

@@ -49,6 +49,7 @@ public class DeliveryServiceImpl implements IDeliveryService {
     private final DeliveryMapper deliveryMapper;
     private final GoodIssueRepository goodIssueRepository;
     private final GoodIssueItemRepository goodIssueItemRepository;
+    private final ReturnOrderItemRepository returnOrderItemRepository;
 
     @Override
     public DeliveryResponseDTO createDelivery(DeliveryRequestDTO request) {
@@ -177,7 +178,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
                 .and(DeliverySpecifications.keywordLike(keyword));
 
         return deliveryRepository.findAll(spec, pageable)
-                .map(deliveryMapper::toListResponse);
+                .map(deliveryMapper::toListResponse)
+                .map(this::enrichDeliveryListDto);
     }
 
     @Override
@@ -745,5 +747,39 @@ public class DeliveryServiceImpl implements IDeliveryService {
             candidate = "DLV-" + datePart + "-" + unique;
         }
         return candidate;
+    }
+
+    private DeliveryListResponseDTO enrichDeliveryListDto(DeliveryListResponseDTO dto) {
+        if (dto == null || dto.getDeliveryId() == null) return dto;
+        Integer deliveryId = dto.getDeliveryId();
+        
+        // Check xem Delivery đã trả hết hàng chưa (tất cả items đều đã có Return Order đủ số lượng)
+        boolean isFullyReturned = true;
+        List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(deliveryId);
+        if (items != null && !items.isEmpty()) {
+            for (DeliveryItem item : items) {
+                // Tính tổng returnedQty từ các ReturnOrderItem liên kết với DeliveryItem này
+                List<ReturnOrderItem> returnOrderItems = returnOrderItemRepository.findByDeliveryItem_DiId(item.getDiId());
+                BigDecimal totalReturnedQty = returnOrderItems.stream()
+                        .map(roi -> roi.getReturnedQty() != null ? roi.getReturnedQty() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+                // So sánh với deliveredQty (hoặc plannedQty nếu deliveredQty = 0)
+                BigDecimal targetQty = item.getDeliveredQty() != null && item.getDeliveredQty().compareTo(BigDecimal.ZERO) > 0
+                        ? item.getDeliveredQty()
+                        : (item.getPlannedQty() != null ? item.getPlannedQty() : BigDecimal.ZERO);
+                
+                if (totalReturnedQty.compareTo(targetQty) < 0) {
+                    isFullyReturned = false;
+                    break;
+                }
+            }
+        } else {
+            // Nếu không có items thì coi như chưa trả hết
+            isFullyReturned = false;
+        }
+        dto.setIsFullyReturned(isFullyReturned);
+        
+        return dto;
     }
 }

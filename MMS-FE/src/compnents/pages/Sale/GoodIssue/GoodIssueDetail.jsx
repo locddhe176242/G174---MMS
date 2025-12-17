@@ -55,11 +55,10 @@ export default function GoodIssueDetail() {
 
     const getStatusBadge = (status) => {
         const map = {
-            Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
-            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
-            Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
+            Draft: { label: "Nháp", color: "bg-gray-100 text-gray-800" },
+            Approved: { label: "Đã hoàn tất", color: "bg-green-100 text-green-800" },
         };
-        const statusInfo = map[status] || { label: status || "Chờ duyệt", color: "bg-gray-100 text-gray-800" };
+        const statusInfo = map[status] || { label: status || "Nháp", color: "bg-gray-100 text-gray-800" };
         return (
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
                 {statusInfo.label}
@@ -120,14 +119,6 @@ export default function GoodIssueDetail() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            {data.status === "Pending" && (
-                                <button
-                                    onClick={() => navigate("/admin/approvals")}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    Đến phần Phê duyệt
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
