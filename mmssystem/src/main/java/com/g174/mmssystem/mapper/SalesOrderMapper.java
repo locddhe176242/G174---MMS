@@ -22,21 +22,31 @@ import java.util.stream.Stream;
 public class SalesOrderMapper {
 
     private final DeliveryItemRepository deliveryItemRepository;
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    public SalesOrder toEntity(SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation, User currentUser) {
+    private BigDecimal defaultBigDecimal(BigDecimal value) {
+        return value == null ? ZERO : value;
+    }
+
+    public SalesOrder toEntity(SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation,
+            User currentUser) {
         SalesOrder order = new SalesOrder();
         order.setCustomer(customer);
         order.setSalesQuotation(quotation);
-        order.setOrderDate(dto.getOrderDate() != null ? dto.getOrderDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC) : Instant.now());
+        order.setOrderDate(
+                dto.getOrderDate() != null ? dto.getOrderDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC)
+                        : Instant.now());
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setCreatedBy(currentUser);
         order.setUpdatedBy(currentUser);
         return order;
     }
 
-    public void updateEntity(SalesOrder order, SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation, User currentUser) {
+    public void updateEntity(SalesOrder order, SalesOrderRequestDTO dto, Customer customer, SalesQuotation quotation,
+            User currentUser) {
         order.setCustomer(customer);
         order.setSalesQuotation(quotation);
         if (dto.getOrderDate() != null) {
@@ -44,11 +54,13 @@ public class SalesOrderMapper {
         }
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setUpdatedBy(currentUser);
     }
 
-    public SalesOrderItem toItemEntity(SalesOrder order, SalesOrderItemRequestDTO dto, Product product, Warehouse warehouse) {
+    public SalesOrderItem toItemEntity(SalesOrder order, SalesOrderItemRequestDTO dto, Product product,
+            Warehouse warehouse) {
         SalesOrderItem item = new SalesOrderItem();
         item.setSalesOrder(order);
         item.setProduct(product);
@@ -76,13 +88,17 @@ public class SalesOrderMapper {
                 .approverName(order.getApprover() != null ? order.getApprover().getEmail() : null)
                 .approvedAt(order.getApprovedAt())
                 .customerId(order.getCustomer() != null ? order.getCustomer().getCustomerId() : null)
-                .customerName(order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null)
+                .customerName(order.getCustomer() != null
+                        ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName()
+                        : null)
                 .customerCode(order.getCustomer() != null ? order.getCustomer().getCustomerCode() : null)
                 .quotationId(order.getSalesQuotation() != null ? order.getSalesQuotation().getSqId() : null)
                 .orderDate(order.getOrderDate())
                 .shippingAddress(order.getShippingAddress())
                 .paymentTerms(order.getPaymentTerms())
                 .subtotal(order.getSubtotal())
+                .headerDiscountPercent(defaultBigDecimal(order.getHeaderDiscountPercent()))
+                .headerDiscountAmount(defaultBigDecimal(order.getHeaderDiscountAmount()))
                 .taxAmount(order.getTaxAmount())
                 .totalAmount(order.getTotalAmount())
                 .notes(order.getNotes())
@@ -105,7 +121,9 @@ public class SalesOrderMapper {
                 .status(order.getStatus())
                 .approvalStatus(order.getApprovalStatus())
                 .customerId(order.getCustomer() != null ? order.getCustomer().getCustomerId() : null)
-                .customerName(order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null)
+                .customerName(order.getCustomer() != null
+                        ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName()
+                        : null)
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
                 .createdAt(order.getCreatedAt())

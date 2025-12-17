@@ -25,31 +25,33 @@ public class SalesQuotationMapper {
     public SalesQuotation toEntity(SalesQuotationRequestDTO dto, Customer customer, User currentUser) {
         SalesQuotation quotation = new SalesQuotation();
         quotation.setCustomer(customer);
-        quotation.setQuotationDate(dto.getQuotationDate() != null ? dto.getQuotationDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC) : Instant.now());
-        quotation.setValidUntil(dto.getValidUntil());
+        quotation.setQuotationDate(dto.getQuotationDate() != null
+                ? dto.getQuotationDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC)
+                : Instant.now());
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
-        quotation.setHeaderDiscount(defaultBigDecimal(dto.getHeaderDiscount()));
+        quotation.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         quotation.setNotes(dto.getNotes());
         quotation.setCreatedBy(currentUser);
         quotation.setUpdatedBy(currentUser);
         return quotation;
     }
 
-    public void updateEntity(SalesQuotation quotation, SalesQuotationRequestDTO dto, Customer customer, User currentUser) {
+    public void updateEntity(SalesQuotation quotation, SalesQuotationRequestDTO dto, Customer customer,
+            User currentUser) {
         quotation.setCustomer(customer);
         if (dto.getQuotationDate() != null) {
             quotation.setQuotationDate(dto.getQuotationDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
         }
-        quotation.setValidUntil(dto.getValidUntil());
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
-        quotation.setHeaderDiscount(defaultBigDecimal(dto.getHeaderDiscount()));
+        quotation.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         quotation.setNotes(dto.getNotes());
         quotation.setUpdatedBy(currentUser);
     }
 
-    public SalesQuotationItem toItemEntity(SalesQuotation quotation, SalesQuotationItemRequestDTO dto, Product product) {
+    public SalesQuotationItem toItemEntity(SalesQuotation quotation, SalesQuotationItemRequestDTO dto,
+            Product product) {
         SalesQuotationItem item = new SalesQuotationItem();
         item.setSalesQuotation(quotation);
         item.setProduct(product);
@@ -77,13 +79,16 @@ public class SalesQuotationMapper {
                 .quotationNo(quotation.getQuotationNo())
                 .status(quotation.getStatus())
                 .customerId(quotation.getCustomer() != null ? quotation.getCustomer().getCustomerId() : null)
-                .customerName(quotation.getCustomer() != null ? quotation.getCustomer().getFirstName() + " " + quotation.getCustomer().getLastName() : null)
+                .customerName(quotation.getCustomer() != null
+                        ? quotation.getCustomer().getFirstName() + " " + quotation.getCustomer().getLastName()
+                        : null)
                 .customerCode(quotation.getCustomer() != null ? quotation.getCustomer().getCustomerCode() : null)
                 .quotationDate(quotation.getQuotationDate())
                 .validUntil(quotation.getValidUntil())
                 .paymentTerms(quotation.getPaymentTerms())
                 .deliveryTerms(quotation.getDeliveryTerms())
-                .headerDiscount(quotation.getHeaderDiscount())
+                .headerDiscountPercent(quotation.getHeaderDiscountPercent())
+                .headerDiscountAmount(quotation.getHeaderDiscountAmount())
                 .subtotal(quotation.getSubtotal())
                 .taxAmount(quotation.getTaxAmount())
                 .totalAmount(quotation.getTotalAmount())
@@ -106,7 +111,9 @@ public class SalesQuotationMapper {
                 .quotationNo(quotation.getQuotationNo())
                 .status(quotation.getStatus())
                 .customerId(quotation.getCustomer() != null ? quotation.getCustomer().getCustomerId() : null)
-                .customerName(quotation.getCustomer() != null ? quotation.getCustomer().getFirstName() + " " + quotation.getCustomer().getLastName() : null)
+                .customerName(quotation.getCustomer() != null
+                        ? quotation.getCustomer().getFirstName() + " " + quotation.getCustomer().getLastName()
+                        : null)
                 .quotationDate(quotation.getQuotationDate())
                 .validUntil(quotation.getValidUntil())
                 .totalAmount(quotation.getTotalAmount())

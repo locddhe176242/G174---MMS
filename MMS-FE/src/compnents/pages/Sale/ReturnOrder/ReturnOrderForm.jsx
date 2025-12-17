@@ -96,6 +96,10 @@ export default function ReturnOrderForm() {
   const filteredDeliveries = useMemo(() => {
     const term = deliverySearch.trim().toLowerCase();
     return deliveries.filter((d) => {
+      // Loại bỏ các Delivery đã trả hết hàng
+      if (d.isFullyReturned === true) {
+        return false;
+      }
       const matchesKeyword =
         !term ||
         (d.deliveryNo || "").toLowerCase().includes(term) ||
@@ -260,22 +264,31 @@ export default function ReturnOrderForm() {
     if (!formData.warehouseId) {
       newErrors.warehouseId = "Vui lòng chọn kho";
     }
-    if (!formData.items || formData.items.length === 0) {
-      newErrors.items = "Cần ít nhất một dòng sản phẩm";
+    
+    // Chỉ lấy các items có returnedQty > 0 để validate
+    const itemsWithReturnQty = (formData.items || []).filter(
+      (item) => item.returnedQty && Number(item.returnedQty) > 0
+    );
+    
+    if (itemsWithReturnQty.length === 0) {
+      newErrors.items = "Cần ít nhất một dòng sản phẩm có số lượng trả lại > 0";
     } else {
+      // Chỉ validate các items có returnedQty > 0
       const itemErrors = formData.items.map((item, idx) => {
         const err = {};
-        if (!item.deliveryItemId) {
-          err.deliveryItemId = "Thiếu Delivery Item";
-        }
-        if (!item.productId) {
-          err.productId = "Chọn sản phẩm";
-        }
-        if (!item.warehouseId) {
-          err.warehouseId = "Chọn kho";
-        }
-        if (!item.returnedQty || Number(item.returnedQty) <= 0) {
-          err.returnedQty = "Số lượng trả lại phải lớn hơn 0";
+        const returnedQty = Number(item.returnedQty || 0);
+        
+        // Chỉ validate nếu returnedQty > 0
+        if (returnedQty > 0) {
+          if (!item.deliveryItemId) {
+            err.deliveryItemId = "Thiếu Delivery Item";
+          }
+          if (!item.productId) {
+            err.productId = "Chọn sản phẩm";
+          }
+          if (!item.warehouseId) {
+            err.warehouseId = "Chọn kho";
+          }
         }
         return err;
       });
@@ -294,14 +307,17 @@ export default function ReturnOrderForm() {
     returnDate: formData.returnDate ? formData.returnDate.toISOString().slice(0, 10) : null,
     reason: formData.reason || null,
     notes: formData.notes || null,
-    items: formData.items.map((item) => ({
-      deliveryItemId: item.deliveryItemId,
-      productId: item.productId,
-      warehouseId: item.warehouseId,
-      returnedQty: Number(item.returnedQty || 0),
-      reason: item.reason || null,
-      note: item.note || null,
-    })),
+    // Chỉ gửi các items có returnedQty > 0
+    items: formData.items
+      .filter((item) => item.returnedQty && Number(item.returnedQty) > 0)
+      .map((item) => ({
+        deliveryItemId: item.deliveryItemId,
+        productId: item.productId,
+        warehouseId: item.warehouseId,
+        returnedQty: Number(item.returnedQty || 0),
+        reason: item.reason || null,
+        note: item.note || null,
+      })),
   });
 
   const handleSubmit = async (e) => {
@@ -732,4 +748,3 @@ const DeliveryPickerModal = ({
     </div>
   );
 };
-

@@ -28,15 +28,8 @@ export const salesOrderService = {
     return response.data;
   },
 
-  changeApprovalStatus: async (id, newApprovalStatus) => {
-    const response = await apiClient.patch(`${BASE_PATH}/${id}/approval-status`, null, {
-      params: { approvalStatus: newApprovalStatus },
-    });
-    return response.data;
-  },
-
-  submitForApproval: async (id) => {
-    const response = await apiClient.post(`${BASE_PATH}/${id}/submit-for-approval`);
+  sendToCustomer: async (id) => {
+    const response = await apiClient.post(`${BASE_PATH}/${id}/send-to-customer`);
     return response.data;
   },
 

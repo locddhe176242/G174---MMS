@@ -17,11 +17,10 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "sales_quotations",
-        indexes = {
-                @Index(name = "idx_sq_status", columnList = "status"),
-                @Index(name = "idx_sq_customer", columnList = "customer_id")
-        })
+@Table(name = "sales_quotations", indexes = {
+        @Index(name = "idx_sq_status", columnList = "status"),
+        @Index(name = "idx_sq_customer", columnList = "customer_id")
+})
 public class SalesQuotation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,9 +51,14 @@ public class SalesQuotation {
     private String deliveryTerms;
 
     @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "100.0", inclusive = true)
+    @Column(name = "header_discount_percent", precision = 5, scale = 2)
+    private BigDecimal headerDiscountPercent = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
     @DecimalMax(value = "999999999999999.99", inclusive = true)
-    @Column(name = "header_discount", precision = 18, scale = 2)
-    private BigDecimal headerDiscount = BigDecimal.ZERO;
+    @Column(name = "header_discount_amount", precision = 18, scale = 2)
+    private BigDecimal headerDiscountAmount = BigDecimal.ZERO;
 
     @DecimalMin(value = "0.0", inclusive = true)
     @DecimalMax(value = "999999999999999.99", inclusive = true)

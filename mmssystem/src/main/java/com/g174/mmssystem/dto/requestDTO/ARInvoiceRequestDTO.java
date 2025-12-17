@@ -21,8 +21,9 @@ public class ARInvoiceRequestDTO {
 
     private LocalDate dueDate;
 
+    private java.math.BigDecimal headerDiscountPercent;
+
     private String notes;
 
     private List<ARInvoiceItemRequestDTO> items;
 }
-

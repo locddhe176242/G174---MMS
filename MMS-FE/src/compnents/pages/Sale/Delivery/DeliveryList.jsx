@@ -163,6 +163,7 @@ export default function DeliveryList() {
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu Giao Hàng</h1>
+            <p className="text-gray-500">Theo dõi và quản lý các phiếu giao hàng</p>
           </div>
           <button
             onClick={() => navigate("/sales/deliveries/new")}
@@ -290,16 +291,12 @@ export default function DeliveryList() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{delivery.trackingCode || "—"}</td>
                       <td className="px-4 py-3 text-sm text-center">
-                        <div className="flex items-center gap-1 justify-center">
+                        <div className="flex items-center gap-3 justify-center">
                           <button
                             onClick={() => navigate(`/sales/deliveries/${delivery.deliveryId}`)}
-                            className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
-                            title="Xem chi tiết"
+                            className="text-blue-600 hover:underline"
                           >
-                            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
+                            Xem
                           </button>
                           {/* Chỉ hiển thị nút Sửa/Xóa nếu:
                               - status = Draft/Picked: tất cả user

@@ -1,6 +1,8 @@
 package com.g174.mmssystem.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,12 +15,11 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "credit_notes",
-        indexes = {
-                @Index(name = "idx_credit_note_status", columnList = "status, deleted_at"),
-                @Index(name = "idx_credit_note_invoice", columnList = "invoice_id"),
-                @Index(name = "idx_credit_note_return_order", columnList = "ro_id")
-        })
+@Table(name = "credit_notes", indexes = {
+        @Index(name = "idx_credit_note_status", columnList = "status, deleted_at"),
+        @Index(name = "idx_credit_note_invoice", columnList = "invoice_id"),
+        @Index(name = "idx_credit_note_return_order", columnList = "ro_id")
+})
 public class CreditNote {
 
     @Id
@@ -47,6 +48,16 @@ public class CreditNote {
 
     @Column(name = "subtotal", precision = 18, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "100.0", inclusive = true)
+    @Column(name = "header_discount_percent", precision = 5, scale = 2)
+    private BigDecimal headerDiscountPercent = BigDecimal.ZERO;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "999999999999999.99", inclusive = true)
+    @Column(name = "header_discount_amount", precision = 18, scale = 2)
+    private BigDecimal headerDiscountAmount = BigDecimal.ZERO;
 
     @Column(name = "tax_amount", precision = 18, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
@@ -81,9 +92,9 @@ public class CreditNote {
     private List<CreditNoteItem> items = new ArrayList<>();
 
     public enum CreditNoteStatus {
-        Draft,    // Nháp
-        Issued,   // Đã xuất
-        Applied,  // Đã áp dụng (vào Invoice)
+        Draft, // Nháp
+        Issued, // Đã xuất
+        Applied, // Đã áp dụng (vào Invoice)
         Cancelled // Đã hủy
     }
 
@@ -102,4 +113,3 @@ public class CreditNote {
         updatedAt = Instant.now();
     }
 }
-

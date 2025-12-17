@@ -101,6 +101,10 @@ export default function DeliveryForm() {
   const filteredSalesOrders = useMemo(() => {
     const term = salesOrderSearch.trim().toLowerCase();
     return salesOrders.filter((so) => {
+      // Loại bỏ các đơn hàng đã giao hết hàng
+      if (so.isFullyDelivered === true) {
+        return false;
+      }
       const matchesKeyword =
         !term ||
         (so.orderNo || "").toLowerCase().includes(term) ||

@@ -49,6 +49,7 @@ public class DeliveryServiceImpl implements IDeliveryService {
     private final DeliveryMapper deliveryMapper;
     private final GoodIssueRepository goodIssueRepository;
     private final GoodIssueItemRepository goodIssueItemRepository;
+    private final ReturnOrderItemRepository returnOrderItemRepository;
 
     @Override
     public DeliveryResponseDTO createDelivery(DeliveryRequestDTO request) {
@@ -82,7 +83,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
         log.info("[CREATE DELIVERY] Đã build {} items, bắt đầu save...", items.size());
 
         Delivery saved = deliveryRepository.save(delivery);
-        log.info("[CREATE DELIVERY] Đã save Delivery thành công với ID: {}, deliveryNo: {}", saved.getDeliveryId(), saved.getDeliveryNo());
+        log.info("[CREATE DELIVERY] Đã save Delivery thành công với ID: {}, deliveryNo: {}", saved.getDeliveryId(),
+                saved.getDeliveryNo());
         return deliveryMapper.toResponse(saved, items);
     }
 
@@ -96,26 +98,29 @@ public class DeliveryServiceImpl implements IDeliveryService {
         // - Shipped: chỉ sửa được tracking info
         // - Delivered: không sửa được (trừ Manager)
         // - Cancelled: không sửa được
-        
+
         if (delivery.getStatus() == Delivery.DeliveryStatus.Delivered) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
+            boolean isManager = authentication != null &&
                     authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
+
             if (!isManager) {
-                throw new IllegalStateException("Không thể chỉnh sửa phiếu giao hàng đã giao. Chỉ Manager mới có quyền sửa.");
+                throw new IllegalStateException(
+                        "Không thể chỉnh sửa phiếu giao hàng đã giao. Chỉ Manager mới có quyền sửa.");
             }
-            
-            log.warn("Manager {} đang chỉnh sửa phiếu giao hàng đã giao: {}", 
+
+            log.warn("Manager {} đang chỉnh sửa phiếu giao hàng đã giao: {}",
                     getCurrentUser().getEmail(), delivery.getDeliveryNo());
         } else if (delivery.getStatus() == Delivery.DeliveryStatus.Cancelled) {
             throw new IllegalStateException("Không thể chỉnh sửa phiếu giao hàng đã hủy");
         } else if (delivery.getStatus() == Delivery.DeliveryStatus.Shipped) {
-            // Shipped: chỉ cho phép sửa tracking info (trackingCode, carrierName, driverName, driverPhone)
+            // Shipped: chỉ cho phép sửa tracking info (trackingCode, carrierName,
+            // driverName, driverPhone)
             // Không cho sửa items, địa chỉ, warehouse
             if (request.getItems() != null && !request.getItems().isEmpty()) {
-                throw new IllegalStateException("Không thể sửa sản phẩm khi phiếu giao hàng đã xuất kho. Chỉ có thể cập nhật thông tin vận chuyển.");
+                throw new IllegalStateException(
+                        "Không thể sửa sản phẩm khi phiếu giao hàng đã xuất kho. Chỉ có thể cập nhật thông tin vận chuyển.");
             }
             if (request.getShippingAddress() != null) {
                 throw new IllegalStateException("Không thể sửa địa chỉ giao hàng khi phiếu giao hàng đã xuất kho.");
@@ -126,7 +131,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
         } else if (delivery.getStatus() == Delivery.DeliveryStatus.Picked) {
             // Picked: chỉ cho phép sửa notes, không sửa items
             if (request.getItems() != null && !request.getItems().isEmpty()) {
-                throw new IllegalStateException("Không thể sửa sản phẩm khi phiếu giao hàng đã được submit cho kho. Chỉ có thể cập nhật ghi chú.");
+                throw new IllegalStateException(
+                        "Không thể sửa sản phẩm khi phiếu giao hàng đã được submit cho kho. Chỉ có thể cập nhật ghi chú.");
             }
         }
 
@@ -146,7 +152,7 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
         // ===== LOAD GOOD ISSUE APPROVED để lấy deliveredQty =====
         List<GoodIssue> approvedIssues = goodIssueRepository.findByDeliveryId(id).stream()
-                .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved 
+                .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved
                         && issue.getDeletedAt() == null)
                 .toList();
 
@@ -169,7 +175,7 @@ public class DeliveryServiceImpl implements IDeliveryService {
     @Override
     @Transactional(readOnly = true)
     public Page<DeliveryListResponseDTO> getDeliveries(Integer salesOrderId, Integer customerId,
-                                                       String status, String keyword, Pageable pageable) {
+            String status, String keyword, Pageable pageable) {
         Specification<Delivery> spec = Specification.where(DeliverySpecifications.notDeleted())
                 .and(DeliverySpecifications.hasOrder(salesOrderId))
                 .and(DeliverySpecifications.hasCustomer(customerId))
@@ -177,13 +183,14 @@ public class DeliveryServiceImpl implements IDeliveryService {
                 .and(DeliverySpecifications.keywordLike(keyword));
 
         return deliveryRepository.findAll(spec, pageable)
-                .map(deliveryMapper::toListResponse);
+                .map(deliveryMapper::toListResponse)
+                .map(this::enrichDeliveryListDto);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<DeliveryListResponseDTO> getAllDeliveries(Integer salesOrderId, Integer customerId,
-                                                          String status, String keyword) {
+            String status, String keyword) {
         Specification<Delivery> spec = Specification.where(DeliverySpecifications.notDeleted())
                 .and(DeliverySpecifications.hasOrder(salesOrderId))
                 .and(DeliverySpecifications.hasCustomer(customerId))
@@ -198,31 +205,33 @@ public class DeliveryServiceImpl implements IDeliveryService {
     @Override
     public void deleteDelivery(Integer id) {
         Delivery delivery = getDeliveryEntity(id);
-        
-        // Check: Không cho xóa khi Delivered, hoặc Manager có thể xóa khi Shipped/Delivered
+
+        // Check: Không cho xóa khi Delivered, hoặc Manager có thể xóa khi
+        // Shipped/Delivered
         if (delivery.getStatus() == Delivery.DeliveryStatus.Delivered) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
+            boolean isManager = authentication != null &&
                     authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
+
             if (!isManager) {
                 throw new IllegalStateException("Không thể xóa phiếu giao hàng đã giao. Chỉ Manager mới có quyền xóa.");
             }
-            
-            log.warn("Manager {} đang xóa phiếu giao hàng đã giao: {}", 
+
+            log.warn("Manager {} đang xóa phiếu giao hàng đã giao: {}",
                     getCurrentUser().getEmail(), delivery.getDeliveryNo());
         } else if (delivery.getStatus() == Delivery.DeliveryStatus.Shipped) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
+            boolean isManager = authentication != null &&
                     authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
+
             if (!isManager) {
-                throw new IllegalStateException("Không thể xóa phiếu giao hàng đã xuất kho. Chỉ Manager mới có quyền xóa.");
+                throw new IllegalStateException(
+                        "Không thể xóa phiếu giao hàng đã xuất kho. Chỉ Manager mới có quyền xóa.");
             }
-            
-            log.warn("Manager {} đang xóa phiếu giao hàng đã xuất kho: {}", 
+
+            log.warn("Manager {} đang xóa phiếu giao hàng đã xuất kho: {}",
                     getCurrentUser().getEmail(), delivery.getDeliveryNo());
         }
 
@@ -246,26 +255,28 @@ public class DeliveryServiceImpl implements IDeliveryService {
         // Validate: Khi chuyển sang Shipped, phải có Good Issue Approved
         if (newStatus == Delivery.DeliveryStatus.Shipped) {
             List<GoodIssue> approvedIssues = goodIssueRepository.findByDeliveryId(id).stream()
-                    .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved 
+                    .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved
                             && issue.getDeletedAt() == null)
                     .collect(Collectors.toList());
             if (approvedIssues.isEmpty()) {
-                throw new IllegalStateException("Không thể chuyển sang trạng thái 'Đã xuất kho'. Phải có phiếu xuất kho đã được phê duyệt trước.");
+                throw new IllegalStateException(
+                        "Không thể chuyển sang trạng thái 'Đã xuất kho'. Phải có phiếu xuất kho đã được phê duyệt trước.");
             }
         }
 
         if (newStatus == Delivery.DeliveryStatus.Delivered) {
             List<GoodIssue> approvedIssues = goodIssueRepository.findByDeliveryId(id).stream()
-                    .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved 
+                    .filter(issue -> issue.getStatus() == GoodIssue.GoodIssueStatus.Approved
                             && issue.getDeletedAt() == null)
                     .collect(Collectors.toList());
             if (approvedIssues.isEmpty()) {
-                throw new IllegalStateException("Không thể chuyển sang trạng thái 'Đã giao hàng'. Phải có phiếu xuất kho đã được phê duyệt trước.");
+                throw new IllegalStateException(
+                        "Không thể chuyển sang trạng thái 'Đã giao hàng'. Phải có phiếu xuất kho đã được phê duyệt trước.");
             }
-            
+
             // Tự động cập nhật deliveredQty từ Good Issue approved
             List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(id);
-            
+
             // Tạo map: productId -> tổng issuedQty từ Good Issue approved
             Map<Integer, BigDecimal> goodIssueQtyByProduct = new HashMap<>();
             for (GoodIssue issue : approvedIssues) {
@@ -276,16 +287,16 @@ public class DeliveryServiceImpl implements IDeliveryService {
                     goodIssueQtyByProduct.merge(productId, issuedQty, BigDecimal::add);
                 }
             }
-            
+
             // Cập nhật deliveredQty cho từng DeliveryItem
             for (DeliveryItem item : items) {
                 BigDecimal deliveredQtyFromGoodIssue = goodIssueQtyByProduct.getOrDefault(
                         item.getProduct().getProductId(), BigDecimal.ZERO);
                 item.setDeliveredQty(deliveredQtyFromGoodIssue);
-                log.info("Auto-updated deliveredQty for product {}: {} (from Good Issue when changing to Delivered)", 
+                log.info("Auto-updated deliveredQty for product {}: {} (from Good Issue when changing to Delivered)",
                         item.getProduct().getName(), deliveredQtyFromGoodIssue);
             }
-            
+
             deliveryItemRepository.saveAll(items);
         }
 
@@ -305,32 +316,32 @@ public class DeliveryServiceImpl implements IDeliveryService {
     @Transactional
     public DeliveryResponseDTO submitToWarehouse(Integer id) {
         log.info("Submitting delivery ID: {} to warehouse", id);
-        
+
         Delivery delivery = getDeliveryEntity(id);
-        
+
         // Validate: Chỉ có thể submit khi ở trạng thái Draft
         if (delivery.getStatus() != Delivery.DeliveryStatus.Draft) {
             throw new IllegalStateException("Chỉ có thể submit phiếu giao hàng khi ở trạng thái Nháp");
         }
-        
+
         // Validate: Phải có items
         List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(id);
         if (items == null || items.isEmpty()) {
             throw new IllegalStateException("Không thể submit: Phiếu giao hàng phải có ít nhất một sản phẩm");
         }
-        
+
         // Validate: Phải có địa chỉ giao hàng
         if (delivery.getShippingAddress() == null || delivery.getShippingAddress().trim().isEmpty()) {
             throw new IllegalStateException("Không thể submit: Vui lòng điền địa chỉ giao hàng");
         }
-        
+
         // Chuyển status sang Picked
         delivery.setStatus(Delivery.DeliveryStatus.Picked);
         delivery.setUpdatedAt(Instant.now());
-        
+
         Delivery saved = deliveryRepository.save(delivery);
         List<DeliveryItem> savedItems = deliveryItemRepository.findByDelivery_DeliveryId(id);
-        
+
         log.info("Delivery {} submitted to warehouse successfully", delivery.getDeliveryNo());
         return deliveryMapper.toResponse(saved, savedItems);
     }
@@ -343,15 +354,18 @@ public class DeliveryServiceImpl implements IDeliveryService {
         User currentUser = getCurrentUser();
         Warehouse defaultWarehouse = getDefaultWarehouse();
 
-        // ===== VALIDATE TRƯỚC: Kiểm tra xem có thể tạo Delivery từ Sales Order này không =====
+        // ===== VALIDATE TRƯỚC: Kiểm tra xem có thể tạo Delivery từ Sales Order này
+        // không =====
         List<SalesOrderItem> orderItems = salesOrderItemRepository.findBySalesOrder_SoId(salesOrderId);
         for (SalesOrderItem orderItem : orderItems) {
             BigDecimal deliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(orderItem.getSoiId());
-            BigDecimal plannedQty = deliveryItemRepository.sumPlannedQtyBySalesOrderItemExcludingDelivered(orderItem.getSoiId());
+            BigDecimal plannedQty = deliveryItemRepository
+                    .sumPlannedQtyBySalesOrderItemExcludingDelivered(orderItem.getSoiId());
             BigDecimal remainingQty = orderItem.getQuantity().subtract(deliveredQty).subtract(plannedQty);
 
             if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-                List<DeliveryItem> plannedItemsForOrder = deliveryItemRepository.findPlannedItemsBySalesOrderItem(orderItem.getSoiId());
+                List<DeliveryItem> plannedItemsForOrder = deliveryItemRepository
+                        .findPlannedItemsBySalesOrderItem(orderItem.getSoiId());
                 StringBuilder deliveryInfo = new StringBuilder();
                 if (!plannedItemsForOrder.isEmpty()) {
                     deliveryInfo.append(" Các phiếu giao hàng đã lên kế hoạch: ");
@@ -365,10 +379,12 @@ public class DeliveryServiceImpl implements IDeliveryService {
                 }
 
                 throw new IllegalStateException(String.format(
-                        "Không thể tạo phiếu giao hàng từ Sales Order: Tất cả số lượng của sản phẩm %s đã được giao hoặc đã lên kế hoạch. " +
+                        "Không thể tạo phiếu giao hàng từ Sales Order: Tất cả số lượng của sản phẩm %s đã được giao hoặc đã lên kế hoạch. "
+                                +
                                 "Số lượng đặt hàng: %s, Đã giao: %s, Đã lên kế hoạch: %s.%s " +
                                 "Vui lòng xóa hoặc chỉnh sửa các phiếu giao hàng đã lên kế hoạch trước.",
-                        orderItem.getProduct().getName(), orderItem.getQuantity(), deliveredQty, plannedQty, deliveryInfo));
+                        orderItem.getProduct().getName(), orderItem.getQuantity(), deliveredQty, plannedQty,
+                        deliveryInfo));
             }
         }
 
@@ -396,7 +412,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
     /**
      * Validate request TRƯỚC KHI tạo entity.
-     * Method này KHÔNG tạo entity, chỉ validate pure logic để tránh Hibernate auto-flush.
+     * Method này KHÔNG tạo entity, chỉ validate pure logic để tránh Hibernate
+     * auto-flush.
      */
     private void validateDeliveryRequest(
             List<DeliveryItemRequestDTO> requestItems,
@@ -410,14 +427,16 @@ public class DeliveryServiceImpl implements IDeliveryService {
         for (DeliveryItemRequestDTO dto : requestItems) {
             // Fetch data cần thiết
             SalesOrderItem salesOrderItem = salesOrderItemRepository.findById(dto.getSalesOrderItemId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Sales Order Item ID " + dto.getSalesOrderItemId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy Sales Order Item ID " + dto.getSalesOrderItemId()));
 
             if (!salesOrderItem.getSalesOrder().getSoId().equals(salesOrder.getSoId())) {
                 throw new IllegalArgumentException("Sales Order Item không thuộc về Sales Order này");
             }
 
             Product product = productRepository.findById(dto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
 
             if (!product.getProductId().equals(salesOrderItem.getProduct().getProductId())) {
                 throw new IllegalArgumentException("Sản phẩm không khớp với Sales Order Item");
@@ -439,15 +458,20 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
             // ========== VALIDATE: Không được giao vượt quá số lượng đơn hàng ==========
             BigDecimal orderedQty = salesOrderItem.getQuantity();
-            BigDecimal alreadyDeliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(salesOrderItem.getSoiId());
-            BigDecimal alreadyPlannedQty = deliveryItemRepository.sumPlannedQtyBySalesOrderItemExcludingDelivered(salesOrderItem.getSoiId());
+            BigDecimal alreadyDeliveredQty = deliveryItemRepository
+                    .sumDeliveredQtyBySalesOrderItem(salesOrderItem.getSoiId());
+            BigDecimal alreadyPlannedQty = deliveryItemRepository
+                    .sumPlannedQtyBySalesOrderItemExcludingDelivered(salesOrderItem.getSoiId());
             BigDecimal maxPlannedQtyFromOrder = orderedQty.subtract(alreadyDeliveredQty).subtract(alreadyPlannedQty);
 
-            log.info("[VALIDATE CREATE] Kiểm tra số lượng từ đơn hàng cho sản phẩm {} (SOI ID: {}): Ordered={}, AlreadyDelivered={}, AlreadyPlanned={}, MaxPlannedFromOrder={}",
-                    product.getName(), salesOrderItem.getSoiId(), orderedQty, alreadyDeliveredQty, alreadyPlannedQty, maxPlannedQtyFromOrder);
+            log.info(
+                    "[VALIDATE CREATE] Kiểm tra số lượng từ đơn hàng cho sản phẩm {} (SOI ID: {}): Ordered={}, AlreadyDelivered={}, AlreadyPlanned={}, MaxPlannedFromOrder={}",
+                    product.getName(), salesOrderItem.getSoiId(), orderedQty, alreadyDeliveredQty, alreadyPlannedQty,
+                    maxPlannedQtyFromOrder);
 
             if (plannedQty.compareTo(maxPlannedQtyFromOrder) > 0) {
-                List<DeliveryItem> plannedItemsForOrder = deliveryItemRepository.findPlannedItemsBySalesOrderItem(salesOrderItem.getSoiId());
+                List<DeliveryItem> plannedItemsForOrder = deliveryItemRepository
+                        .findPlannedItemsBySalesOrderItem(salesOrderItem.getSoiId());
                 StringBuilder deliveryInfo = new StringBuilder();
                 if (!plannedItemsForOrder.isEmpty()) {
                     deliveryInfo.append(" Các phiếu giao hàng đã lên kế hoạch: ");
@@ -460,9 +484,11 @@ public class DeliveryServiceImpl implements IDeliveryService {
                     }
                 }
 
-                log.error("[VALIDATE CREATE] ❌ Validation FAILED - Sẽ throw exception và rollback transaction. Delivery sẽ KHÔNG được tạo.");
+                log.error(
+                        "[VALIDATE CREATE] ❌ Validation FAILED - Sẽ throw exception và rollback transaction. Delivery sẽ KHÔNG được tạo.");
                 throw new IllegalArgumentException(String.format(
-                        "Không thể tạo phiếu giao hàng: Số lượng giao dự kiến (%s) vượt quá số lượng còn lại từ đơn hàng (%s) cho sản phẩm %s. " +
+                        "Không thể tạo phiếu giao hàng: Số lượng giao dự kiến (%s) vượt quá số lượng còn lại từ đơn hàng (%s) cho sản phẩm %s. "
+                                +
                                 "Số lượng đặt hàng: %s, Đã giao: %s, Đã lên kế hoạch: %s.%s " +
                                 "Vui lòng xóa hoặc chỉnh sửa các phiếu giao hàng đã lên kế hoạch trước, hoặc giảm số lượng giao dự kiến.",
                         plannedQty, maxPlannedQtyFromOrder, product.getName(),
@@ -489,14 +515,16 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
         for (DeliveryItemRequestDTO dto : requestItems) {
             SalesOrderItem salesOrderItem = salesOrderItemRepository.findById(dto.getSalesOrderItemId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Sales Order Item ID " + dto.getSalesOrderItemId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy Sales Order Item ID " + dto.getSalesOrderItemId()));
 
             if (!salesOrderItem.getSalesOrder().getSoId().equals(salesOrder.getSoId())) {
                 throw new IllegalArgumentException("Sales Order Item không thuộc về Sales Order này");
             }
 
             Product product = productRepository.findById(dto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
 
             if (!product.getProductId().equals(salesOrderItem.getProduct().getProductId())) {
                 throw new IllegalArgumentException("Sản phẩm không khớp với Sales Order Item");
@@ -517,8 +545,10 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
             // Validate số lượng từ đơn hàng
             BigDecimal orderedQty = salesOrderItem.getQuantity();
-            BigDecimal alreadyDeliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(salesOrderItem.getSoiId());
-            BigDecimal alreadyPlannedQty = deliveryItemRepository.sumPlannedQtyBySalesOrderItemExcludingDelivered(salesOrderItem.getSoiId());
+            BigDecimal alreadyDeliveredQty = deliveryItemRepository
+                    .sumDeliveredQtyBySalesOrderItem(salesOrderItem.getSoiId());
+            BigDecimal alreadyPlannedQty = deliveryItemRepository
+                    .sumPlannedQtyBySalesOrderItemExcludingDelivered(salesOrderItem.getSoiId());
 
             // Trừ đi plannedQty của delivery hiện tại
             for (DeliveryItem currentItem : currentItems) {
@@ -530,8 +560,10 @@ public class DeliveryServiceImpl implements IDeliveryService {
 
             BigDecimal maxPlannedQtyFromOrder = orderedQty.subtract(alreadyDeliveredQty).subtract(alreadyPlannedQty);
 
-            log.info("[VALIDATE UPDATE] Kiểm tra số lượng từ đơn hàng cho sản phẩm {} (SOI ID: {}): Ordered={}, AlreadyDelivered={}, AlreadyPlanned={}, MaxPlannedFromOrder={}",
-                    product.getName(), salesOrderItem.getSoiId(), orderedQty, alreadyDeliveredQty, alreadyPlannedQty, maxPlannedQtyFromOrder);
+            log.info(
+                    "[VALIDATE UPDATE] Kiểm tra số lượng từ đơn hàng cho sản phẩm {} (SOI ID: {}): Ordered={}, AlreadyDelivered={}, AlreadyPlanned={}, MaxPlannedFromOrder={}",
+                    product.getName(), salesOrderItem.getSoiId(), orderedQty, alreadyDeliveredQty, alreadyPlannedQty,
+                    maxPlannedQtyFromOrder);
 
             if (plannedQty.compareTo(maxPlannedQtyFromOrder) > 0) {
                 throw new IllegalArgumentException(String.format(
@@ -571,13 +603,15 @@ public class DeliveryServiceImpl implements IDeliveryService {
                     : delivery.getWarehouse();
 
             DeliveryItem item = deliveryMapper.toItemEntity(delivery, dto, salesOrderItem, product, warehouse);
-            
+
             // Tự động fill deliveredQty từ Good Issue approved theo productId
-            BigDecimal deliveredQtyFromGoodIssue = goodIssueQtyByProduct.getOrDefault(product.getProductId(), BigDecimal.ZERO);
+            BigDecimal deliveredQtyFromGoodIssue = goodIssueQtyByProduct.getOrDefault(product.getProductId(),
+                    BigDecimal.ZERO);
             item.setDeliveredQty(deliveredQtyFromGoodIssue);
-            
-            log.info("Setting deliveredQty for product {}: {} (from Good Issue)", product.getName(), deliveredQtyFromGoodIssue);
-            
+
+            log.info("Setting deliveredQty for product {}: {} (from Good Issue)", product.getName(),
+                    deliveredQtyFromGoodIssue);
+
             items.add(item);
         }
         return items;
@@ -604,7 +638,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
         return items;
     }
 
-    private List<DeliveryItem> buildItemsFromSalesOrder(Delivery delivery, Integer salesOrderId, Warehouse defaultWarehouse) {
+    private List<DeliveryItem> buildItemsFromSalesOrder(Delivery delivery, Integer salesOrderId,
+            Warehouse defaultWarehouse) {
         List<DeliveryItem> items = new ArrayList<>();
         List<SalesOrderItem> orderItems = salesOrderItemRepository.findBySalesOrder_SoId(salesOrderId);
 
@@ -614,7 +649,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
             // Và số lượng đã lên kế hoạch nhưng chưa giao (từ các Delivery chưa Delivered)
             BigDecimal deliveredQty = deliveryItemRepository.sumDeliveredQtyBySalesOrderItem(orderItem.getSoiId());
             // Chỉ tính plannedQty từ các Delivery chưa Delivered (Draft, Picked, Shipped)
-            BigDecimal plannedQty = deliveryItemRepository.sumPlannedQtyBySalesOrderItemExcludingDelivered(orderItem.getSoiId());
+            BigDecimal plannedQty = deliveryItemRepository
+                    .sumPlannedQtyBySalesOrderItemExcludingDelivered(orderItem.getSoiId());
             BigDecimal remainingQty = orderItem.getQuantity().subtract(deliveredQty).subtract(plannedQty);
 
             if (remainingQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -632,7 +668,6 @@ public class DeliveryServiceImpl implements IDeliveryService {
         }
         return items;
     }
-
 
     private void validateStatusTransition(Delivery.DeliveryStatus currentStatus, Delivery.DeliveryStatus newStatus) {
         if (currentStatus == Delivery.DeliveryStatus.Cancelled) {
@@ -713,7 +748,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
             return null;
         }
         return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
     }
 
     private Delivery.DeliveryStatus parseStatus(String status) {
@@ -745,5 +781,43 @@ public class DeliveryServiceImpl implements IDeliveryService {
             candidate = "DLV-" + datePart + "-" + unique;
         }
         return candidate;
+    }
+
+    private DeliveryListResponseDTO enrichDeliveryListDto(DeliveryListResponseDTO dto) {
+        if (dto == null || dto.getDeliveryId() == null)
+            return dto;
+        Integer deliveryId = dto.getDeliveryId();
+
+        // Check xem Delivery đã trả hết hàng chưa (tất cả items đều đã có Return Order
+        // đủ số lượng)
+        boolean isFullyReturned = true;
+        List<DeliveryItem> items = deliveryItemRepository.findByDelivery_DeliveryId(deliveryId);
+        if (items != null && !items.isEmpty()) {
+            for (DeliveryItem item : items) {
+                // Tính tổng returnedQty từ các ReturnOrderItem liên kết với DeliveryItem này
+                List<ReturnOrderItem> returnOrderItems = returnOrderItemRepository
+                        .findByDeliveryItem_DiId(item.getDiId());
+                BigDecimal totalReturnedQty = returnOrderItems.stream()
+                        .map(roi -> roi.getReturnedQty() != null ? roi.getReturnedQty() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // So sánh với deliveredQty (hoặc plannedQty nếu deliveredQty = 0)
+                BigDecimal targetQty = item.getDeliveredQty() != null
+                        && item.getDeliveredQty().compareTo(BigDecimal.ZERO) > 0
+                                ? item.getDeliveredQty()
+                                : (item.getPlannedQty() != null ? item.getPlannedQty() : BigDecimal.ZERO);
+
+                if (totalReturnedQty.compareTo(targetQty) < 0) {
+                    isFullyReturned = false;
+                    break;
+                }
+            }
+        } else {
+            // Nếu không có items thì coi như chưa trả hết
+            isFullyReturned = false;
+        }
+        dto.setIsFullyReturned(isFullyReturned);
+
+        return dto;
     }
 }

@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -83,16 +85,17 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
         }
 
         // Create issue entity
-               GoodIssue issue = GoodIssue.builder()
-                       .issueNo(issueNo)
-                       .delivery(delivery)
-                       .warehouse(warehouse)
-                       .issueDate(dto.getIssueDate() != null ? dto.getIssueDate().toLocalDateTime() : LocalDateTime.now())
-                       .status(GoodIssue.GoodIssueStatus.Draft)
+        GoodIssue issue = GoodIssue.builder()
+                .issueNo(issueNo)
+                .delivery(delivery)
+                .warehouse(warehouse)
+                .issueDate(dto.getIssueDate() != null ? dto.getIssueDate().toLocalDateTime() : LocalDateTime.now())
+                .status(GoodIssue.GoodIssueStatus.Draft)
                 .createdBy(createdBy)
                 .notes(dto.getNotes())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
+                .items(new ArrayList<>()) // Khởi tạo items để tránh null
                 .build();
 
         // Validate and create items
@@ -140,7 +143,13 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                 })
                 .collect(Collectors.toList());
 
-        issue.setItems(items);
+        // Với orphanRemoval = true, dùng addAll() thay vì setItems() để giữ reference của collection
+        // Đảm bảo items không null (có thể xảy ra khi entity được load từ DB)
+        if (issue.getItems() == null) {
+            issue.setItems(new ArrayList<>());
+        }
+        issue.getItems().clear();
+        issue.getItems().addAll(items);
 
         GoodIssue saved = issueRepository.save(issue);
         GoodIssue savedWithRelations = issueRepository.findByIdWithRelations(saved.getIssueId())
@@ -234,32 +243,37 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
         // Check: Chỉ cho phép sửa khi Draft, hoặc Manager có thể sửa khi Approved
         if (issue.getStatus() == GoodIssue.GoodIssueStatus.Approved) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
+            boolean isManager = authentication != null &&
                     authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
+
             if (!isManager) {
                 throw new IllegalStateException("Không thể chỉnh sửa phiếu xuất kho đã được phê duyệt. Chỉ Manager mới có quyền sửa.");
             }
-            
+
             User currentUser = userRepository.findById(updatedById)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + updatedById));
-            log.warn("Manager {} đang chỉnh sửa phiếu xuất kho đã được phê duyệt: {}", 
+            log.warn("Manager {} đang chỉnh sửa phiếu xuất kho đã được phê duyệt: {}",
                     currentUser.getEmail(), issue.getIssueNo());
-        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft) {
-            throw new IllegalStateException("Chỉ có thể chỉnh sửa phiếu xuất kho ở trạng thái Nháp");
+        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft && issue.getStatus() != GoodIssue.GoodIssueStatus.Approved) {
+            throw new IllegalStateException("Chỉ có thể chỉnh sửa phiếu xuất kho ở trạng thái Nháp hoặc Đã duyệt (Manager)");
         }
 
-               // Update basic fields
-               if (dto.getNotes() != null) {
-                   issue.setNotes(dto.getNotes());
-               }
-               if (dto.getIssueDate() != null) {
-                   issue.setIssueDate(dto.getIssueDate().toLocalDateTime());
-               }
+        // Update basic fields
+        if (dto.getNotes() != null) {
+            issue.setNotes(dto.getNotes());
+        }
+        if (dto.getIssueDate() != null) {
+            issue.setIssueDate(dto.getIssueDate().toLocalDateTime());
+        }
 
         // Update items if provided
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            // Với orphanRemoval = true, phải dùng clear() và addAll() thay vì setItems()
+            // Đảm bảo items không null (có thể xảy ra khi entity được load từ DB)
+            if (issue.getItems() == null) {
+                issue.setItems(new ArrayList<>());
+            }
             issue.getItems().clear();
             List<GoodIssueItem> items = dto.getItems().stream()
                     .map(itemDto -> {
@@ -285,7 +299,8 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                                 .build();
                     })
                     .collect(Collectors.toList());
-            issue.setItems(items);
+            // Dùng addAll() thay vì setItems() để giữ reference của collection gốc
+            issue.getItems().addAll(items);
         }
 
         issue.setUpdatedAt(LocalDateTime.now());
@@ -317,17 +332,14 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
             throw new IllegalStateException("Không thể gửi yêu cầu duyệt: Phiếu xuất kho phải có ít nhất một sản phẩm");
         }
 
-        // Chuyển status sang Pending
-        issue.setStatus(GoodIssue.GoodIssueStatus.Pending);
-        issue.setUpdatedAt(LocalDateTime.now());
-
-        GoodIssue saved = issueRepository.save(issue);
-        return issueMapper.toResponseDTO(saved);
+        // Hoàn tất phiếu xuất kho: chuyển sang Approved và trừ tồn kho ngay
+        return approveIssueInternal(issueId, submittedById);
     }
 
-    @Override
-    @Transactional
-    public GoodIssueResponseDTO approveIssue(Integer issueId, Integer approverId) {
+    /**
+     * Internal method để approve Good Issue và trừ tồn kho
+     */
+    private GoodIssueResponseDTO approveIssueInternal(Integer issueId, Integer approverId) {
         log.info("Approving good issue ID: {} by approver ID: {}", issueId, approverId);
 
         // Load issue with items
@@ -335,8 +347,9 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                 .filter(i -> i.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Good Issue not found with ID: " + issueId));
 
-        if (issue.getStatus() != GoodIssue.GoodIssueStatus.Pending) {
-            throw new IllegalStateException("Only pending issues can be approved");
+        // Chỉ có thể approve khi đang ở Draft
+        if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft) {
+            throw new IllegalStateException("Chỉ có thể hoàn tất phiếu xuất kho ở trạng thái Nháp");
         }
 
         User approver = userRepository.findById(approverId)
@@ -391,6 +404,16 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
 
         log.info("Good issue approved successfully, warehouse stock updated");
 
+        // Tự động cập nhật Delivery status sang Shipped nếu đang ở Picked
+        Delivery delivery = saved.getDelivery();
+        if (delivery != null && delivery.getStatus() == Delivery.DeliveryStatus.Picked) {
+            delivery.setStatus(Delivery.DeliveryStatus.Shipped);
+            delivery.setUpdatedAt(Instant.now());
+            deliveryRepository.save(delivery);
+            log.info("Delivery ID: {} automatically updated to Shipped status after Good Issue approval",
+                    delivery.getDeliveryId());
+        }
+
         // Load full relations for response
         GoodIssue savedWithRelations = issueRepository.findByIdWithRelations(saved.getIssueId())
                 .orElse(saved);
@@ -399,37 +422,6 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
         return issueMapper.toResponseDTO(savedWithRelations);
     }
 
-    @Override
-    @Transactional
-    public GoodIssueResponseDTO rejectIssue(Integer issueId, Integer approverId, String reason) {
-        log.info("Rejecting good issue ID: {} by approver ID: {}", issueId, approverId);
-
-        GoodIssue issue = issueRepository.findById(issueId)
-                .filter(i -> i.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Good Issue not found with ID: " + issueId));
-
-        if (issue.getStatus() != GoodIssue.GoodIssueStatus.Pending) {
-            throw new IllegalStateException("Only pending issues can be rejected");
-        }
-
-        User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
-
-        issue.setStatus(GoodIssue.GoodIssueStatus.Rejected);
-        issue.setApprovedBy(approver);
-        issue.setApprovedAt(LocalDateTime.now());
-        issue.setUpdatedAt(LocalDateTime.now());
-        if (reason != null && !reason.trim().isEmpty()) {
-            issue.setNotes((issue.getNotes() != null ? issue.getNotes() + "\n" : "") + "Rejection reason: " + reason);
-        }
-
-        GoodIssue saved = issueRepository.save(issue);
-        GoodIssue savedWithRelations = issueRepository.findByIdWithRelations(saved.getIssueId())
-                .orElse(saved);
-
-        log.info("Good issue rejected successfully");
-        return issueMapper.toResponseDTO(savedWithRelations);
-    }
 
     @Override
     @Transactional
@@ -443,21 +435,21 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
         // Validate: Chỉ cho phép xóa khi Draft, hoặc Manager có thể xóa khi Approved
         if (issue.getStatus() == GoodIssue.GoodIssueStatus.Approved) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null && 
+            boolean isManager = authentication != null &&
                     authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-            
+
             if (!isManager) {
                 throw new IllegalStateException("Không thể xóa phiếu xuất kho đã được phê duyệt. Chỉ Manager mới có quyền xóa.");
             }
-            
+
             User currentUser = userRepository.findByEmail(
-                    SecurityContextHolder.getContext().getAuthentication().getName())
+                            SecurityContextHolder.getContext().getAuthentication().getName())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            log.warn("Manager {} đang xóa phiếu xuất kho đã được phê duyệt: {}", 
+            log.warn("Manager {} đang xóa phiếu xuất kho đã được phê duyệt: {}",
                     currentUser.getEmail(), issue.getIssueNo());
-        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft) {
-            throw new IllegalStateException("Chỉ có thể xóa phiếu xuất kho ở trạng thái Nháp");
+        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft && issue.getStatus() != GoodIssue.GoodIssueStatus.Approved) {
+            throw new IllegalStateException("Chỉ có thể xóa phiếu xuất kho ở trạng thái Nháp hoặc Đã duyệt (Manager)");
         }
 
         issue.setDeletedAt(LocalDateTime.now());

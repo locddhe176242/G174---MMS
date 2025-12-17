@@ -42,8 +42,8 @@ public class SalesQuotationController {
             sort = sort.ascending();
         }
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<SalesQuotationListResponseDTO> result =
-                salesQuotationService.getQuotations(customerId, status, keyword, pageable);
+        Page<SalesQuotationListResponseDTO> result = salesQuotationService.getQuotations(customerId, status, keyword,
+                pageable);
         return ResponseEntity.ok(result);
     }
 
@@ -64,12 +64,7 @@ public class SalesQuotationController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(
-            action = "CREATE_SALES_QUOTATION",
-            activityType = "SALES_MANAGEMENT",
-            description = "Tạo báo giá mới cho khách hàng ID: #{#request.customerId}",
-            entityId = "#{#result.body.quotationId}"
-    )
+    @LogActivity(action = "CREATE_SALES_QUOTATION", activityType = "SALES_MANAGEMENT", description = "Tạo báo giá mới cho khách hàng ID: #{#request.customerId}", entityId = "#{#result.body.quotationId}")
     public ResponseEntity<SalesQuotationResponseDTO> createQuotation(
             @Valid @RequestBody SalesQuotationRequestDTO request) {
         return ResponseEntity.ok(salesQuotationService.createQuotation(request));
@@ -77,12 +72,7 @@ public class SalesQuotationController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(
-            action = "UPDATE_SALES_QUOTATION",
-            activityType = "SALES_MANAGEMENT",
-            description = "Cập nhật báo giá ID: #{#id}",
-            entityId = "#{#id}"
-    )
+    @LogActivity(action = "UPDATE_SALES_QUOTATION", activityType = "SALES_MANAGEMENT", description = "Cập nhật báo giá ID: #{#id}", entityId = "#{#id}")
     public ResponseEntity<SalesQuotationResponseDTO> updateQuotation(
             @PathVariable Integer id,
             @Valid @RequestBody SalesQuotationRequestDTO request) {
@@ -91,26 +81,23 @@ public class SalesQuotationController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(
-            action = "CHANGE_SALES_QUOTATION_STATUS",
-            activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái báo giá ID: #{#id} sang #{#status}",
-            entityId = "#{#id}"
-    )
+    @LogActivity(action = "CHANGE_SALES_QUOTATION_STATUS", activityType = "SALES_MANAGEMENT", description = "Đổi trạng thái báo giá ID: #{#id} sang #{#status}", entityId = "#{#id}")
     public ResponseEntity<SalesQuotationResponseDTO> changeStatus(
             @PathVariable Integer id,
             @RequestParam String status) {
         return ResponseEntity.ok(salesQuotationService.changeStatus(id, status));
     }
 
+    @PostMapping("/{id}/clone")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @LogActivity(action = "CLONE_SALES_QUOTATION", activityType = "SALES_MANAGEMENT", description = "Nhân bản báo giá ID: #{#id} thành bản nháp mới", entityId = "#{#id}")
+    public ResponseEntity<SalesQuotationResponseDTO> cloneQuotation(@PathVariable Integer id) {
+        return ResponseEntity.ok(salesQuotationService.cloneQuotation(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
-    @LogActivity(
-            action = "DELETE_SALES_QUOTATION",
-            activityType = "SALES_MANAGEMENT",
-            description = "Xóa báo giá ID: #{#id}",
-            entityId = "#{#id}"
-    )
+    @LogActivity(action = "DELETE_SALES_QUOTATION", activityType = "SALES_MANAGEMENT", description = "Xóa báo giá ID: #{#id}", entityId = "#{#id}")
     public ResponseEntity<Void> deleteQuotation(@PathVariable Integer id) {
         salesQuotationService.deleteQuotation(id);
         return ResponseEntity.noContent().build();

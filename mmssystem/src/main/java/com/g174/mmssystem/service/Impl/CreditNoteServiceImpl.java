@@ -49,7 +49,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
     @Override
     public CreditNoteResponseDTO createCreditNote(CreditNoteRequestDTO request) {
         ARInvoice invoice = getInvoice(request.getInvoiceId());
-        ReturnOrder returnOrder = request.getReturnOrderId() != null ? getReturnOrder(request.getReturnOrderId()) : null;
+        ReturnOrder returnOrder = request.getReturnOrderId() != null ? getReturnOrder(request.getReturnOrderId())
+                : null;
         User currentUser = getCurrentUser();
 
         CreditNote creditNote = creditNoteMapper.toEntity(request, invoice, returnOrder, currentUser);
@@ -100,14 +101,18 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CreditNoteListResponseDTO> getAllCreditNotes(Integer invoiceId, Integer returnOrderId, String status, String keyword) {
+    public List<CreditNoteListResponseDTO> getAllCreditNotes(Integer invoiceId, Integer returnOrderId, String status,
+            String keyword) {
         List<CreditNote> creditNotes = creditNoteRepository.findAll().stream()
                 .filter(cn -> cn.getDeletedAt() == null)
-                .filter(cn -> invoiceId == null || (cn.getInvoice() != null && cn.getInvoice().getArInvoiceId().equals(invoiceId)))
-                .filter(cn -> returnOrderId == null || (cn.getReturnOrder() != null && cn.getReturnOrder().getRoId().equals(returnOrderId)))
+                .filter(cn -> invoiceId == null
+                        || (cn.getInvoice() != null && cn.getInvoice().getArInvoiceId().equals(invoiceId)))
+                .filter(cn -> returnOrderId == null
+                        || (cn.getReturnOrder() != null && cn.getReturnOrder().getRoId().equals(returnOrderId)))
                 .filter(cn -> status == null || status.isEmpty() || cn.getStatus().name().equals(status))
                 .filter(cn -> keyword == null || keyword.isEmpty() ||
-                        (cn.getCreditNoteNo() != null && cn.getCreditNoteNo().toLowerCase().contains(keyword.toLowerCase())))
+                        (cn.getCreditNoteNo() != null
+                                && cn.getCreditNoteNo().toLowerCase().contains(keyword.toLowerCase())))
                 .collect(Collectors.toList());
 
         return creditNotes.stream()
@@ -142,7 +147,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
         creditNote.setStatus(newStatus);
 
-        // Khi chuyển sang Issued hoặc Applied, cập nhật Invoice balance và Customer balance
+        // Khi chuyển sang Issued hoặc Applied, cập nhật Invoice balance và Customer
+        // balance
         if (newStatus == CreditNote.CreditNoteStatus.Issued || newStatus == CreditNote.CreditNoteStatus.Applied) {
             updateInvoiceBalance(creditNote);
             // Cập nhật customer balance
@@ -199,7 +205,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
             // Lấy discountAmount từ SalesOrderItem (ARInvoiceItem không có field này)
             BigDecimal discountAmount = BigDecimal.ZERO;
-            if (invoiceItem.getSalesOrderItem() != null && invoiceItem.getSalesOrderItem().getDiscountAmount() != null) {
+            if (invoiceItem.getSalesOrderItem() != null
+                    && invoiceItem.getSalesOrderItem().getDiscountAmount() != null) {
                 discountAmount = invoiceItem.getSalesOrderItem().getDiscountAmount();
             }
             item.setDiscountAmount(discountAmount);
@@ -224,7 +231,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
         List<CreditNoteItem> items = new ArrayList<>();
         for (CreditNoteItemRequestDTO dto : requestItems) {
             Product product = productRepository.findById(dto.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + dto.getProductId()));
 
             CreditNoteItem item = creditNoteMapper.toItemEntity(creditNote, dto, product);
             items.add(item);
@@ -233,7 +241,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
     }
 
     private void recalcTotals(CreditNote creditNote, List<CreditNoteItem> items) {
-        BigDecimal subtotal = BigDecimal.ZERO;
+        // 1. Tính tổng sau chiết khấu từng dòng (line discount)
+        BigDecimal lineSubtotalSum = BigDecimal.ZERO;
         BigDecimal taxTotal = BigDecimal.ZERO;
 
         for (CreditNoteItem item : items) {
@@ -241,13 +250,28 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
                     .multiply(item.getUnitPrice())
                     .subtract(item.getDiscountAmount())
                     .max(BigDecimal.ZERO);
-            subtotal = subtotal.add(lineSubtotal);
+            lineSubtotalSum = lineSubtotalSum.add(lineSubtotal);
             taxTotal = taxTotal.add(item.getTaxAmount());
         }
 
-        BigDecimal total = subtotal.add(taxTotal);
+        // 2. Áp dụng chiết khấu chung (header discount) trên tổng sau line discount
+        BigDecimal headerDiscountPercent = creditNote.getHeaderDiscountPercent() != null
+                ? creditNote.getHeaderDiscountPercent()
+                : BigDecimal.ZERO;
+        BigDecimal headerDiscountAmount = lineSubtotalSum
+                .multiply(headerDiscountPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-        creditNote.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
+        creditNote.setHeaderDiscountAmount(headerDiscountAmount);
+
+        // 3. Tính subtotal sau header discount
+        BigDecimal subtotalAfterHeaderDiscount = lineSubtotalSum.subtract(headerDiscountAmount);
+
+        // 4. Thuế đã được tính trên từng dòng (sau line discount), không cần tính lại
+        // 5. Tổng = subtotal sau header discount + thuế
+        BigDecimal total = subtotalAfterHeaderDiscount.add(taxTotal);
+
+        creditNote.setSubtotal(subtotalAfterHeaderDiscount.setScale(2, RoundingMode.HALF_UP));
         creditNote.setTaxAmount(taxTotal.setScale(2, RoundingMode.HALF_UP));
         creditNote.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
     }
@@ -257,14 +281,17 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
         if (invoice != null) {
             // Reload invoice để đảm bảo có dữ liệu mới nhất
             ARInvoice freshInvoice = arInvoiceRepository.findById(invoice.getArInvoiceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Invoice ID " + invoice.getArInvoiceId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy Invoice ID " + invoice.getArInvoiceId()));
 
             // Tính lại balance từ đầu: totalAmount - tổng Credit Notes - tổng Payments
-            // Đây là cách đúng trong ERP: không trừ trực tiếp, mà tính lại từ đầu để đảm bảo chính xác
+            // Đây là cách đúng trong ERP: không trừ trực tiếp, mà tính lại từ đầu để đảm
+            // bảo chính xác
             BigDecimal balance = freshInvoice.getTotalAmount();
 
             // Trừ đi tất cả Credit Notes đã áp dụng (Issued hoặc Applied)
-            List<CreditNote> allCreditNotes = creditNoteRepository.findByInvoice_ArInvoiceIdAndDeletedAtIsNull(freshInvoice.getArInvoiceId());
+            List<CreditNote> allCreditNotes = creditNoteRepository
+                    .findByInvoice_ArInvoiceIdAndDeletedAtIsNull(freshInvoice.getArInvoiceId());
             for (CreditNote cn : allCreditNotes) {
                 if (cn.getStatus() == CreditNote.CreditNoteStatus.Issued ||
                         cn.getStatus() == CreditNote.CreditNoteStatus.Applied) {
@@ -312,7 +339,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
         }
     }
 
-    private void validateStatusTransition(CreditNote.CreditNoteStatus currentStatus, CreditNote.CreditNoteStatus newStatus) {
+    private void validateStatusTransition(CreditNote.CreditNoteStatus currentStatus,
+            CreditNote.CreditNoteStatus newStatus) {
         if (currentStatus == CreditNote.CreditNoteStatus.Cancelled) {
             throw new IllegalStateException("Không thể thay đổi trạng thái của Credit Note đã hủy");
         }
@@ -323,12 +351,14 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
         switch (currentStatus) {
             case Draft:
-                if (newStatus != CreditNote.CreditNoteStatus.Issued && newStatus != CreditNote.CreditNoteStatus.Cancelled) {
+                if (newStatus != CreditNote.CreditNoteStatus.Issued
+                        && newStatus != CreditNote.CreditNoteStatus.Cancelled) {
                     throw new IllegalStateException("Chỉ có thể chuyển từ Draft sang Issued hoặc Cancelled");
                 }
                 break;
             case Issued:
-                if (newStatus != CreditNote.CreditNoteStatus.Applied && newStatus != CreditNote.CreditNoteStatus.Cancelled) {
+                if (newStatus != CreditNote.CreditNoteStatus.Applied
+                        && newStatus != CreditNote.CreditNoteStatus.Cancelled) {
                     throw new IllegalStateException("Chỉ có thể chuyển từ Issued sang Applied hoặc Cancelled");
                 }
                 break;
@@ -360,7 +390,8 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
             return null;
         }
         return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy người dùng: " + authentication.getName()));
     }
 
     private CreditNote.CreditNoteStatus parseStatus(String status) {

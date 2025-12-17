@@ -35,6 +35,11 @@ export const salesQuotationService = {
     return response.data;
   },
 
+  cloneQuotation: async (id) => {
+    const response = await apiClient.post(`${BASE_PATH}/${id}/clone`);
+    return response.data;
+  },
+
   deleteQuotation: async (id) => {
     const response = await apiClient.delete(`${BASE_PATH}/${id}`);
     return response.data;

@@ -27,5 +27,8 @@ public class DeliveryListResponseDTO {
     private Instant updatedAt;
     private String createdByDisplay;
     private String updatedByDisplay;
-}
 
+    // Delivery đã trả hết hàng chưa (tất cả items đều đã có Return Order đủ số
+    // lượng)
+    private Boolean isFullyReturned;
+}
