@@ -74,12 +74,7 @@ public class SalesOrderController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(
-            action = "UPDATE_SALES_ORDER",
-            activityType = "SALES_MANAGEMENT",
-            description = "Cập nhật đơn bán hàng",
-            entityId = "#{#id}"
-    )
+    @LogActivity(action = "UPDATE_SALES_ORDER", activityType = "SALES_MANAGEMENT", description = "Cập nhật đơn bán hàng", entityId = "#{#id}")
     public ResponseEntity<SalesOrderResponseDTO> updateOrder(
             @PathVariable Integer id,
             @Valid @RequestBody SalesOrderRequestDTO request) {

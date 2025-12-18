@@ -237,13 +237,13 @@ export default function CustomerForm() {
       errors.lastName = "Họ phải có ít nhất 2 ký tự";
     }
 
-    // Validate province (bắt buộc)
-    if (!formData.address.provinceCode) {
+    // Validate province (bắt buộc) - dùng provinceName vì đang nhập text tự do
+    if (!formData.address.provinceName || formData.address.provinceName.trim() === "") {
       errors.province = "Vui lòng chọn tỉnh/thành phố";
     }
 
-    // Validate ward (bắt buộc)
-    if (!formData.address.wardCode) {
+    // Validate ward (bắt buộc) - dùng wardName vì đang nhập text tự do
+    if (!formData.address.wardName || formData.address.wardName.trim() === "") {
       errors.ward = "Vui lòng chọn phường/xã";
     }
 
@@ -432,8 +432,8 @@ export default function CustomerForm() {
                     </label>
                     <input
                       type="text"
-                      value={formData.address.province || ''}
-                      onChange={(e) => handleInputChange("address.province", e.target.value)}
+                      value={formData.address.provinceName || ''}
+                      onChange={(e) => handleInputChange("address.provinceName", e.target.value)}
                       placeholder="Nhập tỉnh/thành phố"
                       className={`w-full px-3 py-2 border ${validationErrors.province ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     />
@@ -448,8 +448,8 @@ export default function CustomerForm() {
                     </label>
                     <input
                       type="text"
-                      value={formData.address.ward || ''}
-                      onChange={(e) => handleInputChange("address.ward", e.target.value)}
+                      value={formData.address.wardName || ''}
+                      onChange={(e) => handleInputChange("address.wardName", e.target.value)}
                       placeholder="Nhập phường/xã"
                       className={`w-full px-3 py-2 border ${validationErrors.ward ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     />

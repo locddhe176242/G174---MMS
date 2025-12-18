@@ -58,4 +58,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Integer>
 
     @Query("SELECT COUNT(so) FROM SalesOrder so WHERE so.status = :status AND so.deletedAt IS NULL")
     Long countByStatus(@Param("status") SalesOrder.OrderStatus status);
+
+    @Query("SELECT MAX(so.soNo) FROM SalesOrder so WHERE so.soNo LIKE :prefix% AND so.deletedAt IS NULL")
+    String findMaxOrderNo(@Param("prefix") String prefix);
 }

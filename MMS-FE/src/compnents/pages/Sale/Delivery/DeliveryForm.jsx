@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { deliveryService } from "../../../../api/deliveryService";
 import { salesOrderService } from "../../../../api/salesOrderService";
 import { warehouseService } from "../../../../api/warehouseService";
+import { warehouseStockService } from "../../../../api/warehouseStockService";
 import { goodIssueService } from "../../../../api/goodIssueService";
 import { getProducts } from "../../../../api/productService";
 import { hasRole } from "../../../../api/authService";
@@ -17,10 +18,25 @@ const formatCurrency = (value) =>
     Number(value || 0)
   );
 
+const productSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: 4,
+    borderColor: state.isFocused ? "#2563eb" : "#000000",
+    borderWidth: 1,
+    boxShadow: "none",
+    minHeight: 36,
+    "&:hover": {
+      borderColor: state.isFocused ? "#2563eb" : "#4b5563",
+    },
+  }),
+};
+
 const defaultItem = () => ({
   salesOrderItemId: null,
   productId: null,
   warehouseId: null,
+  uom: "", // Đơn vị tính
   orderedQty: 0, // Số lượng đặt
   deliveredQtyFromSalesOrder: 0, // Số lượng đã giao từ các Delivery khác (từ SalesOrder) - chỉ đọc
   deliveredQty: 0, // Số lượng đã giao của Delivery này (nhập khi status = Shipped)
@@ -42,8 +58,10 @@ export default function DeliveryForm() {
   const [salesOrderModalOpen, setSalesOrderModalOpen] = useState(false);
   const [salesOrderSearch, setSalesOrderSearch] = useState("");
   const [salesOrderLoading, setSalesOrderLoading] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState(null); // Thông tin khách hàng từ Sales Order
   const [deliveryStatus, setDeliveryStatus] = useState(null); // Lưu status khi edit
   const [hasApprovedGoodIssue, setHasApprovedGoodIssue] = useState(false); // Có Good Issue approved không
+  const [itemStocks, setItemStocks] = useState({}); // { "index": stockQuantity }
   const [formData, setFormData] = useState({
     salesOrderId: "",
     warehouseId: "",
@@ -86,7 +104,7 @@ export default function DeliveryForm() {
       setSalesOrders(list);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách Sales Order");
+      toast.error("Không thể tải danh sách đơn bán hàng");
     } finally {
       setSalesOrderLoading(false);
     }
@@ -172,7 +190,7 @@ export default function DeliveryForm() {
           });
         }
       } catch (err) {
-        console.warn("Không thể tải Good Issue:", err);
+        console.warn("Không thể tải phiếu xuất hàng:", err);
       }
       
       // Load SalesOrder để lấy thông tin orderedQty, deliveredQty, remainingQty
@@ -181,7 +199,7 @@ export default function DeliveryForm() {
         try {
           salesOrder = await salesOrderService.getOrderById(data.salesOrderId);
         } catch (err) {
-          console.error("Không thể tải Sales Order:", err);
+          console.error("Không thể tải đơn bán hàng:", err);
         }
       }
       
@@ -214,10 +232,12 @@ export default function DeliveryForm() {
           };
           // deliveredQty từ Good Issue approved (ưu tiên) hoặc từ Delivery data
           const deliveredQtyFromGoodIssue = goodIssueQtyMap.get(item.productId) || 0;
+          const product = products.find(p => p.value === item.productId)?.data;
           return {
             salesOrderItemId: item.salesOrderItemId,
             productId: item.productId,
             warehouseId: item.warehouseId || null,
+            uom: product?.uom || item.uom || "",
             orderedQty: soItemInfo.orderedQty,
             deliveredQtyFromSalesOrder: soItemInfo.deliveredQty || 0,
             deliveredQty: deliveredQtyFromGoodIssue > 0 ? deliveredQtyFromGoodIssue : (item.deliveredQty || 0),
@@ -227,6 +247,24 @@ export default function DeliveryForm() {
           };
         }),
       });
+
+      // Load thông tin khách hàng từ Sales Order
+      if (salesOrder) {
+        setCustomerInfo({
+          customerId: salesOrder.customerId,
+          customerName: salesOrder.customerName || salesOrder.customer?.name || "",
+          customerCode: salesOrder.customerCode || salesOrder.customer?.code || "",
+        });
+      }
+
+      // Load tồn kho cho tất cả items sau khi set formData
+      setTimeout(() => {
+        (data.items || []).forEach((item, index) => {
+          if (item.productId && item.warehouseId) {
+            loadStockForItem(index, item.productId, item.warehouseId);
+          }
+        });
+      }, 100);
     } catch (error) {
       console.error(error);
       toast.error("Không thể tải phiếu giao hàng");
@@ -238,7 +276,7 @@ export default function DeliveryForm() {
   const loadFromSalesOrder = async (salesOrderIdArg) => {
     const targetId = salesOrderIdArg || formData.salesOrderId;
     if (!targetId) {
-      toast.warn("Vui lòng chọn Sales Order");
+      toast.warn("Vui lòng chọn đơn bán hàng");
       return;
     }
     try {
@@ -261,33 +299,51 @@ export default function DeliveryForm() {
           items: [defaultItem()],
         }));
         setSelectedSalesOrder(null);
+        setCustomerInfo(null);
         return;
       }
       
-      // Lấy warehouse đầu tiên từ items hoặc để null
-      const firstWarehouseId = availableItems[0]?.warehouseId || null;
-      
+      // Lưu thông tin khách hàng
+      setCustomerInfo({
+        customerId: salesOrder.customerId,
+        customerName: salesOrder.customerName || salesOrder.customer?.name || "",
+        customerCode: salesOrder.customerCode || salesOrder.customer?.code || "",
+      });
+
       setFormData((prev) => ({
         ...prev,
         salesOrderId: salesOrder.soId || targetId,
-        warehouseId: firstWarehouseId || prev.warehouseId || "",
         shippingAddress: salesOrder.shippingAddress || "",
-        items: availableItems.map((item) => ({
-          salesOrderItemId: item.soiId,
-          productId: item.productId,
-          warehouseId: item.warehouseId || firstWarehouseId || null,
-          orderedQty: item.quantity || 0,
-          deliveredQtyFromSalesOrder: item.deliveredQty || 0, // Số lượng đã giao từ các Delivery khác (từ SalesOrder)
-          deliveredQty: 0, // Số lượng đã giao của Delivery này (ban đầu = 0, nhập khi status = Shipped)
-          remainingQty: item.remainingQty || 0,
-          plannedQty: item.remainingQty || 0, // Số lượng dự kiến = số lượng chưa giao (khi tạo mới)
-          note: "",
-        })),
+        items: availableItems.map((item) => {
+          const product = products.find(p => p.value === item.productId)?.data;
+          return {
+            salesOrderItemId: item.soiId,
+            productId: item.productId,
+            warehouseId: item.warehouseId || null, // Lấy từ Sales Order item, nếu không có thì để null
+            uom: product?.uom || item.uom || "",
+            orderedQty: item.quantity || 0,
+            deliveredQtyFromSalesOrder: item.deliveredQty || 0, // Số lượng đã giao từ các Delivery khác (từ SalesOrder)
+            deliveredQty: 0, // Số lượng đã giao của Delivery này (ban đầu = 0, nhập khi status = Shipped)
+            remainingQty: item.remainingQty || 0,
+            plannedQty: item.remainingQty || 0, // Số lượng dự kiến = số lượng chưa giao (khi tạo mới)
+            note: "",
+          };
+        }),
       }));
-      toast.success("Đã tải dữ liệu từ Sales Order");
+
+      // Load tồn kho cho tất cả items sau khi set formData
+      setTimeout(() => {
+        availableItems.forEach((item, index) => {
+          const itemWarehouseId = item.warehouseId; // Chỉ lấy từ Sales Order item
+          if (item.productId && itemWarehouseId) {
+            loadStockForItem(index, item.productId, itemWarehouseId);
+          }
+        });
+      }, 100);
+      toast.success("Đã tải dữ liệu từ đơn bán hàng");
     } catch (error) {
       console.error(error);
-      toast.error(error?.response?.data?.message || "Không thể tải Sales Order");
+      toast.error(error?.response?.data?.message || "Không thể tải đơn bán hàng");
     } finally {
       setLoading(false);
     }
@@ -309,18 +365,56 @@ export default function DeliveryForm() {
     loadFromSalesOrder(so.orderId);
   };
 
+  const loadStockForItem = async (index, productId, warehouseId) => {
+    if (!productId || !warehouseId) {
+      setItemStocks((prev) => ({ ...prev, [index]: null }));
+      return;
+    }
+    try {
+      // Thử dùng getStockByWarehouseAndProduct để lấy đầy đủ thông tin
+      const stock = await warehouseStockService.getStockByWarehouseAndProduct(warehouseId, productId);
+      let quantity = 0;
+      if (stock?.quantity !== undefined) {
+        quantity = Number(stock.quantity) || 0;
+      } else if (typeof stock === 'number') {
+        quantity = stock;
+      } else if (stock?.data?.quantity !== undefined) {
+        quantity = Number(stock.data.quantity) || 0;
+      }
+      setItemStocks((prev) => ({ ...prev, [index]: quantity }));
+    } catch (error) {
+      console.error("Error loading stock:", error);
+      // Nếu lỗi 404, thử dùng getQuantityByWarehouseAndProduct
+      if (error?.response?.status === 404) {
+        try {
+          const qtyResponse = await warehouseStockService.getQuantityByWarehouseAndProduct(warehouseId, productId);
+          const qty = typeof qtyResponse === 'number' ? qtyResponse : (qtyResponse?.quantity ?? 0);
+          setItemStocks((prev) => ({ ...prev, [index]: Number(qty) || 0 }));
+        } catch (qtyError) {
+          console.error("Error loading quantity:", qtyError);
+          setItemStocks((prev) => ({ ...prev, [index]: 0 }));
+        }
+      } else {
+        setItemStocks((prev) => ({ ...prev, [index]: null }));
+      }
+    }
+  };
+
   const handleItemSelect = (index, option) => {
     setFormData((prev) => {
       const next = [...prev.items];
       if (option) {
+        const product = option.data || products.find(p => p.value === option.value)?.data;
         next[index] = {
           ...next[index],
           productId: option.value,
+          uom: product?.uom || "",
         };
       } else {
         next[index] = {
           ...next[index],
           productId: null,
+          uom: "",
         };
       }
       return { ...prev, items: next };
@@ -331,6 +425,12 @@ export default function DeliveryForm() {
     setFormData((prev) => {
       const next = [...prev.items];
       next[index] = { ...next[index], [field]: value };
+      
+      // Load stock when warehouseId changes
+      if (field === "warehouseId" && next[index].productId) {
+        loadStockForItem(index, next[index].productId, value);
+      }
+      
       return { ...prev, items: next };
     });
   };
@@ -338,7 +438,7 @@ export default function DeliveryForm() {
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, defaultItem()],
+      items: [...prev.items, defaultItem()], // Item mới không có kho, user phải chọn thủ công
     }));
   };
 
@@ -354,21 +454,24 @@ export default function DeliveryForm() {
   const validate = () => {
     const newErrors = {};
     if (!formData.salesOrderId) {
-      newErrors.salesOrderId = "Chọn Sales Order";
+      newErrors.salesOrderId = "Chọn đơn bán hàng";
     }
-    if (!formData.warehouseId) {
-      newErrors.warehouseId = "Chọn kho xuất hàng";
-    }
+    // Kho xuất hàng ở header không bắt buộc nữa vì mỗi item có kho riêng
+    // Chỉ validate nếu không có item nào có kho
     if (!formData.items || formData.items.length === 0) {
       newErrors.items = "Cần ít nhất một dòng giao hàng";
     } else {
       const itemErrors = formData.items.map((item) => {
         const e = {};
         if (!item.salesOrderItemId) {
-          e.salesOrderItemId = "Chọn Sales Order Item";
+          e.salesOrderItemId = "Chọn Dòng đơn bán hàng";
         }
         if (!item.productId) {
           e.productId = "Chọn sản phẩm";
+        }
+        // Mỗi item PHẢI có kho riêng
+        if (!item.warehouseId) {
+          e.warehouseId = "Chọn kho cho sản phẩm này";
         }
         return e;
       });
@@ -389,7 +492,7 @@ export default function DeliveryForm() {
     
     const payload = {
       salesOrderId: formData.salesOrderId,
-      warehouseId: formData.warehouseId,
+      warehouseId: formData.items[0]?.warehouseId || null, // Lấy từ item đầu tiên (nếu backend cần)
       plannedDate: formData.plannedDate ? formData.plannedDate.toISOString().split("T")[0] : null,
       actualDate: formData.actualDate ? formData.actualDate.toISOString().split("T")[0] : null,
       shippingAddress: formData.shippingAddress || null,
@@ -438,75 +541,13 @@ export default function DeliveryForm() {
     }
   };
 
-  const handleSubmitToWarehouse = async () => {
-    // Validate: Phải có items
-    if (!formData.items || formData.items.length === 0) {
-      toast.error("Vui lòng thêm ít nhất một sản phẩm");
-      return;
-    }
-
-    // Validate: Phải có shippingAddress
-    if (!formData.shippingAddress || formData.shippingAddress.trim() === "") {
-      toast.error("Vui lòng điền địa chỉ giao hàng");
-      return;
-    }
-
-    // Validate: Phải có warehouseId
-    if (!formData.warehouseId) {
-      toast.error("Vui lòng chọn kho");
-      return;
-    }
-
-    if (!window.confirm("Bạn có chắc muốn submit phiếu giao hàng cho kho xử lý? Sau khi submit, bạn sẽ không thể sửa sản phẩm nữa.")) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      // Cập nhật Delivery trước để đảm bảo shippingAddress được lưu vào database
-      const updatePayload = {
-        salesOrderId: formData.salesOrderId,
-        warehouseId: formData.warehouseId,
-        plannedDate: formData.plannedDate ? formData.plannedDate.toISOString() : null,
-        actualDate: formData.actualDate ? formData.actualDate.toISOString() : null,
-        shippingAddress: formData.shippingAddress,
-        carrierName: formData.carrierName,
-        trackingCode: formData.trackingCode,
-        notes: formData.notes,
-        items: formData.items.map((item) => ({
-          salesOrderItemId: item.salesOrderItemId,
-          productId: item.productId,
-          warehouseId: item.warehouseId || null,
-          plannedQty: Number(item.plannedQty || item.remainingQty || 0),
-          deliveredQty: Number(item.deliveredQty || 0),
-          note: item.note || null,
-        })),
-      };
-      
-      // Update trước
-      await deliveryService.updateDelivery(id, updatePayload);
-      
-      // Sau đó submit
-      await deliveryService.submitToWarehouse(id);
-      toast.success("Đã submit phiếu giao hàng cho kho xử lý");
-      // Reload để lấy status mới
-      await loadDelivery();
-    } catch (error) {
-      console.error(error);
-      toast.error(error?.response?.data?.message || "Không thể submit phiếu giao hàng");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Tính toán lock rules
   const isManager = hasRole("MANAGER") || hasRole("ROLE_MANAGER");
   const canEditAll = !deliveryStatus || deliveryStatus === "Draft" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
-  const canEditItems = deliveryStatus === "Draft" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
-  const canEditNotes = deliveryStatus === "Draft" || deliveryStatus === "Picked" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
-  const canEditTracking = deliveryStatus === "Draft" || deliveryStatus === "Picked" || deliveryStatus === "Shipped" || (deliveryStatus === "Delivered" && isManager);
-  const canEditBasicInfo = deliveryStatus === "Draft" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
+  const canEditItems = !deliveryStatus || deliveryStatus === "Draft" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
+  const canEditNotes = !deliveryStatus || deliveryStatus === "Draft" || deliveryStatus === "Picked" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
+  const canEditTracking = !deliveryStatus || deliveryStatus === "Draft" || deliveryStatus === "Picked" || deliveryStatus === "Shipped" || (deliveryStatus === "Delivered" && isManager);
+  const canEditBasicInfo = !deliveryStatus || deliveryStatus === "Draft" || (deliveryStatus === "Delivered" && isManager) || (deliveryStatus === "Shipped" && isManager);
 
   if (loading && isEdit && !formData.salesOrderId) {
     return (
@@ -519,7 +560,7 @@ export default function DeliveryForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Cập nhật Phiếu Giao Hàng" : "Tạo Phiếu Giao Hàng"}
@@ -532,18 +573,18 @@ export default function DeliveryForm() {
               onClick={() => navigate("/sales/deliveries")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sales Order <span className="text-red-500">*</span>
+                Đơn bán hàng <span className="text-red-500">*</span>
               </label>
               {isEdit ? (
                 <input
@@ -558,7 +599,7 @@ export default function DeliveryForm() {
                     type="text"
                     value={selectedSalesOrder?.label || ""}
                     readOnly
-                    placeholder="Chọn Sales Order"
+                    placeholder="Chọn Đơn bán hàng"
                     className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                   />
                   <button
@@ -573,6 +614,7 @@ export default function DeliveryForm() {
                       type="button"
                       onClick={() => {
                         setSelectedSalesOrder(null);
+                        setCustomerInfo(null);
                         setFormData((prev) => ({ ...prev, salesOrderId: "" }));
                       }}
                       className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600"
@@ -588,19 +630,19 @@ export default function DeliveryForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kho xuất hàng <span className="text-red-500">*</span>
+                Khách hàng
               </label>
-              <Select
-                value={warehouses.find((w) => w.value === formData.warehouseId) || null}
-                onChange={(option) =>
-                  setFormData((prev) => ({ ...prev, warehouseId: option?.value || "" }))
+              <input
+                type="text"
+                value={
+                  customerInfo
+                    ? `${customerInfo.customerCode ? customerInfo.customerCode + " - " : ""}${customerInfo.customerName || ""}`
+                    : ""
                 }
-                options={warehouses}
-                placeholder="Chọn kho"
+                readOnly
+                className="w-full px-3 py-2 border rounded-lg bg-gray-50"
+                disabled
               />
-              {errors.warehouseId && (
-                <p className="text-red-500 text-xs mt-1">{errors.warehouseId}</p>
-              )}
             </div>
           </div>
 
@@ -623,9 +665,11 @@ export default function DeliveryForm() {
               <DatePicker
                 selected={formData.actualDate}
                 onChange={(date) => setFormData((prev) => ({ ...prev, actualDate: date }))}
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg bg-gray-100"
                 dateFormat="dd/MM/yyyy"
                 isClearable
+                disabled={true}
+                readOnly
               />
             </div>
           </div>
@@ -717,6 +761,9 @@ export default function DeliveryForm() {
                       Sản phẩm
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Đơn vị
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       Kho
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -745,32 +792,58 @@ export default function DeliveryForm() {
                   {formData.items.map((item, index) => {
                     const itemError = errors.itemDetails?.[index] || {};
                     return (
-                      <tr key={index} className="border-t">
-                        <td className="px-3 py-2 text-sm text-gray-600">{index + 1}</td>
-                        <td className="px-3 py-2">
+                      <tr key={index} className="border-t hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-600 align-top">{index + 1}</td>
+                        <td className="px-3 py-2 w-64 align-top">
                           <Select
                             value={products.find((p) => p.value === item.productId) || null}
                             onChange={(opt) => handleItemSelect(index, opt)}
                             options={products}
                             placeholder="Chọn sản phẩm"
                             isClearable
-                            isDisabled={!canEditItems}
+                            isDisabled={true}
+                            styles={productSelectStyles}
+                            menuPortalTarget={
+                              typeof window !== "undefined" ? document.body : null
+                            }
+                            menuPosition="fixed"
                           />
                           {itemError.productId && (
-                            <p className="text-red-500 text-xs">{itemError.productId}</p>
+                            <p className="text-red-500 text-xs mt-1">{itemError.productId}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 align-top">
+                          <input
+                            type="text"
+                            value={item.uom || ""}
+                            onChange={(e) =>
+                              handleItemChange(index, "uom", e.target.value)
+                            }
+                            className="w-24 border rounded px-2 py-1 bg-gray-100"
+                            disabled={true}
+                            readOnly
+                          />
+                        </td>
+                        <td className="px-3 py-2 align-top">
                           <Select
                             value={warehouses.find((w) => w.value === item.warehouseId) || null}
-                            onChange={(opt) =>
-                              handleItemChange(index, "warehouseId", opt ? opt.value : null)
-                            }
+                            onChange={(option) => {
+                              const newWarehouseId = option?.value || null;
+                              handleItemChange(index, "warehouseId", newWarehouseId);
+                            }}
                             options={warehouses}
-                            placeholder="Chọn kho (tuỳ chọn)"
+                            placeholder="Chọn kho"
                             isClearable
                             isDisabled={!canEditItems}
+                            styles={productSelectStyles}
+                            menuPortalTarget={
+                              typeof window !== "undefined" ? document.body : null
+                            }
+                            menuPosition="fixed"
                           />
+                          {itemError.warehouseId && (
+                            <p className="text-red-500 text-xs mt-1">{itemError.warehouseId}</p>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <div className="text-sm text-gray-700">
@@ -786,6 +859,18 @@ export default function DeliveryForm() {
                           <div className="text-sm text-gray-700 font-medium">
                             {Number(item.remainingQty || 0).toLocaleString("vi-VN")}
                           </div>
+                          {item.productId && item.warehouseId && itemStocks[index] !== undefined && (
+                            <div className="mt-1 text-xs">
+                              <span className={itemStocks[index] !== null ? "text-gray-600" : "text-gray-400"}>
+                                Tồn kho: {itemStocks[index] !== null ? Number(itemStocks[index]).toLocaleString("vi-VN") : "—"}
+                              </span>
+                              {itemStocks[index] !== null && item.plannedQty > itemStocks[index] && (
+                                <p className="text-red-600 font-semibold mt-1">
+                                  Không đủ hàng! (Cần: {Number(item.plannedQty || 0).toLocaleString("vi-VN")})
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </td>
                         {isEdit && hasApprovedGoodIssue && (
                           <td className="px-3 py-2">
@@ -831,16 +916,6 @@ export default function DeliveryForm() {
             >
               Hủy
             </button>
-            {isEdit && deliveryStatus === "Draft" && (
-              <button
-                type="button"
-                onClick={handleSubmitToWarehouse}
-                disabled={loading}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {loading ? "Đang xử lý..." : "Submit cho kho xử lý"}
-              </button>
-            )}
             <button
               type="submit"
               disabled={loading || !canEditAll}
@@ -881,8 +956,8 @@ const SalesOrderPickerModal = ({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Chọn Sales Order</h3>
-            <p className="text-sm text-gray-500">Tìm và chọn Sales Order đã được phê duyệt</p>
+            <h3 className="text-lg font-semibold text-gray-900">Chọn Đơn bán hàng</h3>
+            <p className="text-sm text-gray-500">Tìm và chọn Đơn bán hàng đã được phê duyệt</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             ✕
@@ -899,9 +974,9 @@ const SalesOrderPickerModal = ({
         </div>
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="py-12 text-center text-gray-500">Đang tải danh sách Sales Order...</div>
+            <div className="py-12 text-center text-gray-500">Đang tải danh sách Đơn bán hàng...</div>
           ) : salesOrders.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">Không có Sales Order nào</div>
+            <div className="py-12 text-center text-gray-500">Không có Đơn bán hàng nào</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50">

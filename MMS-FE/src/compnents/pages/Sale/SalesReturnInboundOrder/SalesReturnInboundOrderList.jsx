@@ -159,22 +159,22 @@ export default function SalesReturnInboundOrderList() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Đơn nhập hàng lại
+              Đơn nhập hàng trả lại
             </h1>
           </div>
           <button
             onClick={() => navigate("/sales/return-inbound-orders/new")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            + Tạo Đơn nhập hàng lại
+            + Tạo Đơn nhập hàng trả lại
           </button>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <form

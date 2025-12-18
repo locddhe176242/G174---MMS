@@ -204,6 +204,7 @@ export default function ReturnOrderForm() {
       setFormData((prev) => ({
         ...prev,
         deliveryId: targetDeliveryId, // Đảm bảo deliveryId được set
+        // warehouseId không còn ở header, nhưng giữ lại để backward compatibility
         warehouseId: delivery.warehouseId || prev.warehouseId,
         items: items.length > 0 ? items : [defaultItem()],
       }));
@@ -261,9 +262,7 @@ export default function ReturnOrderForm() {
     if (!formData.deliveryId) {
       newErrors.deliveryId = "Vui lòng chọn Delivery";
     }
-    if (!formData.warehouseId) {
-      newErrors.warehouseId = "Vui lòng chọn kho";
-    }
+    // Không validate warehouseId ở header nữa, vì mỗi item có kho riêng
     
     // Chỉ lấy các items có returnedQty > 0 để validate
     const itemsWithReturnQty = (formData.items || []).filter(
@@ -300,25 +299,37 @@ export default function ReturnOrderForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const buildPayload = () => ({
-    deliveryId: formData.deliveryId,
-    invoiceId: formData.invoiceId || null,
-    warehouseId: formData.warehouseId,
-    returnDate: formData.returnDate ? formData.returnDate.toISOString().slice(0, 10) : null,
-    reason: formData.reason || null,
-    notes: formData.notes || null,
-    // Chỉ gửi các items có returnedQty > 0
-    items: formData.items
-      .filter((item) => item.returnedQty && Number(item.returnedQty) > 0)
-      .map((item) => ({
-        deliveryItemId: item.deliveryItemId,
-        productId: item.productId,
-        warehouseId: item.warehouseId,
-        returnedQty: Number(item.returnedQty || 0),
-        reason: item.reason || null,
-        note: item.note || null,
-      })),
-  });
+  const buildPayload = () => {
+    // Tự động lấy warehouseId từ item đầu tiên có returnedQty > 0
+    // Hoặc từ delivery nếu không có item nào
+    const firstItemWithQty = formData.items.find(
+      (item) => item.returnedQty && Number(item.returnedQty) > 0
+    );
+    const autoWarehouseId = firstItemWithQty?.warehouseId || 
+                           selectedDelivery?.warehouseId || 
+                           formData.warehouseId || 
+                           null;
+
+    return {
+      deliveryId: formData.deliveryId,
+      invoiceId: formData.invoiceId || null,
+      warehouseId: autoWarehouseId, // Tự động lấy từ item đầu tiên
+      returnDate: formData.returnDate ? formData.returnDate.toISOString().slice(0, 10) : null,
+      reason: formData.reason || null,
+      notes: formData.notes || null,
+      // Chỉ gửi các items có returnedQty > 0
+      items: formData.items
+        .filter((item) => item.returnedQty && Number(item.returnedQty) > 0)
+        .map((item) => ({
+          deliveryItemId: item.deliveryItemId,
+          productId: item.productId,
+          warehouseId: item.warehouseId, // Mỗi item có kho riêng - có thể khác nhau
+          returnedQty: Number(item.returnedQty || 0),
+          reason: item.reason || null,
+          note: item.note || null,
+        })),
+    };
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -360,28 +371,30 @@ export default function ReturnOrderForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isEdit ? "Cập nhật đơn trả hàng" : "Tạo đơn trả hàng mới"}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  {isEdit ? "Cập nhật thông tin đơn trả hàng" : "Nhập thông tin đơn trả hàng"}
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/sales/return-orders")}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                ← Quay lại
-              </button>
-            </div>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEdit ? "Cập nhật đơn trả hàng" : "Tạo đơn trả hàng mới"}
+            </h1>
+            <p className="text-gray-500">
+              {isEdit ? "Cập nhật thông tin đơn trả hàng" : "Nhập thông tin đơn trả hàng"}
+            </p>
           </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/return-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
+            </button>
+          </div>
+        </div>
+      </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="px-6 py-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -431,22 +444,6 @@ export default function ReturnOrderForm() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kho nhận hàng trả lại <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  value={warehouses.find((w) => w.value === formData.warehouseId) || null}
-                  onChange={(opt) => handleInputChange("warehouseId", opt ? opt.value : "")}
-                  options={warehouses}
-                  placeholder="Chọn kho"
-                  isClearable
-                />
-                {errors.warehouseId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.warehouseId}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ngày trả hàng
                 </label>
                 <DatePicker
@@ -457,7 +454,7 @@ export default function ReturnOrderForm() {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Lý do trả hàng
                 </label>
@@ -641,7 +638,6 @@ export default function ReturnOrderForm() {
               </button>
             </div>
           </form>
-        </div>
       </div>
 
       <DeliveryPickerModal

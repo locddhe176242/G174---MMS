@@ -324,6 +324,7 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
         order.setOrderDate(Instant.now());
         order.setShippingAddress(null);
         order.setPaymentTerms(quotation.getPaymentTerms());
+        order.setDeliveryTerms(quotation.getDeliveryTerms());
         order.setNotes(quotation.getNotes());
         order.setHeaderDiscountPercent(defaultBigDecimal(quotation.getHeaderDiscountPercent()));
         order.setSoNo(generateOrderNo());
@@ -407,66 +408,93 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             String toEmail = customer.getContact().getEmail().trim();
             String subject = String.format("[Sales Order %s] Gửi đơn hàng", order.getSoNo());
 
+            java.text.NumberFormat nf = java.text.NumberFormat
+                    .getInstance(new java.util.Locale("vi", "VN"));
+
             StringBuilder rows = new StringBuilder();
             int idx = 1;
             for (SalesOrderItem item : items) {
                 Product product = item.getProduct();
                 String code = product != null && product.getSku() != null ? product.getSku() : "";
                 String name = product != null && product.getName() != null ? product.getName() : "";
-                String qty = item.getQuantity() != null ? item.getQuantity().toPlainString() : "0";
-                String unitPrice = item.getUnitPrice() != null ? item.getUnitPrice().toPlainString() : "0";
-                String discount = item.getDiscountAmount() != null ? item.getDiscountAmount().toPlainString() : "0";
-                String taxRate = item.getTaxRate() != null ? item.getTaxRate().toPlainString() + "%" : "0%";
-                String lineTotal = item.getLineTotal() != null ? item.getLineTotal().toPlainString() : "0";
+
+                String qty = item.getQuantity() != null ? nf.format(item.getQuantity()) : "0";
+                String unitPrice = item.getUnitPrice() != null ? nf.format(item.getUnitPrice()) : "0";
+                
+                // Tính discountPercent từ discountAmount
+                BigDecimal baseAmount = (item.getQuantity() != null && item.getUnitPrice() != null) 
+                    ? item.getQuantity().multiply(item.getUnitPrice()) : BigDecimal.ZERO;
+                BigDecimal discountAmount = item.getDiscountAmount() != null ? item.getDiscountAmount() : BigDecimal.ZERO;
+                BigDecimal discountPercent = BigDecimal.ZERO;
+                if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
+                    discountPercent = discountAmount
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(baseAmount, 2, RoundingMode.HALF_UP);
+                }
+                String discountPercentStr = discountPercent.toPlainString() + "%%";
+                
+                String taxRate = item.getTaxRate() != null ? item.getTaxRate().toPlainString() + "%%" : "0%%";
+                String lineTotal = item.getLineTotal() != null ? nf.format(item.getLineTotal()) : "0";
 
                 rows.append(
                         """
                                 <tr>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:center;">%d</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb;">%s<br/><span style="color:#6b7280; font-size:12px;">%s</span></td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right; font-weight:bold;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:40px;">%d</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:left;">%s<br/><span style="color:#6b7280; font-size:12px;">%s</span></td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:80px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:right; width:120px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:100px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:70px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:right; width:130px; font-weight:bold;">%s</td>
                                 </tr>
                                 """
-                                .formatted(idx++, code, name, qty, unitPrice, discount, taxRate, lineTotal));
+                                .formatted(idx++, code, name, qty, unitPrice, discountPercentStr, taxRate, lineTotal));
             }
 
-            String total = order.getTotalAmount() != null ? order.getTotalAmount().toPlainString() : "0";
+            String total = order.getTotalAmount() != null ? nf.format(order.getTotalAmount()) : "0";
             String customerName = (customer.getFirstName() + " " + customer.getLastName()).trim();
+            String paymentTerms = order.getPaymentTerms() != null ? order.getPaymentTerms() : "Không có";
+            String deliveryTerms = order.getDeliveryTerms() != null ? order.getDeliveryTerms() : "Không có";
+            String headerDiscountPercent = order.getHeaderDiscountPercent() != null 
+                ? order.getHeaderDiscountPercent().toPlainString() + "%%" : "0%%";
 
             String html = """
                     <html>
-                    <body style="font-family: Arial, sans-serif; color: #333;">
-                      <h2>Gửi đơn bán hàng: %s</h2>
-                      <p>Kính gửi %s,</p>
+                    <body style="font-family: Arial, sans-serif; color: #333; line-height:1.5;">
+                      <h2 style="color:#1f2937;">Gửi đơn bán hàng: %s</h2>
+                      <p>Kính gửi <strong>%s</strong>,</p>
                       <p>Chúng tôi gửi tới quý khách đơn bán hàng số <strong>%s</strong>.</p>
-                      <ul>
-                        <li>Giá trị: <strong>%s</strong></li>
+                      <ul style="margin:12px 0 0 18px; padding:0; font-size:14px;">
+                        <li><strong>Điều khoản thanh toán:</strong> %s</li>
+                        <li><strong>Điều khoản giao hàng:</strong> %s</li>
                       </ul>
-                      <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:13px;">
+                      <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:14px;">
                         <thead>
-                          <tr style="background:#f3f4f6;">
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb;">#</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:left;">Sản phẩm</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Số lượng</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Đơn giá</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Chiết khấu</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thuế</th>
-                            <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thành tiền</th>
+                          <tr style="background:#2563eb; color:#fff;">
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; width:40px;">#</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:left;">Sản phẩm</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:center; width:80px;">Số lượng</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:right; width:120px;">Đơn giá (VND)</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:center; width:100px;">Chiết khấu (%%)</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:center; width:70px;">Thuế (%%)</th>
+                            <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:right; width:130px;">Thành tiền (VND)</th>
                           </tr>
                         </thead>
                         <tbody>
                           %s
                         </tbody>
                       </table>
-                      <p>Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
-                      <p>Trân trọng,<br/>MMS System</p>
+                      <div style="margin-top:20px; font-size:14px; text-align:right;">
+                        <p><strong>Chiết khấu cả đơn:</strong> %s</p>
+                        <p style="margin-top:8px; font-size:16px;"><strong>Tổng cộng: %s VND</strong></p>
+                      </div>
+                      <hr style="margin:20px 0; border:none; border-top:1px solid #e5e7eb;"/>
+                      <p style="color:#6b7280;">Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
+                      <p>Trân trọng,<br/><strong>MMS System</strong></p>
                     </body>
                     </html>
-                    """.formatted(order.getSoNo(), customerName, order.getSoNo(), total, rows.toString());
+                    """.formatted(order.getSoNo(), customerName, order.getSoNo(), paymentTerms, deliveryTerms,
+                            rows.toString(), headerDiscountPercent, total);
 
             emailService.sendHtmlEmail(toEmail, subject, html);
         } catch (Exception e) {
@@ -601,14 +629,20 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
     }
 
     private String generateOrderNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-        String candidate = "SO-" + datePart + "-" + unique;
-
-        while (salesOrderRepository.findBySoNo(candidate) != null) {
-            unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-            candidate = "SO-" + datePart + "-" + unique;
+        String prefix = "SO";
+        String maxNo = salesOrderRepository.findMaxOrderNo(prefix);
+        
+        int nextNum = 1;
+        if (maxNo != null && maxNo.startsWith(prefix)) {
+            try {
+                String numPart = maxNo.substring(prefix.length());
+                nextNum = Integer.parseInt(numPart) + 1;
+            } catch (NumberFormatException e) {
+                // If parsing fails, start from 1
+                nextNum = 1;
+            }
         }
-        return candidate;
+        
+        return String.format("%s%04d", prefix, nextNum);
     }
 }
