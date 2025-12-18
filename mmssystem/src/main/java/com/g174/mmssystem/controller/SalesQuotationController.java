@@ -72,7 +72,12 @@ public class SalesQuotationController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER','SALE')")
-    @LogActivity(action = "UPDATE_SALES_QUOTATION", activityType = "SALES_MANAGEMENT", description = "Cập nhật báo giá ID: #{#id}", entityId = "#{#id}")
+    @LogActivity(
+            action = "UPDATE_SALES_QUOTATION",
+            activityType = "SALES_MANAGEMENT",
+            description = "Cập nhật báo giá bán hàng",
+            entityId = "#{#id}"
+    )
     public ResponseEntity<SalesQuotationResponseDTO> updateQuotation(
             @PathVariable Integer id,
             @Valid @RequestBody SalesQuotationRequestDTO request) {

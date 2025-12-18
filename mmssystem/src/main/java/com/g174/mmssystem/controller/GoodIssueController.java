@@ -71,7 +71,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/{issueId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<GoodIssueResponseDTO> getIssueById(@PathVariable Integer issueId) {
         log.info("REST: Fetching good issue ID: {}", issueId);
 
@@ -80,7 +80,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodIssueResponseDTO>> getAllIssuesPaged(Pageable pageable) {
         log.info("REST: Fetching good issues with pagination");
 
@@ -89,7 +89,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodIssueResponseDTO>> searchIssuesPaged(
             @RequestParam String keyword,
             Pageable pageable) {
@@ -100,7 +100,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/delivery/{deliveryId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','SALE','ACCOUNTING')")
     public ResponseEntity<List<GoodIssueResponseDTO>> getIssuesByDeliveryId(@PathVariable Integer deliveryId) {
         log.info("REST: Fetching good issues for Delivery ID: {}", deliveryId);
 
@@ -109,7 +109,7 @@ public class GoodIssueController {
     }
 
     @GetMapping("/warehouse/{warehouseId}")
-    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<GoodIssueResponseDTO>> getIssuesByWarehouseId(@PathVariable Integer warehouseId) {
         log.info("REST: Fetching good issues for Warehouse ID: {}", warehouseId);
 
@@ -119,7 +119,12 @@ public class GoodIssueController {
 
     @PutMapping("/{issueId}")
     @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
-    @LogActivity(action = "UPDATE_GOOD_ISSUE", activityType = "WAREHOUSE_MANAGEMENT", description = "Cập nhật phiếu xuất kho ID: #{#issueId}", entityId = "#{#issueId}")
+    @LogActivity(
+            action = "UPDATE_GOOD_ISSUE",
+            activityType = "WAREHOUSE_MANAGEMENT",
+            description = "Cập nhật phiếu xuất kho",
+            entityId = "#{#issueId}"
+    )
     public ResponseEntity<GoodIssueResponseDTO> updateIssue(
             @PathVariable Integer issueId,
             @Valid @RequestBody GoodIssueRequestDTO requestDTO,

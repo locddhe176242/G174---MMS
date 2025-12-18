@@ -32,7 +32,7 @@ public class PurchaseOrderItem {
     private PurchaseQuotationItem purchaseQuotationItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @JoinColumn(name = "product_id")  // Removed nullable=false to allow manual PO entry
     private Product product;
 
     @Column(name = "uom", length = 50)

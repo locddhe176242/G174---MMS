@@ -22,7 +22,7 @@ public class ProductCategoryController {
     private final IProductCategoryService productCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<ProductCategoryResponseDTO>> getProductCategories() {
         try {
             List<ProductCategoryResponseDTO> categories = productCategoryService.getProductCategories();
@@ -34,7 +34,7 @@ public class ProductCategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<ProductCategoryResponseDTO> getProductCategory(@PathVariable Integer id) {
         try {
             ProductCategoryResponseDTO category = productCategoryService.getProductCategory(id);
@@ -97,7 +97,7 @@ public class ProductCategoryController {
     @LogActivity(
             action = "DELETE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
-            description = "Xóa danh mục ID: #{#id}",
+            description = "Xóa danh mục sản phẩm",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> deleteProductCategory(@PathVariable Integer id) {
@@ -118,7 +118,7 @@ public class ProductCategoryController {
     @LogActivity(
             action = "RESTORE_PRODUCT_CATEGORY",
             activityType = "PRODUCT_CATEGORY_MANAGEMENT",
-            description = "Khôi phục danh mục ID: #{#id}",
+            description = "Khôi phục danh mục sản phẩm",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> restoreProductCategory(@PathVariable Integer id) {
@@ -135,7 +135,7 @@ public class ProductCategoryController {
     }
 
     @GetMapping("/deleted")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<ProductCategoryResponseDTO>> getDeletedProductCategories() {
         try {
             List<ProductCategoryResponseDTO> categories = productCategoryService.getDeletedProductCategories();

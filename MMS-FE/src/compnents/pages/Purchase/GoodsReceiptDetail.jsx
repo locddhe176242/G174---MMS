@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
 import { apInvoiceService } from "../../../api/apInvoiceService";
 import apiClient from "../../../api/apiClient";
-import { getCurrentUser } from "../../../api/authService";
+import { getCurrentUser, getCurrentRoles } from "../../../api/authService";
 import { formatCurrency } from "../../../utils/formatters";
 
 export default function GoodsReceiptDetail() {
@@ -18,6 +18,7 @@ export default function GoodsReceiptDetail() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
+    const [userRoles, setUserRoles] = useState([]);
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
@@ -64,6 +65,8 @@ export default function GoodsReceiptDetail() {
         try {
             const user = await getCurrentUser();
             setCurrentUser(user);
+            const roles = getCurrentRoles();
+            setUserRoles(roles || []);
         } catch (error) {
             console.warn("Could not load current user:", error);
         }
@@ -291,7 +294,7 @@ export default function GoodsReceiptDetail() {
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">
-                            {data.status === "Approved" && relatedInvoices.length === 0 && (
+                            {data.status === "Approved" && relatedInvoices.length === 0 && !userRoles.includes("WAREHOUSE") && (
                                 <button
                                     onClick={handleCreateInvoice}
                                     className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
@@ -407,7 +410,7 @@ export default function GoodsReceiptDetail() {
                                                         <td className="py-3 pr-4">
                                                             <div className="font-medium">{poItem?.productName || poItem?.product_name || item.productName || item.product_name || "-"}</div>
                                                             <div className="text-xs text-gray-500">
-                                                                SKU: {poItem?.productCode || poItem?.sku || "-"}
+                                                                SKU: {poItem?.productCode || poItem?.sku || item.productCode || item.product_code || item.sku || "-"}
                                                             </div>
                                                         </td>
                                                         <td className="py-3 pr-4 text-right">
@@ -421,7 +424,7 @@ export default function GoodsReceiptDetail() {
                                                         </td>
                                                     </tr>
                                                 );
-                                            })}
+                                            })}         
                                             </tbody>
                                         </table>
                                     </div>

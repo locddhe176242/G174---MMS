@@ -11,6 +11,7 @@ const APInvoiceAttachments = ({ invoiceId, readonly = false }) => {
   const [description, setDescription] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewFileType, setPreviewFileType] = useState(null);
 
   useEffect(() => {
     if (invoiceId) {
@@ -101,11 +102,18 @@ const APInvoiceAttachments = ({ invoiceId, readonly = false }) => {
 
   const handleView = async (attachment) => {
     try {
+      console.log('Viewing attachment:', attachment);
+      
+      // Get static URL directly
       const { downloadUrl } = await apInvoiceAttachmentService.getDownloadUrl(attachment.attachmentId);
-      setPreviewUrl(downloadUrl);
-      setShowPreview(true);
+      
+      console.log('Download URL:', downloadUrl);
+      console.log('File name:', attachment.fileName);
+      
+      // Open in new tab instead of modal to avoid iframe blocking
+      window.open(downloadUrl, '_blank');
     } catch (error) {
-      console.error('Error getting download URL:', error);
+      console.error('Error viewing file:', error);
       alert('Lỗi khi xem file');
     }
   };
@@ -315,6 +323,7 @@ const APInvoiceAttachments = ({ invoiceId, readonly = false }) => {
                 onClick={() => {
                   setShowPreview(false);
                   setPreviewUrl(null);
+                  setPreviewFileType(null);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -323,12 +332,31 @@ const APInvoiceAttachments = ({ invoiceId, readonly = false }) => {
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4">
-              <iframe
-                src={previewUrl}
-                className="w-full h-full min-h-[600px] border rounded"
-                title="File Preview"
-              />
+            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+              {previewFileType && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(previewFileType) ? (
+                <div className="flex items-center justify-center min-h-[600px]">
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className="max-w-full max-h-[80vh] object-contain"
+                    onError={(e) => {
+                      console.error('Image load error');
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = '<div class="text-red-500">Không thể tải hình ảnh</div>';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full min-h-[600px] bg-white rounded">
+                  <iframe
+                    src={previewUrl}
+                    className="w-full h-full min-h-[600px] border-0"
+                    title="File Preview"
+                    onLoad={() => console.log('PDF loaded successfully')}
+                    onError={(e) => console.error('PDF load error:', e)}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -24,6 +24,8 @@ public interface IPurchaseOrderService {
     
     List<PurchaseOrderResponseDTO> getOrdersByPqId(Integer pqId);
     
+    List<PurchaseOrderResponseDTO> getOrdersByRfqId(Integer rfqId);
+    
     PurchaseOrderResponseDTO updateOrder(Integer orderId, PurchaseOrderRequestDTO dto, Integer updatedById);
     
     PurchaseOrderResponseDTO approveOrder(Integer orderId, Integer approverId);

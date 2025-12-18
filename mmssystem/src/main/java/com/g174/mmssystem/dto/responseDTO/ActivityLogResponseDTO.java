@@ -13,10 +13,13 @@ public class ActivityLogResponseDTO {
 
     private Integer logId;
     private Integer userId;
+    private String userName;
+    private String userFullName;
     private String userEmail;
     private String action;
     private String description;
     private String activityType;
+    private String tableName;
     private Integer entityId;
     private LocalDateTime logDate;
     private String logDateFormatted;

@@ -11,8 +11,10 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class GoodsReceiptItemRequestDTO {
-    private Integer poiId;
+    // For Purchase: Inbound Delivery Item ID
+    private Integer idiId;
 
+    // For SalesReturn: Return Order Item ID
     private Integer roiId;
 
     @NotNull(message = "Product ID là bắt buộc")

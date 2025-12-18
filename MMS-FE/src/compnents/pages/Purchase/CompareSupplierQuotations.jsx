@@ -16,7 +16,7 @@ export default function CompareSupplierQuotations() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
-    const [isManager, setIsManager] = useState(false);
+    const [canSelectVendor, setCanSelectVendor] = useState(false);
     const [hasPurchaseOrder, setHasPurchaseOrder] = useState(false);
 
     // Helpers
@@ -161,15 +161,18 @@ export default function CompareSupplierQuotations() {
         }, null);
     }, [quotations]);
 
-    // Get current user and check if MANAGER
+    // Get current user and check if PURCHASE or MANAGER role
     useEffect(() => {
         const user = getCurrentUser();
         setCurrentUser(user);
         const userRoles = user?.roles || [];
-        const hasManagerRole = userRoles.some(role => 
+        console.log('Current user roles:', userRoles);
+        const canSelect = userRoles.some(role => 
+            role === 'PURCHASE' || role === 'ROLE_PURCHASE' || role?.name === 'PURCHASE' ||
             role === 'MANAGER' || role === 'ROLE_MANAGER' || role?.name === 'MANAGER'
         );
-        setIsManager(hasManagerRole);
+        console.log('Can select vendor:', canSelect);
+        setCanSelectVendor(canSelect);
     }, []);
 
     // Fetch data from backend
@@ -349,7 +352,7 @@ export default function CompareSupplierQuotations() {
             
             // 1. Approve winner quotation
             await purchaseQuotationService.approveQuotation(selectedId, approverId);
-            toast.success(`Đã phê duyệt báo giá ${selectedQuotation.pqNo || selectedQuotation.pq_no}`);
+            // Toast sẽ hiện ở PO form khi load xong, không cần toast ở đây
 
             // 2. Reject other quotations from the same RFQ
             const otherQuotations = quotations.filter(q => {
@@ -450,8 +453,8 @@ export default function CompareSupplierQuotations() {
         const statusStr = typeof q.status === 'string' ? q.status : (q.status?.name || q.status?.toString() || '');
         return statusStr === 'Approved' || statusStr === 'Pending';
     }).length;
-    const invitedCount = rfqData.selectedVendorIds?.length || quotations.length;
-    const progressPercentage = invitedCount > 0 ? (submittedCount / invitedCount) * 100 : 0;
+    const totalInvited = rfqData.selectedVendorIds?.length || quotations.length;
+    const progressPercentage = totalInvited > 0 ? (submittedCount / totalInvited) * 100 : 0;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -510,7 +513,19 @@ export default function CompareSupplierQuotations() {
                             <div>
                                 <div className="text-sm text-gray-600 mb-1">Trạng thái</div>
                                 <div className="text-2xl font-bold">
-                                    {rfqData.status === "Published" ? "Đã xuất bản" : rfqData.status}
+                                    {(() => {
+                                        const statusStr = typeof rfqData.status === 'string' ? rfqData.status : (rfqData.status?.name || rfqData.status?.toString() || 'Draft');
+                                        const statusMap = {
+                                            'Draft': 'Nháp',
+                                            'Pending': 'Chờ phản hồi',
+                                            'Sent': 'Đã gửi',
+                                            'Published': 'Đã xuất bản',
+                                            'Completed': 'Hoàn thành',
+                                            'Closed': 'Đã đóng',
+                                            'Cancelled': 'Đã hủy'
+                                        };
+                                        return statusMap[statusStr] || statusStr;
+                                    })()}
                                 </div>
                             </div>
 
@@ -522,48 +537,22 @@ export default function CompareSupplierQuotations() {
                                 </div>
                             </div>
 
-                            {/* Number of Invited Bidders - Circular Progress */}
+                            {/* Number of Invited Bidders - Text Format */}
                             <div>
                                 <div className="text-sm text-gray-600 mb-2">Số lượng nhà cung cấp được mời</div>
-                                <div className="flex items-center gap-4">
-                                    <div className="relative w-16 h-16">
-                                        <svg className="w-16 h-16 transform -rotate-90">
-                                            <circle
-                                                cx="32"
-                                                cy="32"
-                                                r="28"
-                                                stroke="#e5e7eb"
-                                                strokeWidth="6"
-                                                fill="none"
-                                            />
-                                            <circle
-                                                cx="32"
-                                                cy="32"
-                                                r="28"
-                                                stroke={progressPercentage === 100 ? "#10b981" : "#3b82f6"}
-                                                strokeWidth="6"
-                                                fill="none"
-                                                strokeDasharray={`${2 * Math.PI * 28}`}
-                                                strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressPercentage / 100)}`}
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-lg font-bold">{submittedCount}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-sm font-medium">
-                                        {submittedCount}
-                                    </div>
+                                <div className="text-2xl font-bold">
+                                    {submittedCount}/{totalInvited}
                                 </div>
                             </div>
 
-                            {/* Best Quotation - Horizontal Bar */}
+                            {/* Best Quotation - With Vendor Name */}
                             {bestQuotation && (
                                 <div>
                                     <div className="text-sm text-gray-600 mb-1">Báo giá tốt nhất</div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-2 w-24 bg-red-500 rounded"></div>
+                                    <div className="flex flex-col gap-1">
+                                        <div className="text-sm font-medium text-gray-700">
+                                            {bestQuotation.vendorName || "N/A"}
+                                        </div>
                                         <div className="text-lg font-bold text-green-600">
                                             {formatCurrency(bestQuotation.totalAmount || 0, "VND")}
                                         </div>
@@ -587,12 +576,12 @@ export default function CompareSupplierQuotations() {
                             >
                                 Quay lại
                             </button>
-                            {isManager && !hasPurchaseOrder && (
+                            {!hasPurchaseOrder && (
                                 <button
                                     onClick={handleCompareAward}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                                 >
-                                    Phê duyệt và tạo đơn mua hàng
+                                    Chọn nhà cung cấp
                                 </button>
                             )}
                             {hasPurchaseOrder && (

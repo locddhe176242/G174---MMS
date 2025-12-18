@@ -7,12 +7,19 @@ import com.g174.mmssystem.entity.APInvoiceAttachment;
 import com.g174.mmssystem.service.IService.IAPInvoiceAttachmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +36,7 @@ public class APInvoiceAttachmentController {
      * Upload file đính kèm cho hóa đơn
      */
     @PostMapping("/upload")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "UPLOAD_AP_INVOICE_ATTACHMENT",
             activityType = "AP_INVOICE_MANAGEMENT",
@@ -68,7 +75,7 @@ public class APInvoiceAttachmentController {
      * Tạo attachment record (file đã upload trước)
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "CREATE_AP_INVOICE_ATTACHMENT",
             activityType = "AP_INVOICE_MANAGEMENT",
@@ -95,7 +102,7 @@ public class APInvoiceAttachmentController {
      * Lấy danh sách attachments của hóa đơn
      */
     @GetMapping("/invoice/{invoiceId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<?> getAttachmentsByInvoice(@PathVariable Integer invoiceId) {
         try {
             List<APInvoiceAttachmentResponseDTO> attachments = attachmentService.getAttachmentsByInvoiceId(invoiceId);
@@ -110,7 +117,7 @@ public class APInvoiceAttachmentController {
      * Lấy chi tiết attachment
      */
     @GetMapping("/{attachmentId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<?> getAttachment(@PathVariable Integer attachmentId) {
         try {
             APInvoiceAttachmentResponseDTO attachment = attachmentService.getAttachmentById(attachmentId);
@@ -128,7 +135,7 @@ public class APInvoiceAttachmentController {
      * Lấy download URL
      */
     @GetMapping("/{attachmentId}/download-url")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<?> getDownloadUrl(@PathVariable Integer attachmentId) {
         try {
             String downloadUrl = attachmentService.getDownloadUrl(attachmentId);
@@ -145,10 +152,82 @@ public class APInvoiceAttachmentController {
     }
 
     /**
+     * Stream file để xem trực tiếp (không bắt download)
+     */
+    @GetMapping("/{attachmentId}/view")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
+    public ResponseEntity<Resource> viewFile(@PathVariable Integer attachmentId) {
+        try {
+            APInvoiceAttachmentResponseDTO attachment = attachmentService.getAttachmentById(attachmentId);
+            
+            // Get file path from fileUrl (remove base URL part)
+            String fileUrl = attachment.getFileUrl();
+            String filePath = fileUrl.replace("/uploads/", "");
+            
+            Path path = Paths.get("uploads", filePath);
+            Resource resource = new UrlResource(path.toUri());
+            
+            if (!resource.exists() || !resource.isReadable()) {
+                log.error("File not found or not readable: {}", path);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Determine content type
+            String contentType = attachment.getMimeType();
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            
+            // Set headers for inline display (not download)
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(contentType));
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + attachment.getFileName() + "\"");
+            headers.add(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate");
+            headers.add(HttpHeaders.PRAGMA, "no-cache");
+            headers.add(HttpHeaders.EXPIRES, "0");
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(resource);
+                    
+        } catch (MalformedURLException e) {
+            log.error("Malformed URL for attachment {}: {}", attachmentId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            log.error("Error viewing file for attachment {}: {}", attachmentId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error viewing file for attachment {}: {}", attachmentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Lấy view URL (để xem file inline trong browser)
+     */
+    @GetMapping("/{attachmentId}/view-url")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
+    public ResponseEntity<?> getViewUrl(@PathVariable Integer attachmentId) {
+        try {
+            // Return API endpoint instead of static URL
+            String viewUrl = "/api/ap-invoice-attachments/" + attachmentId + "/view";
+            Map<String, String> response = new HashMap<>();
+            response.put("viewUrl", viewUrl);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("Error getting view URL for attachment {}: {}", attachmentId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error getting view URL for attachment {}: {}", attachmentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
      * Xóa attachment
      */
     @DeleteMapping("/{attachmentId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     @LogActivity(
             action = "DELETE_AP_INVOICE_ATTACHMENT",
             activityType = "AP_INVOICE_MANAGEMENT",

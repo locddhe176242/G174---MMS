@@ -17,9 +17,13 @@ public class GoodsReceiptResponseDTO {
     
     private GoodsReceipt.SourceType sourceType;
     
-    private Integer orderId;
-    private String poNo;
+    // For Purchase flow
+    private Integer inboundDeliveryId;
+    private String inboundDeliveryNo;
+    private Integer orderId;  // From Inbound Delivery -> PO
+    private String poNo;      // From Inbound Delivery -> PO
     
+    // For SalesReturn flow
     private Integer roId;
     private String returnNo;
     private Integer sriId;
@@ -41,8 +45,8 @@ public class GoodsReceiptResponseDTO {
     private Boolean hasInvoice; // Đánh dấu GR đã được tạo invoice
     
     // Thông tin tiến độ nhập kho
-    private Double totalReceivedQty; // Tổng số lượng đã nhận (tất cả các GR của PO này)
-    private Double totalOrderedQty;  // Tổng số lượng đã đặt
-    private String poStatus;         // Trạng thái của PO (Sent, Completed, etc.)
+    private Double totalReceivedQty; // Tổng số lượng đã nhận (tất cả các GR của Inbound Delivery này)
+    private Double totalExpectedQty;  // Tổng số lượng dự kiến
+    private String inboundDeliveryStatus; // Trạng thái của Inbound Delivery
 }
 

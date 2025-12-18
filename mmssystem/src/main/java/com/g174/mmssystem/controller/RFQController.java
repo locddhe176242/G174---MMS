@@ -125,7 +125,7 @@ public class RFQController {
     @LogActivity(
             action = "UPDATE_RFQ",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Cập nhật RFQ ID: #{#rfqId}",
+            description = "Cập nhật RFQ",
             entityId = "#{#rfqId}"
     )
     public ResponseEntity<Map<String, Object>> updateRFQ(
@@ -167,7 +167,7 @@ public class RFQController {
     @LogActivity(
             action = "CLOSE_RFQ",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Đóng RFQ ID: #{#rfqId}",
+            description = "Đóng RFQ",
             entityId = "#{#rfqId}"
     )
     public ResponseEntity<Map<String, Object>> closeRFQ(@PathVariable Integer rfqId) {
@@ -186,7 +186,7 @@ public class RFQController {
     @LogActivity(
             action = "CANCEL_RFQ",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Hủy RFQ ID: #{#rfqId}",
+            description = "Hủy RFQ",
             entityId = "#{#rfqId}"
     )
     public ResponseEntity<Map<String, Object>> cancelRFQ(@PathVariable Integer rfqId) {
@@ -205,7 +205,7 @@ public class RFQController {
     @LogActivity(
             action = "DELETE_RFQ",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Xóa RFQ ID: #{#rfqId}",
+            description = "Xóa RFQ",
             entityId = "#{#rfqId}"
     )
     public ResponseEntity<Map<String, Object>> deleteRFQ(@PathVariable Integer rfqId) {

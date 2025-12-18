@@ -28,7 +28,7 @@ public class DebtManagementController {
      * @return Page chứa danh sách DebtTransactionResponseDTO
      */
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT','SALE','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING','SALE','PURCHASE')")
     public ResponseEntity<Page<DebtTransactionResponseDTO>> getAllDebtTransactionsWithPagination(Pageable pageable) {
         log.info("REST: Fetching debt transactions with pagination - page: {}, size: {}, sort: {}",
                 pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
@@ -44,7 +44,7 @@ public class DebtManagementController {
      * @return Page chứa danh sách DebtTransactionResponseDTO
      */
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT','SALE','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING','SALE','PURCHASE')")
     public ResponseEntity<Page<DebtTransactionResponseDTO>> searchDebtTransactionsWithPagination(
             @RequestParam(required = false, defaultValue = "") String keyword,
             Pageable pageable) {
@@ -59,7 +59,7 @@ public class DebtManagementController {
      * Tổng hợp công nợ theo tháng hiện tại (group by KH/NCC)
      */
     @GetMapping("/summary/page")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT','SALE','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING','SALE','PURCHASE')")
     public ResponseEntity<Page<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO>> getMonthlySummary(Pageable pageable) {
         Page<com.g174.mmssystem.dto.responseDTO.DebtSummaryRowDTO> response = debtManagementService.getCurrentMonthSummary(pageable);
         return ResponseEntity.ok(response);

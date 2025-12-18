@@ -24,6 +24,16 @@ public interface WarehouseStockRepository extends JpaRepository<WarehouseStock, 
      * Lấy tất cả stock trong một warehouse
      */
     List<WarehouseStock> findByWarehouseId(Integer warehouseId);
+    
+    /**
+     * Lấy tất cả stock trong một warehouse với eager loading Product và Category
+     */
+    @Query("SELECT ws FROM WarehouseStock ws " +
+           "LEFT JOIN FETCH ws.product p " +
+           "LEFT JOIN FETCH p.category " +
+           "LEFT JOIN FETCH ws.warehouse " +
+           "WHERE ws.warehouseId = :warehouseId")
+    List<WarehouseStock> findByWarehouseIdWithProductAndCategory(@Param("warehouseId") Integer warehouseId);
 
     /**
      * Lấy tất cả stock của một product (trong tất cả warehouses)

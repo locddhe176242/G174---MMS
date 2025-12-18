@@ -139,10 +139,9 @@ public class ActivityLogServiceImpl implements IActivityLogService {
 
     @Override
     public List<ActivityLogResponseDTO> getRecentActivityLogs(int limit) {
-        log.info("Getting recent {} activity logs", limit);
-        List<ActivityLog> activityLogs = activityLogRepository.findAll().stream()
-                .limit(limit)
-                .toList();
+        log.info("Getting recent {} activity logs from all users", limit);
+        Pageable pageable = Pageable.ofSize(limit);
+        List<ActivityLog> activityLogs = activityLogRepository.findRecentActivityLogs(pageable);
         return activityLogMapper.toResponseDTOList(activityLogs);
     }
 

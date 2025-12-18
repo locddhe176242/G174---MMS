@@ -81,6 +81,10 @@ export default function APInvoiceDetail() {
 
         const invoiceData = await apInvoiceService.getInvoiceById(id);
         const itemsData = invoiceData.items || [];
+        
+        console.log("Invoice data:", invoiceData);
+        console.log("Header discount:", invoiceData.header_discount, invoiceData.headerDiscount);
+        console.log("Items:", itemsData);
 
         const resProducts = await apiClient.get("/product", {
           params: { page: 0, size: 1000 }
@@ -148,7 +152,9 @@ export default function APInvoiceDetail() {
     );
   }
 
-  const subtotal = Number(data.subtotal || data.subtotal || 0);
+  // Use backend values instead of recalculating
+  // This ensures consistency with invoice list and preserves historical data
+  const subtotal = Number(data.subtotal || 0);
   const taxAmount = Number(data.tax_amount || data.taxAmount || 0);
   const totalAmount = Number(data.total_amount || data.totalAmount || 0);
   const balanceAmount = Number(data.balance_amount || data.balanceAmount || 0);
@@ -222,10 +228,12 @@ export default function APInvoiceDetail() {
                       <thead>
                         <tr className="text-left text-gray-500 border-b">
                           <th className="py-3 pr-4">#</th>
-                          <th className="py-3 pr-4">Mô tả</th>
-                          <th className="py-3 pr-4">Số lượng</th>
-                          <th className="py-3 pr-4">Đơn giá</th>
-                          <th className="py-3 pr-4">Thuế (%)</th>
+                          <th className="py-3 pr-4">Sản phẩm</th>
+                          <th className="py-3 pr-4 text-right">SL yêu cầu</th>
+                          <th className="py-3 pr-4 text-right">Đơn giá/Sản phẩm(VND)</th>
+                          <th className="py-3 pr-4 text-center">Chiết Khấu (%)</th>
+                          <th className="py-3 pr-4 text-center">Thuế (%)</th>
+                          <th className="py-3 pr-4">Ghi chú</th>
                           <th className="py-3 pr-4 text-right">Thành tiền</th>
                         </tr>
                       </thead>
@@ -234,16 +242,31 @@ export default function APInvoiceDetail() {
                           <tr key={item.api_id || item.id || index} className="border-t hover:bg-gray-50">
                             <td className="py-3 pr-4">{index + 1}</td>
                             <td className="py-3 pr-4">
-                              {item.description || getProductName(item.product_id || item.productId) || "-"}
+                              <div className="font-medium">
+                                {item.product_name || item.productName || item.description || "-"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                SKU: {item.product_sku || item.productSku || "-"}
+                              </div>
                             </td>
-                            <td className="py-3 pr-4">
+                            <td className="py-3 pr-4 text-right">
                               {Number(item.quantity || 0).toLocaleString()}
                             </td>
-                            <td className="py-3 pr-4">
+                            <td className="py-3 pr-4 text-right">
                               {formatCurrency(item.unit_price || item.unitPrice || 0)}
                             </td>
+                            <td className="py-3 pr-4 text-center">
+                              <span className={item.discount_percent || item.discountPercent ? "text-green-600 font-medium" : ""}>
+                                {Number(item.discount_percent || item.discountPercent || 0).toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-center">
+                              {Number(item.tax_rate || item.taxRate || 0).toFixed(2)}
+                            </td>
                             <td className="py-3 pr-4">
-                              {Number(item.tax_rate || item.taxRate || 0).toFixed(2)}%
+                              <span className="text-sm text-gray-600">
+                                {item.remark || item.notes || "-"}
+                              </span>
                             </td>
                             <td className="py-3 pr-0 text-right font-medium">
                               {formatCurrency(Number(item.quantity || 0) * Number(item.unit_price || item.unitPrice || 0))}
@@ -253,7 +276,7 @@ export default function APInvoiceDetail() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t font-semibold bg-gray-50">
-                          <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
+                          <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
                             Tạm tính:
                           </td>
                           <td className="py-3 pr-4 text-right">
@@ -270,17 +293,17 @@ export default function APInvoiceDetail() {
                           }, 0);
                           return totalLineDiscount > 0 && (
                             <tr className="border-t font-semibold bg-gray-50">
-                              <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
+                              <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
                                 Chiết khấu sản phẩm:
                               </td>
                               <td className="py-3 pr-4 text-right text-red-600">
-                                -{formatCurrency(totalLineDiscount)}
+                                {formatCurrency(totalLineDiscount)}
                               </td>
                             </tr>
                           );
                         })()}
                         <tr className="border-t font-semibold bg-gray-50">
-                          <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
+                          <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
                             Tổng sau chiết khấu sản phẩm:
                           </td>
                           <td className="py-3 pr-4 text-right">
@@ -298,34 +321,48 @@ export default function APInvoiceDetail() {
                         </tr>
                         {(() => {
                           const round = (v) => Math.round(v * 100) / 100;
-                          const headerDiscount = data.header_discount || data.headerDiscount || 0;
+                          const headerDiscount = Number(data.header_discount || data.headerDiscount || 0);
                           const totalAfterLineDiscount = items.reduce((sum, item) => {
                             const itemSubtotal = round((item.quantity || 0) * (item.unit_price || item.unitPrice || 0));
                             const discountPercent = item.discount_percent || item.discountPercent || 0;
                             const discountAmount = round(itemSubtotal * (discountPercent / 100));
                             return sum + round(itemSubtotal - discountAmount);
                           }, 0);
-                          return headerDiscount > 0 && (
-                            <tr className="border-t font-semibold bg-gray-50">
-                              <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
-                                Chiết khấu tổng đơn ({headerDiscount}%):
-                              </td>
-                              <td className="py-3 pr-4 text-right text-red-600">
-                                -{formatCurrency(round(totalAfterLineDiscount * (headerDiscount / 100)))}
-                              </td>
-                            </tr>
-                          );
+                          
+                          if (headerDiscount > 0) {
+                            return (
+                              <>
+                                <tr className="border-t font-semibold bg-gray-50">
+                                  <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                                    Chiết khấu tổng đơn ({headerDiscount}%):
+                                  </td>
+                                  <td className="py-3 pr-4 text-right text-red-600">
+                                    {formatCurrency(round(totalAfterLineDiscount * (headerDiscount / 100)))}
+                                  </td>
+                                </tr>
+                                <tr className="border-t font-semibold bg-gray-50">
+                                  <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                                    Tiền sau khi chiết khấu tổng đơn:
+                                  </td>
+                                  <td className="py-3 pr-4 text-right">
+                                    {formatCurrency(round(totalAfterLineDiscount * (1 - headerDiscount / 100)))}
+                                  </td>
+                                </tr>
+                              </>
+                            );
+                          }
+                          return null;
                         })()}
                         <tr className="border-t font-semibold bg-gray-50">
-                          <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
-                            Thuế VAT:
+                          <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
+                            Thuế:
                           </td>
                           <td className="py-3 pr-4 text-right">
                             {formatCurrency(taxAmount)}
                           </td>
                         </tr>
                         <tr className="border-t-2 font-bold bg-blue-50 text-blue-900">
-                          <td colSpan={5} className="py-3 pr-4 text-right whitespace-nowrap">
+                          <td colSpan={7} className="py-3 pr-4 text-right whitespace-nowrap">
                             Tổng cộng:
                           </td>
                           <td className="py-3 pr-4 text-right">
@@ -400,28 +437,6 @@ export default function APInvoiceDetail() {
                     </span>
                   </div>
                 ) : null}
-              </div>
-            </div>
-
-            <div className="bg-white border rounded-lg">
-              <div className="px-6 py-4 border-b font-medium">Tổng hợp</div>
-              <div className="p-6 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tổng trước thuế:</span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tổng thuế:</span>
-                  <span className="font-medium">{formatCurrency(taxAmount)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="font-semibold">Tổng cộng:</span>
-                  <span className="font-semibold">{formatCurrency(totalAmount)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-gray-500">Còn nợ:</span>
-                  <span className="font-semibold text-red-600">{formatCurrency(balanceAmount)}</span>
-                </div>
               </div>
             </div>
 

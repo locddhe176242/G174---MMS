@@ -17,7 +17,8 @@ public interface GoodsReceiptItemRepository extends JpaRepository<GoodsReceiptIt
     @Query("SELECT gri FROM GoodsReceiptItem gri WHERE gri.product.productId = :productId")
     List<GoodsReceiptItem> findByProductId(@Param("productId") Integer productId);
 
-    @Query("SELECT gri FROM GoodsReceiptItem gri WHERE gri.purchaseOrderItem.poiId = :poiId")
+    // Query through InboundDeliveryItem -> PurchaseOrderItem chain
+    @Query("SELECT gri FROM GoodsReceiptItem gri WHERE gri.inboundDeliveryItem.purchaseOrderItem.poiId = :poiId")
     List<GoodsReceiptItem> findByPoiId(@Param("poiId") Integer poiId);
 }
 

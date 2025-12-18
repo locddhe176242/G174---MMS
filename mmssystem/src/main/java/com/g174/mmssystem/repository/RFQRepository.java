@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,5 +51,23 @@ public interface RFQRepository extends JpaRepository<RFQ, Integer> {
 
     @Query(value = "SELECT * FROM RFQs WHERE rfq_no LIKE CONCAT(:prefix, '%') AND deleted_at IS NULL ORDER BY rfq_no DESC LIMIT 1", nativeQuery = true)
     Optional<RFQ> findTopByRfqNoStartingWithOrderByRfqNoDesc(@Param("prefix") String prefix);
+    
+    /**
+     * Tìm các RFQ quá hạn (due_date < today) và chưa đóng
+     */
+    @Query("SELECT r FROM RFQ r WHERE r.dueDate < :today " +
+           "AND r.status IN ('Sent', 'Pending') " +
+           "AND r.deletedAt IS NULL")
+    List<RFQ> findOverdueRFQs(@Param("today") LocalDate today);
+    
+    /**
+     * Tìm các RFQ sắp hết hạn (due_date trong khoảng từ today đến endDate)
+     */
+    @Query("SELECT r FROM RFQ r WHERE r.dueDate >= :startDate " +
+           "AND r.dueDate <= :endDate " +
+           "AND r.status IN ('Sent', 'Pending') " +
+           "AND r.deletedAt IS NULL")
+    List<RFQ> findExpiringRFQs(@Param("startDate") LocalDate startDate, 
+                                @Param("endDate") LocalDate endDate);
 }
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import purchaseQuotationService from "../../../api/purchaseQuotationService";
 import purchaseOrderService from "../../../api/purchaseOrderService";
 import salesOrderService from "../../../api/salesOrderService";
@@ -86,46 +85,7 @@ export default function ApprovalList() {
       console.log('=== Starting fetchDocuments ===');
       console.log('Type filter:', type);
 
-      // Fetch Purchase Requisitions (Pending)
-      if (type === "all" || type === "purchase") {
-        try {
-          console.log('Fetching Purchase Requisitions...');
-          let prResponse = await purchaseRequisitionService.getRequisitionsWithPagination(0, 100, sort, "Pending");
-          console.log('PR Raw Response:', prResponse);
-          
-          // Extract data if wrapped
-          let prData = prResponse;
-          if (prData && typeof prData === 'object' && 'data' in prData) {
-            prData = prData.data;
-          }
-          
-          console.log('PR Data after extract:', prData);
-          
-          if (prData && prData.content && Array.isArray(prData.content)) {
-            console.log('PR Count:', prData.content.length);
-            prData.content.forEach(item => {
-              const docId = item.requisitionId || item.requisition_id || item.id;
-              if (docId) {
-                allDocuments.push({
-                  ...item,
-                  documentType: "Purchase Requisition",
-                  documentTypeCode: "PR",
-                  id: docId,
-                  number: item.requisitionNo || item.requisition_no || item.number,
-                  createdDate: item.createdAt || item.created_at || item.createdDate,
-                  requesterName: item.requesterName || item.requester_name || item.requester,
-                  totalAmount: item.totalValue || item.total_value || item.totalAmount || 0,
-                });
-              }
-            });
-          } else {
-            console.log('PR Data structure unexpected:', prData);
-          }
-        } catch (err) {
-          console.error("Error fetching purchase requisitions:", err);
-          console.error("Error details:", err.response?.data);
-        }
-      }
+      // Purchase Requisitions không cần duyệt nữa - đã bỏ bước manager approve
 
       // Fetch Purchase Quotations (Pending)
       if (type === "all" || type === "purchase") {
@@ -447,9 +407,6 @@ export default function ApprovalList() {
       
       // Approve based on document type
       switch (selectedDocument.documentTypeCode) {
-        case "PR":
-          await purchaseRequisitionService.approveRequisition(selectedDocument.id);
-          break;
         case "PQ":
           await purchaseQuotationService.approveQuotation(selectedDocument.id, approverId);
           break;
@@ -504,9 +461,6 @@ export default function ApprovalList() {
       
       // Reject based on document type
       switch (selectedDocument.documentTypeCode) {
-        case "PR":
-          await purchaseRequisitionService.rejectRequisition(selectedDocument.id, rejectReason);
-          break;
         case "PQ":
           await purchaseQuotationService.rejectQuotation(selectedDocument.id, approverId, rejectReason);
           break;

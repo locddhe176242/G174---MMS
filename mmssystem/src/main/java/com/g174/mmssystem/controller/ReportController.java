@@ -39,7 +39,7 @@ public class ReportController {
     
     // Get report by ID
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','SALE','ACCOUNTING')")
     public ResponseEntity<ReportResponse> getReportById(@PathVariable Integer id) {
         ReportResponse report = reportService.getReportById(id);
         return ResponseEntity.ok(report);
@@ -47,7 +47,7 @@ public class ReportController {
     
     // Filter reports
     @GetMapping("/filter")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','SALE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','SALE','ACCOUNTING')")
     public ResponseEntity<Page<ReportResponse>> filterReports(
             @RequestParam(required = false) ReportType type,
             @RequestParam(required = false) ReportStatus status,
@@ -97,7 +97,7 @@ public class ReportController {
     
     // Generate Financial Report
     @PostMapping("/generate/financial")
-    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
     public ResponseEntity<ReportResponse> generateFinancialReport(
             @RequestBody ReportRequest request,
             Authentication authentication) {

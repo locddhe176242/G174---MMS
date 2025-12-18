@@ -37,8 +37,8 @@ public class GoodsReceiptController {
     public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(
             @Valid @RequestBody GoodsReceiptRequestDTO requestDTO,
             @RequestParam(required = false) Integer createdById) {
-        log.info("REST: Creating goods receipt for Order ID: {}, Warehouse ID: {}",
-                requestDTO.getOrderId(), requestDTO.getWarehouseId());
+        log.info("REST: Creating goods receipt for Inbound Delivery ID: {}, Warehouse ID: {}",
+                requestDTO.getInboundDeliveryId(), requestDTO.getWarehouseId());
 
         // Get current user ID if not provided
         if (createdById == null) {
@@ -91,7 +91,7 @@ public class GoodsReceiptController {
     }
 
     @GetMapping("/{receiptId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<GoodsReceiptResponseDTO> getReceiptById(@PathVariable Integer receiptId) {
         log.info("REST: Fetching goods receipt ID: {}", receiptId);
 
@@ -104,7 +104,7 @@ public class GoodsReceiptController {
     // All list operations must use pagination
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodsReceiptResponseDTO>> getAllReceiptsPaged(Pageable pageable) {
         log.info("REST: Fetching goods receipts with pagination");
 
@@ -117,7 +117,7 @@ public class GoodsReceiptController {
     // All search operations must use pagination
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<GoodsReceiptResponseDTO>> searchReceiptsPaged(
             @RequestParam String keyword,
             Pageable pageable) {
@@ -127,17 +127,17 @@ public class GoodsReceiptController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping({"/order/{orderId}", "/po/{orderId}"})
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
-    public ResponseEntity<List<GoodsReceiptResponseDTO>> getReceiptsByOrderId(@PathVariable Integer orderId) {
-        log.info("REST: Fetching goods receipts for Order ID: {}", orderId);
+    @GetMapping("/inbound-delivery/{inboundDeliveryId}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
+    public ResponseEntity<List<GoodsReceiptResponseDTO>> getReceiptsByInboundDeliveryId(@PathVariable Integer inboundDeliveryId) {
+        log.info("REST: Fetching goods receipts for Inbound Delivery ID: {}", inboundDeliveryId);
 
-        List<GoodsReceiptResponseDTO> response = receiptService.getReceiptsByOrderId(orderId);
+        List<GoodsReceiptResponseDTO> response = receiptService.getReceiptsByInboundDeliveryId(inboundDeliveryId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/warehouse/{warehouseId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<GoodsReceiptResponseDTO>> getReceiptsByWarehouseId(@PathVariable Integer warehouseId) {
         log.info("REST: Fetching goods receipts for Warehouse ID: {}", warehouseId);
 
@@ -150,7 +150,7 @@ public class GoodsReceiptController {
     @LogActivity(
             action = "UPDATE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Cập nhật phiếu nhập kho ID: #{#receiptId}",
+            description = "Cập nhật phiếu nhập kho",
             entityId = "#{#receiptId}"
     )
     public ResponseEntity<GoodsReceiptResponseDTO> updateReceipt(
@@ -176,7 +176,7 @@ public class GoodsReceiptController {
     @LogActivity(
             action = "APPROVE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Duyệt phiếu nhập kho ID: #{#receiptId}",
+            description = "Duyệt phiếu nhập kho",
             entityId = "#{#receiptId}"
     )
     public ResponseEntity<GoodsReceiptResponseDTO> approveReceipt(
@@ -193,7 +193,7 @@ public class GoodsReceiptController {
     @LogActivity(
             action = "REJECT_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Từ chối phiếu nhập kho ID: #{#receiptId}",
+            description = "Từ chối phiếu nhập kho",
             entityId = "#{#receiptId}"
     )
     public ResponseEntity<GoodsReceiptResponseDTO> rejectReceipt(
@@ -211,7 +211,7 @@ public class GoodsReceiptController {
     @LogActivity(
             action = "DELETE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
-            description = "Xóa phiếu nhập kho ID: #{#receiptId}",
+            description = "Xóa phiếu nhập kho",
             entityId = "#{#receiptId}"
     )
     public ResponseEntity<GoodsReceiptResponseDTO> deleteReceipt(@PathVariable Integer receiptId) {
@@ -222,7 +222,7 @@ public class GoodsReceiptController {
     }
 
     @GetMapping("/generate-number")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<java.util.Map<String, String>> generateReceiptNo() {
         log.info("REST: Generating Receipt number");
 

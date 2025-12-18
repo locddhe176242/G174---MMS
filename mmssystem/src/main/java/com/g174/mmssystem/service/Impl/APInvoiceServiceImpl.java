@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,6 +40,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     private final GoodsReceiptRepository receiptRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
     private final GoodsReceiptItemRepository receiptItemRepository;
+    private final InboundDeliveryRepository inboundDeliveryRepository;
     private final com.g174.mmssystem.service.IService.IVendorBalanceService vendorBalanceService;
 
     @Override
@@ -175,16 +177,27 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("Only approved Goods Receipts can be invoiced");
         }
 
-        // Check if invoice already exists for this GR
-        // ERP Standard: 1 Goods Receipt = 1 Invoice (multiple payments on that invoice)
+        // Check if active invoice already exists for this GR
+        // ERP Standard: 1 Goods Receipt = 1 Active Invoice (multiple payments on that invoice)
+        // Allow creating new invoice if existing one is Cancelled
         List<APInvoice> existingInvoices = invoiceRepository.findByReceiptId(receiptId);
-        if (!existingInvoices.isEmpty()) {
+        List<APInvoice> activeInvoices = existingInvoices.stream()
+                .filter(inv -> inv.getStatus() != APInvoice.APInvoiceStatus.Cancelled)
+                .toList();
+        
+        if (!activeInvoices.isEmpty()) {
             throw new IllegalStateException("Hóa đơn đã được tạo cho phiếu nhập kho này");
         }
 
-        PurchaseOrder purchaseOrder = goodsReceipt.getPurchaseOrder();
+        // Access PurchaseOrder through InboundDelivery
+        InboundDelivery inboundDelivery = goodsReceipt.getInboundDelivery();
+        if (inboundDelivery == null) {
+            throw new IllegalStateException("Inbound Delivery not found for Goods Receipt ID: " + receiptId);
+        }
+        
+        PurchaseOrder purchaseOrder = inboundDelivery.getPurchaseOrder();
         if (purchaseOrder == null) {
-            throw new IllegalStateException("Purchase Order not found for Goods Receipt ID: " + receiptId);
+            throw new IllegalStateException("Purchase Order not found for Inbound Delivery ID: " + inboundDelivery.getInboundDeliveryId());
         }
         
         Vendor vendor = purchaseOrder.getVendor();
@@ -192,24 +205,81 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("Vendor not found for Purchase Order ID: " + purchaseOrder.getOrderId());
         }
 
-        // Calculate totals from PO totals based on accepted quantities
-        BigDecimal totalOrderedQty = goodsReceipt.getItems().stream()
-                .map(grItem -> grItem.getPurchaseOrderItem().getQuantity())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Get header discount from PO
+        BigDecimal headerDiscountPercent = purchaseOrder.getHeaderDiscount() != null 
+                ? purchaseOrder.getHeaderDiscount() : BigDecimal.ZERO;
+
+        // Calculate totals from GR items directly (more accurate than using PO ratios)
+        // This ensures correct calculation even if PO was saved with wrong values
+        BigDecimal subtotalBeforeDiscount = BigDecimal.ZERO; // Tổng trước chiết khấu
+        BigDecimal totalLineDiscount = BigDecimal.ZERO;
+        BigDecimal subtotalAfterLineDiscount = BigDecimal.ZERO;
+        BigDecimal taxAmount = BigDecimal.ZERO;
         
-        BigDecimal totalAcceptedQty = goodsReceipt.getItems().stream()
-                .map(GoodsReceiptItem::getAcceptedQty)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<APInvoiceItem> invoiceItems = new ArrayList<>();
         
-        // Calculate ratio of accepted vs ordered
-        BigDecimal ratio = totalOrderedQty.compareTo(BigDecimal.ZERO) > 0 
-                ? totalAcceptedQty.divide(totalOrderedQty, 10, RoundingMode.HALF_UP)
-                : BigDecimal.ONE;
+        for (GoodsReceiptItem grItem : goodsReceipt.getItems()) {
+            PurchaseOrderItem poItem = grItem.getInboundDeliveryItem().getPurchaseOrderItem();
+            BigDecimal acceptedQty = grItem.getAcceptedQty();
+            BigDecimal unitPrice = poItem.getUnitPrice();
+            BigDecimal lineDiscountPercent = poItem.getDiscountPercent() != null ? poItem.getDiscountPercent() : BigDecimal.ZERO;
+            BigDecimal taxRate = poItem.getTaxRate() != null ? poItem.getTaxRate() : BigDecimal.ZERO;
+            
+            // Calculate line subtotal (before any discount)
+            BigDecimal lineSubtotal = acceptedQty.multiply(unitPrice);
+            subtotalBeforeDiscount = subtotalBeforeDiscount.add(lineSubtotal);
+            
+            // Apply line discount
+            BigDecimal lineDiscountAmount = lineSubtotal.multiply(lineDiscountPercent)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            BigDecimal lineAfterDiscount = lineSubtotal.subtract(lineDiscountAmount);
+            
+            totalLineDiscount = totalLineDiscount.add(lineDiscountAmount);
+            subtotalAfterLineDiscount = subtotalAfterLineDiscount.add(lineAfterDiscount);
+            
+            APInvoiceItem invoiceItem = APInvoiceItem.builder()
+                    .purchaseOrderItem(poItem)
+                    .goodsReceiptItem(grItem)
+                    .description(grItem.getProduct().getName())
+                    .quantity(acceptedQty)
+                    .unitPrice(unitPrice)
+                    .discountPercent(lineDiscountPercent)
+                    .taxRate(taxRate)
+                    .lineTotal(lineAfterDiscount) // Store value after line discount only
+                    .build();
+            
+            invoiceItems.add(invoiceItem);
+        }
         
-        // Use PO totals (which already include all discounts and taxes)
-        BigDecimal subtotal = purchaseOrder.getTotalBeforeTax().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal taxAmount = purchaseOrder.getTaxAmount().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalAmount = purchaseOrder.getTotalAfterTax().multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+        // Apply header discount on subtotal after line discounts
+        BigDecimal headerDiscountAmount = subtotalAfterLineDiscount.multiply(headerDiscountPercent)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal subtotalAfterAllDiscounts = subtotalAfterLineDiscount.subtract(headerDiscountAmount);
+        
+        // Calculate tax on final subtotal (after all discounts)
+        for (APInvoiceItem item : invoiceItems) {
+            PurchaseOrderItem poItem = item.getPurchaseOrderItem();
+            BigDecimal taxRate = poItem.getTaxRate() != null ? poItem.getTaxRate() : BigDecimal.ZERO;
+            
+            // Get line total after line discount
+            BigDecimal lineAfterDiscount = item.getLineTotal();
+            
+            // Apply header discount proportion
+            BigDecimal lineHeaderDiscountAmount = lineAfterDiscount.multiply(headerDiscountPercent)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            BigDecimal lineFinalAmount = lineAfterDiscount.subtract(lineHeaderDiscountAmount);
+            
+            // Calculate tax on final amount
+            BigDecimal lineTax = lineFinalAmount.multiply(taxRate)
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            
+            taxAmount = taxAmount.add(lineTax);
+            
+            // Update lineTotal to be the amount BEFORE tax (after all discounts)
+            item.setLineTotal(lineFinalAmount);
+        }
+        
+        BigDecimal totalAmount = subtotalAfterAllDiscounts.add(taxAmount);
 
         // Generate invoice number
         String invoiceNo = generateInvoiceNo();
@@ -222,7 +292,8 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .goodsReceipt(goodsReceipt)
                 .invoiceDate(goodsReceipt.getReceivedDate().toLocalDate())
                 .dueDate(goodsReceipt.getReceivedDate().toLocalDate().plusDays(30)) // Default 30 days payment term
-                .subtotal(subtotal)
+                .subtotal(subtotalBeforeDiscount) // Tổng trước chiết khấu
+                .headerDiscount(headerDiscountPercent)
                 .taxAmount(taxAmount)
                 .totalAmount(totalAmount)
                 .balanceAmount(totalAmount)
@@ -232,31 +303,8 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        // Create invoice items from GR items
-        List<APInvoiceItem> invoiceItems = goodsReceipt.getItems().stream()
-                .map(grItem -> {
-                    PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
-                    BigDecimal acceptedQty = grItem.getAcceptedQty();
-                    BigDecimal orderedQty = poItem.getQuantity();
-                    BigDecimal unitPrice = poItem.getUnitPrice();
-                    
-                    // Calculate proportional amount from PO lineTotal (includes discount and tax)
-                    BigDecimal itemRatio = acceptedQty.divide(orderedQty, 10, RoundingMode.HALF_UP);
-                    BigDecimal lineTotal = poItem.getLineTotal().multiply(itemRatio).setScale(2, RoundingMode.HALF_UP);
-
-                    return APInvoiceItem.builder()
-                            .apInvoice(invoice)
-                            .purchaseOrderItem(poItem)
-                            .goodsReceiptItem(grItem)
-                            .description(grItem.getProduct().getName())
-                            .quantity(acceptedQty)
-                            .unitPrice(unitPrice)
-                            .taxRate(poItem.getTaxRate())
-                            .lineTotal(lineTotal)
-                            .build();
-                })
-                .collect(Collectors.toList());
-
+        // Set invoice reference for items
+        invoiceItems.forEach(item -> item.setApInvoice(invoice));
         invoice.setItems(invoiceItems);
 
         APInvoice saved = invoiceRepository.save(invoice);
@@ -295,8 +343,10 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("AP Invoice already exists for this Purchase Order");
         }
 
-        // Get all approved GRs for this PO
-        List<GoodsReceipt> goodsReceipts = receiptRepository.findByOrderId(orderId).stream()
+        // Get all approved GRs for this PO through Inbound Deliveries
+        List<InboundDelivery> inboundDeliveries = inboundDeliveryRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(orderId);
+        List<GoodsReceipt> goodsReceipts = inboundDeliveries.stream()
+                .flatMap(id -> receiptRepository.findByInboundDeliveryId(id.getInboundDeliveryId()).stream())
                 .filter(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved)
                 .toList();
 

@@ -21,10 +21,18 @@ public class ActivityLogMapper {
         ActivityLogResponseDTO dto = new ActivityLogResponseDTO();
         dto.setLogId(activityLog.getLogId());
         dto.setUserId(activityLog.getUser() != null ? activityLog.getUser().getId() : null);
+        dto.setUserName(activityLog.getUser() != null && activityLog.getUser().getProfile() != null 
+            ? activityLog.getUser().getProfile().getFirstName() : null);
+        // UserFullName = FirstName + " " + LastName
+        dto.setUserFullName(activityLog.getUser() != null && activityLog.getUser().getProfile() != null 
+            ? (activityLog.getUser().getProfile().getFirstName() + " " + 
+               (activityLog.getUser().getProfile().getLastName() != null ? activityLog.getUser().getProfile().getLastName() : "")).trim()
+            : null);
         dto.setUserEmail(activityLog.getUser() != null ? activityLog.getUser().getEmail() : null);
         dto.setAction(activityLog.getAction());
         dto.setDescription(activityLog.getDescription());
         dto.setActivityType(activityLog.getActivityType());
+        dto.setTableName(activityLog.getAction()); // Use action as tableName to avoid duplicate with activityType
         dto.setEntityId(activityLog.getEntityId());
         dto.setLogDate(activityLog.getLogDate());
         dto.setLogDateFormatted(activityLog.getLogDate() != null ?

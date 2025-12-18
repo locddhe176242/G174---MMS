@@ -29,6 +29,13 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, Intege
     );
 
     List<ActivityLog> findTop10ByUserIdOrderByLogDateDesc(Integer userId);
+    
+    // Get recent activity logs from all users (system-wide)
+    @Query("SELECT al FROM ActivityLog al " +
+           "LEFT JOIN FETCH al.user u " +
+           "LEFT JOIN FETCH u.profile " +
+           "ORDER BY al.logDate DESC")
+    List<ActivityLog> findRecentActivityLogs(Pageable pageable);
 
     long countByUserIdAndActivityType(Integer userId, String activityType);
 

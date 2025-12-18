@@ -86,7 +86,7 @@ export default function APaymentDetail() {
         <div className="bg-white rounded-lg shadow-sm p-6 max-w-md">
           <div className="text-red-600 mb-4">Lỗi: {err}</div>
           <button
-            onClick={() => navigate("/purchase/ap-invoices")}
+            onClick={() => navigate("/purchase/ap-payments")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Quay lại danh sách
@@ -111,13 +111,13 @@ export default function APaymentDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate("/purchase/ap-invoices")}
+                onClick={() => navigate("/purchase/ap-payments")}
                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
               >
                 ← Quay lại
               </button>
               <h1 className="text-2xl font-semibold">
-                Chi tiết hóa đơn {data.invoiceNo}
+                Chi tiết thanh toán {data.paymentNo || data.payment_no || `#${id}`}
               </h1>
             </div>
             <button

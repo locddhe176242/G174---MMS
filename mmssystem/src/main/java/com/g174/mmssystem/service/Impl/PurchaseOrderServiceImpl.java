@@ -3,6 +3,7 @@ package com.g174.mmssystem.service.Impl;
 import com.g174.mmssystem.dto.requestDTO.PurchaseOrderRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.PurchaseOrderResponseDTO;
 import com.g174.mmssystem.entity.*;
+import com.g174.mmssystem.entity.RFQ.RFQStatus;
 import com.g174.mmssystem.enums.PurchaseOrderApprovalStatus;
 import com.g174.mmssystem.enums.PurchaseOrderStatus;
 import com.g174.mmssystem.enums.PurchaseQuotationStatus;
@@ -42,6 +43,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     private final PurchaseOrderItemRepository orderItemRepository;
     private final EmailService emailService;
     private final GoodsReceiptRepository goodsReceiptRepository;
+    private final InboundDeliveryRepository inboundDeliveryRepository;
 
     @Override
     @Transactional
@@ -116,8 +118,11 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             List<PurchaseOrderItem> items = dto.getItems().stream()
                     .map(itemDto -> {
-                        Product product = productRepository.findById(itemDto.getProductId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
+                        Product product = null;
+                        if (itemDto.getProductId() != null) {
+                            product = productRepository.findById(itemDto.getProductId())
+                                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
+                        }
 
                         PurchaseQuotationItem pqItem = null;
                         if (itemDto.getPqItemId() != null) {
@@ -203,8 +208,10 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         Page<PurchaseOrder> orders = orderRepository.findAllActive(pageable);
         return orders.map(order -> {
             PurchaseOrderResponseDTO dto = orderMapper.toResponseDTO(order);
-            // Check if PO has approved Goods Receipt
-            boolean hasApprovedGR = goodsReceiptRepository.findByOrderId(order.getOrderId()).stream()
+            // Check if PO has approved Goods Receipt (through Inbound Deliveries)
+            List<InboundDelivery> inboundDeliveries = inboundDeliveryRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(order.getOrderId());
+            boolean hasApprovedGR = inboundDeliveries.stream()
+                    .flatMap(id -> goodsReceiptRepository.findByInboundDeliveryId(id.getInboundDeliveryId()).stream())
                     .anyMatch(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved && gr.getDeletedAt() == null);
             dto.setHasGoodsReceipt(hasApprovedGR);
             return dto;
@@ -244,6 +251,17 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     }
 
     @Override
+    public List<PurchaseOrderResponseDTO> getOrdersByRfqId(Integer rfqId) {
+        log.info("Fetching purchase orders for RFQ ID: {}", rfqId);
+
+        List<PurchaseOrder> orders = orderRepository.findByRfqId(rfqId);
+        log.info("Found {} purchase orders for RFQ ID: {}", orders.size(), rfqId);
+        orders.forEach(po -> log.info("PO ID: {}, PO No: {}, Deleted: {}", 
+            po.getOrderId(), po.getPoNo(), po.getDeletedAt() != null));
+        return orderMapper.toResponseDTOList(orders);
+    }
+
+    @Override
     @Transactional
     public PurchaseOrderResponseDTO updateOrder(Integer orderId, PurchaseOrderRequestDTO dto, Integer updatedById) {
         log.info("Updating purchase order ID: {}", orderId);
@@ -254,6 +272,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         if (order.getStatus() == PurchaseOrderStatus.Completed || order.getStatus() == PurchaseOrderStatus.Cancelled) {
             throw new IllegalStateException("Cannot update order with status: " + order.getStatus());
+        }
+
+        // Check if any Goods Receipt exists for this PO
+        long grCount = goodsReceiptRepository.findByPurchaseOrder(order).stream()
+                .filter(gr -> gr.getDeletedAt() == null)
+                .count();
+        if (grCount > 0) {
+            throw new IllegalStateException("Cannot update Purchase Order: Goods Receipt already created. Please cancel GR first.");
         }
 
         User updatedBy = userRepository.findById(updatedById)
@@ -737,10 +763,47 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                 .filter(o -> o.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
 
+        // Check if any Goods Receipt exists
+        long grCount = goodsReceiptRepository.findByPurchaseOrder(order).stream()
+                .filter(gr -> gr.getDeletedAt() == null)
+                .count();
+        if (grCount > 0) {
+            throw new IllegalStateException("Cannot delete Purchase Order: Goods Receipt records exist. Please delete GR first.");
+        }
+
+        // Check if any Inbound Delivery exists
+        long idCount = inboundDeliveryRepository.findByPurchaseOrder(order).stream()
+                .filter(id -> id.getDeletedAt() == null)
+                .count();
+        if (idCount > 0) {
+            throw new IllegalStateException("Cannot delete Purchase Order: Inbound Delivery records exist. Please delete ID first.");
+        }
+
         // Clear quotation reference to allow quotation to be reused
         // Only if PO has not been approved yet
         if (order.getPurchaseQuotation() != null && order.getApprovalStatus() != PurchaseOrderApprovalStatus.Approved) {
             log.info("Clearing quotation reference from deleted PO (not approved yet)");
+            PurchaseQuotation quotation = order.getPurchaseQuotation();
+            
+            // Reset quotation status to Approved (not Pending) so it can be used to create PO again
+            // Quotation was already approved before, so we keep it approved
+            if (quotation.getStatus() == PurchaseQuotationStatus.Ordered) {
+                quotation.setStatus(PurchaseQuotationStatus.Approved);
+                quotation.setUpdatedAt(LocalDateTime.now());
+                log.info("Reset quotation ID: {} status from Ordered to Approved", quotation.getPqId());
+            }
+            
+            // Reopen RFQ if it was closed after selecting quotation
+            if (quotation.getRfq() != null) {
+                RFQ rfq = quotation.getRfq();
+                if (rfq.getStatus() == RFQStatus.Closed || rfq.getStatus() == RFQStatus.Completed) {
+                    rfq.setStatus(RFQStatus.Sent);
+                    rfq.setUpdatedAt(LocalDateTime.now());
+                    rfqRepository.save(rfq);
+                    log.info("Reopened RFQ ID: {} status to Sent", rfq.getRfqId());
+                }
+            }
+            
             order.setPurchaseQuotation(null);
         }
 

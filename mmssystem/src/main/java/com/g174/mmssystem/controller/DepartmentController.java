@@ -75,7 +75,7 @@ public class DepartmentController {
     @PutMapping("/{departmentId}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(action = "UPDATE_DEPARTMENT", activityType = "USER_MANAGEMENT",
-            description = "Cập nhật phòng ban ID: #{#departmentId}",
+            description = "Cập nhật phòng ban",
             entityId = "#{#departmentId}")
     public ResponseEntity<Map<String, Object>> updateDepartment(
             @PathVariable Integer departmentId,
@@ -95,7 +95,7 @@ public class DepartmentController {
     @DeleteMapping("/{departmentId}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(action = "DELETE_DEPARTMENT", activityType = "USER_MANAGEMENT",
-            description = "Dừng hoạt động phòng ban ID: #{#departmentId}",
+            description = "Dừng hoạt động phòng ban",
             entityId = "#{#departmentId}")
     public ResponseEntity<Map<String, Object>> deleteDepartment(@PathVariable Integer departmentId) {
         log.info("API: Dừng hoạt động department ID: {}", departmentId);

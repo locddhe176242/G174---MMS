@@ -14,7 +14,7 @@ import java.time.LocalDate;
 public class PurchaseOrderItemRequestDTO {
     private Integer pqItemId;
 
-    @NotNull(message = "Product ID là bắt buộc")
+    // Removed @NotNull to allow manual PO creation without selecting from product dropdown
     private Integer productId;
 
     private String uom;

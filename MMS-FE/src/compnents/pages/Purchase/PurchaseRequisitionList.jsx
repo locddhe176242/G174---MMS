@@ -85,9 +85,10 @@ export default function PurchaseRequisitionList() {
         const statusMap = {
             Draft: { label: "Bản nháp", color: "bg-gray-100 text-gray-800" },
             Pending: { label: "Chờ duyệt", color: "bg-yellow-100 text-yellow-800" },
-            Approved: { label: "Đã duyệt", color: "bg-green-100 text-green-800" },
+            Approved: { label: "Đã tạo", color: "bg-green-100 text-green-800" },
             Rejected: { label: "Đã từ chối", color: "bg-red-100 text-red-800" },
             Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
+            Converted: { label: "Đã chuyển đổi", color: "bg-green-100 text-green-800" },
         };
         const statusInfo = statusMap[statusStr] || { label: statusStr, color: "bg-gray-100 text-gray-800" };
         return <span className={`px-2 py-1 rounded text-xs font-medium ${statusInfo.color}`}>{statusInfo.label}</span>;
@@ -356,26 +357,6 @@ export default function PurchaseRequisitionList() {
                                 Tìm kiếm
                             </button>
                         </form>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <label className="text-sm text-gray-600">Lọc trạng thái:</label>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value="ALL">Tất cả</option>
-                                <option value="Draft">Nháp</option>
-                                <option value="Pending">Chờ duyệt</option>
-                                <option value="Approved">Đã duyệt</option>
-                                <option value="Rejected">Đã từ chối</option>
-                                <option value="Cancelled">Đã hủy</option>
-                            </select>
-                            {searchKeyword.trim() && (
-                                <span className="text-xs text-gray-500">
-                                    * Bộ lọc trạng thái áp dụng khi không tìm kiếm
-                                </span>
-                            )}
-                        </div>
                     </div>
 
                     <div className="overflow-x-auto">

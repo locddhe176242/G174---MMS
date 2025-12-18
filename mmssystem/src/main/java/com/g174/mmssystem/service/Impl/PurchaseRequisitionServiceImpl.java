@@ -548,7 +548,9 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
             throw new IllegalArgumentException("Danh sách sản phẩm không được để trống khi submit");
         }
 
-        requisition.setStatus(RequisitionStatus.Pending);
+        // Bỏ bước manager duyệt - chuyển thẳng sang Approved
+        requisition.setStatus(RequisitionStatus.Approved);
+        requisition.setApprovedAt(LocalDateTime.now());
         requisition.setUpdatedAt(LocalDateTime.now());
 
         PurchaseRequisition saved = requisitionRepository.save(requisition);

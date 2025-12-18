@@ -156,4 +156,14 @@ public class ActivityLogController {
 
         return ResponseEntity.ok(response);
     }
+    
+    @GetMapping("/recent")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<List<ActivityLogResponseDTO>> getRecentSystemActivityLogs(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        log.info("API: Lấy {} hoạt động gần đây của toàn hệ thống (chỉ MANAGER)", limit);
+        List<ActivityLogResponseDTO> activityLogs = activityLogService.getRecentActivityLogs(limit);
+        return ResponseEntity.ok(activityLogs);
+    }
 }

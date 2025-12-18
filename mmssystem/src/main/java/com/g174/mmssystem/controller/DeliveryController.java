@@ -90,7 +90,7 @@ public class DeliveryController {
     @LogActivity(
             action = "UPDATE_DELIVERY",
             activityType = "SALES_MANAGEMENT",
-            description = "Cập nhật phiếu giao hàng ID: #{#id}",
+            description = "Cập nhật phiếu giao hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<DeliveryResponseDTO> updateDelivery(
@@ -104,7 +104,7 @@ public class DeliveryController {
     @LogActivity(
             action = "SUBMIT_DELIVERY_TO_WAREHOUSE",
             activityType = "SALES_MANAGEMENT",
-            description = "Submit phiếu giao hàng ID: #{#id} cho kho xử lý",
+            description = "Submit phiếu giao hàng cho kho xử lý",
             entityId = "#{#id}"
     )
     public ResponseEntity<DeliveryResponseDTO> submitToWarehouse(@PathVariable Integer id) {
@@ -116,7 +116,7 @@ public class DeliveryController {
     @LogActivity(
             action = "CHANGE_DELIVERY_STATUS",
             activityType = "SALES_MANAGEMENT",
-            description = "Đổi trạng thái giao hàng ID: #{#id} sang #{#status}",
+            description = "Đổi trạng thái giao hàng sang #{#status}",
             entityId = "#{#id}"
     )
     public ResponseEntity<DeliveryResponseDTO> changeStatus(
@@ -130,7 +130,7 @@ public class DeliveryController {
     @LogActivity(
             action = "DELETE_DELIVERY",
             activityType = "SALES_MANAGEMENT",
-            description = "Xóa phiếu giao hàng ID: #{#id}",
+            description = "Xóa phiếu giao hàng",
             entityId = "#{#id}"
     )
     public ResponseEntity<Void> deleteDelivery(@PathVariable Integer id) {

@@ -52,7 +52,7 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{orderId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
     public ResponseEntity<PurchaseOrderResponseDTO> getOrderById(@PathVariable Integer orderId) {
         log.info("REST: Fetching purchase order ID: {}", orderId);
 
@@ -65,7 +65,7 @@ public class PurchaseOrderController {
     // All list operations must use pagination
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<PurchaseOrderResponseDTO>> getAllOrdersPaged(Pageable pageable) {
         log.info("REST: Fetching purchase orders with pagination");
 
@@ -78,7 +78,7 @@ public class PurchaseOrderController {
     // All search operations must use pagination
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<Page<PurchaseOrderResponseDTO>> searchOrdersPaged(
             @RequestParam String keyword,
             Pageable pageable) {
@@ -106,12 +106,21 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/rfq/{rfqId}")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    public ResponseEntity<List<PurchaseOrderResponseDTO>> getOrdersByRfqId(@PathVariable Integer rfqId) {
+        log.info("REST: Fetching purchase orders for RFQ ID: {}", rfqId);
+
+        List<PurchaseOrderResponseDTO> response = orderService.getOrdersByRfqId(rfqId);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "UPDATE_PURCHASE_ORDER",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Cập nhật đơn mua hàng ID: #{#orderId}",
+            description = "Cập nhật đơn mua hàng",
             entityId = "#{#orderId}"
     )
     public ResponseEntity<PurchaseOrderResponseDTO> updateOrder(
@@ -137,7 +146,7 @@ public class PurchaseOrderController {
     @LogActivity(
             action = "APPROVE_PURCHASE_ORDER",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Duyệt đơn mua hàng ID: #{#orderId}",
+            description = "Duyệt đơn mua hàng",
             entityId = "#{#orderId}"
     )
     public ResponseEntity<PurchaseOrderResponseDTO> approveOrder(
@@ -154,7 +163,7 @@ public class PurchaseOrderController {
     @LogActivity(
             action = "REJECT_PURCHASE_ORDER",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Từ chối đơn mua hàng ID: #{#orderId}",
+            description = "Từ chối đơn mua hàng",
             entityId = "#{#orderId}"
     )
     public ResponseEntity<PurchaseOrderResponseDTO> rejectOrder(
@@ -190,7 +199,7 @@ public class PurchaseOrderController {
     @LogActivity(
             action = "CANCEL_PURCHASE_ORDER",
             activityType = "PURCHASE_MANAGEMENT",
-            description = "Hủy đơn mua hàng ID: #{#orderId}",
+            description = "Hủy đơn mua hàng",
             entityId = "#{#orderId}"
     )
     public ResponseEntity<PurchaseOrderResponseDTO> cancelOrder(@PathVariable Integer orderId) {

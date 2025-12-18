@@ -172,18 +172,22 @@ const PurchaseRequisitionForm = () => {
                     setLoading(true);
                     const data = await purchaseRequisitionService.getRequisitionById(id);
 
-                    // Kiểm tra status - chỉ cho phép edit khi status là Draft
+                    // Kiểm tra status - cho phép edit khi status là Draft hoặc Pending
                     const status = data.status || 'Draft';
-                    if (status !== 'Draft') {
+                    const editableStatuses = ['Draft', 'Pending'];
+                    const nonEditableStatuses = ['Approved', 'Rejected', 'Cancelled', 'Converted'];
+                    
+                    if (!editableStatuses.includes(status)) {
                         const statusMap = {
                             'Draft': 'Bản nháp',
                             'Pending': 'Chờ duyệt',
                             'Approved': 'Đã duyệt',
                             'Rejected': 'Đã từ chối',
-                            'Cancelled': 'Đã hủy'
+                            'Cancelled': 'Đã hủy',
+                            'Converted': 'Đã chuyển đổi'
                         };
                         const statusLabel = statusMap[status] || status;
-                        toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${statusLabel}". Chỉ có thể chỉnh sửa khi trạng thái là "Bản nháp".`);
+                        toast.error(`Không thể chỉnh sửa phiếu yêu cầu với trạng thái "${statusLabel}". Chỉ có thể chỉnh sửa khi ở trạng thái "Bản nháp" hoặc "Chờ duyệt".`);
                         navigate(`/purchase/purchase-requisitions/${id}`);
                         return;
                     }
@@ -781,8 +785,7 @@ const PurchaseRequisitionForm = () => {
                 requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 requesterId: formData.requester_id,
                 purpose: formData.purpose,
-                // Khi tạo mới: gửi status 'Pending', khi edit: giữ nguyên status hiện tại
-                status: isEdit ? formData.status : 'Pending',
+                status: isEdit ? formData.status : undefined, // Không set status, để backend tự xử lý
                 approverId: formData.approver_id,
                 approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
                 items: formData.items.map(item => ({
