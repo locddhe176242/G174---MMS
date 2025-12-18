@@ -17,7 +17,6 @@ import java.util.List;
                 @Index(name = "idx_gr_no", columnList = "receipt_no"),
                 @Index(name = "idx_gr_status", columnList = "status, deleted_at"),
                 @Index(name = "idx_gr_order", columnList = "order_id"),
-                @Index(name = "idx_gr_inbound_delivery", columnList = "inbound_delivery_id"),
                 @Index(name = "idx_gr_warehouse", columnList = "warehouse_id"),
                 @Index(name = "idx_gr_return_order", columnList = "ro_id"),
                 @Index(name = "idx_gr_source_type", columnList = "source_type")

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getUserPermissions } from '../api/userPermissionService';
-import { useAuthStore } from '../store/authStore';
+import useAuthStore from '../store/authStore';
 import { jwtDecode } from 'jwt-decode';
 
 export const usePermissions = () => {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const token = useAuthStore((state) => state.token);
+  const token = useAuthStore((state) => state.accessToken);
 
   useEffect(() => {
     const fetchPermissions = async () => {
