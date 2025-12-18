@@ -761,6 +761,7 @@ export default function GoodsReceiptForm() {
                         }
                         
                         return {
+                            poiId: item.poi_id || item.poiId,
                             productId: item.product_id,
                             receivedQty: Number(item.received_qty || 0),
                             acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty

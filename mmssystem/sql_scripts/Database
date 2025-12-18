@@ -664,7 +664,6 @@ CREATE TABLE Vendor_Balances (
     INDEX idx_vendor_balance (vendor_id),
     INDEX idx_outstanding_balance (outstanding_balance)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- =====================================================
 -- SALES FLOW
 -- =====================================================
