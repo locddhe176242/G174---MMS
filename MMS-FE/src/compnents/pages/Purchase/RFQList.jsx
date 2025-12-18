@@ -150,6 +150,7 @@ export default function RFQList() {
       Sent: { label: "Đã gửi", color: "bg-blue-100 text-blue-800" },
       Closed: { label: "Đã đóng", color: "bg-gray-200 text-gray-800" },
       Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
+      Completed: { label: "Hoàn thành", color: "bg-green-100 text-green-800" },
     };
 
     const statusInfo = map[statusStr] || { label: statusStr || "Nháp", color: "bg-gray-100 text-gray-800" };
@@ -344,7 +345,7 @@ export default function RFQList() {
       </div>
 
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex items-center mb-4">
               <div className="flex-shrink-0 w-10 h-10 mx-auto bg-red-100 rounded-full flex items-center justify-center">

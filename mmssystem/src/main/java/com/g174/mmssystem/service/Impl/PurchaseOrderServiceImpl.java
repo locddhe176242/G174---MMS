@@ -43,7 +43,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
     private final PurchaseOrderItemRepository orderItemRepository;
     private final EmailService emailService;
     private final GoodsReceiptRepository goodsReceiptRepository;
-    private final InboundDeliveryRepository inboundDeliveryRepository;
+ 
 
     @Override
     @Transactional
@@ -52,15 +52,15 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         // Validate and load entities
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found  " + dto.getVendorId()));
 
         User createdBy = userRepository.findById(createdById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + createdById));
 
         PurchaseQuotation purchaseQuotation = null;
         if (dto.getPqId() != null) {
             purchaseQuotation = quotationRepository.findById(dto.getPqId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + dto.getPqId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + dto.getPqId()));
             
             // Validate: PQ must be Approved
             if (purchaseQuotation.getStatus() != PurchaseQuotationStatus.Approved) {
@@ -121,7 +121,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
                         Product product = null;
                         if (itemDto.getProductId() != null) {
                             product = productRepository.findById(itemDto.getProductId())
-                                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
+                                    .orElseThrow(() -> new ResourceNotFoundException("Product not found  " + itemDto.getProductId()));
                         }
 
                         PurchaseQuotationItem pqItem = null;
@@ -188,7 +188,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         log.info("Fetching purchase order ID: {}", orderId);
 
         PurchaseOrder order = orderRepository.findByIdWithRelations(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         return orderMapper.toResponseDTO(order);
     }
@@ -208,11 +208,11 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         Page<PurchaseOrder> orders = orderRepository.findAllActive(pageable);
         return orders.map(order -> {
             PurchaseOrderResponseDTO dto = orderMapper.toResponseDTO(order);
-            // Check if PO has approved Goods Receipt (through Inbound Deliveries)
-            List<InboundDelivery> inboundDeliveries = inboundDeliveryRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(order.getOrderId());
-            boolean hasApprovedGR = inboundDeliveries.stream()
-                    .flatMap(id -> goodsReceiptRepository.findByInboundDeliveryId(id.getInboundDeliveryId()).stream())
-                    .anyMatch(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved && gr.getDeletedAt() == null);
+            // New flow: check approved Goods Receipt directly linked to PO
+            boolean hasApprovedGR = goodsReceiptRepository
+                .findByPurchaseOrder_OrderIdAndDeletedAtIsNull(order.getOrderId())
+                .stream()
+                .anyMatch(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved);
             dto.setHasGoodsReceipt(hasApprovedGR);
             return dto;
         });
@@ -268,14 +268,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getStatus() == PurchaseOrderStatus.Completed || order.getStatus() == PurchaseOrderStatus.Cancelled) {
             throw new IllegalStateException("Cannot update order with status: " + order.getStatus());
         }
 
         // Check if any Goods Receipt exists for this PO
-        long grCount = goodsReceiptRepository.findByPurchaseOrder(order).stream()
+        long grCount = goodsReceiptRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(order.getOrderId()).stream()
                 .filter(gr -> gr.getDeletedAt() == null)
                 .count();
         if (grCount > 0) {
@@ -283,7 +283,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
         }
 
         User updatedBy = userRepository.findById(updatedById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + updatedById));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + updatedById));
 
         // Update fields
         if (dto.getPaymentTerms() != null) {
@@ -311,7 +311,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
             List<PurchaseOrderItem> items = dto.getItems().stream()
                     .map(itemDto -> {
                         Product product = productRepository.findById(itemDto.getProductId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
+                                .orElseThrow(() -> new ResourceNotFoundException("Product not found  " + itemDto.getProductId()));
 
                         PurchaseQuotationItem pqItem = null;
                         if (itemDto.getPqItemId() != null) {
@@ -354,14 +354,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getApprovalStatus() != PurchaseOrderApprovalStatus.Pending) {
             throw new IllegalStateException("Only pending orders can be approved");
         }
 
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + approverId));
 
         order.setApprovalStatus(PurchaseOrderApprovalStatus.Approved);
         order.setApprover(approver);
@@ -393,14 +393,14 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getApprovalStatus() != PurchaseOrderApprovalStatus.Pending) {
             throw new IllegalStateException("Only pending orders can be rejected");
         }
 
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + approverId));
 
         order.setApprovalStatus(PurchaseOrderApprovalStatus.Rejected);
         order.setStatus(PurchaseOrderStatus.Cancelled);
@@ -423,7 +423,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getApprovalStatus() != PurchaseOrderApprovalStatus.Approved) {
             throw new IllegalStateException("Only approved orders can be sent");
@@ -713,7 +713,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getStatus() != PurchaseOrderStatus.Sent) {
             throw new IllegalStateException("Only sent orders can be completed");
@@ -737,7 +737,7 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         if (order.getStatus() == PurchaseOrderStatus.Completed) {
             throw new IllegalStateException("Cannot cancel completed order");
@@ -761,23 +761,17 @@ public class PurchaseOrderServiceImpl implements IPurchaseOrderService {
 
         PurchaseOrder order = orderRepository.findById(orderId)
                 .filter(o -> o.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         // Check if any Goods Receipt exists
-        long grCount = goodsReceiptRepository.findByPurchaseOrder(order).stream()
+        long grCount = goodsReceiptRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(order.getOrderId()).stream()
                 .filter(gr -> gr.getDeletedAt() == null)
                 .count();
         if (grCount > 0) {
             throw new IllegalStateException("Cannot delete Purchase Order: Goods Receipt records exist. Please delete GR first.");
         }
 
-        // Check if any Inbound Delivery exists
-        long idCount = inboundDeliveryRepository.findByPurchaseOrder(order).stream()
-                .filter(id -> id.getDeletedAt() == null)
-                .count();
-        if (idCount > 0) {
-            throw new IllegalStateException("Cannot delete Purchase Order: Inbound Delivery records exist. Please delete ID first.");
-        }
+        // New flow: No Inbound Delivery constraint anymore (removed)
 
         // Clear quotation reference to allow quotation to be reused
         // Only if PO has not been approved yet

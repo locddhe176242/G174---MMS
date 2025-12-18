@@ -51,7 +51,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         // Load requester
         User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + requesterId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + requesterId));
 
         // Validate based on status: if not DRAFT, must validate items and purpose
         RequisitionStatus status = dto.getStatus() != null ? dto.getStatus() : RequisitionStatus.Draft;
@@ -180,7 +180,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         PurchaseRequisition requisition = requisitionRepository.findByIdWithRelations(requisitionId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         return requisitionMapper.toResponseDTO(requisition);
     }
@@ -269,7 +269,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
 
         // Load updatedBy user
         User updatedBy = userRepository.findById(updatedById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + updatedById));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + updatedById));
 
         // Check if user is requester or admin when status is Pending
         if (requisition.getStatus() == RequisitionStatus.Pending) {
@@ -415,7 +415,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Pending) {
             throw new IllegalStateException("Only pending requisitions can be approved");
@@ -431,7 +431,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         }
 
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + approverId));
 
         // Check if user has APPROVER role
         boolean hasApproverRole = approver.getUserRoles().stream()
@@ -480,7 +480,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Pending) {
             throw new IllegalStateException("Only pending requisitions can be rejected");
@@ -496,7 +496,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         }
 
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + approverId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + approverId));
 
         // Check if user has APPROVER role
         boolean hasApproverRole = approver.getUserRoles().stream()
@@ -534,7 +534,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         if (requisition.getStatus() != RequisitionStatus.Draft) {
             throw new IllegalStateException("Only draft requisitions can be submitted");
@@ -569,7 +569,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         // Check if RFQ has been created
         List<RFQ> rfqs = rfqRepository.findByRequisitionId(requisitionId);
@@ -627,7 +627,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         // Check current status - must be Approved
         if (requisition.getStatus() != RequisitionStatus.Approved) {
@@ -653,7 +653,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() != null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId + " or not deleted"));
+                        "Purchase Requisition not found  " + requisitionId + " or not deleted"));
 
         requisition.setDeletedAt(null);
         PurchaseRequisition saved = requisitionRepository.save(requisition);
@@ -670,7 +670,7 @@ public class PurchaseRequisitionServiceImpl implements IPurchaseRequisitionServi
         PurchaseRequisition requisition = requisitionRepository.findById(requisitionId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Purchase Requisition not found with ID: " + requisitionId));
+                        "Purchase Requisition not found  " + requisitionId));
 
         // ERP rule: only Draft PRs can be deleted
         if (requisition.getStatus() != RequisitionStatus.Draft) {

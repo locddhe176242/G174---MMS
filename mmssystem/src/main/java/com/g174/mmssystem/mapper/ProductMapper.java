@@ -8,6 +8,7 @@ import com.g174.mmssystem.entity.User;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,6 +47,15 @@ public class ProductMapper {
             return null;
         }
 
+        // Parse imageUrl to imageUrls array (split by comma or semicolon)
+        List<String> imageUrls = null;
+        if (entity.getImageUrl() != null && !entity.getImageUrl().trim().isEmpty()) {
+            imageUrls = Arrays.stream(entity.getImageUrl().split("[,;]"))
+                    .map(String::trim)
+                    .filter(url -> !url.isEmpty())
+                    .collect(Collectors.toList());
+        }
+
         return ProductResponseDTO.builder()
                 .productId(entity.getProductId())
                 .sku(entity.getSku())
@@ -56,7 +66,8 @@ public class ProductMapper {
                 .purchasePrice(entity.getPurchasePrice())
                 .sellingPrice(entity.getSellingPrice())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : null)
-                .imageUrl(entity.getImageUrl())
+                .imageUrl(entity.getImageUrl()) // Legacy field
+                .imageUrls(imageUrls) // New array field
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getCategoryId() : null)
                 .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : null)
                 .createdAt(entity.getCreatedAt())

@@ -16,6 +16,7 @@ import java.util.List;
         indexes = {
                 @Index(name = "idx_gr_no", columnList = "receipt_no"),
                 @Index(name = "idx_gr_status", columnList = "status, deleted_at"),
+                @Index(name = "idx_gr_order", columnList = "order_id"),
                 @Index(name = "idx_gr_inbound_delivery", columnList = "inbound_delivery_id"),
                 @Index(name = "idx_gr_warehouse", columnList = "warehouse_id"),
                 @Index(name = "idx_gr_return_order", columnList = "ro_id"),
@@ -30,10 +31,10 @@ public class GoodsReceipt {
     @Column(name = "receipt_no", length = 30, unique = true, nullable = false)
     private String receiptNo;
 
-    // Purchase flow: BẮT BUỘC từ Inbound Delivery
+    // Purchase flow (NEW): Direct link to Purchase Order (PO → GR)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "inbound_delivery_id", nullable = true)
-    private InboundDelivery inboundDelivery;
+    @JoinColumn(name = "order_id", nullable = true)
+    private PurchaseOrder purchaseOrder;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id", nullable = false)

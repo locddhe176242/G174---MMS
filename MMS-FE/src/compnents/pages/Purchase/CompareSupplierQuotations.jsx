@@ -20,15 +20,15 @@ export default function CompareSupplierQuotations() {
     const [hasPurchaseOrder, setHasPurchaseOrder] = useState(false);
 
     // Helpers
-    const formatDate = (dateString, format = "MM/DD/YYYY") => {
+    const formatDate = (dateString, format = "DD/MM/YYYY") => {
         if (!dateString) return "-";
         try {
             const d = new Date(dateString);
-            if (format === "MM/DD/YYYY") {
-                const month = String(d.getMonth() + 1).padStart(2, '0');
+            if (format === "DD/MM/YYYY") {
                 const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
                 const year = d.getFullYear();
-                return `${month}/${day}/${year}`;
+                return `${day}/${month}/${year}`;
             }
             return d.toLocaleDateString("vi-VN");
         } catch {
@@ -313,12 +313,14 @@ export default function CompareSupplierQuotations() {
 
     const handleCompareAward = async () => {
         if (selectedQuotations.length === 0) {
-            toast.warning("Vui lòng chọn ít nhất một báo giá để so sánh");
+            toast.warning("Vui lòng chọn ít nhất một báo giá");
             return;
         }
 
         // If multiple quotations selected, automatically choose the one with best price
         let selectedId;
+        let selectedQuotation;
+        
         if (selectedQuotations.length > 1) {
             const selectedQuotationsList = quotations.filter(q => 
                 selectedQuotations.includes(q.pqId || q.pq_id)
@@ -332,12 +334,13 @@ export default function CompareSupplierQuotations() {
                 return best;
             }, null);
             selectedId = bestSelected?.pqId || bestSelected?.pq_id;
-            toast.info(`Đã tự động chọn báo giá tốt nhất: ${bestSelected?.pqNo || bestSelected?.pq_no} (${new Intl.NumberFormat("vi-VN").format(bestSelected?.totalAmount || 0)} ₫)`);
+            selectedQuotation = bestSelected;
+            toast.info(`Tự động chọn báo giá tốt nhất: ${bestSelected?.pqNo || bestSelected?.pq_no} (${formatCurrency(bestSelected?.totalAmount || 0, "VND")})`);
         } else {
             selectedId = selectedQuotations[0];
+            selectedQuotation = quotations.find(q => (q.pqId || q.pq_id) === selectedId);
         }
 
-        const selectedQuotation = quotations.find(q => (q.pqId || q.pq_id) === selectedId);
         if (!selectedQuotation) {
             toast.error("Không tìm thấy báo giá được chọn");
             return;
@@ -349,10 +352,11 @@ export default function CompareSupplierQuotations() {
             const approverId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1;
 
             console.log('Awarding quotation:', selectedId);
+            console.log('All quotations:', quotations.map(q => ({ id: q.pqId || q.pq_id, pqNo: q.pqNo || q.pq_no })));
             
             // 1. Approve winner quotation
+            console.log('Approving quotation:', selectedId);
             await purchaseQuotationService.approveQuotation(selectedId, approverId);
-            // Toast sẽ hiện ở PO form khi load xong, không cần toast ở đây
 
             // 2. Reject other quotations from the same RFQ
             const otherQuotations = quotations.filter(q => {
@@ -360,10 +364,13 @@ export default function CompareSupplierQuotations() {
                 return qId !== selectedId;
             });
 
+            console.log('Other quotations to reject:', otherQuotations.map(q => ({ id: q.pqId || q.pq_id, pqNo: q.pqNo || q.pq_no })));
+
             if (otherQuotations.length > 0) {
                 await Promise.all(
                     otherQuotations.map(q => {
                         const qId = q.pqId || q.pq_id;
+                        console.log('Rejecting quotation:', qId);
                         return purchaseQuotationService.rejectQuotation(
                             qId, 
                             approverId, 
@@ -382,34 +389,77 @@ export default function CompareSupplierQuotations() {
                 console.warn('Could not close RFQ:', closeErr);
             }
 
-            // 4. Get full quotation details before navigating
-            let fullQuotationData = null;
+            // 4. Reload data to show updated status
+            setLoading(true);
             try {
-                fullQuotationData = await purchaseQuotationService.getQuotationById(selectedId);
-            } catch (err) {
-                console.warn('Could not load full quotation details:', err);
-                fullQuotationData = selectedQuotation;
+                const [updatedRfq, updatedQuotes] = await Promise.all([
+                    rfqService.getRFQById(id),
+                    purchaseQuotationService.getQuotationsByRfqId(id)
+                ]);
+
+                // Mark best quotation
+                if (updatedQuotes.length > 0) {
+                    const best = updatedQuotes.reduce((best, current) => {
+                        const currentAmount = Number(current.totalAmount || 0);
+                        const bestAmount = best ? Number(best.totalAmount || 0) : Infinity;
+                        if (!best || currentAmount < bestAmount) {
+                            return current;
+                        }
+                        return best;
+                    }, null);
+
+                    const formattedQuotes = updatedQuotes.map(q => {
+                        let expectedDeliveryDate = '-';
+                        const leadTimeDays = q.leadTimeDays || q.lead_time_days;
+                        if (leadTimeDays && (q.pqDate || q.pq_date || q.createdAt || q.created_at)) {
+                            const baseDate = new Date(q.pqDate || q.pq_date || q.createdAt || q.created_at);
+                            const deliveryDate = new Date(baseDate);
+                            deliveryDate.setDate(baseDate.getDate() + Number(leadTimeDays));
+                            expectedDeliveryDate = deliveryDate.toLocaleDateString('vi-VN');
+                        }
+                        
+                        return {
+                            pqId: q.pqId || q.pq_id,
+                            pqNo: q.pqNo || q.pq_no,
+                            vendorId: q.vendorId || q.vendor_id,
+                            vendorName: q.vendorName || q.vendor_name || '',
+                            vendorAddress: q.vendorAddress || q.vendor_address || '',
+                            status: q.status,
+                            totalAmount: Number(q.totalAmount || q.total_amount || 0),
+                            quotationDate: q.pqDate || q.pq_date || q.createdAt || q.created_at,
+                            fullyQuotedItems: q.items?.length || 0,
+                            totalItems: updatedRfq?.items?.length || 0,
+                            leadTimeDays: leadTimeDays || null,
+                            deliveryLeadTime: leadTimeDays ? `${leadTimeDays} ngày` : '-',
+                            expectedDeliveryDate: expectedDeliveryDate,
+                            paymentTerms: q.paymentTerms || q.payment_terms || '-',
+                            deliveryTerms: q.deliveryTerms || q.delivery_terms || '-',
+                            isBest: (q.pqId || q.pq_id) === (best?.pqId || best?.pq_id)
+                        };
+                    });
+
+                    setQuotations(formattedQuotes);
+                }
+                
+                setRfqData(updatedRfq);
+                setHasPurchaseOrder(true);
+                setSelectedQuotations([]);
+            } catch (reloadErr) {
+                console.error('Error reloading data:', reloadErr);
+            } finally {
+                setLoading(false);
             }
 
-            // 5. Navigate to PO form with full data
-            console.log('Navigating to PO form with quotation_id:', selectedId);
-            const prId = rfqData?.prId || rfqData?.pr_id;
-            const rfqId = rfqData?.rfqId || rfqData?.rfq_id || id;
-            
-            // Store quotation data in sessionStorage to pass to PO form
-            sessionStorage.setItem('selectedQuotationData', JSON.stringify({
-                quotation: fullQuotationData,
-                rfqId: rfqId,
-                prId: prId
-            }));
-            
-            const navUrl = prId 
-                ? `/purchase/purchase-orders/new?quotation_id=${selectedId}&pr_id=${prId}&rfq_id=${rfqId}`
-                : `/purchase/purchase-orders/new?quotation_id=${selectedId}&rfq_id=${rfqId}`;
-            navigate(navUrl);
+            toast.success("Đã chọn nhà cung cấp thành công!");
         } catch (error) {
             console.error('Error awarding quotation:', error);
-            toast.error(error.response?.data?.message || "Không thể trao thầu. Vui lòng thử lại");
+            
+            // Check if it's a permission error
+            if (error.response?.status === 403 || error.response?.status === 401) {
+                toast.error("Bạn không có quyền thực hiện thao tác này. Vui lòng liên hệ quản trị viên.");
+            } else {
+                toast.error(error.response?.data?.message || "Không thể trao thầu. Vui lòng thử lại");
+            }
         }
     };
 
@@ -453,15 +503,23 @@ export default function CompareSupplierQuotations() {
         const statusStr = typeof q.status === 'string' ? q.status : (q.status?.name || q.status?.toString() || '');
         return statusStr === 'Approved' || statusStr === 'Pending';
     }).length;
-    const totalInvited = rfqData.selectedVendorIds?.length || quotations.length;
-    const progressPercentage = totalInvited > 0 ? (submittedCount / totalInvited) * 100 : 0;
+    // Số NCC được mời = selectedVendorIds từ RFQ, nếu không có thì dùng số quotation
+    // Số báo giá nhận được = số quotation
+    const selectedVendorIds = rfqData.selectedVendorIds || [];
+    console.log('=== DEBUG CompareSupplierQuotations ===');
+    console.log('rfqData.selectedVendorIds:', rfqData.selectedVendorIds);
+    console.log('selectedVendorIds:', selectedVendorIds);
+    console.log('quotations.length:', quotations.length);
+    const invitedVendorCount = selectedVendorIds.length > 0 ? selectedVendorIds.length : quotations.length;
+    const receivedQuotationCount = quotations.length;
+    console.log('invitedVendorCount:', invitedVendorCount);
+    console.log('receivedQuotationCount:', receivedQuotationCount);
+    const progressPercentage = invitedVendorCount > 0 ? (receivedQuotationCount / invitedVendorCount) * 100 : 0;
 
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="container mx-auto px-4 py-6">
-                {/* RFQ Overview Section */}
                 <div className="bg-white border rounded-lg p-6 mb-6">
-                    {/* RFQ ID Section */}
                     <div className="mb-6">
                         <div className="flex items-center gap-2 mb-3">
                             <label className="text-sm text-gray-600">RFQ:</label>
@@ -539,12 +597,11 @@ export default function CompareSupplierQuotations() {
 
                             {/* Number of Invited Bidders - Text Format */}
                             <div>
-                                <div className="text-sm text-gray-600 mb-2">Số lượng nhà cung cấp được mời</div>
+                                <div className="text-sm text-gray-600 mb-2">Số lượng nhà cung cấp đã gửi báo giá</div>
                                 <div className="text-2xl font-bold">
-                                    {submittedCount}/{totalInvited}
+                                    {receivedQuotationCount}/{invitedVendorCount}
                                 </div>
                             </div>
-
                             {/* Best Quotation - With Vendor Name */}
                             {bestQuotation && (
                                 <div>

@@ -43,11 +43,11 @@ public class RFQVendorServiceImpl implements IRFQVendorService {
 
         // Validate RFQ exists
         RFQ rfq = rfqRepository.findById(dto.getRfqId())
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + dto.getRfqId()));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + dto.getRfqId()));
 
         // Validate Vendor exists
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found  " + dto.getVendorId()));
 
         RFQVendor rfqVendor = RFQVendor.builder()
                 .rfqId(dto.getRfqId())

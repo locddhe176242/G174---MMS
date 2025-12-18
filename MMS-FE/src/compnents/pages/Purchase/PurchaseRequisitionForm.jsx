@@ -264,8 +264,6 @@ const PurchaseRequisitionForm = () => {
                 requesterId: formData.requester_id,
                 purpose: formData.purpose || '',
                 status: 'Draft', // Luôn là Draft khi lưu bản nháp
-                approverId: formData.approver_id,
-                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
                 items: (formData.items || []).map(item => ({
                     productId: item.product_id,
                     productName: item.product_name || '',
@@ -275,6 +273,11 @@ const PurchaseRequisitionForm = () => {
                     note: item.note || ''
                 }))
             };
+            
+            // Chỉ thêm approverId nếu có giá trị
+            if (formData.approver_id) {
+                draftData.approverId = formData.approver_id;
+            }
 
             // Use service - apiClient handles auth automatically
             await purchaseRequisitionService.createRequisition(draftData);
@@ -829,8 +832,6 @@ const PurchaseRequisitionForm = () => {
                 requesterId: formData.requester_id,
                 purpose: formData.purpose || '',
                 status: 'Draft', // Luôn là Draft khi lưu bản nháp
-                approverId: formData.approver_id,
-                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
                 items: (formData.items || []).map(item => ({
                     productId: item.product_id,
                     productName: item.product_name || '',
@@ -840,6 +841,11 @@ const PurchaseRequisitionForm = () => {
                     note: item.note || ''
                 }))
             };
+            
+            // Chỉ thêm approverId nếu có giá trị
+            if (formData.approver_id) {
+                draftData.approverId = formData.approver_id;
+            }
 
             // Use service - apiClient handles auth automatically
             if (isEdit) {
@@ -1192,7 +1198,7 @@ const PurchaseRequisitionForm = () => {
 
             {/* Save Draft Dialog */}
             {showSaveDraftDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">
                             Bạn có thay đổi chưa lưu

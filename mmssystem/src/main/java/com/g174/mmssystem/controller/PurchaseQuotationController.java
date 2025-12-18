@@ -146,7 +146,7 @@ public class PurchaseQuotationController {
     }
 
     @PutMapping("/{pqId}/reject")
-    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(
             action = "REJECT_PURCHASE_QUOTATION",
             activityType = "PURCHASE_MANAGEMENT",

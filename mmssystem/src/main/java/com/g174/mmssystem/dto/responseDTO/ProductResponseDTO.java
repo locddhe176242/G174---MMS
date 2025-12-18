@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,7 +23,8 @@ public class ProductResponseDTO {
     private BigDecimal purchasePrice;
     private BigDecimal sellingPrice;
     private String status;
-    private String imageUrl;
+    private String imageUrl; // Legacy field - first image URL
+    private List<String> imageUrls; // All image URLs as array
     private Integer categoryId;
     private String categoryName;
     private java.math.BigDecimal totalQuantity;

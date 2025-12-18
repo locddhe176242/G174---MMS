@@ -23,6 +23,17 @@ const ProductList = () => {
   const [pageSize, setPageSize] = useState(10);
   const [categories, setCategories] = useState([]);
 
+  // Helper function to build full image URL
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    // Remove /api from base URL for static resources
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  };
+
   // ============ Effects ============
   useEffect(() => {
     fetchCategories();
@@ -262,6 +273,7 @@ const ProductList = () => {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Hình ảnh</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Sản phẩm</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Số lượng</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Danh mục</th>
@@ -272,8 +284,52 @@ const ProductList = () => {
             <tbody className="divide-y divide-slate-200">
               {paginatedProducts.map((product, index) => {
                 const productId = product.productId || product.id || product.product_id;
+                const imageUrls = product.imageUrls || (product.imageUrl ? [product.imageUrl] : []);
+                const images = imageUrls.map(url => getImageUrl(url)).filter(Boolean);
+                
                 return (
                   <tr key={productId} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {images.length > 0 ? (
+                          <>
+                            <img 
+                              src={images[0]} 
+                              alt={product.name}
+                              className="w-24 h-24 object-cover rounded-lg border-2 border-slate-300 shadow-md hover:shadow-lg transition-shadow"
+                              onError={(e) => {
+                                console.error('Image load error:', images[0]);
+                                e.target.src = 'https://via.placeholder.com/112?text=No+Image';
+                              }}
+                            />
+                            {images.length > 1 && (
+                              <div className="flex flex-col gap-1.5">
+                                {images.slice(1, 4).map((img, idx) => (
+                                  <img 
+                                    key={idx}
+                                    src={img} 
+                                    alt={`${product.name} ${idx + 2}`}
+                                    className="w-16 h-16 object-cover rounded border-2 border-slate-200 hover:border-slate-300 transition-colors"
+                                    onError={(e) => {
+                                      e.target.src = 'https://via.placeholder.com/64?text=?';
+                                    }}
+                                  />
+                                ))}
+                                {images.length > 4 && (
+                                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 rounded border-2 border-slate-200 text-sm font-semibold text-slate-700">
+                                    +{images.length - 4}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="w-28 h-28 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg flex items-center justify-center border-2 border-slate-200">
+                            <FontAwesomeIcon icon={faBox} className="w-12 h-12 text-slate-400" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-slate-800">{product.name || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

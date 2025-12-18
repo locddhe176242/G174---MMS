@@ -52,7 +52,7 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{orderId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','ACCOUNTING')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<PurchaseOrderResponseDTO> getOrderById(@PathVariable Integer orderId) {
         log.info("REST: Fetching purchase order ID: {}", orderId);
 

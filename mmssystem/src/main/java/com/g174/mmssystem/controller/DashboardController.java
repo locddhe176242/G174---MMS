@@ -15,7 +15,6 @@ import com.g174.mmssystem.repository.ARInvoiceRepository;
 import com.g174.mmssystem.repository.DeliveryRepository;
 import com.g174.mmssystem.repository.GoodIssueRepository;
 import com.g174.mmssystem.repository.GoodsReceiptRepository;
-import com.g174.mmssystem.repository.InboundDeliveryRepository;
 import com.g174.mmssystem.repository.ProductRepository;
 import com.g174.mmssystem.repository.PurchaseOrderRepository;
 import com.g174.mmssystem.repository.PurchaseQuotationRepository;
@@ -54,7 +53,6 @@ public class DashboardController {
     private final GoodIssueRepository goodIssueRepository;
     private final WarehouseRepository warehouseRepository;
     private final WarehouseStockRepository warehouseStockRepository;
-    private final InboundDeliveryRepository inboundDeliveryRepository;
     private final DeliveryRepository deliveryRepository;
     private final APInvoiceRepository apInvoiceRepository;
     private final ARInvoiceRepository arInvoiceRepository;
@@ -115,11 +113,13 @@ public class DashboardController {
         // Monthly Import/Export Statistics (last 6 months)
         stats.setMonthlyImportExport(getMonthlyImportExportStats());
         
+        // Daily Import/Export Statistics (last 7 days)
+        stats.setDailyImportExport(getDailyImportExportStats());
+        
         // Top Warehouses by Revenue (top 5)
         stats.setTopWarehouses(getTopWarehousesByRevenue(5));
         
         // Warehouse pending tasks
-        stats.setPendingInboundDeliveries(getPendingInboundDeliveries(10));
         stats.setPendingDeliveries(getPendingDeliveries(10));
         stats.setTodayActivity(getTodayWarehouseActivity());
         
@@ -192,6 +192,48 @@ public class DashboardController {
         return monthlyStats;
     }
     
+    // Helper method to get daily import/export statistics (last 7 days)
+    private List<DailyImportExport> getDailyImportExportStats() {
+        List<DailyImportExport> dailyStats = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM");
+        
+        // Get data for last 7 days
+        for (int i = 6; i >= 0; i--) {
+            LocalDateTime dayStart = now.minusDays(i).withHour(0).withMinute(0).withSecond(0);
+            LocalDateTime dayEnd = dayStart.withHour(23).withMinute(59).withSecond(59);
+            String dayLabel = dayStart.format(formatter);
+            
+            // Count imports (Goods Receipts) created on this day
+            Long importCount = goodsReceiptRepository.findAllActive().stream()
+                .filter(gr -> {
+                    LocalDateTime dateToCheck = gr.getReceivedDate() != null ? gr.getReceivedDate() : gr.getCreatedAt();
+                    return dateToCheck != null 
+                        && !dateToCheck.isBefore(dayStart) 
+                        && !dateToCheck.isAfter(dayEnd);
+                })
+                .count();
+            
+            // Count exports (Good Issues) created on this day
+            Long exportCount = goodIssueRepository.findAllActive().stream()
+                .filter(gi -> {
+                    LocalDateTime dateToCheck = gi.getIssueDate() != null ? gi.getIssueDate() : gi.getCreatedAt();
+                    return dateToCheck != null 
+                        && !dateToCheck.isBefore(dayStart) 
+                        && !dateToCheck.isAfter(dayEnd);
+                })
+                .count();
+            
+            dailyStats.add(new DailyImportExport(
+                dayLabel,
+                importCount,
+                exportCount
+            ));
+        }
+        
+        return dailyStats;
+    }
+    
     // Helper method to get top warehouses by revenue
     private List<WarehouseRevenue> getTopWarehousesByRevenue(int limit) {
         List<WarehouseRevenue> warehouseRevenues = new ArrayList<>();
@@ -235,21 +277,24 @@ public class DashboardController {
         // Get all warehouse stock entries
         List<com.g174.mmssystem.entity.WarehouseStock> allStocks = warehouseStockRepository.findAll();
         
-        // Define minimum stock threshold (you can make this configurable)
+        // Define minimum stock threshold
         final BigDecimal MIN_STOCK_THRESHOLD = new BigDecimal("100"); // Minimum stock level
         
         for (com.g174.mmssystem.entity.WarehouseStock stock : allStocks) {
-            if (stock.getProduct() != null && stock.getProduct().getDeletedAt() == null) {
+            if (stock.getProduct() != null && stock.getProduct().getDeletedAt() == null 
+                && stock.getWarehouse() != null && stock.getWarehouse().getDeletedAt() == null) {
                 BigDecimal currentQuantity = stock.getQuantity();
                 
-                // Only include products with stock below threshold
-                if (currentQuantity.compareTo(MIN_STOCK_THRESHOLD) < 0) {
+                // Include products with stock <= threshold (bao gồm cả hết hàng)
+                if (currentQuantity.compareTo(MIN_STOCK_THRESHOLD) <= 0) {
                     Long currentStock = currentQuantity.longValue();
                     Long minStock = MIN_STOCK_THRESHOLD.longValue();
-                    Double stockPercentage = (currentStock.doubleValue() / minStock.doubleValue()) * 100;
+                    Double stockPercentage = minStock > 0 ? (currentStock.doubleValue() / minStock.doubleValue()) * 100 : 0;
                     
                     String status;
-                    if (stockPercentage < 30) {
+                    if (currentStock == 0) {
+                        status = "Hết hàng";
+                    } else if (stockPercentage < 30) {
                         status = "Cực thấp";
                     } else if (stockPercentage < 50) {
                         status = "Cần bổ sung";
@@ -261,10 +306,15 @@ public class DashboardController {
                         ? stock.getProduct().getCategory().getName() 
                         : "Chưa phân loại";
                     
+                    String warehouseName = stock.getWarehouse().getName();
+                    String warehouseCode = stock.getWarehouse().getCode();
+                    
                     lowStockList.add(new LowStockProduct(
                         stock.getProduct().getProductId(),
                         stock.getProduct().getName(),
                         categoryName,
+                        warehouseName,
+                        warehouseCode,
                         currentStock,
                         minStock,
                         stockPercentage,
@@ -274,46 +324,11 @@ public class DashboardController {
             }
         }
         
-        // Sort by stock percentage (lowest first) and limit
+        // Sort by stock percentage (lowest first, hết hàng lên đầu) and limit
         return lowStockList.stream()
             .sorted((p1, p2) -> Double.compare(p1.getStockPercentage(), p2.getStockPercentage()))
             .limit(limit)
             .collect(Collectors.toList());
-    }
-    
-    // Helper method to get pending inbound deliveries (chờ nhập kho)
-    private List<PendingInboundDelivery> getPendingInboundDeliveries(int limit) {
-        List<PendingInboundDelivery> pendingList = new ArrayList<>();
-        
-        // Sử dụng query với JOIN FETCH để tránh lazy loading
-        List<com.g174.mmssystem.entity.InboundDelivery> inboundDeliveries = 
-            inboundDeliveryRepository.findPendingInboundDeliveriesWithDetails().stream()
-                .limit(limit)
-                .collect(Collectors.toList());
-        
-        for (com.g174.mmssystem.entity.InboundDelivery id : inboundDeliveries) {
-            String vendorName = "N/A";
-            String purchaseOrderNo = "N/A";
-            
-            if (id.getVendor() != null) {
-                vendorName = id.getVendor().getName();
-            }
-            if (id.getPurchaseOrder() != null) {
-                purchaseOrderNo = id.getPurchaseOrder().getPoNo();
-            }
-            
-            pendingList.add(new PendingInboundDelivery(
-                id.getInboundDeliveryId(),
-                id.getInboundDeliveryNo(),
-                purchaseOrderNo,
-                vendorName,
-                id.getItems() != null ? id.getItems().size() : 0,
-                id.getStatus() != null ? id.getStatus().name() : "Unknown",
-                id.getPlannedDate() != null ? id.getPlannedDate().toString() : null
-            ));
-        }
-        
-        return pendingList;
     }
     
     // Helper method to get pending deliveries (chờ xuất kho)
@@ -596,26 +611,6 @@ public class DashboardController {
     private List<NotificationItem> getWarehouseNotifications() {
         List<NotificationItem> notifications = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
-        
-        // Pending inbound deliveries
-        Long pendingInbound = inboundDeliveryRepository.findAll().stream()
-            .filter(id -> id.getDeletedAt() == null &&
-                id.getStatus() == com.g174.mmssystem.entity.InboundDelivery.InboundDeliveryStatus.Pending)
-            .count();
-        
-        if (pendingInbound > 0) {
-            notifications.add(new NotificationItem(
-                "warehouse-inbound-pending",
-                "warning",
-                "📦",
-                "Hàng chờ nhập kho",
-                pendingInbound + " đơn hàng chờ nhập kho từ nhà cung cấp",
-                "/purchase/inbound-deliveries",
-                now,
-                false,
-                "high"
-            ));
-        }
         
         // Pending deliveries
         Long pendingDelivery = deliveryRepository.findAll().stream()

@@ -1,129 +1,146 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { reportService } from "../../../api/reportService";
 import { toast } from "react-toastify";
-import Pagination from "../../common/Pagination";
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { getProducts } from '../../../api/productService';
+import * as ExcelJS from 'exceljs';
 
 export default function ReportList() {
-    const navigate = useNavigate();
-    const [reports, setReports] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [totalElements, setTotalElements] = useState(0);
-    const [pageSize, setPageSize] = useState(10);
-
-    // Filters
-    const [typeFilter, setTypeFilter] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
-    const [searchKeyword, setSearchKeyword] = useState("");
-
-    // Delete confirm modal
-    const [deleteModal, setDeleteModal] = useState({ open: false, reportId: null });
+    const [loading, setLoading] = useState(false);
+    const [inventoryData, setInventoryData] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [inventoryFilters, setInventoryFilters] = useState({
+        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        endDate: new Date(),
+        productId: null
+    });
 
     useEffect(() => {
-        fetchReports(0);
-    }, [pageSize]);
+        fetchProducts();
+    }, []);
 
-    const fetchReports = async (page = 0) => {
+    const fetchProducts = async () => {
+        try {
+            const data = await getProducts();
+            setProducts(data || []);
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        }
+    };
+
+    const generateInventoryReport = async () => {
         try {
             setLoading(true);
-            setError(null);
-
-            const filters = {
-                page,
-                size: pageSize,
-                sortBy: "generatedAt",
-                sortDir: "desc"
+            const requestData = {
+                startDate: inventoryFilters.startDate.toISOString().split('T')[0],
+                endDate: inventoryFilters.endDate.toISOString().split('T')[0],
+                productId: inventoryFilters.productId
             };
 
-            if (typeFilter) filters.type = typeFilter;
-            if (statusFilter) filters.status = statusFilter;
-            if (searchKeyword) filters.keyword = searchKeyword;
-
-            const response = (typeFilter || statusFilter || searchKeyword) ?
-                await reportService.filterReports(filters) :
-                await reportService.getAllReports(page, pageSize);
-
-            setReports(response.content || []);
-            setTotalPages(response.totalPages || 0);
-            setTotalElements(response.totalElements || 0);
-            setCurrentPage(page);
-        } catch (err) {
-            console.error("Error fetching reports:", err);
-            setError("Không thể tải danh sách báo cáo");
-            toast.error("Không thể tải danh sách báo cáo");
+            const response = await reportService.generateInventoryReport(requestData);
+            // Ensure inventoryData is always an array
+            let data = [];
+            if (Array.isArray(response)) {
+                data = response;
+            } else if (response && response.reportData && Array.isArray(response.reportData.items)) {
+                data = response.reportData.items; // Backend returns reportData.items
+            } else if (response && Array.isArray(response.items)) {
+                data = response.items;
+            } else if (response && Array.isArray(response.data)) {
+                data = response.data;
+            }
+            
+            setInventoryData(data);
+            
+            if (data.length === 0) {
+                toast.warning('Không có dữ liệu trong khoảng thời gian này');
+            } else {
+                toast.success(`Tạo báo cáo thành công! (${data.length} sản phẩm)`);
+            }
+        } catch (error) {
+            console.error('Error generating inventory report:', error);
+            toast.error(error.response?.data?.message || 'Không thể tạo báo cáo');
+            setInventoryData([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchReports(0);
-    };
-
-    const handlePageChange = (newPage) => {
-        fetchReports(newPage);
-    };
-
-    const handlePageSizeChange = (newSize) => {
-        setPageSize(newSize);
-        setCurrentPage(0);
-    };
-
-    const handleDeleteClick = (reportId) => {
-        setDeleteModal({ open: true, reportId });
-    };
-
-    const confirmDelete = async () => {
-        try {
-            await reportService.deleteReport(deleteModal.reportId);
-            toast.success("Đã xóa báo cáo thành công");
-            setDeleteModal({ open: false, reportId: null });
-            fetchReports(currentPage);
-        } catch (err) {
-            console.error("Error deleting report:", err);
-            toast.error("Không thể xóa báo cáo");
+    const exportInventoryToExcel = async () => {
+        if (inventoryData.length === 0) {
+            toast.warning('Không có dữ liệu để xuất');
+            return;
         }
-    };
 
-    const getTypeLabel = (type) => {
-        const map = {
-            Inventory: "Tồn kho",
-            Purchase: "Mua hàng",
-            Sales: "Bán hàng",
-            Financial: "Tài chính"
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Báo cáo tồn kho');
+
+        // Define columns
+        worksheet.columns = [
+            { header: 'STT', key: 'stt', width: 5 },
+            { header: 'Mã sản phẩm', key: 'productCode', width: 15 },
+            { header: 'Tên sản phẩm', key: 'productName', width: 30 },
+            { header: 'Đơn vị', key: 'unit', width: 10 },
+            { header: 'SL đầu kỳ', key: 'openingQty', width: 12 },
+            { header: 'SL nhập', key: 'inboundQty', width: 12 },
+            { header: 'SL xuất', key: 'outboundQty', width: 12 },
+            { header: 'Hàng tồn', key: 'closingQty', width: 12 }
+        ];
+
+        // Add data rows
+        inventoryData.forEach((item, index) => {
+            worksheet.addRow({
+                stt: index + 1,
+                productCode: item.productCode || item.product_code || '',
+                productName: item.productName || item.product_name || '',
+                unit: item.unit || '',
+                openingQty: item.openingQty || item.opening_qty || 0,
+                inboundQty: item.inboundQty || item.inbound_qty || 0,
+                outboundQty: item.outboundQty || item.outbound_qty || 0,
+                closingQty: item.closingQty || item.closing_qty || 0
+            });
+        });
+
+        // Style header row
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE0E0E0' }
         };
-        return map[type] || type;
+
+        // Generate file
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `BaoCaoTonKho_${inventoryFilters.startDate.toISOString().split('T')[0]}_${inventoryFilters.endDate.toISOString().split('T')[0]}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('Xuất Excel thành công!');
     };
 
-    const getStatusLabel = (status) => {
-        const map = {
-            Pending: "Đang xử lý",
-            Completed: "Hoàn thành",
-            Failed: "Thất bại"
+    const formatNumber = (num) => {
+        return new Intl.NumberFormat('vi-VN').format(num || 0);
+    };
+
+    const calculateTotals = () => {
+        if (!inventoryData || inventoryData.length === 0) return {
+            totalOpening: 0, totalInbound: 0, totalOutbound: 0, totalClosing: 0
         };
-        return map[status] || status;
+
+        return inventoryData.reduce((acc, item) => ({
+            totalOpening: acc.totalOpening + (item.openingQty || item.opening_qty || 0),
+            totalInbound: acc.totalInbound + (item.inboundQty || item.inbound_qty || 0),
+            totalOutbound: acc.totalOutbound + (item.outboundQty || item.outbound_qty || 0),
+            totalClosing: acc.totalClosing + (item.closingQty || item.closing_qty || 0)
+        }), { totalOpening: 0, totalInbound: 0, totalOutbound: 0, totalClosing: 0 });
     };
 
-    const getStatusColor = (status) => {
-        const map = {
-            Pending: "bg-yellow-100 text-yellow-700",
-            Completed: "bg-green-100 text-green-700",
-            Failed: "bg-red-100 text-red-700"
-        };
-        return map[status] || "bg-gray-100 text-gray-700";
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleString("vi-VN");
-    };
+    const totals = calculateTotals();
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -132,191 +149,147 @@ export default function ReportList() {
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Quản lý báo cáo</h1>
-                            <p className="text-sm text-gray-600 mt-1">Tạo và quản lý các báo cáo hệ thống</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Báo cáo tồn kho</h1>
+                            <p className="text-sm text-gray-600 mt-1">Theo dõi số lượng đầu kỳ, nhập, xuất và tồn kho cuối kỳ</p>
                         </div>
-                        <button
-                            onClick={() => navigate("/reports/generate")}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            + Tạo báo cáo mới
-                        </button>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
             <div className="container mx-auto px-4 py-6">
-                <div className="bg-white rounded-lg shadow-sm">
-                    {/* Search and Filters */}
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <div className="flex items-center gap-4">
-                            <form onSubmit={handleSearch} className="flex items-center gap-4 flex-1">
-                                <div className="relative flex-1 max-w-md">
-                                    <input
-                                        type="text"
-                                        placeholder="Tìm kiếm báo cáo..."
-                                        value={searchKeyword}
-                                        onChange={(e) => setSearchKeyword(e.target.value)}
-                                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                    <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </div>
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    Tìm kiếm
+                {/* Inventory Report Section */}
+                <div className="bg-white rounded-lg shadow-sm mb-6">
+                    <div className="px-6 py-4 border-b">
+                        <h2 className="text-lg font-semibold text-gray-900">Tạo báo cáo tồn kho</h2>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="px-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
+                                <DatePicker
+                                    selected={inventoryFilters.startDate}
+                                    onChange={(date) => setInventoryFilters({ ...inventoryFilters, startDate: date })}
+                                    dateFormat="dd/MM/yyyy"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
+                                <DatePicker
+                                    selected={inventoryFilters.endDate}
+                                    onChange={(date) => setInventoryFilters({ ...inventoryFilters, endDate: date })}
+                                    dateFormat="dd/MM/yyyy"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Sản phẩm (Tùy chọn)</label>
+                                <select
+                                    value={inventoryFilters.productId || ''}
+                                    onChange={(e) => setInventoryFilters({ ...inventoryFilters, productId: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Tất cả sản phẩm</option>
+                                    {products.map(product => (
+                                        <option key={product.productId || product.product_id} value={product.productId || product.product_id}>
+                                            {product.productName || product.product_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-end gap-2">
+                                <button
+                                    onClick={generateInventoryReport}
+                                    disabled={loading}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
+                                >
+                                    {loading ? 'Đang tạo...' : 'Tạo báo cáo'}
                                 </button>
-                            </form>
-
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => { setTypeFilter(e.target.value); fetchReports(0); }}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                            >
-                                <option value="">Tất cả loại báo cáo</option>
-                                <option value="Inventory">Tồn kho</option>
-                                <option value="Purchase">Mua hàng</option>
-                                <option value="Sales">Bán hàng</option>
-                                <option value="Financial">Tài chính</option>
-                            </select>
-
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => { setStatusFilter(e.target.value); fetchReports(0); }}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                            >
-                                <option value="">Tất cả trạng thái</option>
-                                <option value="Pending">Đang xử lý</option>
-                                <option value="Completed">Hoàn thành</option>
-                                <option value="Failed">Thất bại</option>
-                            </select>
+                                {inventoryData.length > 0 && (
+                                    <button
+                                        onClick={exportInventoryToExcel}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+                                        title="Xuất Excel"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        {loading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                <span className="ml-2 text-gray-600">Đang tải...</span>
-                            </div>
-                        ) : error ? (
-                            <div className="flex items-center justify-center py-12">
-                                <div className="text-red-600">{error}</div>
-                            </div>
-                        ) : (
-                            <table className="w-full">
+                    {/* Report Table */}
+                    {inventoryData.length > 0 && (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên báo cáo</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Người tạo</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày tạo</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">STT</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Đơn vị</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL đầu kỳ</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL nhập</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL xuất</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hàng tồn</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {reports.map((report) => (
-                                        <tr key={report.reportId} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm">
-                                                <button
-                                                    onClick={() => navigate(`/reports/${report.reportId}`)}
-                                                    className="text-blue-600 hover:underline font-medium"
-                                                >
-                                                    {report.name}
-                                                </button>
-                                                {report.description && (
-                                                    <p className="text-xs text-gray-500 mt-1">{report.description}</p>
-                                                )}
+                                    {inventoryData.map((item, index) => (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">
+                                                <div className="font-medium">{item.productName || item.product_name}</div>
+                                                <div className="text-xs text-gray-500">{item.productCode || item.product_code}</div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                {getTypeLabel(report.type)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(report.status)}`}>
-                                                    {getStatusLabel(report.status)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {report.generatedByEmail || "—"}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {formatDate(report.generatedAt)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => navigate(`/reports/${report.reportId}`)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-md"
-                                                        title="Xem chi tiết"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteClick(report.reportId)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                                                        title="Xóa"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.unit || ''}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(item.openingQty || item.opening_qty)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-medium">{formatNumber(item.inboundQty || item.inbound_qty)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{formatNumber(item.outboundQty || item.outbound_qty)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">{formatNumber(item.closingQty || item.closing_qty)}</td>
                                         </tr>
                                     ))}
+                                    <tr className="bg-gray-100 font-bold">
+                                        <td colSpan="3" className="px-6 py-4 text-sm text-gray-900">TỔNG CỘNG</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalOpening)}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">{formatNumber(totals.totalInbound)}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">{formatNumber(totals.totalOutbound)}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalClosing)}</td>
+                                    </tr>
                                 </tbody>
                             </table>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
-                    {/* Pagination */}
-                    {!loading && !error && reports.length > 0 && (
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            pageSize={pageSize}
-                            totalElements={totalElements}
-                            onPageChange={handlePageChange}
-                            onPageSizeChange={handlePageSizeChange}
-                        />
+                    {/* Summary Info */}
+                    {inventoryData.length > 0 && (
+                        <div className="px-6 py-4 bg-gray-50 border-t">
+                            <div className="text-sm text-gray-600">
+                                <p>Kỳ báo cáo: <span className="font-medium">{inventoryFilters.startDate.toLocaleDateString('vi-VN')}</span> - <span className="font-medium">{inventoryFilters.endDate.toLocaleDateString('vi-VN')}</span></p>
+                                <p className="mt-1">Tổng số mặt hàng: <span className="font-medium">{inventoryData.length}</span></p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!loading && inventoryData.length === 0 && (
+                        <div className="px-6 py-12 text-center">
+                            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <h3 className="mt-2 text-sm font-medium text-gray-900">Chưa có dữ liệu</h3>
+                            <p className="mt-1 text-sm text-gray-500">Chọn khoảng thời gian và nhấn "Tạo báo cáo" để xem dữ liệu</p>
+                        </div>
                     )}
                 </div>
             </div>
-
-            {/* Delete Confirmation Modal */}
-            {deleteModal.open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/30" onClick={() => setDeleteModal({ open: false, reportId: null })}></div>
-                    <div className="relative bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-900">Xác nhận xóa</h3>
-                        </div>
-                        <div className="px-6 py-5 text-gray-700">
-                            Bạn có chắc chắn muốn xóa báo cáo này không?
-                        </div>
-                        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
-                            <button
-                                onClick={() => setDeleteModal({ open: false, reportId: null })}
-                                className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                            >
-                                Xóa
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

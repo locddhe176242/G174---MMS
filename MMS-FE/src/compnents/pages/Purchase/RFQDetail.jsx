@@ -262,6 +262,11 @@ export default function RFQDetail() {
         : []);
   
   const selectedVendors = data.selectedVendors || [];
+   
+  // Số NCC được mời = selectedVendorIds, nếu không có thì dùng số quotation
+  // Số báo giá nhận được = số quotation
+  const invitedVendorCount = selectedVendorIds.length > 0 ? selectedVendorIds.length : quotations.length;
+  const receivedQuotationCount = quotations.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -321,7 +326,7 @@ export default function RFQDetail() {
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <Stat label="Tổng số lượng" value={totalQuantity.toLocaleString()} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
-                <Stat label="Số nhà cung cấp" value={selectedVendorIds.length} />
+                <Stat label="Số nhà cung cấp" value={`${receivedQuotationCount}/${invitedVendorCount}`} />
                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                 <div className="flex-1 text-center">
                   <div className="text-sm text-gray-500">Trạng thái</div>

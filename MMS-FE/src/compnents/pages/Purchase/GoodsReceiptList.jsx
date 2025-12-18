@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService.js";
+import { hasRole } from "../../../api/authService";
 import Pagination from "../../common/Pagination";
 
 export default function GoodsReceiptList() {
@@ -183,12 +184,14 @@ export default function GoodsReceiptList() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu nhập kho</h1>
                         </div>
-                        <button
-                            onClick={() => navigate("/purchase/goods-receipts/new")}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            + Tạo Phiếu nhập kho
-                        </button>
+                        {(hasRole("WAREHOUSE") || hasRole("MANAGER")) && (
+                            <button
+                                onClick={() => navigate("/purchase/goods-receipts/new")}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                                + Tạo Phiếu nhập kho
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -285,7 +288,7 @@ export default function GoodsReceiptList() {
                                                         ? "bg-purple-100 text-purple-800" 
                                                         : "bg-blue-100 text-blue-800"
                                                 }`}>
-                                                    {receipt.sourceType === "SalesReturn" ? "Sales Return" : "Purchase"}
+                                                    {receipt.sourceType === "SalesReturn" ? "Đơn bán trả" : "Đơn mua"}
                                                 </span>
                                                 <span className="font-medium">
                                                     {receipt.sourceType === "SalesReturn" 
@@ -423,7 +426,7 @@ export default function GoodsReceiptList() {
             </div>
 
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
                         <div className="flex items-center mb-4">
                             <div className="flex-shrink-0 w-10 h-10 mx-auto bg-red-100 rounded-full flex items-center justify-center">

@@ -151,7 +151,8 @@ export default function APaymentList() {
       payment.vendorName || "-",
       getPaymentMethodLabel(payment.method),
       payment.amount || 0,
-      payment.status === 'Completed' ? 'Đã thanh toán' : 'Chưa thanh toán'
+      payment.invoiceStatus === 'Paid' ? 'Đã thanh toán' : 
+      payment.invoiceStatus === 'Partially_Paid' ? 'Thanh toán một phần' : 'Chưa thanh toán'
     ]);
 
     // Kết hợp headers và rows
@@ -264,15 +265,19 @@ export default function APaymentList() {
                 {formatCurrency(payment.amount)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {payment.status ? (
+                {payment.invoiceStatus ? (
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    payment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    payment.invoiceStatus === 'Paid' ? 'bg-green-100 text-green-800' : 
+                    payment.invoiceStatus === 'Partially_Paid' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
-                    {payment.status === 'Completed' ? 'Đã thanh toán' : 'Chưa thanh toán hết'}
+                    {payment.invoiceStatus === 'Paid' ? 'Đã thanh toán' : 
+                     payment.invoiceStatus === 'Partially_Paid' ? 'Thanh toán một phần' :
+                     'Chưa thanh toán'}
                   </span>
                 ) : (
-                  <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                    Chưa thanh toán hết
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    Không xác định
                   </span>
                 )}
               </td>

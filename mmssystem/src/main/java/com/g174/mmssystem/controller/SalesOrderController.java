@@ -25,7 +25,7 @@ public class SalesOrderController {
     private final ISalesOrderService salesOrderService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     public ResponseEntity<Page<SalesOrderListResponseDTO>> listOrders(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) String status,
@@ -43,7 +43,7 @@ public class SalesOrderController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     public ResponseEntity<List<SalesOrderListResponseDTO>> getAllOrders(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) String status,
@@ -52,7 +52,7 @@ public class SalesOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
     public ResponseEntity<SalesOrderResponseDTO> getOrder(@PathVariable Integer id) {
         return ResponseEntity.ok(salesOrderService.getOrder(id));
     }

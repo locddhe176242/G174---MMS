@@ -27,7 +27,7 @@ public class GoodsReceiptController {
     private final IGoodsReceiptService receiptService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "CREATE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -37,8 +37,8 @@ public class GoodsReceiptController {
     public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(
             @Valid @RequestBody GoodsReceiptRequestDTO requestDTO,
             @RequestParam(required = false) Integer createdById) {
-        log.info("REST: Creating goods receipt for Inbound Delivery ID: {}, Warehouse ID: {}",
-                requestDTO.getInboundDeliveryId(), requestDTO.getWarehouseId());
+        log.info("REST: Creating goods receipt for Purchase Order ID: {}, Warehouse ID: {}",
+                requestDTO.getOrderId(), requestDTO.getWarehouseId());
 
         // Get current user ID if not provided
         if (createdById == null) {
@@ -127,14 +127,7 @@ public class GoodsReceiptController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/inbound-delivery/{inboundDeliveryId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
-    public ResponseEntity<List<GoodsReceiptResponseDTO>> getReceiptsByInboundDeliveryId(@PathVariable Integer inboundDeliveryId) {
-        log.info("REST: Fetching goods receipts for Inbound Delivery ID: {}", inboundDeliveryId);
 
-        List<GoodsReceiptResponseDTO> response = receiptService.getReceiptsByInboundDeliveryId(inboundDeliveryId);
-        return ResponseEntity.ok(response);
-    }
 
     @GetMapping("/warehouse/{warehouseId}")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','ACCOUNTING')")
@@ -146,7 +139,7 @@ public class GoodsReceiptController {
     }
 
     @PutMapping("/{receiptId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "UPDATE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",
@@ -207,7 +200,7 @@ public class GoodsReceiptController {
     }
 
     @DeleteMapping("/{receiptId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','WAREHOUSE')")
     @LogActivity(
             action = "DELETE_GOODS_RECEIPT",
             activityType = "WAREHOUSE_MANAGEMENT",

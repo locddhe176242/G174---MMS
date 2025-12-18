@@ -40,7 +40,6 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     private final GoodsReceiptRepository receiptRepository;
     private final PurchaseOrderItemRepository orderItemRepository;
     private final GoodsReceiptItemRepository receiptItemRepository;
-    private final InboundDeliveryRepository inboundDeliveryRepository;
     private final com.g174.mmssystem.service.IService.IVendorBalanceService vendorBalanceService;
 
     @Override
@@ -51,14 +50,14 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
 
         // Validate and load entities
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found  " + dto.getVendorId()));
 
         // Optional: Link to Purchase Order (can be null for prepayment/manual invoices)
         PurchaseOrder purchaseOrder = null;
         if (dto.getOrderId() != null) {
             purchaseOrder = orderRepository.findById(dto.getOrderId())
                     .filter(o -> o.getDeletedAt() == null)
-                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + dto.getOrderId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + dto.getOrderId()));
             log.info("Invoice linked to PO: {}", purchaseOrder.getPoNo());
         }
 
@@ -67,7 +66,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         if (dto.getReceiptId() != null) {
             goodsReceipt = receiptRepository.findById(dto.getReceiptId())
                     .filter(gr -> gr.getDeletedAt() == null)
-                    .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + dto.getReceiptId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found  " + dto.getReceiptId()));
             
             // Validate: GR must be Approved
             if (goodsReceipt.getStatus() != GoodsReceipt.GoodsReceiptStatus.Approved) {
@@ -164,11 +163,11 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         // Load GR with all relations needed for invoice creation
         GoodsReceipt goodsReceipt = receiptRepository.findByIdWithRelations(receiptId)
                 .filter(gr -> gr.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found with ID: " + receiptId));
+                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found  " + receiptId));
         
         // Load items separately to avoid cartesian product - reassign to get items populated
         goodsReceipt = receiptRepository.findByIdWithItems(receiptId)
-                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt items not found with ID: " + receiptId));
+                .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt items not found  " + receiptId));
         
         log.info("GR Status: {}, Items count: {}", goodsReceipt.getStatus(), 
                  goodsReceipt.getItems() != null ? goodsReceipt.getItems().size() : "NULL");
@@ -189,20 +188,16 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("Hóa đơn đã được tạo cho phiếu nhập kho này");
         }
 
-        // Access PurchaseOrder through InboundDelivery
-        InboundDelivery inboundDelivery = goodsReceipt.getInboundDelivery();
-        if (inboundDelivery == null) {
-            throw new IllegalStateException("Inbound Delivery not found for Goods Receipt ID: " + receiptId);
-        }
+        // Access PurchaseOrder directly from GoodsReceipt
+        PurchaseOrder purchaseOrder = goodsReceipt.getPurchaseOrder();
         
-        PurchaseOrder purchaseOrder = inboundDelivery.getPurchaseOrder();
         if (purchaseOrder == null) {
-            throw new IllegalStateException("Purchase Order not found for Inbound Delivery ID: " + inboundDelivery.getInboundDeliveryId());
+            throw new IllegalStateException("No Purchase Order found for Goods Receipt " + receiptId);
         }
         
         Vendor vendor = purchaseOrder.getVendor();
         if (vendor == null) {
-            throw new IllegalStateException("Vendor not found for Purchase Order ID: " + purchaseOrder.getOrderId());
+            throw new IllegalStateException("Vendor not found for Purchase Order " + purchaseOrder.getOrderId());
         }
 
         // Get header discount from PO
@@ -219,7 +214,12 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         List<APInvoiceItem> invoiceItems = new ArrayList<>();
         
         for (GoodsReceiptItem grItem : goodsReceipt.getItems()) {
-            PurchaseOrderItem poItem = grItem.getInboundDeliveryItem().getPurchaseOrderItem();
+            // Get PurchaseOrderItem by matching product
+            PurchaseOrderItem poItem = purchaseOrder.getItems().stream()
+                    .filter(item -> item.getProduct().getProductId().equals(grItem.getProduct().getProductId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Purchase Order Item not found for product: " + grItem.getProduct().getName()));
+            
             BigDecimal acceptedQty = grItem.getAcceptedQty();
             BigDecimal unitPrice = poItem.getUnitPrice();
             BigDecimal lineDiscountPercent = poItem.getDiscountPercent() != null ? poItem.getDiscountPercent() : BigDecimal.ZERO;
@@ -330,7 +330,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
         // Load PO with all relations
         PurchaseOrder purchaseOrder = orderRepository.findByIdWithRelations(orderId)
                 .filter(po -> po.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found  " + orderId));
 
         // Check if PO is completed
         if (purchaseOrder.getStatus() != com.g174.mmssystem.enums.PurchaseOrderStatus.Completed) {
@@ -343,10 +343,8 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             throw new IllegalStateException("AP Invoice already exists for this Purchase Order");
         }
 
-        // Get all approved GRs for this PO through Inbound Deliveries
-        List<InboundDelivery> inboundDeliveries = inboundDeliveryRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(orderId);
-        List<GoodsReceipt> goodsReceipts = inboundDeliveries.stream()
-                .flatMap(id -> receiptRepository.findByInboundDeliveryId(id.getInboundDeliveryId()).stream())
+        // Get all approved GRs for this PO (new flow: direct PO → GR)
+        List<GoodsReceipt> goodsReceipts = receiptRepository.findByPurchaseOrder_OrderIdAndDeletedAtIsNull(orderId).stream()
                 .filter(gr -> gr.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved)
                 .toList();
 
@@ -437,7 +435,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
     @Override
     public APInvoiceResponseDTO getInvoiceById(Integer invoiceId) {
         APInvoice invoice = invoiceRepository.findByIdWithRelations(invoiceId)
-                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
+                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found  " + invoiceId));
         return invoiceMapper.toResponseDTO(invoice);
     }
 
@@ -508,7 +506,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
 
         APInvoice invoice = invoiceRepository.findById(invoiceId)
                 .filter(inv -> inv.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
+                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found  " + invoiceId));
 
         // Validate invoice can be edited
         if (!"Unpaid".equals(invoice.getStatus()) && !"Chưa thanh toán".equals(invoice.getStatus())) {
@@ -564,7 +562,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
 
         APInvoice invoice = invoiceRepository.findById(invoiceId)
                 .filter(inv -> inv.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + invoiceId));
+                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found  " + invoiceId));
 
         // Store values before delete for balance update
         Integer vendorId = invoice.getVendor().getVendorId();
@@ -591,7 +589,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
 
         APInvoice invoice = invoiceRepository.findById(dto.getApInvoiceId())
                 .filter(inv -> inv.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found with ID: " + dto.getApInvoiceId()));
+                .orElseThrow(() -> new ResourceNotFoundException("AP Invoice not found  " + dto.getApInvoiceId()));
 
         // Auto-generate reference number if not provided
         String referenceNo = dto.getReferenceNo();
@@ -678,6 +676,7 @@ public class APInvoiceServiceImpl implements IAPInvoiceService {
             dto.setMethod(payment.getMethod());
             dto.setReferenceNo(payment.getReferenceNo());
             dto.setNotes(payment.getNotes());
+            dto.setInvoiceStatus(payment.getApInvoice().getStatus());
             dto.setCreatedAt(payment.getCreatedAt());
             return dto;
         });

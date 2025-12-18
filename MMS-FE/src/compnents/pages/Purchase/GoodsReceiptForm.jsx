@@ -15,7 +15,6 @@ export default function GoodsReceiptForm() {
     const navigate = useNavigate();
     const isEdit = Boolean(id);
     const poIdFromQuery = searchParams.get("po_id");
-    const inboundIdFromQuery = searchParams.get("inbound_id");
     const sriIdFromQuery = searchParams.get("sriId");
     
     // Source type selection: 'purchase' or 'salesReturn'
@@ -49,6 +48,18 @@ export default function GoodsReceiptForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const [validationErrors, setValidationErrors] = useState({});
+
+    // Function to translate status to Vietnamese
+    const getStatusInVietnamese = (status) => {
+        const statusMap = {
+            'Pending': 'Chờ xử lý',
+            'Approved': 'Đã duyệt',
+            'Rejected': 'Từ chối',
+            'Draft': 'Nháp',
+            'Completed': 'Hoàn thành'
+        };
+        return statusMap[status] || status;
+    };
 
     const formattedDate = useMemo(() => {
         if (!formData.received_date) return "";
@@ -84,7 +95,7 @@ export default function GoodsReceiptForm() {
         loadUser();
         loadWarehouses();
         if (!isSalesReturnMode) {
-            loadInboundDeliveries();
+            loadPurchaseOrders();
         }
         if (isEdit) {
             loadReceipt();
@@ -93,16 +104,12 @@ export default function GoodsReceiptForm() {
             if (isSalesReturnMode && sriIdFromQuery) {
                 console.log("=== Sales Return Mode detected ===", { sriIdFromQuery, isSalesReturnMode });
                 loadSalesReturnInboundOrder(sriIdFromQuery);
-            } else if (inboundIdFromQuery) {
-                console.log("Auto-loading Inbound Delivery from query:", inboundIdFromQuery);
-                loadInboundDeliveryItems(inboundIdFromQuery);
             } else if (poIdFromQuery) {
                 console.log("Auto-loading PO from query:", poIdFromQuery);
-                loadPurchaseOrderItems(poIdFromQuery);
-                setFormData((prev) => ({ ...prev, order_id: parseInt(poIdFromQuery) }));
+                loadPOItems(poIdFromQuery);
             }
         }
-    }, [isEdit, id, poIdFromQuery, inboundIdFromQuery, sriIdFromQuery]);
+    }, [isEdit, id, poIdFromQuery, sriIdFromQuery]);
 
     const generateReceiptNumber = async () => {
         try {
@@ -138,39 +145,37 @@ export default function GoodsReceiptForm() {
         }
     };
 
-    const loadInboundDeliveries = async () => {
+    const loadPurchaseOrders = async () => {
         try {
-            const response = await apiClient.get("/inbound-deliveries/page", {
+            const response = await apiClient.get("/purchase-orders/page", {
                 params: { page: 0, size: 100, sort: "createdAt,desc" },
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
             
-            // Filter: Chỉ lấy Inbound Delivery có status Pending (chưa hoàn thành nhập kho)
-            // Bao gồm cả những đơn đã nhập một phần nhưng chưa hoàn tất
-            const eligibleDeliveries = data.filter((delivery) => {
-                const status = delivery.status?.toString() || delivery.status || "";
-                // Lấy đơn Pending (chưa nhập hoặc đang nhập dở)
-                return status.toUpperCase() === "PENDING";
+            // Filter: Chỉ lấy PO đã Approved và chưa nhập kho hoàn tất
+            const eligiblePOs = data.filter((po) => {
+                const approvalStatus = po.approvalStatus || po.approval_status || "";
+                const hasGoodsReceipt = po.hasGoodsReceipt || false;
+                return approvalStatus.toUpperCase() === "APPROVED" && !hasGoodsReceipt;
             });
 
             setPurchaseOrders(
-                eligibleDeliveries.map((delivery) => {
-                    const deliveryNo = delivery.inboundDeliveryNo || delivery.inbound_delivery_no || delivery.deliveryNo || delivery.delivery_no;
-                    const deliveryId = delivery.inboundDeliveryId || delivery.inbound_delivery_id || delivery.deliveryId || delivery.delivery_id || delivery.id;
-                    const vendorName = delivery.vendorName || delivery.vendor?.name || "N/A";
-                    const poNo = delivery.poNo || delivery.po_no || "";
+                eligiblePOs.map((po) => {
+                    const poNo = po.poNo || po.po_no;
+                    const poId = po.orderId || po.order_id || po.id;
+                    const vendorName = po.vendorName || po.vendor?.name || "N/A";
                     
                     return {
-                        value: deliveryId,
-                        label: `${deliveryNo} - ${vendorName} (PO: ${poNo})`,
-                        delivery,
+                        value: poId,
+                        label: `${poNo} - ${vendorName}`,
+                        po,
                         isDisabled: false
                     };
                 })
             );
         } catch (err) {
-            console.error("Error loading inbound deliveries:", err);
-            toast.error("Không thể tải danh sách Kế hoạch nhận hàng");
+            console.error("Error loading purchase orders:", err);
+            toast.error("Đông thể tải danh sách đơn hàng");
         }
     };
 
@@ -290,79 +295,52 @@ export default function GoodsReceiptForm() {
         }
     };
 
-    const loadInboundDeliveryItems = async (inboundId, showSuccessToast = true, skipItemsUpdate = false) => {
-        if (!inboundId) return;
+    const loadPOItems = async (poId) => {
+        if (!poId) return;
         try {
             setLoading(true);
-            const response = await apiClient.get(`/inbound-deliveries/${inboundId}`);
-            console.log("=== INBOUND DELIVERY RESPONSE ===", response.data);
-            const inboundDelivery = response.data;
-            const items = Array.isArray(inboundDelivery.items) ? inboundDelivery.items : inboundDelivery.items?.content || [];
+            const response = await apiClient.get(`/purchase-orders/${poId}`);
+            console.log("=== PO RESPONSE ===", response.data);
+            const po = response.data;
+            const items = Array.isArray(po.items) ? po.items : po.items?.content || [];
             
-            const warehouseId = inboundDelivery.warehouseId || inboundDelivery.warehouse_id;
-            const orderId = inboundDelivery.orderId || inboundDelivery.order_id;
+            const warehouseId = po.warehouseId || po.warehouse_id;
+            const orderId = po.orderId || po.order_id || po.id;
             
             console.log("Setting warehouse_id:", warehouseId);
             console.log("Setting order_id:", orderId);
-            console.log("Available warehouses:", warehouses);
-            console.log("Available POs:", purchaseOrders);
             
-            // Only update items if not skipping
-            if (!skipItemsUpdate) {
-                // Map items from Inbound Delivery
-                const mapped = items.map((item, index) => {
-                    console.log(`Mapping Inbound Delivery item ${index}:`, item);
-                    const expectedQty = Number(item.expectedQty || item.expected_qty || 0);
-                    const orderedQty = Number(item.orderedQty || item.ordered_qty || 0);
-                    const receivedQty = Number(item.receivedQty || item.received_qty || 0);
-                    const remainingQty = Math.max(0, expectedQty - receivedQty);
-                    const isCompleted = receivedQty >= expectedQty;
-                    
-                    const mapped = {
-                        idi_id: item.idiId || item.idi_id || item.id,
-                        poi_id: item.poiId || item.poi_id,
-                        product_id: item.productId || item.product_id,
-                        productName: item.productName || item.product_name || "-",
-                        productCode: item.productCode || item.productSku || "",
-                        ordered_qty: orderedQty,
-                        expected_qty: expectedQty,
-                        previously_received_qty: receivedQty,
-                        remaining_qty: remainingQty,
-                        received_qty: isCompleted ? 0 : remainingQty, 
-                        accepted_qty: isCompleted ? 0 : remainingQty,
-                        remark: "",
-                        is_completed: isCompleted, 
-                    };
-                    console.log(`Mapped Inbound Delivery item ${index}:`, mapped);
-                    console.log(`  -> Expected: ${expectedQty}, Received: ${receivedQty}, Remaining: ${remainingQty}, Completed: ${isCompleted}`);
-                    return mapped;
-                });
-                console.log("=== FINAL MAPPED INBOUND DELIVERY ITEMS ===", mapped);
+            // Map items from PO
+            const mapped = items.map((item, index) => {
+                console.log(`Mapping PO item ${index}:`, item);
+                const orderedQty = Number(item.quantity || item.qty || 0);
                 
-                // Update form data with warehouse, order, and items
-                setFormData((prev) => ({
-                    ...prev,
-                    warehouse_id: warehouseId,
-                    order_id: orderId,
-                    inbound_delivery_id: parseInt(inboundId),
-                    items: mapped
-                }));
-                
-                if (showSuccessToast) {
-                    toast.success(`Đã tải ${mapped.length} sản phẩm từ kế hoạch nhận hàng`);
-                }
-            } else {
-                // Only update warehouse and order, keep existing items
-                setFormData((prev) => ({
-                    ...prev,
-                    warehouse_id: warehouseId,
-                    order_id: orderId,
-                    inbound_delivery_id: parseInt(inboundId),
-                }));
-            }
+                return {
+                    poi_id: item.poiId || item.poi_id || item.id,
+                    product_id: item.productId || item.product_id,
+                    productName: item.productName || item.product_name || "-",
+                    productCode: item.productCode || item.productSku || "",
+                    ordered_qty: orderedQty,
+                    received_qty: orderedQty,
+                    accepted_qty: orderedQty,
+                    remark: "",
+                };
+            });
+            console.log("=== FINAL MAPPED PO ITEMS ===", mapped);
+            
+            // Update form data with warehouse, order, and items
+            setFormData((prev) => ({
+                ...prev,
+                warehouse_id: warehouseId,
+                order_id: orderId,
+                items: mapped
+            }));
+            
+            setPoReferenceItems(mapped);
+            toast.success("Đã tải thông tin đơn hàng");
         } catch (err) {
-            console.error("Error loading inbound delivery items:", err);
-            toast.error("Không thể tải danh sách sản phẩm từ kế hoạch nhận hàng");
+            console.error("Error loading PO items:", err);
+            toast.error("Không thể tải thông tin đơn hàng");
         } finally {
             setLoading(false);
         }
@@ -520,11 +498,10 @@ export default function GoodsReceiptForm() {
 
     const handleOrderChange = (option) => {
         if (option) {
-            // Set inbound_delivery_id instead of order_id
-            handleInputChange("inbound_delivery_id", option.value);
-            loadInboundDeliveryItems(option.value);
+            handleInputChange("order_id", option.value);
+            loadPOItems(option.value);
         } else {
-            handleInputChange("inbound_delivery_id", null);
+            handleInputChange("order_id", null);
             setFormData((prev) => ({ ...prev, items: [] }));
             setPoReferenceItems([]);
         }
@@ -616,6 +593,9 @@ export default function GoodsReceiptForm() {
             const userId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1; // Fallback to 1 for testing
             console.log("Current user:", currentUser);
             console.log("User ID:", userId);
+            console.log("sourceType:", sourceType);
+            console.log("isSalesReturnMode:", isSalesReturnMode);
+            console.log("sriIdFromQuery:", sriIdFromQuery);
 
             if (isSalesReturnMode) {
                 // Sales Return mode
@@ -760,10 +740,15 @@ export default function GoodsReceiptForm() {
                     }
                 }
                 
+                // Validate required fields before building payload
+                if (!formData.warehouse_id) {
+                    toast.error("Vui lòng chọn Kho nhận");
+                    return;
+                }
+                
                 const payload = {
                     receiptNo: formData.receipt_no,
-                    inboundDeliveryId: formData.inbound_delivery_id || null, // Tham chiếu từ Inbound Delivery
-                    orderId: formData.order_id, // Vẫn giữ orderId để biết PO nào
+                    orderId: formData.order_id, // PO ID
                     warehouseId: formData.warehouse_id,
                     receivedDate: formattedDate,
                     status: formData.status,
@@ -776,7 +761,6 @@ export default function GoodsReceiptForm() {
                         }
                         
                         return {
-                            idiId: item.idi_id, // Inbound Delivery Item ID
                             productId: item.product_id,
                             receivedQty: Number(item.received_qty || 0),
                             acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
@@ -787,7 +771,6 @@ export default function GoodsReceiptForm() {
 
                 console.log("=== SUBMITTING PAYLOAD (Purchase) ===", payload);
                 console.log("Items detail:", payload.items);
-                console.log("Inbound Delivery ID:", payload.inboundDeliveryId);
             
                 if (isEdit) {
                     console.log("Updating with userId:", userId);
@@ -888,7 +871,7 @@ export default function GoodsReceiptForm() {
                                                     onChange={(e) => handleSourceTypeChange('purchase')}
                                                     className="mr-2"
                                                 />
-                                                <span className="text-sm text-gray-700">Từ Kế hoạch nhập hàng (Inbound Delivery)</span>
+                                                <span className="text-sm text-gray-700">Từ đơn đặt hàng</span>
                                             </label>
                                             <label className="flex items-center cursor-pointer">
                                                 <input
@@ -899,7 +882,7 @@ export default function GoodsReceiptForm() {
                                                     onChange={(e) => handleSourceTypeChange('salesReturn')}
                                                     className="mr-2"
                                                 />
-                                                <span className="text-sm text-gray-700">Từ Đơn nhập hàng lại (Sales Return)</span>
+                                                <span className="text-sm text-gray-700">Từ Đơn nhập hàng lại</span>
                                             </label>
                                         </div>
                                     </div>
@@ -928,7 +911,7 @@ export default function GoodsReceiptForm() {
                                         </label>
                                         <input
                                             type="text"
-                                            value={formData.status}
+                                            value={getStatusInVietnamese(formData.status)}
                                             readOnly
                                             className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
                                         />
@@ -1003,17 +986,17 @@ export default function GoodsReceiptForm() {
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Nếu có inbound_delivery_id từ URL (tạo mới), hiển thị info box thay vì dropdown */}
-                                            {!isEdit && formData.inbound_delivery_id && inboundIdFromQuery ? (
+                                            {/* Nếu có order_id từ URL (tạo mới), hiển thị info box thay vì dropdown */}
+                                            {!isEdit && formData.order_id && poIdFromQuery ? (
                                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                                     <div className="flex items-start gap-3">
                                                         <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
                                                         <div>
-                                                            <p className="text-sm font-medium text-blue-800">Đơn nhập kho từ Kế hoạch nhận hàng</p>
+                                                            <p className="text-sm font-medium text-blue-800">Đơn nhập kho từ Đơn hàng</p>
                                                             <p className="text-sm text-blue-700 mt-1">
-                                                                Danh sách sản phẩm được lấy tự động từ Kế hoạch nhận hàng ID: {formData.inbound_delivery_id}
+                                                                Danh sách sản phẩm được lấy tự động từ Đơn hàng ID: {formData.order_id}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1021,13 +1004,13 @@ export default function GoodsReceiptForm() {
                                             ) : (
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Kế hoạch nhận hàng <span className="text-red-500">*</span>
+                                                        Đơn hàng <span className="text-red-500">*</span>
                                                     </label>
                                                     <Select
-                                                        value={purchaseOrders.find((opt) => opt.value === formData.inbound_delivery_id) || null}
+                                                        value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
                                                         onChange={handleOrderChange}
                                                         options={purchaseOrders}
-                                                        placeholder="Chọn Kế hoạch nhận hàng"
+                                                        placeholder="Chọn đơn hàng"
                                                         isClearable
                                                         classNamePrefix="react-select"
                                                         isOptionDisabled={(option) => option.isDisabled}

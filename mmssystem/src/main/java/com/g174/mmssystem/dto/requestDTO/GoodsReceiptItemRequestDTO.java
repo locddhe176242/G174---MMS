@@ -11,8 +11,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class GoodsReceiptItemRequestDTO {
-    // For Purchase: Inbound Delivery Item ID
-    private Integer idiId;
+    // For Purchase: Purchase Order Item ID
+    private Integer poiId;
 
     // For SalesReturn: Return Order Item ID
     private Integer roiId;

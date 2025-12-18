@@ -772,7 +772,7 @@ const VendorQuotationForm = () => {
                         {/* Shipping Cost */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Phí vận chuyển
+                                Phí vận chuyển (VND)
                             </label>
                             <input
                                 type="text"
