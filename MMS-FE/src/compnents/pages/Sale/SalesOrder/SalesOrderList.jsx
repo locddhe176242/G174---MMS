@@ -99,6 +99,11 @@ export default function SalesOrderList() {
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter((order) => {
+      // Ẩn các đơn đã giao hết hàng và đã có hóa đơn tương ứng
+      if (order.isFullyDelivered && order.hasInvoice) {
+        return false;
+      }
+
       const matchesKeyword =
         !term ||
         (order.orderNo || "").toLowerCase().includes(term) ||
@@ -184,7 +189,7 @@ export default function SalesOrderList() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn bán hàng</h1>
             <p className="text-gray-500">Theo dõi đơn bán hàng và trạng thái thực hiện</p>
@@ -198,7 +203,7 @@ export default function SalesOrderList() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -15,7 +15,8 @@ import java.math.BigDecimal;
         indexes = {
                 @Index(name = "idx_gii_issue", columnList = "issue_id"),
                 @Index(name = "idx_gii_product", columnList = "product_id"),
-                @Index(name = "idx_gii_delivery_item", columnList = "di_id")
+                @Index(name = "idx_gii_delivery_item", columnList = "di_id"),
+                @Index(name = "idx_gii_warehouse", columnList = "warehouse_id")
         })
 public class GoodIssueItem {
     @Id
@@ -34,6 +35,10 @@ public class GoodIssueItem {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    private Warehouse warehouse;
 
     @Column(name = "issued_qty", precision = 18, scale = 2, nullable = false)
     private BigDecimal issuedQty;

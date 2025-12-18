@@ -27,6 +27,12 @@ public interface SalesReturnInboundOrderRepository extends JpaRepository<SalesRe
                    "ORDER BY sri_no DESC LIMIT 1",
            nativeQuery = true)
     Optional<SalesReturnInboundOrder> findTopBySriNoStartingWithOrderBySriNoDesc(@Param("prefix") String prefix);
+
+    /**
+     * Tìm số đơn nhập hàng lại lớn nhất bắt đầu bằng prefix (để generate số tuần tự)
+     */
+    @Query("SELECT MAX(sri.sriNo) FROM SalesReturnInboundOrder sri WHERE sri.sriNo LIKE CONCAT(:prefix, '%') AND sri.deletedAt IS NULL")
+    String findMaxSriNo(@Param("prefix") String prefix);
 }
 
 

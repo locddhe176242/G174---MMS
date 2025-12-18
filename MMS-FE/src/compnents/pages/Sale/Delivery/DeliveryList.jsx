@@ -160,7 +160,7 @@ export default function DeliveryList() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu Giao Hàng</h1>
             <p className="text-gray-500">Theo dõi và quản lý các phiếu giao hàng</p>
@@ -174,7 +174,7 @@ export default function DeliveryList() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -236,7 +236,7 @@ export default function DeliveryList() {
                       </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Sales Order
+                      Đơn bán hàng
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Khách hàng

@@ -52,4 +52,7 @@ public interface SalesQuotationRepository extends JpaRepository<SalesQuotation, 
             "WHERE sq.customer.customerId = :customerId AND sq.deletedAt IS NULL " +
             "ORDER BY sq.quotationDate DESC")
     Page<SalesQuotation> findByCustomerIdOrderByDateDesc(@Param("customerId") Integer customerId, Pageable pageable);
+
+    @Query("SELECT MAX(sq.quotationNo) FROM SalesQuotation sq WHERE sq.quotationNo LIKE CONCAT(:prefix, '%')")
+    String findMaxQuotationNo(@Param("prefix") String prefix);
 }

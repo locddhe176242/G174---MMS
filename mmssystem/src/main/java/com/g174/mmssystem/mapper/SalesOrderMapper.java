@@ -38,6 +38,7 @@ public class SalesOrderMapper {
                         : Instant.now());
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setDeliveryTerms(dto.getDeliveryTerms());
         order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setCreatedBy(currentUser);
@@ -54,6 +55,7 @@ public class SalesOrderMapper {
         }
         order.setShippingAddress(dto.getShippingAddress());
         order.setPaymentTerms(dto.getPaymentTerms());
+        order.setDeliveryTerms(dto.getDeliveryTerms());
         order.setHeaderDiscountPercent(defaultBigDecimal(dto.getHeaderDiscountPercent()));
         order.setNotes(dto.getNotes());
         order.setUpdatedBy(currentUser);
@@ -96,6 +98,7 @@ public class SalesOrderMapper {
                 .orderDate(order.getOrderDate())
                 .shippingAddress(order.getShippingAddress())
                 .paymentTerms(order.getPaymentTerms())
+                .deliveryTerms(order.getDeliveryTerms())
                 .subtotal(order.getSubtotal())
                 .headerDiscountPercent(defaultBigDecimal(order.getHeaderDiscountPercent()))
                 .headerDiscountAmount(defaultBigDecimal(order.getHeaderDiscountAmount()))

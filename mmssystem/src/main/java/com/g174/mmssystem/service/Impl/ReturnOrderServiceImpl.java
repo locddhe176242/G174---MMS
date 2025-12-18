@@ -19,12 +19,8 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -296,14 +292,15 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     }
 
     private String generateReturnNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-        String candidate = "RO-" + datePart + "-" + unique;
-
-        while (returnOrderRepository.findByReturnNo(candidate) != null) {
-            unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-            candidate = "RO-" + datePart + "-" + unique;
+        String prefix = "RO";
+        String maxNo = returnOrderRepository.findMaxReturnNo(prefix);
+        int nextNum = 1;
+        if (maxNo != null && maxNo.startsWith(prefix)) {
+            try {
+                nextNum = Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+            }
         }
-        return candidate;
+        return String.format("%s%04d", prefix, nextNum);
     }
 }

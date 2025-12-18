@@ -45,7 +45,7 @@ public class DeliveryController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<DeliveryListResponseDTO>> getAllDeliveries(
             @RequestParam(required = false) Integer salesOrderId,
             @RequestParam(required = false) Integer customerId,
@@ -55,7 +55,7 @@ public class DeliveryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<DeliveryResponseDTO> getDelivery(@PathVariable Integer id) {
         return ResponseEntity.ok(deliveryService.getDelivery(id));
     }

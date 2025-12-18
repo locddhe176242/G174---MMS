@@ -726,6 +726,7 @@ CREATE TABLE Sales_Orders (
     approved_at DATETIME,
     shipping_address TEXT,
     payment_terms VARCHAR(255),
+    delivery_terms VARCHAR(255),
     header_discount_percent DECIMAL(5, 2) DEFAULT 0,
     header_discount_amount DECIMAL(18, 2) DEFAULT 0,
     subtotal DECIMAL(18, 2) DEFAULT 0,
@@ -822,7 +823,7 @@ CREATE TABLE Good_Issues (
     issue_id INT AUTO_INCREMENT PRIMARY KEY,
     issue_no VARCHAR(30) UNIQUE NOT NULL,
     delivery_id INT NOT NULL,
-    warehouse_id INT NOT NULL,
+    warehouse_id INT NULL,
     issue_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('Draft', 'Approved') DEFAULT 'Draft',
     created_by INT,
@@ -851,6 +852,7 @@ CREATE TABLE Good_Issue_Items (
     issue_id INT NOT NULL,
     di_id INT NOT NULL,
     product_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
     issued_qty DECIMAL(18, 2) NOT NULL,
     remark TEXT,
     CONSTRAINT fk_gii_issue
@@ -859,9 +861,12 @@ CREATE TABLE Good_Issue_Items (
       FOREIGN KEY (di_id) REFERENCES Delivery_Items(di_id) ON DELETE RESTRICT,
     CONSTRAINT fk_gii_product
       FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_gii_warehouse
+      FOREIGN KEY (warehouse_id) REFERENCES Warehouses(warehouse_id) ON DELETE RESTRICT,
     INDEX idx_gii_issue (issue_id),
     INDEX idx_gii_product (product_id),
-    INDEX idx_gii_delivery_item (di_id)
+    INDEX idx_gii_delivery_item (di_id),
+    INDEX idx_gii_warehouse (warehouse_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE AR_Invoices (

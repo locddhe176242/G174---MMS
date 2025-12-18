@@ -22,6 +22,8 @@ public class SalesOrderRequestDTO {
 
     private String paymentTerms;
 
+    private String deliveryTerms;
+
     private java.math.BigDecimal headerDiscountPercent;
 
     private String notes;

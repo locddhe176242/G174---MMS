@@ -82,6 +82,9 @@ public class GoodIssueMapper {
                 .productId(item.getProduct() != null ? item.getProduct().getProductId() : null)
                 .productName(item.getProduct() != null ? item.getProduct().getName() : null)
                 .productCode(item.getProduct() != null ? item.getProduct().getSku() : null)
+                .warehouseId(item.getWarehouse() != null ? item.getWarehouse().getWarehouseId() : null)
+                .warehouseName(item.getWarehouse() != null ? item.getWarehouse().getName() : null)
+                .warehouseCode(item.getWarehouse() != null ? item.getWarehouse().getCode() : null)
                 .issuedQty(item.getIssuedQty())
                 .remark(item.getRemark());
 

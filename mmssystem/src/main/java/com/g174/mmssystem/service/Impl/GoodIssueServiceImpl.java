@@ -44,7 +44,7 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
     @Override
     @Transactional
     public GoodIssueResponseDTO createIssue(GoodIssueRequestDTO dto, Integer createdById) {
-        log.info("Creating good issue for Delivery ID: {}, Warehouse ID: {}", dto.getDeliveryId(), dto.getWarehouseId());
+        log.info("Creating good issue for Delivery ID: {}", dto.getDeliveryId());
 
         // Validate and load entities
         Delivery delivery = deliveryRepository.findById(dto.getDeliveryId())
@@ -65,12 +65,14 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
             throw new IllegalStateException("Delivery already has an approved Good Issue. Cannot create another one.");
         }
 
-        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + dto.getWarehouseId()));
-
-        // Validate warehouse matches delivery warehouse
-        if (!warehouse.getWarehouseId().equals(delivery.getWarehouse().getWarehouseId())) {
-            throw new IllegalArgumentException("Warehouse must match Delivery warehouse");
+        // warehouseId ở header không còn bắt buộc, nhưng có thể dùng làm giá trị mặc định
+        Warehouse warehouse = null;
+        if (dto.getWarehouseId() != null) {
+            warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                    .orElse(null); // Không throw exception, chỉ log warning
+            if (warehouse == null) {
+                log.warn("Warehouse ID {} not found, will use warehouse from items", dto.getWarehouseId());
+            }
         }
 
         User createdBy = userRepository.findById(createdById)
@@ -116,6 +118,16 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                     Product product = productRepository.findById(itemDto.getProductId())
                             .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
 
+                    // Validate warehouseId cho từng item
+                    if (itemDto.getWarehouseId() == null) {
+                        throw new IllegalArgumentException(
+                                String.format("Warehouse ID is required for product %s", product.getName()));
+                    }
+                    Warehouse itemWarehouse = warehouseRepository.findById(itemDto.getWarehouseId())
+                            .orElseThrow(() -> new ResourceNotFoundException(
+                                    String.format("Warehouse not found with ID: %d for product %s",
+                                            itemDto.getWarehouseId(), product.getName())));
+
                     // Validate issued quantity does not exceed planned quantity
                     if (itemDto.getIssuedQty().compareTo(di.getPlannedQty()) > 0) {
                         throw new IllegalArgumentException(
@@ -123,12 +135,13 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                                         itemDto.getIssuedQty(), di.getPlannedQty(), product.getName()));
                     }
 
-                    // Validate stock availability
+                    // Validate stock availability - check theo kho của từng item
                     BigDecimal availableStock = warehouseStockService.getStockByWarehouseAndProduct(
-                            warehouse.getWarehouseId(), product.getProductId()).getQuantity();
+                            itemWarehouse.getWarehouseId(), product.getProductId()).getQuantity();
                     if (availableStock == null || availableStock.compareTo(itemDto.getIssuedQty()) < 0) {
                         throw new IllegalStateException(
-                                String.format("Insufficient stock. Available: %s, Required: %s for product %s",
+                                String.format("Insufficient stock in warehouse %s. Available: %s, Required: %s for product %s",
+                                        itemWarehouse.getName(),
                                         availableStock != null ? availableStock : BigDecimal.ZERO,
                                         itemDto.getIssuedQty(), product.getName()));
                     }
@@ -137,6 +150,7 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                             .goodIssue(issue)
                             .deliveryItem(di)
                             .product(product)
+                            .warehouse(itemWarehouse) // Kho riêng cho từng item
                             .issuedQty(itemDto.getIssuedQty())
                             .remark(itemDto.getRemark())
                             .build();
@@ -283,17 +297,39 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                         Product product = productRepository.findById(itemDto.getProductId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + itemDto.getProductId()));
 
+                        // Validate warehouseId cho từng item
+                        if (itemDto.getWarehouseId() == null) {
+                            throw new IllegalArgumentException(
+                                    String.format("Warehouse ID is required for product %s", product.getName()));
+                        }
+                        Warehouse itemWarehouse = warehouseRepository.findById(itemDto.getWarehouseId())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                        String.format("Warehouse not found with ID: %d for product %s",
+                                                itemDto.getWarehouseId(), product.getName())));
+
                         // Validate issued quantity
                         if (itemDto.getIssuedQty().compareTo(di.getPlannedQty()) > 0) {
                             throw new IllegalArgumentException(
-                                    String.format("Issued quantity (%s) cannot exceed planned quantity (%s)",
-                                            itemDto.getIssuedQty(), di.getPlannedQty()));
+                                    String.format("Issued quantity (%s) cannot exceed planned quantity (%s) for product %s",
+                                            itemDto.getIssuedQty(), di.getPlannedQty(), product.getName()));
+                        }
+
+                        // Validate stock availability - check theo kho của từng item
+                        BigDecimal availableStock = warehouseStockService.getStockByWarehouseAndProduct(
+                                itemWarehouse.getWarehouseId(), product.getProductId()).getQuantity();
+                        if (availableStock == null || availableStock.compareTo(itemDto.getIssuedQty()) < 0) {
+                            throw new IllegalStateException(
+                                    String.format("Insufficient stock in warehouse %s. Available: %s, Required: %s for product %s",
+                                            itemWarehouse.getName(),
+                                            availableStock != null ? availableStock : BigDecimal.ZERO,
+                                            itemDto.getIssuedQty(), product.getName()));
                         }
 
                         return GoodIssueItem.builder()
                                 .goodIssue(issue)
                                 .deliveryItem(di)
                                 .product(product)
+                                .warehouse(itemWarehouse) // Kho riêng cho từng item
                                 .issuedQty(itemDto.getIssuedQty())
                                 .remark(itemDto.getRemark())
                                 .build();
@@ -372,12 +408,10 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
 
         log.info("Processing {} items for Good Issue ID: {}", savedWithItems.getItems().size(), saved.getIssueId());
 
-        // Update Warehouse Stock: Decrease inventory quantity
-        Integer warehouseId = saved.getWarehouse().getWarehouseId();
-        log.info("Updating warehouse stock for warehouse ID: {}", warehouseId);
-
+        // Update Warehouse Stock: Decrease inventory quantity theo kho của từng item
         for (GoodIssueItem issueItem : savedWithItems.getItems()) {
             Integer productId = issueItem.getProduct() != null ? issueItem.getProduct().getProductId() : null;
+            Integer warehouseId = issueItem.getWarehouse() != null ? issueItem.getWarehouse().getWarehouseId() : null;
             BigDecimal issuedQty = issueItem.getIssuedQty();
 
             if (productId == null) {
@@ -385,20 +419,27 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                 throw new IllegalStateException("Good Issue Item has null product");
             }
 
+            if (warehouseId == null) {
+                log.error("Good Issue Item {} has null warehouse", issueItem.getGiiId());
+                throw new IllegalStateException("Good Issue Item has null warehouse");
+            }
+
             if (issuedQty == null || issuedQty.compareTo(BigDecimal.ZERO) <= 0) {
                 log.warn("Good Issue Item {} has invalid issuedQty: {}", issueItem.getGiiId(), issuedQty);
                 continue; // Skip items with zero or negative quantity
             }
 
-            log.info("Processing stock decrease for product {} with issuedQty {}", productId, issuedQty);
+            log.info("Processing stock decrease for product {} in warehouse {} with issuedQty {}", productId, warehouseId, issuedQty);
 
-            // Decrease stock
+            // Decrease stock theo kho của từng item
             try {
                 warehouseStockService.decreaseStock(warehouseId, productId, issuedQty);
                 log.info("Decreased stock: warehouse {} product {} -{}", warehouseId, productId, issuedQty);
             } catch (Exception e) {
-                log.error("Error decreasing stock for product {}: {}", productId, e.getMessage());
-                throw new IllegalStateException("Failed to decrease stock for product " + productId + ": " + e.getMessage());
+                log.error("Error decreasing stock for product {} in warehouse {}: {}", productId, warehouseId, e.getMessage());
+                throw new IllegalStateException(
+                        String.format("Failed to decrease stock for product %d in warehouse %d: %s",
+                                productId, warehouseId, e.getMessage()));
             }
         }
 

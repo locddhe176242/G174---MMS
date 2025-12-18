@@ -157,7 +157,7 @@ export default function SalesQuotationList() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Quản lý báo giá bán hàng
@@ -174,8 +174,8 @@ export default function SalesQuotationList() {
           </button>
         </div>
       </div>
-
-      <div className="container mx-auto px-4 py-6">
+      
+      <div className="px-6 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <form
@@ -279,7 +279,14 @@ export default function SalesQuotationList() {
                         {quotation.customerName || "—"}
                       </td>
                       <td className="px-6 py-3">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          quotation.status === "Draft" ? "bg-gray-100 text-gray-700" :
+                          quotation.status === "Active" ? "bg-blue-100 text-blue-700" :
+                          quotation.status === "Converted" ? "bg-green-100 text-green-700" :
+                          quotation.status === "Cancelled" ? "bg-red-100 text-red-700" :
+                          quotation.status === "Expired" ? "bg-yellow-100 text-yellow-700" :
+                          "bg-gray-100 text-gray-700"
+                        }`}>
                           {STATUS_LABELS[quotation.status] || quotation.status}
                         </span>
                       </td>

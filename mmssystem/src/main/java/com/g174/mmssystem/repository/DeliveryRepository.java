@@ -31,5 +31,11 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Integer>, Jp
            "AND (d.status = 'Draft' OR d.status = 'Picked') " +
            "ORDER BY d.createdAt DESC")
     List<Delivery> findPendingDeliveriesWithDetails();
+
+    /**
+     * Tìm số phiếu giao hàng lớn nhất bắt đầu bằng prefix (để generate số tuần tự)
+     */
+    @Query("SELECT MAX(d.deliveryNo) FROM Delivery d WHERE d.deliveryNo LIKE CONCAT(:prefix, '%') AND d.deletedAt IS NULL")
+    String findMaxDeliveryNo(@Param("prefix") String prefix);
 }
 

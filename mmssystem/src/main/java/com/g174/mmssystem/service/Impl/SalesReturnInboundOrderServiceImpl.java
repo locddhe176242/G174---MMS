@@ -15,10 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -183,9 +180,16 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
     }
 
     private String generateSriNo() {
-        String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String unique = UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
-        return "SRI-" + datePart + "-" + unique;
+        String prefix = "SRI";
+        String maxNo = inboundOrderRepository.findMaxSriNo(prefix);
+        int nextNum = 1;
+        if (maxNo != null && maxNo.startsWith(prefix)) {
+            try {
+                nextNum = Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return String.format("%s%04d", prefix, nextNum);
     }
 }
 

@@ -105,26 +105,35 @@ export default function GoodIssueDetail() {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm">
-                <div className="container mx-auto px-4 py-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                <div className="px-6 py-6 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">
+                            Phiếu xuất kho: {data.issueNo || data.issue_no}
+                        </h1>
+                        <p className="text-gray-500">Chi tiết phiếu xuất kho</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => navigate("/sales/good-issues")}
+                            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                        >
+                            Quay lại
+                        </button>
+                        {data.status === "Draft" && (
                             <button
-                                onClick={() => navigate("/sales/good-issues")}
-                                className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                                type="button"
+                                onClick={() => navigate(`/sales/good-issues/${id}/edit`)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
-                                ← Quay lại
+                                Sửa
                             </button>
-                            <h1 className="text-2xl font-semibold">
-                                Phiếu xuất kho: {data.issueNo || data.issue_no}
-                            </h1>
-                        </div>
-                        <div className="flex items-center gap-2">
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            <div className="container mx-auto px-4 py-6 space-y-6">
+            <div className="px-6 py-6 space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white border rounded-lg p-6">

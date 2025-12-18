@@ -20,6 +20,10 @@ public class GoodIssueItemResponseDTO {
     private String productName;
     private String productCode;
 
+    private Integer warehouseId;
+    private String warehouseName;
+    private String warehouseCode;
+
     private BigDecimal issuedQty;
     private String remark;
 
