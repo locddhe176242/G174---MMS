@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getUserPermissions } from '../api/userPermissionService';
-import { useAuthStore } from '../store/authStore';
+import useAuthStore from '../store/authStore';
 import { jwtDecode } from 'jwt-decode';
 
 export const usePermissions = () => {

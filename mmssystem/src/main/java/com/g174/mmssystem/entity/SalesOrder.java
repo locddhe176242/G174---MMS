@@ -67,6 +67,10 @@ public class SalesOrder {
     @Column(name = "payment_terms")
     private String paymentTerms;
 
+    @Size(max = 255)
+    @Column(name = "delivery_terms")
+    private String deliveryTerms;
+
     @DecimalMin(value = "0.0", inclusive = true)
     @DecimalMax(value = "999999999999999.99", inclusive = true)
     @Column(name = "subtotal", precision = 18, scale = 2)

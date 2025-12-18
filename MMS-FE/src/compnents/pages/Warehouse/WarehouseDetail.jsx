@@ -225,17 +225,15 @@ export default function WarehouseDetail() {
                                 },
                                 {
                                     title: 'Trạng thái',
-                                    dataIndex: 'productStatus',
                                     key: 'status',
                                     width: 120,
-                                    render: (status) => {
-                                        const statusMap = {
-                                            'IN_STOCK': { label: 'Còn hàng', color: 'green' },
-                                            'OUT_OF_STOCK': { label: 'Hết hàng', color: 'red' },
-                                            'DISCONTINUED': { label: 'Ngừng kinh doanh', color: 'gray' }
-                                        };
-                                        const statusInfo = statusMap[status] || { label: status, color: 'default' };
-                                        return <Tag color={statusInfo.color}>{statusInfo.label}</Tag>;
+                                    render: (_, record) => {
+                                        const quantity = parseFloat(record.quantity || 0);
+                                        if (quantity > 0) {
+                                            return <Tag color="green">Còn hàng</Tag>;
+                                        } else {
+                                            return <Tag color="red">Hết hàng</Tag>;
+                                        }
                                     }
                                 }
                             ]}

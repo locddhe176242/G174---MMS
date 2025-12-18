@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -772,15 +771,16 @@ public class DeliveryServiceImpl implements IDeliveryService {
     }
 
     private String generateDeliveryNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-        String candidate = "DLV-" + datePart + "-" + unique;
-
-        while (deliveryRepository.findByDeliveryNo(candidate) != null) {
-            unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-            candidate = "DLV-" + datePart + "-" + unique;
+        String prefix = "DLV";
+        String maxNo = deliveryRepository.findMaxDeliveryNo(prefix);
+        int nextNum = 1;
+        if (maxNo != null && maxNo.startsWith(prefix)) {
+            try {
+                nextNum = Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+            }
         }
-        return candidate;
+        return String.format("%s%04d", prefix, nextNum);
     }
 
     private DeliveryListResponseDTO enrichDeliveryListDto(DeliveryListResponseDTO dto) {

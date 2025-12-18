@@ -137,7 +137,7 @@ export default function SalesQuotationDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
             Đơn báo giá bán hàng: {data.quotationNo}
@@ -175,13 +175,13 @@ export default function SalesQuotationDetail() {
               onClick={() => navigate("/sales/quotations")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-6">
         <div className="bg-white rounded-lg shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
@@ -210,7 +210,7 @@ export default function SalesQuotationDetail() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-              Tổng quan tiền tệ
+              Tổng quan tiền hàng
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
               <li>

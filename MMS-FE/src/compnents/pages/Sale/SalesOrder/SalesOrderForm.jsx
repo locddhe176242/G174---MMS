@@ -10,6 +10,7 @@ import { salesQuotationService } from "../../../../api/salesQuotationService";
 import { customerService } from "../../../../api/customerService";
 import { getProducts } from "../../../../api/productService";
 import { warehouseService } from "../../../../api/warehouseService";
+import { warehouseStockService } from "../../../../api/warehouseStockService";
 import { hasRole } from "../../../../api/authService";
 
 const defaultItem = () => ({
@@ -20,6 +21,7 @@ const defaultItem = () => ({
   discountPercent: 0,
   taxRate: 0,
   note: "",
+  uom: "",
 });
 
 const formatCurrency = (value) =>
@@ -49,6 +51,37 @@ const getEffectiveTaxRate = (itemTaxRate, commonTaxRate) => {
   return Number(itemTaxRate || 0);
 };
 
+// Style cho ô chọn sản phẩm trong bảng
+const productSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: 4,
+    borderColor: state.isFocused ? "#2563eb" : "#000000",
+    borderWidth: 1,
+    boxShadow: "none",
+    minHeight: 36,
+    "&:hover": {
+      borderColor: state.isFocused ? "#2563eb" : "#4b5563",
+    },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 0.5rem",
+  }),
+  indicatorsContainer: (base) => ({
+    ...base,
+    paddingRight: "0.5rem",
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+};
+
 export default function SalesOrderForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -67,6 +100,8 @@ export default function SalesOrderForm() {
   const [globalTaxRate, setGlobalTaxRate] = useState("");
   const [commonDiscountRate, setCommonDiscountRate] = useState(0);
   const [orderData, setOrderData] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [itemStocks, setItemStocks] = useState({}); // { "index": stockQuantity }
   const [formData, setFormData] = useState({
     orderNo: "",
     customerId: "",
@@ -74,6 +109,7 @@ export default function SalesOrderForm() {
     orderDate: new Date(),
     shippingAddress: "",
     paymentTerms: "",
+    deliveryTerms: "",
     notes: "",
     items: [defaultItem()],
   });
@@ -93,6 +129,19 @@ export default function SalesOrderForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Helpers cho message validate số (hiển thị tiếng Việt thay vì message mặc định của trình duyệt)
+  const clearCustomValidity = (e) => {
+    e.target.setCustomValidity("");
+  };
+
+  const handleMinZeroInvalid = (e) => {
+    e.target.setCustomValidity("Giá trị phải lớn hơn hoặc bằng 0");
+  };
+
+  const handlePercentInvalid = (e) => {
+    e.target.setCustomValidity("Giá trị phải từ 0 đến 100");
+  };
 
   const getCustomerLabel = (customer) => {
     const code = customer.customerCode || customer.code || "KH";
@@ -207,6 +256,7 @@ export default function SalesOrderForm() {
         orderDate: data.orderDate ? new Date(data.orderDate) : new Date(),
         shippingAddress: data.shippingAddress || "",
         paymentTerms: data.paymentTerms || "",
+        deliveryTerms: data.deliveryTerms || "",
         notes: data.notes || "",
         items: (data.items || []).map((item) => ({
           productId: item.productId,
@@ -216,6 +266,7 @@ export default function SalesOrderForm() {
           discountPercent: item.discountPercent || 0,
           taxRate: item.taxRate || 0,
           note: item.note || "",
+          uom: item.uom || "",
         })),
       });
       setCommonDiscountRate(data.headerDiscountPercent || 0);
@@ -233,6 +284,16 @@ export default function SalesOrderForm() {
         });
       } else {
         setSelectedQuotation(null);
+      }
+      
+      // Load customer if customerId exists
+      if (data.customerId) {
+        try {
+          const customer = await customerService.getCustomerById(data.customerId);
+          setSelectedCustomer(customer);
+        } catch (error) {
+          console.error("Error loading customer:", error);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -272,6 +333,7 @@ export default function SalesOrderForm() {
         salesQuotationId: quotation.quotationId || targetId,
         customerId: quotation.customerId,
         paymentTerms: quotation.paymentTerms || "",
+        deliveryTerms: quotation.deliveryTerms || "",
         notes: quotation.notes || "",
         items: (quotation.items || []).map((item) => {
           const qty = Number(item.quantity || 0);
@@ -289,6 +351,7 @@ export default function SalesOrderForm() {
             discountPercent,
             taxRate: item.taxRate || 0,
             note: item.note || "",
+            uom: item.uom || "",
           };
         }),
       }));
@@ -312,6 +375,28 @@ export default function SalesOrderForm() {
       } else {
         setGlobalTaxRate("");
       }
+      
+      // Load customer and fill address if needed
+      if (quotation.customerId) {
+        try {
+          const customer = await customerService.getCustomerById(quotation.customerId);
+          setSelectedCustomer(customer);
+          
+          // Fill address only if delivery terms is "CIF - Ship hàng đến nơi của khách hàng"
+          if (quotation.deliveryTerms === "CIF - Ship hàng đến nơi của khách hàng" && customer.address) {
+            const addr = customer.address;
+            const parts = [];
+            if (addr.street) parts.push(addr.street);
+            if (addr.wardName) parts.push(addr.wardName);
+            if (addr.provinceName) parts.push(addr.provinceName);
+            const addressStr = parts.join(", ");
+            setFormData((prev) => ({ ...prev, shippingAddress: addressStr }));
+          }
+        } catch (error) {
+          console.error("Error loading customer:", error);
+        }
+      }
+      
       toast.success("Đã tải dữ liệu từ báo giá");
     } catch (error) {
       console.error(error);
@@ -327,7 +412,12 @@ export default function SalesOrderForm() {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
         const base = qty * price;
-        const discountPercent = Number(item.discountPercent || 0);
+        // Chỉ dùng discountPercent nếu đã được set (không null/undefined)
+        // Không tự động fallback về commonDiscountRate
+        const discountPercent =
+          item.discountPercent !== null && item.discountPercent !== undefined
+            ? Number(item.discountPercent || 0)
+            : 0;
         const lineDiscount = Math.min((base * discountPercent) / 100, base);
         const lineSubtotal = Math.max(base - lineDiscount, 0); // sau CK dòng
         const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
@@ -380,8 +470,40 @@ export default function SalesOrderForm() {
 
   const totalValue = totals.total;
 
-  const handleCustomerChange = (option) => {
-    setFormData((prev) => ({ ...prev, customerId: option ? option.value : "" }));
+  const handleCustomerChange = async (option) => {
+    const customerId = option ? option.value : "";
+    setFormData((prev) => ({ ...prev, customerId }));
+    
+    if (customerId) {
+      try {
+        const customer = await customerService.getCustomerById(customerId);
+        setSelectedCustomer(customer);
+        
+        // Build address string from customer address
+        let addressStr = "";
+        if (customer.address) {
+          const addr = customer.address;
+          const parts = [];
+          if (addr.street) parts.push(addr.street);
+          if (addr.wardName) parts.push(addr.wardName);
+          if (addr.provinceName) parts.push(addr.provinceName);
+          addressStr = parts.join(", ");
+        }
+        
+        // Only fill address if delivery terms is "CIF - Ship hàng đến nơi của khách hàng" or not set yet
+        if (formData.deliveryTerms !== "FOB - Lấy hàng tại kho") {
+          setFormData((prev) => ({ ...prev, shippingAddress: addressStr }));
+        }
+      } catch (error) {
+        console.error("Error loading customer:", error);
+        setSelectedCustomer(null);
+      }
+    } else {
+      setSelectedCustomer(null);
+      if (formData.deliveryTerms !== "FOB - Lấy hàng tại kho") {
+        setFormData((prev) => ({ ...prev, shippingAddress: "" }));
+      }
+    }
   };
 
   const handleGlobalTaxChange = (value) => {
@@ -420,6 +542,44 @@ export default function SalesOrderForm() {
     );
   };
 
+  const loadStockForItem = async (index, productId, warehouseId) => {
+    if (!productId || !warehouseId) {
+      setItemStocks((prev) => ({ ...prev, [index]: null }));
+      return;
+    }
+    try {
+      // Thử dùng getStockByWarehouseAndProduct để lấy đầy đủ thông tin
+      const stock = await warehouseStockService.getStockByWarehouseAndProduct(warehouseId, productId);
+      console.log("Stock response:", stock, "for productId:", productId, "warehouseId:", warehouseId);
+      // API có thể trả về quantity trong object stock
+      let quantity = 0;
+      if (stock?.quantity !== undefined) {
+        quantity = Number(stock.quantity) || 0;
+      } else if (typeof stock === 'number') {
+        quantity = stock;
+      } else if (stock?.data?.quantity !== undefined) {
+        quantity = Number(stock.data.quantity) || 0;
+      }
+      console.log("Parsed quantity:", quantity);
+      setItemStocks((prev) => ({ ...prev, [index]: quantity }));
+    } catch (error) {
+      console.error("Error loading stock:", error);
+      // Nếu lỗi 404, thử dùng getQuantityByWarehouseAndProduct
+      if (error?.response?.status === 404) {
+        try {
+          const qtyResponse = await warehouseStockService.getQuantityByWarehouseAndProduct(warehouseId, productId);
+          const qty = typeof qtyResponse === 'number' ? qtyResponse : (qtyResponse?.quantity ?? 0);
+          setItemStocks((prev) => ({ ...prev, [index]: Number(qty) || 0 }));
+        } catch (qtyError) {
+          console.error("Error loading quantity:", qtyError);
+          setItemStocks((prev) => ({ ...prev, [index]: 0 }));
+        }
+      } else {
+        setItemStocks((prev) => ({ ...prev, [index]: null }));
+      }
+    }
+  };
+
   const handleItemSelect = (index, option) => {
     setFormData((prev) => {
       const next = [...prev.items];
@@ -431,13 +591,20 @@ export default function SalesOrderForm() {
           productId: option.value,
           unitPrice: productPrice,
           quantity: next[index].quantity || 1,
+          uom: product.uom || product.unit || "",
         };
+        // Load stock if warehouse is already selected
+        if (next[index].warehouseId) {
+          loadStockForItem(index, option.value, next[index].warehouseId);
+        }
       } else {
         next[index] = {
           ...next[index],
           productId: null,
           unitPrice: 0,
+          uom: "",
         };
+        setItemStocks((prev) => ({ ...prev, [index]: null }));
       }
       return { ...prev, items: next };
     });
@@ -447,6 +614,12 @@ export default function SalesOrderForm() {
     setFormData((prev) => {
       const next = [...prev.items];
       next[index] = { ...next[index], [field]: value };
+      
+      // Load stock when warehouse or product changes
+      if (field === "warehouseId" && next[index].productId) {
+        loadStockForItem(index, next[index].productId, value);
+      }
+      
       return { ...prev, items: next };
     });
   };
@@ -511,6 +684,7 @@ export default function SalesOrderForm() {
       orderDate: formData.orderDate ? formData.orderDate.toISOString() : null,
       shippingAddress: formData.shippingAddress || null,
       paymentTerms: formData.paymentTerms || null,
+      deliveryTerms: formData.deliveryTerms || null,
       headerDiscountPercent: Number(commonDiscountRate || 0),
       notes: formData.notes || null,
       items: formData.items.map((item) => ({
@@ -518,7 +692,10 @@ export default function SalesOrderForm() {
         warehouseId: item.warehouseId || null,
         quantity: Number(item.quantity || 0),
         unitPrice: Number(item.unitPrice || 0),
-        discountPercent: Number(item.discountPercent || 0),
+        discountPercent:
+          item.discountPercent !== null && item.discountPercent !== undefined
+            ? Number(item.discountPercent || 0)
+            : 0, // Không tự động điền từ commonDiscountRate
         taxRate: getEffectiveTaxRate(item.taxRate, globalTaxRate),
         note: item.note || null,
       })),
@@ -581,7 +758,7 @@ export default function SalesOrderForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
@@ -599,7 +776,6 @@ export default function SalesOrderForm() {
                 </span>
               )}
             </div>
-            <p className="text-gray-500">Nhập thông tin đơn hàng và danh sách sản phẩm</p>
           </div>
           <div className="flex gap-2">
             {canSendToCustomer && (
@@ -617,13 +793,13 @@ export default function SalesOrderForm() {
               onClick={() => navigate("/sales/orders")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-4 lg:col-span-2">
@@ -642,43 +818,45 @@ export default function SalesOrderForm() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Khách hàng <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    className="mt-1"
                     value={customers.find((c) => c.value === formData.customerId) || null}
                     onChange={handleCustomerChange}
                     options={customers}
                     placeholder="Chọn khách hàng"
                     isClearable
                     isDisabled={!canEdit}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: 40, borderRadius: 8, borderColor: "#000" }),
+                    }}
                   />
                   {errors.customerId && (
                     <p className="text-xs text-red-500 mt-1">{errors.customerId}</p>
                   )}
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-gray-600">Báo giá liên quan</label>
-                  <div className="mt-1 flex flex-col lg:flex-row gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        selectedQuotation?.label ||
-                        (formData.salesQuotationId
-                          ? `Báo giá #${formData.salesQuotationId}`
-                          : "")
-                      }
-                      placeholder="Chưa chọn báo giá"
-                      className="w-full border rounded-lg px-3 py-2 bg-gray-50"
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Báo giá liên quan</label>
                     <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={
+                          selectedQuotation?.label ||
+                          (formData.salesQuotationId
+                            ? `Báo giá #${formData.salesQuotationId}`
+                            : "")
+                        }
+                        placeholder="Chưa chọn báo giá"
+                        className="flex-1 border border-black rounded-lg px-3 py-2 h-10 bg-gray-50"
+                      />
                       <button
                         type="button"
                         onClick={() => setQuotationModalOpen(true)}
                         disabled={!canEdit}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 border border-black rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Chọn
                       </button>
@@ -687,113 +865,180 @@ export default function SalesOrderForm() {
                           type="button"
                           onClick={clearSelectedQuotation}
                           disabled={!canEdit}
-                          className="px-4 py-2 border rounded-lg hover:bg-gray-100 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 border border-black rounded-lg hover:bg-gray-100 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Xóa
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
                   <div>
-                    <label className="text-sm text-gray-600">Ngày tạo đơn</label>
+                    <label className="block text-sm text-gray-600 mb-1">Ngày tạo đơn</label>
                     <DatePicker
                       selected={formData.orderDate}
                       onChange={(date) => setFormData((prev) => ({ ...prev, orderDate: date }))}
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      wrapperClassName="mt-1 w-full"
+                      className="w-full border border-black rounded-lg px-3 py-2 h-10"
+                      wrapperClassName="w-full"
                       dateFormat="dd/MM/yyyy"
                       disabled={!canEdit}
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
                   <div>
-                    <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
-                    <input
-                      type="text"
-                      value={formData.paymentTerms}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, paymentTerms: e.target.value }))
-                      }
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="VD: Thanh toán trong 30 ngày"
-                      disabled={!canEdit}
+                    <label className="block text-sm text-gray-600 mb-1">Điều khoản thanh toán</label>
+                    <Select
+                      options={[
+                        { value: "COD - Thanh toán sau khi nhận hàng.", label: "COD - Thanh toán sau khi nhận hàng." },
+                        { value: "Net 30 - Thanh toán trong 30 ngày", label: "Net 30 - Thanh toán trong 30 ngày" },
+                      ]}
+                      value={formData.paymentTerms ? { value: formData.paymentTerms, label: formData.paymentTerms } : null}
+                      onChange={(opt) => setFormData((prev) => ({ ...prev, paymentTerms: opt?.value || "" }))}
+                      placeholder="Chọn điều khoản thanh toán"
+                      isClearable
+                      isDisabled={!canEdit}
+                      styles={{
+                        control: (base) => ({ ...base, minHeight: 40, borderRadius: 8, borderColor: "#000" }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Điều khoản giao hàng</label>
+                    <Select
+                      options={[
+                        { value: "FOB - Lấy hàng tại kho", label: "FOB - Lấy hàng tại kho" },
+                        { value: "CIF - Ship hàng đến nơi của khách hàng", label: "CIF - Ship hàng đến nơi của khách hàng" },
+                      ]}
+                      value={formData.deliveryTerms ? { value: formData.deliveryTerms, label: formData.deliveryTerms } : null}
+                      onChange={(opt) => {
+                        const deliveryTerms = opt?.value || "";
+                        setFormData((prev) => {
+                          let shippingAddress = prev.shippingAddress;
+                          
+                          if (deliveryTerms === "FOB - Lấy hàng tại kho") {
+                            // Clear address when "FOB - Lấy hàng tại kho"
+                            shippingAddress = "";
+                          } else if (deliveryTerms === "CIF - Ship hàng đến nơi của khách hàng" && selectedCustomer) {
+                            // Fill address from customer when "CIF - Ship hàng đến nơi của khách hàng"
+                            if (selectedCustomer.address) {
+                              const addr = selectedCustomer.address;
+                              const parts = [];
+                              if (addr.street) parts.push(addr.street);
+                              if (addr.wardName) parts.push(addr.wardName);
+                              if (addr.provinceName) parts.push(addr.provinceName);
+                              shippingAddress = parts.join(", ");
+                            }
+                          }
+                          
+                          return { ...prev, deliveryTerms, shippingAddress };
+                        });
+                      }}
+                      placeholder="Chọn điều khoản giao hàng"
+                      isClearable
+                      isDisabled={!canEdit}
+                      styles={{
+                        control: (base) => ({ ...base, minHeight: 40, borderRadius: 8, borderColor: "#000" }),
+                      }}
                     />
                   </div>
                 </div>
-                <div className="md:col-span-2 flex flex-col gap-4">
-                  <div>
-                    <label className="text-sm text-gray-600">Địa chỉ giao hàng</label>
-                    <input
-                      type="text"
-                      value={formData.shippingAddress}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, shippingAddress: e.target.value }))
-                      }
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="Nhập địa chỉ giao hàng"
-                      disabled={!canEdit}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Ghi chú</label>
-                    <textarea
-                      rows={3}
-                      value={formData.notes}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      placeholder="Thông tin bổ sung cho đơn hàng"
-                      disabled={!canEdit}
-                    />
-                  </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Địa chỉ giao hàng</label>
+                  <input
+                    type="text"
+                    value={formData.shippingAddress}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, shippingAddress: e.target.value }))
+                    }
+                    className="w-full border border-black rounded-lg px-3 py-2 h-10"
+                    placeholder="Nhập địa chỉ giao hàng"
+                    disabled={!canEdit || formData.deliveryTerms === "FOB - Lấy hàng tại kho"}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Ghi chú</label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    className="w-full border border-black rounded-lg px-3 py-2"
+                    placeholder="Thông tin bổ sung cho đơn hàng"
+                    disabled={!canEdit}
+                  />
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Tổng quan tiền tệ</h2>
-              <label className="text-sm text-gray-600">Chiết khấu chung (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={commonDiscountRate}
-                onChange={(e) => setCommonDiscountRate(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2"
-                placeholder="Áp dụng chiết khấu trên tổng sau CK từng sản phẩm"
-                disabled={!canEdit}
-              />
-              <label className="text-sm text-gray-600 mt-3 block">Thuế (%)</label>
-              <input
-                type="number"
-                min="0"
-                value={globalTaxRate}
-                onChange={(e) => handleGlobalTaxChange(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2"
-                placeholder="Áp dụng thuế chung cho toàn bộ sản phẩm"
-              />
-              <hr className="my-3" />
-              <div className="space-y-2 text-sm text-gray-700">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tổng quan tiền tệ</h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-600">
+                      Chiết khấu chung (%)
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Áp dụng cho tất cả sản phẩm.
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={commonDiscountRate}
+                    onChange={(e) => setCommonDiscountRate(Number(e.target.value) || 0)}
+                    onInvalid={handlePercentInvalid}
+                    onInput={clearCustomValidity}
+                    disabled={!canEdit}
+                    className="w-28 border rounded-lg px-3 py-2 text-right"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-600">
+                      Thuế chung (%)
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Áp dụng cho tất cả sản phẩm.
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={globalTaxRate}
+                    onChange={(e) => handleGlobalTaxChange(e.target.value)}
+                    onInvalid={handleMinZeroInvalid}
+                    onInput={clearCustomValidity}
+                    disabled={!canEdit}
+                    className="w-28 border rounded-lg px-3 py-2 text-right"
+                  />
+                </div>
+              </div>
+
+              {/* Ô tổng tiền */}
+              <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3 space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
-                  <span>Tạm tính</span>
+                  <span>Tạm tính (VND)</span>
                   <span className="font-semibold">
                     {formatCurrency(totals.gross)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Chiết khấu dòng</span>
+                  <span>Chiết khấu dòng (VND)</span>
                   <span>{formatCurrency(totals.lineDiscount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Chiết khấu chung</span>
+                  <span>Chiết khấu cả đơn (VND)</span>
                   <span>{formatCurrency(totals.headerDiscount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Thuế</span>
+                  <span>Thuế (VND)</span>
                   <span>{formatCurrency(totals.tax)}</span>
                 </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t">
-                  <span>Tổng cộng</span>
+                <div className="flex justify-between text-base font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-1">
+                  <span>Tổng cộng (VND)</span>
                   <span>{formatCurrency(totalValue)}</span>
                 </div>
               </div>
@@ -813,81 +1058,105 @@ export default function SalesOrderForm() {
               </button>
             </div>
 
-            {errors.items && <p className="text-red-500 text-sm mb-2">{errors.items}</p>}
-
             <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-200">
-                <thead className="bg-gray-100">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      #
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Sản phẩm
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Kho
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Số lượng
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Đơn giá
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Chiết khấu (%)
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      Thuế (%)
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                      Thành tiền
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                      Hành động
-                    </th>
+                    <th className="px-4 py-3 text-left">Sản phẩm</th>
+                    <th className="px-4 py-3 text-left">ĐVT</th>
+                    <th className="px-4 py-3 text-left">Kho</th>
+                    <th className="px-4 py-3 text-right">Số lượng</th>
+                    <th className="px-4 py-3 text-right">Đơn giá (VND)</th>
+                    <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
+                    <th className="px-4 py-3 text-right">Thuế (%)</th>
+                    <th className="px-4 py-3 text-right">Tạm tính (VND)</th>
+                    <th className="px-4 py-3 text-center">#</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y">
                   {formData.items.map((item, index) => {
+                    // Không cho chọn trùng sản phẩm trong nhiều dòng
+                    const usedProductIds = formData.items
+                      .map((it, idx) => (idx === index ? null : it.productId))
+                      .filter((id) => id !== null && id !== undefined);
+                    const availableProducts = products.filter(
+                      (opt) => !usedProductIds.includes(opt.value)
+                    );
+
                     const itemError = errors.itemDetails?.[index] || {};
                     const qty = Number(item.quantity || 0);
                     const price = Number(item.unitPrice || 0);
-                    const discountPercent = Number(item.discountPercent || 0);
+                    // Chỉ dùng discountPercent nếu đã được set (không null/undefined)
+                    // Không tự động fallback về commonDiscountRate
+                    const discountPercent =
+                      item.discountPercent !== null && item.discountPercent !== undefined
+                        ? Number(item.discountPercent || 0)
+                        : 0;
                     const taxRate = getEffectiveTaxRate(item.taxRate, globalTaxRate);
                     const discount = Math.min((qty * price * discountPercent) / 100, qty * price);
                     const base = Math.max(qty * price - discount, 0);
                     const tax = base * (taxRate / 100);
                     const lineTotal = base + tax;
+
                     return (
-                      <tr key={index} className="border-t">
-                        <td className="px-3 py-2 text-sm text-gray-600">{index + 1}</td>
-                        <td className="px-3 py-2">
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 w-64 align-top">
                           <Select
+                            placeholder="Chọn sản phẩm"
                             value={products.find((p) => p.value === item.productId) || null}
                             onChange={(opt) => handleItemSelect(index, opt)}
-                            options={products}
-                            placeholder="Chọn sản phẩm"
+                            options={availableProducts}
                             isClearable
                             isDisabled={!canEdit}
+                            styles={productSelectStyles}
+                            menuPortalTarget={
+                              typeof window !== "undefined" ? document.body : null
+                            }
+                            menuPosition="fixed"
                           />
                           {itemError.productId && (
-                            <p className="text-red-500 text-xs">{itemError.productId}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.productId}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
-                          <Select
-                            value={warehouses.find((w) => w.value === item.warehouseId) || null}
-                            onChange={(opt) =>
-                              handleItemChange(index, "warehouseId", opt ? opt.value : null)
+                        <td className="px-4 py-3 align-top">
+                          <input
+                            type="text"
+                            value={item.uom || ""}
+                            onChange={(e) =>
+                              handleItemChange(index, "uom", e.target.value)
                             }
-                            options={warehouses}
-                            placeholder="Chọn kho (tuỳ chọn)"
-                            isClearable
-                            isDisabled={!canEdit}
+                            className="w-24 border rounded px-2 py-1"
+                            disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 align-top">
+                          <Select
+                            placeholder="Chọn kho"
+                            value={warehouses.find((w) => w.value === item.warehouseId) || null}
+                            onChange={(opt) => handleItemChange(index, "warehouseId", opt ? opt.value : null)}
+                            options={warehouses}
+                            isClearable
+                            isDisabled={!canEdit}
+                            styles={productSelectStyles}
+                            menuPortalTarget={
+                              typeof window !== "undefined" ? document.body : null
+                            }
+                            menuPosition="fixed"
+                          />
+                          {item.productId && item.warehouseId && itemStocks[index] !== undefined && (
+                            <div className="mt-1 text-xs">
+                              <span className={itemStocks[index] !== null ? "text-gray-600" : "text-gray-400"}>
+                                Tồn kho: {itemStocks[index] !== null ? Number(itemStocks[index]).toLocaleString("vi-VN") : "—"}
+                              </span>
+                              {itemStocks[index] !== null && qty > itemStocks[index] && (
+                                <p className="text-red-600 font-semibold mt-1">
+                                  Không đủ hàng! (Cần: {qty.toLocaleString("vi-VN")})
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="number"
                             min="0"
@@ -895,14 +1164,16 @@ export default function SalesOrderForm() {
                             onChange={(e) =>
                               handleItemChange(index, "quantity", Number(e.target.value))
                             }
-                            className="w-24 px-2 py-1 border rounded"
+                            onInvalid={handleMinZeroInvalid}
+                            onInput={clearCustomValidity}
+                            className="w-24 border rounded px-2 py-1 text-right"
                             disabled={!canEdit}
                           />
                           {itemError.quantity && (
-                            <p className="text-red-500 text-xs">{itemError.quantity}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.quantity}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -918,23 +1189,27 @@ export default function SalesOrderForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="number"
                             min="0"
                             max="100"
+                            step="0.01"
                             value={item.discountPercent}
                             onChange={(e) =>
                               handleItemChange(index, "discountPercent", Number(e.target.value))
                             }
-                            className="w-24 px-2 py-1 border rounded"
+                            onInvalid={handlePercentInvalid}
+                            onInput={clearCustomValidity}
+                            className="w-28 border rounded px-2 py-1 text-right"
+                            placeholder="0"
                             disabled={!canEdit}
                           />
                           {itemError.discountPercent && (
-                            <p className="text-red-500 text-xs">{itemError.discountPercent}</p>
+                            <p className="text-xs text-red-600 mt-1">{itemError.discountPercent}</p>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="number"
                             min="0"
@@ -942,22 +1217,26 @@ export default function SalesOrderForm() {
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", Number(e.target.value))
                             }
-                            className="w-20 px-2 py-1 border rounded"
+                            onInvalid={handleMinZeroInvalid}
+                            onInput={clearCustomValidity}
+                            className="w-24 border rounded px-2 py-1 text-right"
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                        <td className="px-4 py-3 text-right font-medium align-top">
                           {formatCurrency(lineTotal)}
                         </td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            disabled={!canEdit}
-                            className="text-red-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Xóa
-                          </button>
+                        <td className="px-4 py-3 text-center align-top">
+                          {formData.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              disabled={!canEdit}
+                              className="text-red-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -965,31 +1244,28 @@ export default function SalesOrderForm() {
                 </tbody>
               </table>
             </div>
+            {errors.items && (
+              <p className="text-sm text-red-600 px-6 py-3">
+                {errors.items}
+              </p>
+            )}
           </div>
 
-          <div className="border-t pt-4 flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500">Tổng dự kiến</div>
-              <div className="text-2xl font-semibold text-gray-900">
-                {formatCurrency(totalValue)}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/sales/orders")}
-                className="px-6 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || !canEdit}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
-              </button>
-            </div>
+          <div className="border-t pt-4 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/orders")}
+              className="px-6 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !canEdit}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo đơn bán hàng"}
+            </button>
           </div>
         </form>
       </div>

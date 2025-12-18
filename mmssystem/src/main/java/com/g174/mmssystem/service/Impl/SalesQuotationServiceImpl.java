@@ -328,38 +328,48 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
             List<SalesQuotationItem> items) {
         String customerName = (customer.getFirstName() + " " + customer.getLastName()).trim();
         String quotationNo = quotation.getQuotationNo();
-        String total = quotation.getTotalAmount() != null ? quotation.getTotalAmount().toPlainString() : "0";
+        java.text.NumberFormat nf = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+        String total = quotation.getTotalAmount() != null ? nf.format(quotation.getTotalAmount()) : "0";
 
         StringBuilder rows = new StringBuilder();
         if (items != null && !items.isEmpty()) {
             int idx = 1;
             for (SalesQuotationItem item : items) {
-                String code = item.getProductCode() != null ? item.getProductCode() : "";
                 String name = item.getProductName() != null ? item.getProductName() : "";
-                String qty = item.getQuantity() != null ? item.getQuantity().toPlainString() : "0";
-                String unitPrice = item.getUnitPrice() != null ? item.getUnitPrice().toPlainString() : "0";
-                String discount = item.getDiscountAmount() != null ? item.getDiscountAmount().toPlainString() : "0";
+                String qty = item.getQuantity() != null ? nf.format(item.getQuantity()) : "0";
+                String unitPrice = item.getUnitPrice() != null ? nf.format(item.getUnitPrice()) : "0";
+                // Tính % chiết khấu từ số tiền: discount% = discountAmount / (quantity * unitPrice) * 100
+                String discount = "0%";
+                if (item.getDiscountAmount() != null && item.getQuantity() != null && item.getUnitPrice() != null) {
+                    java.math.BigDecimal subTotal = item.getQuantity().multiply(item.getUnitPrice());
+                    if (subTotal.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        java.math.BigDecimal discountPct = item.getDiscountAmount()
+                            .multiply(new java.math.BigDecimal("100"))
+                            .divide(subTotal, 2, java.math.RoundingMode.HALF_UP);
+                        discount = discountPct.toPlainString() + "%";
+                    }
+                }
                 String taxRate = item.getTaxRate() != null ? item.getTaxRate().toPlainString() + "%" : "0%";
-                String lineTotal = item.getLineTotal() != null ? item.getLineTotal().toPlainString() : "0";
+                String lineTotal = item.getLineTotal() != null ? nf.format(item.getLineTotal()) : "0";
 
                 rows.append(
                         """
                                 <tr>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:center;">%d</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb;">%s<br/><span style="color:#6b7280; font-size:12px;">%s</span></td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right;">%s</td>
-                                  <td style="padding:4px 8px; border:1px solid #e5e7eb; text-align:right; font-weight:bold;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:40px;">%d</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:left;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:80px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:right; width:120px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:right; width:100px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:center; width:70px;">%s</td>
+                                  <td style="padding:8px 12px; border:1px solid #d1d5db; text-align:right; width:130px; font-weight:bold;">%s</td>
                                 </tr>
                                 """
-                                .formatted(idx++, code, name, qty, unitPrice, discount, taxRate, lineTotal));
+                                .formatted(idx++, name, qty, unitPrice, discount, taxRate, lineTotal));
             }
         } else {
             rows.append("""
                     <tr>
-                      <td colspan="7" style="padding:8px; border:1px solid #e5e7eb; text-align:center; color:#6b7280;">
+                      <td colspan="7" style="padding:12px; border:1px solid #d1d5db; text-align:center; color:#6b7280;">
                         Không có dòng sản phẩm
                       </td>
                     </tr>
@@ -368,31 +378,33 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
 
         return String.format("""
                 <html>
-                <body style="font-family: Arial, sans-serif; color: #333;">
-                  <h2>Gửi báo giá: %s</h2>
-                  <p>Kính gửi %s,</p>
-                  <p>Chúng tôi gửi tới quý khách báo giá số <strong>%s</strong>.</p>
-                  <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:13px;">
+                <body style="font-family: Arial, sans-serif; color: #333; line-height:1.5;">
+                  <h2 style="color:#1f2937;">Gửi báo giá bán hàng: %s</h2>
+                  <p>Kính gửi <strong>%s</strong>,</p>
+                  <p>Chúng tôi gửi tới quý khách báo giá bán hàng số <strong>%s</strong>.</p>
+                  <table style="border-collapse:collapse; width:100%%; margin-top:16px; font-size:14px;">
                     <thead>
-                      <tr style="background:#f3f4f6;">
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb;">#</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:left;">Sản phẩm</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Số lượng</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Đơn giá</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Chiết khấu</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thuế</th>
-                        <th style="padding:6px 8px; border:1px solid #e5e7eb; text-align:right;">Thành tiền</th>
+                      <tr style="background:#2563eb; color:#fff;">
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; width:40px;">#</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:left;">Sản phẩm</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:center; width:80px;">SL</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:right; width:120px;">Đơn giá(VND)</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:right; width:100px;">Chiết khấu(%%)</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:center; width:70px;">Thuế(%%)</th>
+                        <th style="padding:10px 12px; border:1px solid #1d4ed8; text-align:right; width:130px;">Thành tiền(VND)</th>
                       </tr>
                     </thead>
                     <tbody>
                       %s
                     </tbody>
                   </table>
-                  <p>Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
-                  <p>Trân trọng,<br/>MMS System</p>
+                  <p style="margin-top:20px; font-size:16px; text-align:right;"><strong>Tổng cộng: %s VNĐ</strong></p>
+                  <hr style="margin:20px 0; border:none; border-top:1px solid #e5e7eb;"/>
+                  <p style="color:#6b7280;">Nếu cần chỉnh sửa, vui lòng phản hồi email này.</p>
+                  <p>Trân trọng,<br/><strong>MMS System</strong></p>
                 </body>
                 </html>
-                """, quotationNo, customerName, quotationNo, total, rows.toString());
+                """, quotationNo, customerName, quotationNo, rows.toString(), total);
     }
 
     private List<SalesQuotationItem> cloneItems(SalesQuotation target, List<SalesQuotationItem> sourceItems) {
@@ -512,14 +524,15 @@ public class SalesQuotationServiceImpl implements ISalesQuotationService {
     }
 
     private String generateQuotationNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-        String candidate = "SQ-" + datePart + "-" + unique;
-
-        while (quotationRepository.findByQuotationNo(candidate) != null) {
-            unique = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-            candidate = "SQ-" + datePart + "-" + unique;
+        String prefix = "SQ";
+        String maxNo = quotationRepository.findMaxQuotationNo(prefix);
+        int nextNum = 1;
+        if (maxNo != null && maxNo.startsWith(prefix)) {
+            try {
+                nextNum = Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+            }
         }
-        return candidate;
+        return String.format("%s%04d", prefix, nextNum);
     }
 }

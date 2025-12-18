@@ -44,6 +44,7 @@ const compactSelectStyles = {
 const defaultItem = () => ({
   diId: null,
   productId: null,
+  warehouseId: null, // Kho riêng cho từng item
   issuedQty: 0,
   remark: "",
 });
@@ -73,11 +74,11 @@ export default function GoodIssueForm() {
   const [formData, setFormData] = useState({
     issueNo: "",
     deliveryId: null,
-    warehouseId: null,
     issueDate: new Date(),
     notes: "",
     items: [],
   });
+  const [itemStocks, setItemStocks] = useState({}); // { "index": stockQuantity }
 
   const [errors, setErrors] = useState({});
 
@@ -233,25 +234,30 @@ export default function GoodIssueForm() {
         data: delivery,
       });
 
-      // Load warehouse stock for each item
+      // Load warehouse stock for each item - lấy kho từ deliveryItem.warehouseId
       const itemsWithStock = await Promise.all(
         (delivery.items || []).map(async (item) => {
-          const warehouseId = delivery.warehouseId || delivery.warehouse_id;
+          // Lấy kho từ deliveryItem.warehouseId (mỗi item có kho riêng)
+          const warehouseId = item.warehouseId || item.warehouse_id || null;
           const productId = item.productId || item.product_id;
           
           let availableStock = 0;
-          try {
-            const stock = await warehouseStockService.getQuantityByWarehouseAndProduct(
-              warehouseId,
-              productId
-            );
-            availableStock = Number(stock || 0);
-          } catch (err) {
+          if (warehouseId && productId) {
+            try {
+              const stock = await warehouseStockService.getQuantityByWarehouseAndProduct(
+                warehouseId,
+                productId
+              );
+              availableStock = Number(stock || 0);
+            } catch (err) {
+              // Nếu lỗi, để availableStock = 0
+            }
           }
 
           return {
             diId: item.deliveryItemId || item.diId || item.di_id || item.id,
             productId: productId,
+            warehouseId: warehouseId, // Kho riêng cho từng item
             productName: item.productName || item.product_name,
             productCode: item.productSku || item.productCode || item.product_code || item.sku,
             plannedQty: Number(item.plannedQty || item.planned_qty || 0),
@@ -264,12 +270,12 @@ export default function GoodIssueForm() {
       setFormData({
         issueNo: "",
         deliveryId: delivery.deliveryId || delivery.delivery_id || delivery.id,
-        warehouseId: delivery.warehouseId || delivery.warehouse_id,
         issueDate: new Date(),
         notes: "",
-        items: itemsWithStock.map((item) => ({
+        items: itemsWithStock.map((item, index) => ({
           diId: item.diId,
           productId: item.productId,
+          warehouseId: item.warehouseId, // Kho riêng cho từng item
           issuedQty: item.plannedQty, // Default to plannedQty
           remark: "",
           // Store additional info for display
@@ -280,6 +286,13 @@ export default function GoodIssueForm() {
           availableStock: item.availableStock,
         })),
       });
+
+      // Lưu tồn kho vào state để hiển thị
+      const stocks = {};
+      itemsWithStock.forEach((item, index) => {
+        stocks[index] = item.availableStock;
+      });
+      setItemStocks(stocks);
 
       toast.success("Đã tải dữ liệu từ phiếu giao hàng");
     } catch (error) {
@@ -296,23 +309,67 @@ export default function GoodIssueForm() {
       
       setIssueStatus(data.status);
       
+      // Load items với warehouseId từ Good Issue items hoặc từ Delivery items
+      const itemsWithWarehouse = await Promise.all(
+        (data.items || []).map(async (item) => {
+          let warehouseId = item.warehouseId || item.warehouse_id || null;
+          
+          // Nếu không có warehouseId trong Good Issue item, lấy từ Delivery item
+          if (!warehouseId && data.deliveryId) {
+            try {
+              const delivery = await deliveryService.getDeliveryById(data.deliveryId);
+              const deliveryItem = (delivery.items || []).find(
+                (di) => (di.deliveryItemId || di.diId || di.di_id || di.id) === (item.diId || item.di_id || item.deliveryItemId)
+              );
+              warehouseId = deliveryItem?.warehouseId || deliveryItem?.warehouse_id || null;
+            } catch (err) {
+              // Nếu lỗi, để warehouseId = null
+            }
+          }
+          
+          // Load tồn kho
+          let availableStock = 0;
+          if (warehouseId && item.productId) {
+            try {
+              const stock = await warehouseStockService.getQuantityByWarehouseAndProduct(
+                warehouseId,
+                item.productId || item.product_id
+              );
+              availableStock = Number(stock || 0);
+            } catch (err) {
+              // Nếu lỗi, để availableStock = 0
+            }
+          }
+          
+          return {
+            diId: item.diId || item.di_id || item.deliveryItemId,
+            productId: item.productId || item.product_id,
+            warehouseId: warehouseId,
+            issuedQty: Number(item.issuedQty || item.issued_qty || 0),
+            remark: item.remark || "",
+            productName: item.productName || item.product_name,
+            productCode: item.productCode || item.product_code || item.productSku || item.sku,
+            plannedQty: Number(item.plannedQty || item.planned_qty || 0),
+            uom: item.uom,
+            availableStock,
+          };
+        })
+      );
+
       setFormData({
         issueNo: data.issueNo || data.issue_no || "",
         deliveryId: data.deliveryId || data.delivery_id,
-        warehouseId: data.warehouseId || data.warehouse_id,
         issueDate: data.issueDate ? new Date(data.issueDate) : new Date(),
         notes: data.notes || "",
-        items: (data.items || []).map((item) => ({
-          diId: item.diId || item.di_id || item.deliveryItemId,
-          productId: item.productId || item.product_id,
-          issuedQty: Number(item.issuedQty || item.issued_qty || 0),
-          remark: item.remark || "",
-          productName: item.productName || item.product_name,
-          productCode: item.productCode || item.product_code || item.productSku || item.sku,
-          plannedQty: Number(item.plannedQty || item.planned_qty || 0),
-          uom: item.uom,
-        })),
+        items: itemsWithWarehouse,
       });
+
+      // Lưu tồn kho vào state
+      const stocks = {};
+      itemsWithWarehouse.forEach((item, index) => {
+        stocks[index] = item.availableStock;
+      });
+      setItemStocks(stocks);
 
       // Load delivery info
       if (data.deliveryId) {
@@ -337,6 +394,21 @@ export default function GoodIssueForm() {
     loadDelivery(deliveryId);
   };
 
+  const loadStockForItem = async (index, productId, warehouseId) => {
+    if (!productId || !warehouseId) {
+      setItemStocks((prev) => ({ ...prev, [index]: 0 }));
+      return;
+    }
+    try {
+      const stock = await warehouseStockService.getQuantityByWarehouseAndProduct(warehouseId, productId);
+      const quantity = typeof stock === 'number' ? stock : (stock?.quantity ?? 0);
+      setItemStocks((prev) => ({ ...prev, [index]: Number(quantity) || 0 }));
+    } catch (error) {
+      console.error("Error loading stock:", error);
+      setItemStocks((prev) => ({ ...prev, [index]: 0 }));
+    }
+  };
+
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
       const next = [...prev.items];
@@ -349,6 +421,19 @@ export default function GoodIssueForm() {
           toast.warn(`Số lượng xuất không được vượt quá số lượng dự kiến (${plannedQty})`);
           next[index][field] = plannedQty;
         }
+        // Validate không vượt quá tồn kho (chỉ validate nếu đã có kho)
+        if (next[index].warehouseId) {
+          const availableStock = itemStocks[index] !== undefined ? itemStocks[index] : 0;
+          if (value > availableStock && availableStock > 0) {
+            toast.warn(`Số lượng xuất không được vượt quá tồn kho (${availableStock})`);
+            next[index][field] = Math.min(value, availableStock);
+          }
+        }
+      }
+      
+      // Khi đổi kho, load lại tồn kho
+      if (field === "warehouseId" && next[index].productId) {
+        loadStockForItem(index, next[index].productId, value);
       }
       
       return { ...prev, items: next };
@@ -360,13 +445,10 @@ export default function GoodIssueForm() {
     if (!formData.deliveryId) {
       newErrors.deliveryId = "Chọn phiếu giao hàng";
     }
-    if (!formData.warehouseId) {
-      newErrors.warehouseId = "Chọn kho xuất hàng";
-    }
     if (!formData.items || formData.items.length === 0) {
       newErrors.items = "Cần ít nhất một dòng xuất kho";
     } else {
-      const itemErrors = formData.items.map((item) => {
+      const itemErrors = formData.items.map((item, index) => {
         const e = {};
         if (!item.diId) {
           e.diId = "Delivery Item ID không hợp lệ";
@@ -374,11 +456,20 @@ export default function GoodIssueForm() {
         if (!item.productId) {
           e.productId = "Sản phẩm không hợp lệ";
         }
+        // Mỗi item PHẢI có kho riêng
+        if (!item.warehouseId) {
+          e.warehouseId = "Chọn kho cho sản phẩm này";
+        }
         if (!item.issuedQty || item.issuedQty <= 0) {
           e.issuedQty = "Số lượng xuất phải lớn hơn 0";
         }
         if (item.issuedQty > item.plannedQty) {
           e.issuedQty = `Số lượng xuất không được vượt quá số lượng dự kiến (${item.plannedQty})`;
+        }
+        // Validate không vượt quá tồn kho
+        const availableStock = itemStocks[index] || 0;
+        if (item.warehouseId && item.issuedQty > availableStock) {
+          e.issuedQty = `Số lượng xuất không được vượt quá tồn kho (${availableStock})`;
         }
         return e;
       });
@@ -393,14 +484,15 @@ export default function GoodIssueForm() {
   const checkStockBeforeSubmit = async (items) => {
     const insufficientItems = [];
     
-    for (const item of items) {
-      if (!item.productId || !formData.warehouseId || Number(item.issuedQty || 0) <= 0) {
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      if (!item.productId || !item.warehouseId || Number(item.issuedQty || 0) <= 0) {
         continue;
       }
       
       try {
         const stockQty = await warehouseStockService.getQuantityByWarehouseAndProduct(
-          formData.warehouseId,
+          item.warehouseId, // Lấy kho từ item, không phải từ formData.warehouseId
           item.productId
         );
         const issuedQty = Number(item.issuedQty || 0);
@@ -409,14 +501,21 @@ export default function GoodIssueForm() {
         if (issuedQty > availableQty) {
           insufficientItems.push({
             productName: item.productName || `Sản phẩm ID ${item.productId}`,
-            warehouseName: warehouses.find((w) => w.value === formData.warehouseId)?.label || `Kho ID ${formData.warehouseId}`,
+            warehouseName: warehouses.find((w) => w.value === item.warehouseId)?.label || `Kho ID ${item.warehouseId}`,
             issuedQty: issuedQty,
             availableQty,
             shortage: issuedQty - availableQty,
           });
         }
       } catch (error) {
-        // Silent fail - will be handled on submit
+        // Nếu lỗi, thêm vào insufficientItems để cảnh báo
+        insufficientItems.push({
+          productName: item.productName || `Sản phẩm ID ${item.productId}`,
+          warehouseName: warehouses.find((w) => w.value === item.warehouseId)?.label || `Kho ID ${item.warehouseId}`,
+          issuedQty: Number(item.issuedQty || 0),
+          availableQty: 0,
+          shortage: Number(item.issuedQty || 0),
+        });
       }
     }
     
@@ -489,12 +588,12 @@ export default function GoodIssueForm() {
       // Backend sẽ tự động generate số phiếu nếu issueNo null/empty
       issueNo: formData.issueNo?.trim() || undefined,
       deliveryId: formData.deliveryId,
-      warehouseId: formData.warehouseId,
       issueDate: formData.issueDate ? formData.issueDate.toISOString() : new Date().toISOString(),
       notes: formData.notes || null,
       items: formData.items.map((item) => ({
         diId: item.diId,
         productId: item.productId,
+        warehouseId: item.warehouseId || null, // Kho riêng cho từng item
         issuedQty: Number(item.issuedQty || 0),
         remark: item.remark || null,
       })),
@@ -560,25 +659,28 @@ export default function GoodIssueForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 flex items-center justify-between">
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Cập nhật Phiếu Xuất Kho" : "Tạo Phiếu Xuất Kho"}
             </h1>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate("/sales/good-issues")}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-              >
-                ← Quay lại
-              </button>
-            </div>
+            <p className="text-gray-500">Nhập thông tin phiếu xuất kho</p>
           </div>
-          <div className="border-t border-gray-200" />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/good-issues")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
+            </button>
+          </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+      <div className="px-6 py-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           {/* Thông tin phiếu xuất kho */}
           <div className="grid grid-cols-1 gap-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -642,30 +744,6 @@ export default function GoodIssueForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">
-                    Kho xuất hàng <span className="text-red-500">*</span>
-                  </label>
-                  <Select
-                    className="mt-1"
-                    value={warehouses.find((w) => w.value === formData.warehouseId) || null}
-                    onChange={(option) =>
-                      setFormData((prev) => ({ ...prev, warehouseId: option?.value || null }))
-                    }
-                    options={warehouses}
-                    placeholder="Chọn kho"
-                    isDisabled={isEdit || !canEditFields}
-                    menuPortalTarget={
-                      typeof window !== "undefined" ? document.body : null
-                    }
-                    menuPosition="fixed"
-                    menuShouldScrollIntoView={false}
-                    styles={selectStyles}
-                  />
-                  {errors.warehouseId && (
-                    <p className="text-sm text-red-600 mt-1">{errors.warehouseId}</p>
-                  )}
-                </div>
-                <div>
                   <label className="block text-sm text-gray-600 mb-1">Ngày xuất kho</label>
                   <DatePicker
                     selected={formData.issueDate}
@@ -703,6 +781,7 @@ export default function GoodIssueForm() {
                     <th className="px-4 py-3 text-left">Mã sản phẩm</th>
                     <th className="px-4 py-3 text-left">Tên sản phẩm</th>
                     <th className="px-4 py-3 text-right">ĐVT</th>
+                    <th className="px-4 py-3 text-left">Kho <span className="text-red-500">*</span></th>
                     <th className="px-4 py-3 text-right">Số lượng dự kiến</th>
                     <th className="px-4 py-3 text-right">Tồn kho</th>
                     <th className="px-4 py-3 text-right">Số lượng xuất <span className="text-red-500">*</span></th>
@@ -712,14 +791,15 @@ export default function GoodIssueForm() {
                 <tbody className="divide-y divide-gray-100">
                   {formData.items.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                         {selectedDelivery ? "Không có sản phẩm nào" : "Vui lòng chọn phiếu giao hàng để tải sản phẩm"}
                       </td>
                     </tr>
                   ) : (
                     formData.items.map((item, index) => {
                       const itemError = errors.itemDetails?.[index] || {};
-                      const isStockInsufficient = item.availableStock !== undefined && item.issuedQty > item.availableStock;
+                      const availableStock = itemStocks[index] !== undefined ? itemStocks[index] : (item.availableStock || 0);
+                      const isStockInsufficient = availableStock !== undefined && availableStock !== null && item.issuedQty > availableStock;
                       return (
                         <tr key={index} className={`hover:bg-gray-50 ${isStockInsufficient ? "bg-red-50" : ""}`}>
                           <td className="px-4 py-3 text-xs text-gray-700 text-center">{index + 1}</td>
@@ -729,20 +809,46 @@ export default function GoodIssueForm() {
                           <td className="px-4 py-3 text-sm text-gray-700">
                             {item.productName || "-"}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-700">
+                          <td className="px-4 py-3 text-right text-sm text-gray-700 align-top">
                             {item.uom || "-"}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 align-top">
+                            <Select
+                              value={warehouses.find((w) => w.value === item.warehouseId) || null}
+                              onChange={(option) => {
+                                const newWarehouseId = option?.value || null;
+                                handleItemChange(index, "warehouseId", newWarehouseId);
+                              }}
+                              options={warehouses}
+                              placeholder="Chọn kho"
+                              isClearable={false}
+                              isDisabled={!canEditFields}
+                              styles={compactSelectStyles}
+                              menuPortalTarget={
+                                typeof window !== "undefined" ? document.body : null
+                              }
+                              menuPosition="fixed"
+                            />
+                            {itemError.warehouseId && (
+                              <p className="text-xs text-red-600 mt-1">{itemError.warehouseId}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right align-top">
                             <div className="text-sm text-gray-700 font-medium">
                               {Number(item.plannedQty || 0).toLocaleString("vi-VN")}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className={`text-sm ${item.availableStock !== undefined && item.availableStock < item.issuedQty ? "text-red-600 font-semibold" : "text-gray-700"}`}>
-                              {item.availableStock !== undefined 
-                                ? Number(item.availableStock).toLocaleString("vi-VN")
+                          <td className="px-4 py-3 text-right align-top">
+                            <div className={`text-sm ${availableStock !== undefined && availableStock !== null && availableStock < item.issuedQty ? "text-red-600 font-semibold" : "text-gray-700"}`}>
+                              {availableStock !== undefined && availableStock !== null
+                                ? Number(availableStock).toLocaleString("vi-VN")
                                 : "-"}
                             </div>
+                            {item.warehouseId && item.productId && itemStocks[index] !== undefined && (
+                              <div className="mt-1 text-xs text-gray-500">
+                                Tồn kho tại kho đã chọn
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <input
@@ -769,7 +875,7 @@ export default function GoodIssueForm() {
                             )}
                             {isStockInsufficient && (
                               <p className="text-xs text-red-600 mt-1">
-                                Thiếu: {(item.issuedQty - item.availableStock).toLocaleString("vi-VN")}
+                                Thiếu: {(item.issuedQty - availableStock).toLocaleString("vi-VN")}
                               </p>
                             )}
                           </td>
@@ -795,11 +901,11 @@ export default function GoodIssueForm() {
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate("/sales/good-issues")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="px-6 py-2 border rounded-lg hover:bg-gray-100"
             >
               Hủy
             </button>

@@ -21,6 +21,9 @@ public class GoodIssueItemRequestDTO {
     @NotNull(message = "Product ID là bắt buộc")
     private Integer productId;
 
+    @NotNull(message = "Warehouse ID là bắt buộc")
+    private Integer warehouseId;
+
     @NotNull(message = "Số lượng xuất là bắt buộc")
     @DecimalMin(value = "0.0001", message = "Số lượng xuất phải lớn hơn 0")
     @DecimalMax(value = "999999999999999.99", message = "Số lượng xuất quá lớn")

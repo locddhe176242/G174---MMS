@@ -22,7 +22,8 @@ public class GoodIssueRequestDTO {
     @NotNull(message = "Delivery ID là bắt buộc")
     private Integer deliveryId;
 
-    @NotNull(message = "Warehouse ID là bắt buộc")
+    // warehouseId không còn bắt buộc ở header, mỗi item có kho riêng
+    // Giữ lại để backward compatibility, nhưng không validate
     private Integer warehouseId;
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS][XXX]", shape = JsonFormat.Shape.STRING)

@@ -103,19 +103,19 @@ export default function ReturnOrderDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
+      <div className="px-6 py-6">
+        <div className="mb-4">
           <button
             onClick={() => navigate("/sales/return-orders")}
             className="text-blue-600 hover:underline mb-4"
           >
-            ← Quay lại danh sách
+            Quay lại
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Đơn trả hàng: {data.returnNo}</h1>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
                 Thông tin đơn trả hàng
@@ -161,7 +161,7 @@ export default function ReturnOrderDetail() {
         </div>
 
         {canChangeStatus && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Thay đổi trạng thái</h3>
@@ -258,7 +258,7 @@ export default function ReturnOrderDetail() {
         </div>
 
         {data.notes && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+          <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Ghi chú</h3>
             <p className="text-gray-700 whitespace-pre-wrap">{data.notes}</p>
           </div>

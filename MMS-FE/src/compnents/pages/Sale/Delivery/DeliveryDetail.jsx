@@ -105,13 +105,13 @@ export default function DeliveryDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Phiếu Giao Hàng: {data.deliveryNo}
             </h1>
             <p className="text-gray-500">
-              Sales Order: {data.salesOrderNo || "—"} | Khách hàng: {data.customerName || "—"}
+              Đơn bán hàng: {data.salesOrderNo || "—"} | Khách hàng: {data.customerName || "—"}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -127,13 +127,13 @@ export default function DeliveryDetail() {
               onClick={() => navigate("/sales/deliveries")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-6">
         <div className="bg-white rounded-lg shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
@@ -147,7 +147,7 @@ export default function DeliveryDetail() {
                 </span>
               </li>
               <li>
-                <span className="text-gray-500">Sales Order:</span>{" "}
+                <span className="text-gray-500">Đơn bán hàng:</span>{" "}
                 <button
                   onClick={() => navigate(`/sales/orders/${data.salesOrderId}`)}
                   className="text-blue-600 hover:underline"
@@ -234,10 +234,8 @@ export default function DeliveryDetail() {
               )}
             </div>
             <div className="mt-4 text-sm text-gray-600">
-              <p>Quy trình: Draft → Picked → Shipped → Delivered</p>
               {data.status === "Shipped" && (
                 <p className="text-yellow-600 mt-1">
-                  Khi chuyển sang "Delivered", hệ thống sẽ tự động cập nhật ngày giao thực tế
                 </p>
               )}
             </div>

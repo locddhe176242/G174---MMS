@@ -33,6 +33,79 @@ const DEFAULT_ITEM = {
   taxRate: null,
 };
 
+// Style chung cho ô chọn khách hàng (bo tròn, cao đồng bộ với input)
+const customerSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: 8,
+    borderColor: state.isFocused ? "#2563eb" : "#000000",
+    borderWidth: 1,
+    boxShadow: "none",
+    minHeight: 40,
+    "&:hover": {
+      borderColor: state.isFocused ? "#3b82f6" : "#9ca3af",
+    },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 0.75rem",
+  }),
+  indicatorsContainer: (base) => ({
+    ...base,
+    paddingRight: "0.5rem",
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+};
+
+// Style cho ô chọn sản phẩm trong bảng (cao tương đương input, không bị lệch hàng)
+const productSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: 4,
+    borderColor: state.isFocused ? "#2563eb" : "#000000",
+    borderWidth: 1,
+    boxShadow: "none",
+    minHeight: 36,
+    "&:hover": {
+      borderColor: state.isFocused ? "#2563eb" : "#4b5563",
+    },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 0.5rem",
+  }),
+  indicatorsContainer: (base) => ({
+    ...base,
+    paddingRight: "0.5rem",
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+};
+
+// Options chung cho điều khoản giao hàng & thanh toán (báo giá bán)
+const deliveryTermsOptions = [
+  { value: "FOB - Lấy hàng tại kho", label: "FOB - Lấy hàng tại kho" },
+  { value: "CIF - Ship hàng đến nơi của khách hàng", label: "CIF - Ship hàng đến nơi của khách hàng" },
+];
+
+const paymentTermsOptions = [
+  { value: "COD - Thanh toán sau khi nhận hàng.", label: "COD - Thanh toán sau khi nhận hàng." },
+  { value: "Net 30 - Thanh toán trong 30 ngày", label: "Net 30 - Thanh toán trong 30 ngày" },
+];
+
 const currencyFormatter = (value) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -86,6 +159,19 @@ export default function SalesQuotationForm() {
     taxRate: 0,
     items: [DEFAULT_ITEM],
   });
+
+  // Helpers cho message validate số (hiển thị tiếng Việt thay vì message mặc định của trình duyệt)
+  const clearCustomValidity = (e) => {
+    e.target.setCustomValidity("");
+  };
+
+  const handleMinZeroInvalid = (e) => {
+    e.target.setCustomValidity("Giá trị phải lớn hơn hoặc bằng 0");
+  };
+
+  const handlePercentInvalid = (e) => {
+    e.target.setCustomValidity("Giá trị phải từ 0 đến 100");
+  };
 
   useEffect(() => {
     loadCustomers();
@@ -273,10 +359,7 @@ export default function SalesQuotationForm() {
     setFormData((prev) => ({
       ...prev,
       commonDiscountRate: value,
-      items: prev.items.map((item) => ({
-        ...item,
-        discountRate: value,
-      })),
+      items: prev.items,
     }));
   };
 
@@ -299,51 +382,65 @@ export default function SalesQuotationForm() {
   };
 
   const totals = useMemo(() => {
+    // Tổng tiền trước mọi chiết khấu
     const subtotal = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
       return sum + qty * price;
     }, 0);
 
-    const discount = formData.items.reduce((sum, item) => {
+    // Chiết khấu dòng (theo discountRate từng dòng, không dùng CK chung)
+    const lineDiscountTotal = formData.items.reduce((sum, item) => {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice || 0);
-      const hasCustomDiscount =
-        item.discountRate !== null &&
-        item.discountRate !== undefined &&
-        item.discountRate !== "";
-      const rate = hasCustomDiscount
-        ? Number(item.discountRate || 0)
-        : Number(formData.commonDiscountRate || 0);
+      const rate = Number(item.discountRate || 0);
       const lineTotal = qty * price;
       return sum + (lineTotal * rate) / 100;
     }, 0);
 
-    const taxable = Math.max(subtotal - discount, 0);
-    const taxAmount =
-      formData.items.reduce((sum, item) => {
+    // Tổng sau chiết khấu dòng
+    const subtotalAfterLine = Math.max(subtotal - lineDiscountTotal, 0);
+
+    // Chiết khấu cả đơn (header) tính trên phần sau CK dòng
+    const headerPercent = Number(formData.commonDiscountRate || 0);
+    const headerDiscount =
+      headerPercent > 0
+        ? (subtotalAfterLine * headerPercent) / 100
+        : 0;
+
+    // Phân bổ CK cả đơn theo tỷ lệ để tính thuế
+    let taxAmount = 0;
+    if (subtotalAfterLine > 0) {
+      formData.items.forEach((item) => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.unitPrice || 0);
-        const hasCustomDiscount =
-          item.discountRate !== null &&
-          item.discountRate !== undefined &&
-          item.discountRate !== "";
-        const discountRate = hasCustomDiscount
-          ? Number(item.discountRate || 0)
-          : Number(formData.commonDiscountRate || 0);
-        const lineTotal = qty * price;
-        const lineDiscount = (lineTotal * discountRate) / 100;
-        const lineBase = Math.max(lineTotal - lineDiscount, 0);
-        const itemTaxRate = getEffectiveTaxRate(item.taxRate, formData.taxRate);
-        return sum + (lineBase * itemTaxRate) / 100;
-      }, 0);
-    const total = taxable + Number(taxAmount || 0);
+        const lineGross = qty * price;
+        const lineDiscRate = Number(item.discountRate || 0);
+        const lineDisc = (lineGross * lineDiscRate) / 100;
+        const lineSubtotal = Math.max(lineGross - lineDisc, 0);
+
+        if (lineSubtotal <= 0) return;
+
+        const allocHeader =
+          (lineSubtotal / subtotalAfterLine) * headerDiscount;
+        const taxableBase = Math.max(lineSubtotal - allocHeader, 0);
+        const itemTaxRate = getEffectiveTaxRate(
+          item.taxRate,
+          formData.taxRate
+        );
+        taxAmount += taxableBase * (Number(itemTaxRate || 0) / 100);
+      });
+    }
+
+    const totalAmount =
+      subtotalAfterLine - headerDiscount + Number(taxAmount || 0);
 
     return {
       subtotal,
-      discountTotal: discount,
+      discountTotal: lineDiscountTotal,
+      headerDiscount,
       taxAmount,
-      totalAmount: total,
+      totalAmount,
     };
   }, [formData.items, formData.taxRate, formData.commonDiscountRate]);
 
@@ -427,11 +524,9 @@ export default function SalesQuotationForm() {
       quantity: Number(item.quantity || 0),
       unitPrice: Number(item.unitPrice || 0),
       discountPercent:
-        item.discountRate !== null &&
-        item.discountRate !== undefined &&
-        item.discountRate !== ""
+        item.discountRate !== null && item.discountRate !== undefined
           ? Number(item.discountRate || 0)
-          : Number(formData.commonDiscountRate || 0),
+          : 0, // Không tự động điền từ commonDiscountRate
       taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
     })),
   });
@@ -555,7 +650,7 @@ export default function SalesQuotationForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
@@ -589,9 +684,7 @@ export default function SalesQuotationForm() {
                 </span>
               )}
             </div>
-            <p className="text-gray-500">
-              Nhập thông tin chung và danh sách sản phẩm báo giá
-            </p>
+
             {isActive && !isManager && (
               <p className="text-sm text-yellow-600 mt-1">
                 Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
@@ -623,13 +716,13 @@ export default function SalesQuotationForm() {
               onClick={() => navigate("/sales/quotations")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
@@ -638,7 +731,7 @@ export default function SalesQuotationForm() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600">Số báo giá</label>
+                  <label className="block text-sm text-gray-600">Số báo giá</label>
                   <input
                     type="text"
                     value={formData.quotationNo}
@@ -651,11 +744,11 @@ export default function SalesQuotationForm() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">
+                  <label className="block text-sm text-gray-600">
                     Khách hàng <span className="text-red-500">*</span>
                   </label>
                   <Select
-                    className="mt-1"
+                    className="mt-1 w-full"
                     placeholder="Chọn khách hàng"
                     value={customers.find(
                       (opt) => opt.value === formData.customerId
@@ -666,6 +759,11 @@ export default function SalesQuotationForm() {
                     options={customers}
                     isClearable
                     isDisabled={!canEdit}
+                    styles={customerSelectStyles}
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
                   />
                   {validationErrors.customerId && (
                     <p className="text-sm text-red-600 mt-1">
@@ -674,7 +772,7 @@ export default function SalesQuotationForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">
+                  <label className="block text-sm text-gray-600">
                     Ngày báo giá <span className="text-red-500">*</span>
                   </label>
                   <DatePicker
@@ -685,7 +783,7 @@ export default function SalesQuotationForm() {
                     }
                     onChange={(date) => handleDateChange("quotationDate", date)}
                     dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    className="mt-1 w-full h-10 border rounded-lg px-3 py-2"
                     disabled={!canEdit}
                   />
                   {validationErrors.quotationDate && (
@@ -695,33 +793,53 @@ export default function SalesQuotationForm() {
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Điều khoản thanh toán</label>
-                  <input
-                    type="text"
-                    value={formData.paymentTerms}
-                    onChange={(e) =>
-                      handleInputChange("paymentTerms", e.target.value)
+                  <label className="block text-sm text-gray-600">Điều khoản thanh toán</label>
+                  <Select
+                    className="mt-1 w-full"
+                    styles={customerSelectStyles}
+                    placeholder="Chọn điều khoản thanh toán"
+                    options={paymentTermsOptions}
+                    value={
+                      formData.paymentTerms
+                        ? { value: formData.paymentTerms, label: formData.paymentTerms }
+                        : null
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
-                    placeholder="VD: Thanh toán trong 30 ngày"
-                    disabled={!canEdit}
+                    onChange={(opt) =>
+                      handleInputChange("paymentTerms", opt ? opt.value : "")
+                    }
+                    isClearable
+                    isDisabled={!canEdit}
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Điều khoản giao hàng</label>
-                  <input
-                    type="text"
-                    value={formData.deliveryTerms}
-                    onChange={(e) =>
-                      handleInputChange("deliveryTerms", e.target.value)
+                  <label className="block text-sm text-gray-600">Điều khoản giao hàng</label>
+                  <Select
+                    className="mt-1 w-full"
+                    styles={customerSelectStyles}
+                    placeholder="Chọn điều khoản giao hàng"
+                    options={deliveryTermsOptions}
+                    value={
+                      formData.deliveryTerms
+                        ? { value: formData.deliveryTerms, label: formData.deliveryTerms }
+                        : null
                     }
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
-                    placeholder="VD: Giao tại kho khách hàng"
-                    disabled={!canEdit}
+                    onChange={(opt) =>
+                      handleInputChange("deliveryTerms", opt ? opt.value : "")
+                    }
+                    isClearable
+                    isDisabled={!canEdit}
+                    menuPortalTarget={
+                      typeof window !== "undefined" ? document.body : null
+                    }
+                    menuPosition="fixed"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Ghi chú</label>
+                  <label className="block text-sm text-gray-600">Ghi chú</label>
                   <textarea
                     rows={3}
                     value={formData.notes}
@@ -734,12 +852,18 @@ export default function SalesQuotationForm() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm text-gray-600">
-                    Chiết khấu chung (%)
-                  </label>
+            <div className="bg-white rounded-lg shadow-sm p-6 space-y-5">
+              {/* Ô chiết khấu & thuế chung */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-600">
+                      Chiết khấu cả đơn (%)
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Áp dụng cho hoá đơn.
+                    </p>
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -748,56 +872,66 @@ export default function SalesQuotationForm() {
                     value={formData.commonDiscountRate}
                     disabled={!canEdit}
                     onChange={(e) => applyCommonDiscountToItems(e.target.value)}
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    onInvalid={handlePercentInvalid}
+                    onInput={clearCustomValidity}
+                    className="w-28 border rounded-lg px-3 py-2 text-right"
                   />
-                  {validationErrors.commonDiscountRate && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {validationErrors.commonDiscountRate}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Áp dụng cho tất cả sản phẩm.
-                  </p>
                 </div>
-                <div>
-                  <label className="text-sm text-gray-600">
-                    Thuế chung (%)
-                  </label>
+                {validationErrors.commonDiscountRate && (
+                  <p className="text-sm text-red-600">
+                    {validationErrors.commonDiscountRate}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-600">
+                      Thuế chung (%)
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Áp dụng cho tất cả sản phẩm.
+                    </p>
+                  </div>
                   <input
                     type="number"
                     min="0"
                     value={formData.taxRate}
                     disabled={!canEdit}
                     onChange={(e) => applyCommonTaxToItems(e.target.value)}
-                    className="mt-1 w-full border rounded-lg px-3 py-2"
+                    onInvalid={handleMinZeroInvalid}
+                    onInput={clearCustomValidity}
+                    className="w-28 border rounded-lg px-3 py-2 text-right"
                   />
-                  {validationErrors.taxRate && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {validationErrors.taxRate}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Áp dụng cho tất cả sản phẩm.
-                  </p>
                 </div>
+                {validationErrors.taxRate && (
+                  <p className="text-sm text-red-600">
+                    {validationErrors.taxRate}
+                  </p>
+                )}
               </div>
-              <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+
+              {/* Ô tổng tiền */}
+              <div className="mt-2 rounded-lg bg-gray-50 px-4 py-3 space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
-                  <span>Tạm tính</span>
+                  <span>Tạm tính (VND)</span>
                   <span className="font-semibold">
                     {currencyFormatter(totals.subtotal)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Chiết khấu dòng</span>
+                  <span>Chiết khấu dòng (VND)</span>
                   <span>{currencyFormatter(totals.discountTotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Thuế</span>
+                  <span>Chiết khấu cả đơn (VND)</span>
+                  <span>{currencyFormatter(totals.headerDiscount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Thuế (VND)</span>
                   <span>{currencyFormatter(totals.taxAmount)}</span>
                 </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900">
-                  <span>Tổng cộng</span>
+                <div className="flex justify-between text-base font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-1">
+                  <span>Tổng cộng (VND)</span>
                   <span>{currencyFormatter(totals.totalAmount)}</span>
                 </div>
               </div>
@@ -825,24 +959,31 @@ export default function SalesQuotationForm() {
                     <th className="px-4 py-3 text-left">Sản phẩm</th>
                     <th className="px-4 py-3 text-left">ĐVT</th>
                     <th className="px-4 py-3 text-right">Số lượng</th>
-                    <th className="px-4 py-3 text-right">Đơn giá</th>
+                    <th className="px-4 py-3 text-right">Đơn giá (VND)</th>
                     <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
                     <th className="px-4 py-3 text-right">Thuế (%)</th>
-                    <th className="px-4 py-3 text-right">Tạm tính</th>
+                    <th className="px-4 py-3 text-right">Tạm tính (VND)</th>
                     <th className="px-4 py-3 text-center">#</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {formData.items.map((item, index) => {
+                    // Không cho chọn trùng sản phẩm trong nhiều dòng
+                    const usedProductIds = formData.items
+                      .map((it, idx) => (idx === index ? null : it.productId))
+                      .filter((id) => id !== null && id !== undefined);
+                    const availableProducts = products.filter(
+                      (opt) => !usedProductIds.includes(opt.value)
+                    );
+
                     const baseTotal =
                       Number(item.quantity || 0) * Number(item.unitPrice || 0);
-                    const hasCustomDiscount =
-                      item.discountRate !== null &&
-                      item.discountRate !== undefined &&
-                      item.discountRate !== "";
-                    const effectiveDiscountRate = hasCustomDiscount
-                      ? Number(item.discountRate || 0)
-                      : Number(formData.commonDiscountRate || 0);
+                    // Chỉ dùng discountRate nếu đã được set (không null/undefined)
+                    // Không tự động fallback về commonDiscountRate
+                    const effectiveDiscountRate = 
+                      item.discountRate !== null && item.discountRate !== undefined
+                        ? Number(item.discountRate || 0)
+                        : 0;
                     const lineDiscount =
                       (baseTotal * effectiveDiscountRate) / 100;
                     const taxable = Math.max(baseTotal - lineDiscount, 0);
@@ -858,7 +999,7 @@ export default function SalesQuotationForm() {
 
                     return (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 w-64">
+                        <td className="px-4 py-3 w-64 align-top">
                           <Select
                             placeholder="Chọn sản phẩm"
                             value={products.find(
@@ -867,9 +1008,14 @@ export default function SalesQuotationForm() {
                             onChange={(option) =>
                               handleProductSelect(index, option)
                             }
-                            options={products}
+                            options={availableProducts}
                             isClearable
                             isDisabled={!canEdit}
+                            styles={productSelectStyles}
+                            menuPortalTarget={
+                              typeof window !== "undefined" ? document.body : null
+                            }
+                            menuPosition="fixed"
                           />
                           {validationErrors.itemDetails?.[index]?.productId && (
                             <p className="text-xs text-red-600 mt-1">
@@ -877,7 +1023,7 @@ export default function SalesQuotationForm() {
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 align-top">
                           <input
                             type="text"
                             value={item.uom}
@@ -888,7 +1034,7 @@ export default function SalesQuotationForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="number"
                             min="0"
@@ -896,6 +1042,8 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "quantity", e.target.value)
                             }
+                            onInvalid={handleMinZeroInvalid}
+                            onInput={clearCustomValidity}
                             className="w-24 border rounded px-2 py-1 text-right"
                             disabled={!canEdit}
                           />
@@ -905,7 +1053,7 @@ export default function SalesQuotationForm() {
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -921,19 +1069,13 @@ export default function SalesQuotationForm() {
                             disabled={!canEdit}
                           />
                         </td>
-                    <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
-                            value={
-                              item.discountRate !== null &&
-                              item.discountRate !== undefined &&
-                              item.discountRate !== ""
-                                ? item.discountRate
-                                : formData.commonDiscountRate || ""
-                            }
+                            value={item.discountRate ?? ""}
                             onChange={(e) =>
                               handleItemChange(
                                 index,
@@ -941,17 +1083,19 @@ export default function SalesQuotationForm() {
                                 e.target.value
                               )
                             }
+                            onInvalid={handlePercentInvalid}
+                            onInput={clearCustomValidity}
                             className="w-28 border rounded px-2 py-1 text-right"
                             placeholder="0"
                             disabled={!canEdit}
                           />
-                      {validationErrors.itemDetails?.[index]?.discountRate && (
-                        <p className="text-xs text-red-600 mt-1">
-                          {validationErrors.itemDetails[index].discountRate}
-                        </p>
-                      )}
+                          {validationErrors.itemDetails?.[index]?.discountRate && (
+                            <p className="text-xs text-red-600 mt-1">
+                              {validationErrors.itemDetails[index].discountRate}
+                            </p>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right align-top">
                           <input
                             type="number"
                             min="0"
@@ -965,6 +1109,8 @@ export default function SalesQuotationForm() {
                             onChange={(e) =>
                               handleItemChange(index, "taxRate", e.target.value)
                             }
+                            onInvalid={handleMinZeroInvalid}
+                            onInput={clearCustomValidity}
                             className="w-24 border rounded px-2 py-1 text-right"
                             disabled={!canEdit}
                           />
@@ -974,10 +1120,10 @@ export default function SalesQuotationForm() {
                         </p>
                       )}
                         </td>
-                        <td className="px-4 py-3 text-right font-medium">
+                        <td className="px-4 py-3 text-right font-medium align-top">
                           {currencyFormatter(lineGrandTotal)}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center align-top">
                           {formData.items.length > 1 && (
                             <button
                               type="button"

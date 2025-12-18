@@ -33,8 +33,10 @@ public class GoodIssue {
     @JoinColumn(name = "delivery_id", nullable = false)
     private Delivery delivery;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "warehouse_id", nullable = false)
+    // warehouseId không còn bắt buộc ở header, mỗi item có kho riêng
+    // Giữ lại để backward compatibility, nhưng nullable = true
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id", nullable = true)
     private Warehouse warehouse;
 
     @Column(name = "issue_date")
