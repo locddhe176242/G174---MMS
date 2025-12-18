@@ -54,14 +54,14 @@ public class RFQServiceImpl implements IRFQService {
         if (dto.getRequisitionId() != null) {
             requisition = requisitionRepository.findById(dto.getRequisitionId())
                     .filter(r -> r.getDeletedAt() == null)
-                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found with ID: " + dto.getRequisitionId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Purchase Requisition not found  " + dto.getRequisitionId()));
             
             // Note: One PR can create MULTIPLE RFQs for different product groups or procurement batches
             // This is standard ERP behavior - validation removed
         }
 
         User createdBy = userRepository.findById(createdById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + createdById));
 
         Vendor selectedVendor = null;
         if (dto.getSelectedVendorId() != null) {
@@ -133,7 +133,7 @@ public class RFQServiceImpl implements IRFQService {
             for (Integer vendorId : dto.getSelectedVendorIds()) {
                 Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
                 if (vendor == null) {
-                    throw new ResourceNotFoundException("Vendor not found with ID: " + vendorId);
+                    throw new ResourceNotFoundException("Vendor not found  " + vendorId);
                 }
                 
                 // Check if vendor has email (same validation as PO)
@@ -207,7 +207,7 @@ public class RFQServiceImpl implements IRFQService {
         log.info("Fetching RFQ ID: {}", rfqId);
 
         RFQ rfq = rfqRepository.findByIdWithRelations(rfqId)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         return rfqMapper.toResponseDTO(rfq);
     }
@@ -259,7 +259,7 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         if (rfq.getStatus() == RFQ.RFQStatus.Closed || rfq.getStatus() == RFQ.RFQStatus.Cancelled) {
             throw new IllegalStateException("Cannot update RFQ with status: " + rfq.getStatus());
@@ -398,7 +398,7 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         rfq.setStatus(status);
         rfq.setUpdatedAt(LocalDateTime.now());
@@ -418,7 +418,7 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         rfq.setStatus(RFQ.RFQStatus.Closed);
         rfq.setUpdatedAt(LocalDateTime.now());
@@ -438,7 +438,7 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         rfq.setStatus(RFQ.RFQStatus.Cancelled);
         rfq.setUpdatedAt(LocalDateTime.now());
@@ -458,7 +458,7 @@ public class RFQServiceImpl implements IRFQService {
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + rfqId));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + rfqId));
 
         rfq.setDeletedAt(LocalDateTime.now());
         RFQ saved = rfqRepository.save(rfq);

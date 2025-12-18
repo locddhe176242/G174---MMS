@@ -18,8 +18,8 @@ import java.util.List;
 public class GoodsReceiptRequestDTO {
     private String receiptNo;
 
-    // For Purchase: inboundDeliveryId is required (Flow: PO → ID → GR)
-    private Integer inboundDeliveryId;
+    // For Purchase: orderId when creating GR directly from PO (Flow: PO → GR)
+    private Integer orderId;
 
     // For SalesReturn: Sales Return Inbound Order ID
     private Integer sriId;

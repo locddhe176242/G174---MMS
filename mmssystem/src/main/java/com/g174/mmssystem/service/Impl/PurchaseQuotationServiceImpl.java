@@ -43,10 +43,10 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
 
         // Validate and load entities
         RFQ rfq = rfqRepository.findById(dto.getRfqId())
-                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found with ID: " + dto.getRfqId()));
+                .orElseThrow(() -> new ResourceNotFoundException("RFQ not found  " + dto.getRfqId()));
 
         Vendor vendor = vendorRepository.findById(dto.getVendorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found with ID: " + dto.getVendorId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found  " + dto.getVendorId()));
 
         // Validate: One vendor can only submit one PQ per RFQ
         List<PurchaseQuotation> existingQuotations = quotationRepository.findByRfqIdAndVendorId(dto.getRfqId(), dto.getVendorId());
@@ -66,7 +66,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
         }
 
         User createdBy = userRepository.findById(createdById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found  " + createdById));
 
         // Generate PQ number if not provided
         String pqNo = dto.getPqNo();
@@ -103,7 +103,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
             List<PurchaseQuotationItem> items = dto.getItems().stream()
                     .map(itemDto -> {
                         RFQItem rfqItem = rfqItemRepository.findById(itemDto.getRfqItemId())
-                                .orElseThrow(() -> new ResourceNotFoundException("RFQ Item not found with ID: " + itemDto.getRfqItemId()));
+                                .orElseThrow(() -> new ResourceNotFoundException("RFQ Item not found  " + itemDto.getRfqItemId()));
 
                         Product product = null;
                         if (itemDto.getProductId() != null) {
@@ -141,7 +141,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
         log.info("Fetching purchase quotation ID: {}", pqId);
 
         PurchaseQuotation quotation = quotationRepository.findByIdWithRelations(pqId)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + pqId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + pqId));
 
         return quotationMapper.toResponseDTO(quotation);
     }
@@ -201,7 +201,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
 
         PurchaseQuotation quotation = quotationRepository.findById(pqId)
                 .filter(q -> q.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + pqId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + pqId));
 
         if (quotation.getStatus() == PurchaseQuotationStatus.Approved) {
             throw new IllegalStateException("Cannot update approved quotation");
@@ -248,7 +248,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
             List<PurchaseQuotationItem> items = dto.getItems().stream()
                     .map(itemDto -> {
                         RFQItem rfqItem = rfqItemRepository.findById(itemDto.getRfqItemId())
-                                .orElseThrow(() -> new ResourceNotFoundException("RFQ Item not found with ID: " + itemDto.getRfqItemId()));
+                                .orElseThrow(() -> new ResourceNotFoundException("RFQ Item not found  " + itemDto.getRfqItemId()));
 
                         Product product = null;
                         if (itemDto.getProductId() != null) {
@@ -289,7 +289,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
 
         PurchaseQuotation quotation = quotationRepository.findById(pqId)
                 .filter(q -> q.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + pqId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + pqId));
 
         if (quotation.getStatus() != PurchaseQuotationStatus.Pending) {
             throw new IllegalStateException("Only pending quotations can be approved");
@@ -313,7 +313,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
 
         PurchaseQuotation quotation = quotationRepository.findById(pqId)
                 .filter(q -> q.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + pqId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + pqId));
 
         if (quotation.getStatus() != PurchaseQuotationStatus.Pending) {
             throw new IllegalStateException("Only pending quotations can be rejected");
@@ -340,7 +340,7 @@ public class PurchaseQuotationServiceImpl implements IPurchaseQuotationService {
 
         PurchaseQuotation quotation = quotationRepository.findById(pqId)
                 .filter(q -> q.getDeletedAt() == null)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found with ID: " + pqId));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Quotation not found  " + pqId));
 
         quotation.setDeletedAt(LocalDateTime.now());
         PurchaseQuotation saved = quotationRepository.save(quotation);

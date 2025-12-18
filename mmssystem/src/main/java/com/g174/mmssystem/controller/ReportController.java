@@ -5,6 +5,8 @@ import com.g174.mmssystem.dto.response.ReportResponse;
 import com.g174.mmssystem.enums.ReportStatus;
 import com.g174.mmssystem.enums.ReportType;
 import com.g174.mmssystem.service.ReportService;
+import com.g174.mmssystem.entity.MenuItem;
+import com.g174.mmssystem.repository.MenuItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -13,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.annotation.PostConstruct;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -23,6 +27,27 @@ public class ReportController {
     
     private final ReportService reportService;
     private final com.g174.mmssystem.repository.UserRepository userRepository;
+    private final MenuItemRepository menuItemRepository;
+    
+    @PostConstruct
+    public void initializeReportsMenu() {
+        try {
+            // Check if reports menu exists, if not create it
+            if (!menuItemRepository.findByMenuKey("reports").isPresent()) {
+                MenuItem reportsMenu = MenuItem.builder()
+                        .menuKey("reports")
+                        .menuLabel("Báo cáo")
+                        .menuPath("/reports")
+                        .menuIcon("reports")
+                        .displayOrder(50)
+                        .build();
+                menuItemRepository.save(reportsMenu);
+                log.info("Created reports menu item successfully");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to initialize reports menu: {}", e.getMessage());
+        }
+    }
     
     // Get all reports
     @GetMapping

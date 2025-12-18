@@ -8,6 +8,7 @@ import com.g174.mmssystem.service.IService.IUserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +24,7 @@ public class UserProfileController {
     private final IUserProfileService userProfileService;
 
     @GetMapping("/profile")
+    @PreAuthorize("hasAnyRole('MANAGER', 'SALE', 'PURCHASE', 'ACCOUNTING', 'WAREHOUSE')")
     public ResponseEntity<UserProfileResponseDTO> getCurrentUserProfile(Authentication authentication) {
         String email = authentication.getName();
         UserProfileResponseDTO profile = userProfileService.getCurrentUserProfile(email);
@@ -30,6 +32,7 @@ public class UserProfileController {
     }
 
     @PutMapping("/profile")
+    @PreAuthorize("hasAnyRole('MANAGER', 'SALE', 'PURCHASE', 'ACCOUNTING', 'WAREHOUSE')")
     @LogActivity(
             action = "UPDATE_PROFILE",
             activityType = "PROFILE_UPDATE",
@@ -50,6 +53,7 @@ public class UserProfileController {
     }
 
     @PutMapping("/change-password")
+    @PreAuthorize("hasAnyRole('MANAGER', 'SALE', 'PURCHASE', 'ACCOUNTING', 'WAREHOUSE')")
     @LogActivity(
             action = "CHANGE_PASSWORD",
             activityType = "PASSWORD_CHANGE",
@@ -69,6 +73,7 @@ public class UserProfileController {
     }
 
     @PostMapping("/profile/avatar")
+    @PreAuthorize("hasAnyRole('MANAGER', 'SALE', 'PURCHASE', 'ACCOUNTING', 'WAREHOUSE')")
     @LogActivity(
             action = "UPLOAD_AVATAR",
             activityType = "PROFILE_UPDATE",

@@ -24,11 +24,13 @@ public class DashboardStatsDTO {
     // Monthly import/export statistics
     private List<MonthlyImportExport> monthlyImportExport;
     
+    // Daily import/export statistics (last 7 days)
+    private List<DailyImportExport> dailyImportExport;
+    
     // Top warehouses by revenue
     private List<WarehouseRevenue> topWarehouses;
     
     // Warehouse pending tasks (for WAREHOUSE role)
-    private List<PendingInboundDelivery> pendingInboundDeliveries;
     private List<PendingDelivery> pendingDeliveries;
     private WarehouseActivity todayActivity;
     
@@ -81,10 +83,12 @@ public class DashboardStatsDTO {
         private Integer productId;
         private String productName;
         private String categoryName;
+        private String warehouseName;
+        private String warehouseCode;
         private Long currentStock;
         private Long minStock;
         private Double stockPercentage;
-        private String status; // "Cực thấp", "Cần bổ sung", "Thời trang"
+        private String status; // "Hết hàng", "Cực thấp", "Cần bổ sung"
     }
     
     @Data
@@ -101,6 +105,15 @@ public class DashboardStatsDTO {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class DailyImportExport {
+        private String date; // Format: "dd/MM"
+        private Long importCount; // Số phiếu nhập kho
+        private Long exportCount; // Số phiếu xuất kho
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class WarehouseRevenue {
         private Integer warehouseId;
         private String warehouseName;
@@ -108,19 +121,6 @@ public class DashboardStatsDTO {
         private BigDecimal totalRevenue;
         private Long totalOrders;
         private Long totalQuantity;
-    }
-    
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class PendingInboundDelivery {
-        private Integer inboundDeliveryId;
-        private String inboundDeliveryNo;
-        private String purchaseOrderNo;
-        private String vendorName;
-        private Integer totalItems;
-        private String status;
-        private String expectedDate;
     }
     
     @Data

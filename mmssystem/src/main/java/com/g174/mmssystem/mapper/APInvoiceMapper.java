@@ -97,6 +97,7 @@ public class APInvoiceMapper {
                 .method(payment.getMethod())
                 .referenceNo(payment.getReferenceNo())
                 .notes(payment.getNotes())
+                .invoiceStatus(payment.getApInvoice() != null ? payment.getApInvoice().getStatus() : null)
                 .createdAt(payment.getCreatedAt())
                 .build();
     }

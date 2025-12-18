@@ -333,9 +333,6 @@ export default function APaymentForm() {
   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Mã tham chiếu
-                      {formData.method === "Bank Transfer" && (
-                        <span className="text-red-500 ml-1">*</span>
-                      )}
                     </label>
                     <input
                       type="text"
@@ -351,8 +348,8 @@ export default function APaymentForm() {
                     )}
                     <p className="text-xs text-gray-500 mt-1">
                       {formData.method === "Bank Transfer" 
-                        ? "Bắt buộc nhập mã giao dịch ngân hàng để đối soát"
-                        : "Nhập mã tham chiếu hoặc mã giao dịch ngân hàng"
+                        ? "Nhập mã giao dịch ngân hàng để đối soát (không bắt buộc)"
+                        : "Nhập mã tham chiếu hoặc mã giao dịch ngân hàng (không bắt buộc)"
                       }
                     </p>
                   </div>

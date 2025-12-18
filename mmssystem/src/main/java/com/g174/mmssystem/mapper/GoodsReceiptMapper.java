@@ -40,15 +40,12 @@ public class GoodsReceiptMapper {
                 .createdAt(receipt.getCreatedAt())
                 .updatedAt(receipt.getUpdatedAt());
 
-        // Set Inbound Delivery info if sourceType is Purchase
-        if (receipt.getSourceType() == GoodsReceipt.SourceType.Purchase && receipt.getInboundDelivery() != null) {
-            builder.inboundDeliveryId(receipt.getInboundDelivery().getInboundDeliveryId())
-                   .inboundDeliveryNo(receipt.getInboundDelivery().getInboundDeliveryNo());
-            
-            // Also get PO info from Inbound Delivery
-            if (receipt.getInboundDelivery().getPurchaseOrder() != null) {
-                builder.orderId(receipt.getInboundDelivery().getPurchaseOrder().getOrderId())
-                       .poNo(receipt.getInboundDelivery().getPurchaseOrder().getPoNo());
+        // Set Purchase Order info if sourceType is Purchase
+        if (receipt.getSourceType() == GoodsReceipt.SourceType.Purchase) {
+            // New flow: Direct PO → GR
+            if (receipt.getPurchaseOrder() != null) {
+                builder.orderId(receipt.getPurchaseOrder().getOrderId())
+                       .poNo(receipt.getPurchaseOrder().getPoNo());
             }
         }
 
@@ -65,26 +62,6 @@ public class GoodsReceiptMapper {
             dto.setItems(toItemResponseDTOList(receipt.getItems()));
         }
 
-        // Calculate progress info from Inbound Delivery
-        if (receipt.getInboundDelivery() != null) {
-            dto.setInboundDeliveryStatus(receipt.getInboundDelivery().getStatus() != null 
-                ? receipt.getInboundDelivery().getStatus().toString() 
-                : null);
-            
-            if (receipt.getInboundDelivery().getItems() != null) {
-                double totalExpected = receipt.getInboundDelivery().getItems().stream()
-                    .mapToDouble(item -> item.getExpectedQty() != null ? item.getExpectedQty().doubleValue() : 0.0)
-                    .sum();
-                
-                double totalReceived = receipt.getItems() != null ? receipt.getItems().stream()
-                    .mapToDouble(item -> item.getReceivedQty() != null ? item.getReceivedQty().doubleValue() : 0.0)
-                    .sum() : 0.0;
-                
-                dto.setTotalExpectedQty(totalExpected);
-                dto.setTotalReceivedQty(totalReceived);
-            }
-        }
-
         return dto;
     }
 
@@ -96,7 +73,7 @@ public class GoodsReceiptMapper {
         GoodsReceiptItemResponseDTO.GoodsReceiptItemResponseDTOBuilder builder = GoodsReceiptItemResponseDTO.builder()
                 .griId(item.getGriId())
                 .receiptId(item.getGoodsReceipt() != null ? item.getGoodsReceipt().getReceiptId() : null)
-                .idiId(item.getInboundDeliveryItem() != null ? item.getInboundDeliveryItem().getIdiId() : null)
+                .poiId(item.getPurchaseOrderItem() != null ? item.getPurchaseOrderItem().getPoiId() : null)
                 .roiId(item.getReturnOrderItem() != null ? item.getReturnOrderItem().getRoiId() : null)
                 .productId(item.getProduct() != null ? item.getProduct().getProductId() : null)
                 .productName(item.getProduct() != null ? item.getProduct().getName() : null)
@@ -105,16 +82,11 @@ public class GoodsReceiptMapper {
                 .acceptedQty(item.getAcceptedQty())
                 .remark(item.getRemark());
 
-        // Get additional info from InboundDeliveryItem if available (for Purchase)
-        if (item.getInboundDeliveryItem() != null) {
-            builder.uom(item.getInboundDeliveryItem().getUom());
-            
-            // Get price info from Purchase Order Item via Inbound Delivery Item
-            if (item.getInboundDeliveryItem().getPurchaseOrderItem() != null) {
-                builder.unitPrice(item.getInboundDeliveryItem().getPurchaseOrderItem().getUnitPrice())
-                       .discountPercent(item.getInboundDeliveryItem().getPurchaseOrderItem().getDiscountPercent())
-                       .taxRate(item.getInboundDeliveryItem().getPurchaseOrderItem().getTaxRate());
-            }
+        // Get additional info from PurchaseOrderItem if available (for Purchase)
+        if (item.getPurchaseOrderItem() != null) {
+            builder.unitPrice(item.getPurchaseOrderItem().getUnitPrice())
+                   .discountPercent(item.getPurchaseOrderItem().getDiscountPercent())
+                   .taxRate(item.getPurchaseOrderItem().getTaxRate());
         }
 
         // Get additional info from ReturnOrderItem if available (for SalesReturn)

@@ -11,6 +11,7 @@ import CustomerList from "./compnents/pages/CustomerList";
 import UserProfile from "./compnents/pages/UserProfile";
 import Notifications from "./compnents/pages/Notifications";
 import ProtectedRoute from "./compnents/ProtectedRoute";
+import PermissionGuard from "./compnents/PermissionGuard";
 import WarehouseList from "./compnents/pages/Warehouse/WarehouseList.jsx";
 import AddWarehouse from "./compnents/pages/Warehouse/AddWarehouse.jsx";
 import EditWarehouse from "./compnents/pages/Warehouse/EditWarehouse.jsx";
@@ -46,9 +47,6 @@ import APaymentDetail from "./compnents/pages/Purchase/APaymentDetail.jsx";
 import APInvoiceDetail from "./compnents/pages/Purchase/APInvoiceDetail.jsx";
 import APInvoiceForm from "./compnents/pages/Purchase/APInvoiceForm.jsx";
 import APInvoiceList from "./compnents/pages/Purchase/APInvoiceList.jsx";
-import InboundDeliveryForm from "./compnents/pages/Purchase/InboundDeliveryForm.jsx";
-import InboundDeliveryList from "./compnents/pages/Purchase/InboundDeliveryList.jsx";
-import InboundDeliveryDetail from "./compnents/pages/Purchase/InboundDeliveryDetail.jsx";
 
 //pages for sales module
 import SalesQuotationList from "./compnents/pages/Sale/SalesQuotation/SalesQuotationList.jsx";
@@ -79,8 +77,6 @@ import SalesReturnInboundOrderForm from "./compnents/pages/Sale/SalesReturnInbou
 
 //pages for Report module
 import ReportList from "./compnents/pages/Report/ReportList.jsx";
-import ReportDetail from "./compnents/pages/Report/ReportDetail.jsx";
-import GenerateReport from "./compnents/pages/Report/GenerateReport.jsx";
 
 import RoleManagement from "./compnents/pages/Admin/RoleManagement";
 import RoleDetail from "./compnents/pages/Admin/RoleDetail";
@@ -164,11 +160,6 @@ function App() {
                 <Route path="/purchase/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
                 <Route path="/purchase/purchase-orders/:id" element={<PurchaseOrderDetail />} />
 
-                <Route path="/purchase/inbound-deliveries" element={<InboundDeliveryList />} />
-                <Route path="/purchase/inbound-deliveries/new" element={<InboundDeliveryForm />} />
-                <Route path="/purchase/inbound-deliveries/:id/edit" element={<InboundDeliveryForm />} />
-                <Route path="/purchase/inbound-deliveries/:id" element={<InboundDeliveryDetail />} />
-
                 <Route path="/purchase/goods-receipts" element={<GoodsReceiptList />} />
                 <Route path="/purchase/goods-receipts/new" element={<GoodsReceiptForm />} />
                 <Route path="/purchase/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
@@ -217,9 +208,14 @@ function App() {
                 <Route path="/sales/return-inbound-orders/:id" element={<SalesReturnInboundOrderDetail />} />
 
                 {/**Report Module Routes */}
-                <Route path="/reports" element={<ReportList />} />
-                <Route path="/reports/generate" element={<GenerateReport />} />
-                <Route path="/reports/:id" element={<ReportDetail />} />
+                <Route 
+                  path="/reports" 
+                  element={
+                    <PermissionGuard requiredPermissions={['MANAGER', 'WAREHOUSE']}>
+                      <ReportList />
+                    </PermissionGuard>
+                  } 
+                />
 
                 <Route path="/approval" element={<ApprovalList />} />
 

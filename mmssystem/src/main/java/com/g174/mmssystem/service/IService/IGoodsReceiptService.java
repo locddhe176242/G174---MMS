@@ -22,8 +22,6 @@ public interface IGoodsReceiptService {
     
     Page<GoodsReceiptResponseDTO> searchReceipts(String keyword, Pageable pageable);
     
-    List<GoodsReceiptResponseDTO> getReceiptsByInboundDeliveryId(Integer inboundDeliveryId);
-    
     List<GoodsReceiptResponseDTO> getReceiptsByWarehouseId(Integer warehouseId);
     
     GoodsReceiptResponseDTO updateReceipt(Integer receiptId, GoodsReceiptRequestDTO dto, Integer updatedById);

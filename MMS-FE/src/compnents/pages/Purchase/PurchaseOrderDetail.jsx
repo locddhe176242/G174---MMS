@@ -257,7 +257,7 @@ export default function PurchaseOrderDetail() {
     const normalizedStatus = getStatusString(data.status, "Pending");
     const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
-    const canCreateGR = normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent" && !data?.hasGoodsReceipt;
+    const canCreateGR = (hasRole("WAREHOUSE") || hasRole("MANAGER")) && normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent" && !data?.hasGoodsReceipt;
     // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
     const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
 
@@ -301,10 +301,10 @@ export default function PurchaseOrderDetail() {
                             )}
                             {canCreateGR && (
                                 <button
-                                    onClick={() => navigate(`/purchase/inbound-deliveries/new?po_id=${id}`)}
+                                    onClick={() => navigate(`/purchase/goods-receipts/new?po_id=${id}`)}
                                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                                 >
-                                    Tạo kế hoạch nhận hàng
+                                    Tạo phiếu nhập kho
                                 </button>
                             )}
                             {normalizedApprovalStatus === "Approved" && data?.hasGoodsReceipt && (
@@ -635,8 +635,8 @@ export default function PurchaseOrderDetail() {
             </div>
             {/* Approve Modal */}
             {showApproveModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <div className="fixed inset-0 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-6 w-full max-w-md">
                         <h3 className="text-lg font-semibold mb-3">Phê duyệt đơn hàng</h3>
                         <p className="text-sm text-gray-600 mb-6">
                             Bạn có chắc chắn muốn phê duyệt đơn hàng {data.poNo || data.po_no || `#${id}`}?
@@ -663,8 +663,8 @@ export default function PurchaseOrderDetail() {
 
             {/* Reject Modal */}
             {showRejectModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                <div className="fixed inset-0 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-6 w-full max-w-lg">
                         <h3 className="text-lg font-semibold mb-3">Từ chối đơn hàng</h3>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Lý do từ chối <span className="text-red-500">*</span>

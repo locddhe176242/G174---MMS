@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Select from 'react-select';
 import { vendorService } from "../../api/vendorService";
 import { toast } from "react-toastify";
 
@@ -35,28 +34,16 @@ export default function VendorForm() {
     }
   });
 
-  const [provinces, setProvinces] = useState([]);
-  const [wards, setWards] = useState([]);
-  const [loadingProvinces, setLoadingProvinces] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
 
-  // Load provinces on mount, sau đó mới load vendor data
+
+  // Load vendor data or generate code on mount
   useEffect(() => {
-    const initializeForm = async () => {
-      await loadProvinces();
-      
-      if (isEdit && id) {
-        loadVendorData();
-      } else if (!isEdit) {
-        generateVendorCode();
-      }
-    };
-    
-    initializeForm();
+    if (isEdit && id) {
+      loadVendorData();
+    } else if (!isEdit) {
+      generateVendorCode();
+    }
   }, [isEdit, id]);
-
-  useEffect(() => {
-  }, [formData.address.provinceCode]);
 
   const loadVendorData = async () => {
     try {
@@ -111,57 +98,6 @@ export default function VendorForm() {
     }
   };
 
-  const loadProvinces = async () => {
-    try {
-      setLoadingProvinces(true);
-      const response = await fetch('https://provinces.open-api.vn/api/v2/p/');
-      const data = await response.json();
-      const formattedProvinces = data.map(province => ({
-        value: province.code,
-        label: province.name
-      }));
-      console.log("Loaded provinces:", formattedProvinces.length);
-      setProvinces(formattedProvinces);
-      return formattedProvinces;
-    } catch (err) {
-      console.error('Error loading provinces:', err);
-      toast.error('Không thể tải danh sách tỉnh/thành phố');
-      return [];
-    } finally {
-      setLoadingProvinces(false);
-    }
-  };
-
-  const loadWards = async (provinceCode) => {
-    try {
-      setLoadingWards(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/v2/p/${provinceCode}?depth=2`);
-      const provinceData = await response.json();
-
-      const allWards = [];
-      if (provinceData.wards && Array.isArray(provinceData.wards)) {
-        provinceData.wards.forEach(ward => {
-          allWards.push({
-            value: ward.code,
-            label: ward.name
-          });
-        });
-      }
-
-      setWards(allWards);
-
-      if (allWards.length === 0) {
-        toast.info('Không tìm thấy phường/xã cho tỉnh này');
-      }
-    } catch (err) {
-      console.error('Error loading wards:', err);
-      toast.error('Không thể tải danh sách phường/xã');
-      setWards([]);
-    } finally {
-      setLoadingWards(false);
-    }
-  };
-
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -178,39 +114,6 @@ export default function VendorForm() {
         [field]: value
       }));
     }
-  };
-
-  const handleProvinceChange = (selectedOption) => {
-    const provinceCode = selectedOption ? selectedOption.value : "";
-    const provinceName = selectedOption ? selectedOption.label : "";
-
-    // Reset wards
-    setWards([]);
-
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        provinceCode,
-        provinceName,
-        wardCode: "", // Reset ward khi đổi province
-        wardName: ""
-      }
-    }));
-  };
-
-  const handleWardChange = (selectedOption) => {
-    const wardCode = selectedOption ? selectedOption.value : "";
-    const wardName = selectedOption ? selectedOption.label : "";
-
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        wardCode,
-        wardName
-      }
-    }));
   };
 
   // Validation functions
@@ -247,13 +150,13 @@ export default function VendorForm() {
     }
 
     // Validate province (bắt buộc)
-    if (!formData.address.provinceCode) {
-      errors.province = "Vui lòng chọn tỉnh/thành phố";
+    if (!formData.address.provinceName || formData.address.provinceName.trim().length === 0) {
+      errors.province = "Vui lòng nhập tỉnh/thành phố";
     }
 
     // Validate ward (bắt buộc)
-    if (!formData.address.wardCode) {
-      errors.ward = "Vui lòng chọn phường/xã";
+    if (!formData.address.wardName || formData.address.wardName.trim().length === 0) {
+      errors.ward = "Vui lòng nhập phường/xã";
     }
 
     // Validate email (bắt buộc)
@@ -321,7 +224,7 @@ export default function VendorForm() {
     navigate("/vendors");
   };
 
-  if (loading || (isEdit && loadingProvinces)) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

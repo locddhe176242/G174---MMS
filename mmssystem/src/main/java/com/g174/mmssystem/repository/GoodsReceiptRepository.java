@@ -25,8 +25,7 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     Page<GoodsReceipt> findAllActive(Pageable pageable);
 
     @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
-           "LEFT JOIN FETCH gr.inboundDelivery id " +
-           "LEFT JOIN FETCH id.purchaseOrder po " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
            "LEFT JOIN FETCH gr.warehouse w " +
            "LEFT JOIN FETCH gr.createdBy cb " +
            "LEFT JOIN FETCH cb.profile " +
@@ -34,8 +33,7 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     List<GoodsReceipt> findAllActiveWithRelations();
 
     @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
-           "LEFT JOIN FETCH gr.inboundDelivery id " +
-           "LEFT JOIN FETCH id.purchaseOrder po " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
            "LEFT JOIN FETCH gr.warehouse w " +
            "LEFT JOIN FETCH gr.createdBy cb " +
            "LEFT JOIN FETCH cb.profile " +
@@ -43,33 +41,32 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
            "ORDER BY gr.createdAt DESC")
     Page<GoodsReceipt> findAllActiveWithRelations(Pageable pageable);
 
-    @Query("SELECT gr FROM GoodsReceipt gr WHERE " +
-           "(LOWER(gr.receiptNo) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(gr.inboundDelivery.inboundDeliveryNo) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+    @Query("SELECT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN gr.purchaseOrder po " +
+           "WHERE (LOWER(gr.receiptNo) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(po.poNo) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
            "gr.deletedAt IS NULL")
     List<GoodsReceipt> searchReceipts(@Param("keyword") String keyword);
 
-    @Query("SELECT gr FROM GoodsReceipt gr WHERE " +
-           "(LOWER(gr.receiptNo) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(gr.inboundDelivery.inboundDeliveryNo) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+    @Query("SELECT gr FROM GoodsReceipt gr " +
+           "LEFT JOIN gr.purchaseOrder po " +
+           "WHERE (LOWER(gr.receiptNo) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(po.poNo) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
            "gr.deletedAt IS NULL")
     Page<GoodsReceipt> searchReceipts(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.returnOrder.roId = :roId AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findByReturnOrderId(@Param("roId") Integer roId);
 
-    @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.inboundDelivery.inboundDeliveryId = :inboundDeliveryId AND gr.deletedAt IS NULL")
-    List<GoodsReceipt> findByInboundDeliveryId(@Param("inboundDeliveryId") Integer inboundDeliveryId);
-
-    @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.inboundDelivery.purchaseOrder = :purchaseOrder AND gr.deletedAt IS NULL")
-    List<GoodsReceipt> findByPurchaseOrder(@Param("purchaseOrder") com.g174.mmssystem.entity.PurchaseOrder purchaseOrder);
+    // New flow: Direct PO → GR
+    @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.purchaseOrder.orderId = :orderId AND gr.deletedAt IS NULL")
+    List<GoodsReceipt> findByPurchaseOrder_OrderIdAndDeletedAtIsNull(@Param("orderId") Integer orderId);
 
     @Query("SELECT gr FROM GoodsReceipt gr WHERE gr.warehouse.warehouseId = :warehouseId AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findByWarehouseId(@Param("warehouseId") Integer warehouseId);
 
     @Query("SELECT gr FROM GoodsReceipt gr " +
-           "LEFT JOIN FETCH gr.inboundDelivery id " +
-           "LEFT JOIN FETCH id.purchaseOrder po " +
+           "LEFT JOIN FETCH gr.purchaseOrder po " +
            "LEFT JOIN FETCH po.vendor " +
            "LEFT JOIN FETCH gr.returnOrder ro " +
            "LEFT JOIN FETCH ro.delivery " +
@@ -84,11 +81,9 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
     @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
            "LEFT JOIN FETCH gr.items i " +
            "LEFT JOIN FETCH i.product " +
-           "LEFT JOIN FETCH i.inboundDeliveryItem idi " +
-           "LEFT JOIN FETCH idi.purchaseOrderItem " +
+           "LEFT JOIN FETCH i.purchaseOrderItem poi " +
            "LEFT JOIN FETCH i.returnOrderItem " +
-           "LEFT JOIN FETCH gr.inboundDelivery id " +
-           "LEFT JOIN FETCH id.purchaseOrder " +
+           "LEFT JOIN FETCH gr.purchaseOrder " +
            "LEFT JOIN FETCH gr.warehouse " +
            "LEFT JOIN FETCH gr.returnOrder " +
            "WHERE gr.receiptId = :id AND gr.deletedAt IS NULL")
@@ -99,7 +94,7 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
 
     @Query("SELECT DISTINCT gr FROM GoodsReceipt gr " +
            "LEFT JOIN FETCH gr.items i " +
-           "LEFT JOIN FETCH i.inboundDeliveryItem " +
+           "LEFT JOIN FETCH i.purchaseOrderItem " +
            "WHERE gr.status = 'Approved' AND gr.deletedAt IS NULL")
     List<GoodsReceipt> findAllApprovedWithItems();
 }

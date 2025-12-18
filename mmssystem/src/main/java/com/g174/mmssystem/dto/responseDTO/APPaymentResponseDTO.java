@@ -1,5 +1,6 @@
 package com.g174.mmssystem.dto.responseDTO;
 
+import com.g174.mmssystem.entity.APInvoice;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -22,5 +23,6 @@ public class APPaymentResponseDTO {
     private String method;
     private String referenceNo;
     private String notes;
+    private APInvoice.APInvoiceStatus invoiceStatus;
     private LocalDateTime createdAt;
 }
