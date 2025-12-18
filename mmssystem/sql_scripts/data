@@ -115,14 +115,14 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (21, 'sales-orders', 'Đơn bán hàng', '/sales/orders', 'sales-orders', 8, 23),
 (22, 'deliveries', 'Phiếu giao hàng', '/sales/deliveries', 'deliveries', 8, 24),
 (23, 'return-orders', 'Đơn trả hàng', '/sales/return-orders', 'return', 8, 25),
-(24, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 8, 26),
-(25, 'sales-return-inbound-orders', 'Đơn nhập hàng lại', '/sales/return-inbound-orders', 'inbound', 8, 27),
+(25, 'sales-return-inbound-orders', 'Đơn nhập hàng lại', '/sales/return-inbound-orders', 'inbound', 8, 26),
 
 -- Menu con của Accounting (parent_id = 9)
-(26, 'accounting-ap-invoices', 'Hóa đơn mua hàng', '/purchase/ap-invoices', 'accounting', 9, 29),
-(27, 'accounting-ar-invoices', 'Hóa đơn bán hàng', '/sales/invoices', 'invoice', 9, 30),
-(28, 'accounting-ap-payments', 'Thanh toán mua hàng', '/purchase/ap-payments', 'payment', 9, 31),
-(29, 'accounting-ar-payments', 'Thanh toán bán hàng', '/sales/ar-payments', 'payment', 9, 32)
+(24, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 9, 27),
+(26, 'accounting-ap-invoices', 'Hóa đơn mua hàng', '/purchase/ap-invoices', 'accounting', 9, 28),
+(27, 'accounting-ar-invoices', 'Hóa đơn bán hàng', '/sales/invoices', 'invoice', 9, 29),
+(28, 'accounting-ap-payments', 'Thanh toán mua hàng', '/purchase/ap-payments', 'payment', 9, 30),
+(32, 'debt-reports','Báo cáo công nợ', '/debt-management', 'debt', 9, 104)
 AS new_menu
 ON DUPLICATE KEY UPDATE
   menu_label = new_menu.menu_label,
@@ -132,30 +132,31 @@ ON DUPLICATE KEY UPDATE
   display_order = new_menu.display_order;
 
 -- ==================== 8. ROLE_MENUS ====================
--- MANAGER (role_id = 1): Có tất cả menus (1-31)
+-- MANAGER (role_id = 1): Có tất cả menus (bao gồm menu Báo cáo công nợ)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
 (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19),
 (1, 20), (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27), (1, 28),
-(1, 29), (1, 30), (1, 31)
+(1, 30), (1, 31), (1, 32)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- SALE (role_id = 2): Dashboard, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (view Good Issues), Xuất hàng (+ menu con), Báo cáo
+-- SALE (role_id = 2): Dashboard, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (view Good Issues), Xuất hàng (+ menu con), Phiếu yêu cầu mua hàng, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 1),   -- Dashboard
 (2, 3),   -- Customers
 (2, 4),   -- Vendors
 (2, 5),   -- Products
 (2, 6),   -- Warehouse (parent) - để hiển thị menu con Good Issues
+(2, 7),   -- Purchase (parent) - để hiển thị menu con Purchase Requisition
 (2, 8),   -- Sales
 (2, 11),  -- Reports
+(2, 16),  -- Purchase Requisition (tạo PR khi hàng sắp hết)
 (2, 20),  -- Sales Quotations
 (2, 21),  -- Sales Orders
 (2, 22),  -- Deliveries
 (2, 23),  -- Return Orders
-(2, 24),  -- Credit Notes
 (2, 25),  -- Sales Return Inbound Orders
 (2, 30)   -- Good Issues (Phiếu xuất kho) - để xem trạng thái xuất kho
 AS new_rm
@@ -179,7 +180,7 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- ACCOUNTING (role_id = 4): Dashboard, Danh mục, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (Phiếu nhập kho), Kế toán (AP/AR Invoices + Payments), Phê duyệt, Báo cáo
+-- ACCOUNTING (role_id = 4): Dashboard, Danh mục, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (Phiếu nhập kho), Kế toán (AP/AR Invoices + AP Payments + Credit Notes + Báo cáo công nợ), Phê duyệt, Báo cáo
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (4, 1),   -- Dashboard
 (4, 2),   -- Categories
@@ -191,10 +192,11 @@ INSERT INTO role_menus (role_id, menu_id) VALUES
 (4, 10),  -- Approval
 (4, 11),  -- Reports
 (4, 15),  -- Goods Receipt (Phiếu nhập kho) - để xem và tạo hóa đơn
+(4, 24),  -- Credit Notes (đã chuyển vào Accounting)
 (4, 26),  -- Accounting - AP Invoices
 (4, 27),  -- Accounting - AR Invoices
 (4, 28),  -- Accounting - AP Payments
-(4, 29)   -- Accounting - AR Payments
+(4, 32)   -- Báo cáo công nợ
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
@@ -256,6 +258,13 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 (23, 'purchase.edit', 'Sửa đơn mua hàng', 'purchase', 'edit'),
 (24, 'purchase.delete', 'Xóa đơn mua hàng', 'purchase', 'delete'),
 (25, 'purchase.approve', 'Phê duyệt đơn mua hàng', 'purchase', 'approve'),
+
+-- Purchase Requisition permissions (71-75)
+(71, 'purchase_requisition.view', 'Xem phiếu yêu cầu mua hàng', 'purchase_requisition', 'view'),
+(72, 'purchase_requisition.create', 'Tạo phiếu yêu cầu mua hàng', 'purchase_requisition', 'create'),
+(73, 'purchase_requisition.edit', 'Sửa phiếu yêu cầu mua hàng', 'purchase_requisition', 'edit'),
+(74, 'purchase_requisition.delete', 'Xóa phiếu yêu cầu mua hàng', 'purchase_requisition', 'delete'),
+
 
 -- Warehouse permissions (26-30)
 (26, 'warehouse.view', 'Xem kho', 'warehouse', 'view'),
@@ -358,7 +367,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Inbound Delivery permissions (61-65)
 (1, 61), (1, 62), (1, 63), (1, 64), (1, 65),
 -- Goods Receipt permissions (66-70)
-(1, 66), (1, 67), (1, 68), (1, 69), (1, 70)
+(1, 66), (1, 67), (1, 68), (1, 69), (1, 70),
+-- Purchase Requisition permissions (71-75)
+(1, 71), (1, 72), (1, 73), (1, 74), (1, 75)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -381,11 +392,11 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (2, 36), (2, 37), (2, 38), (2, 40),
 -- Sales Return Inbound Order permissions: view, create, edit
 (2, 51), (2, 52), (2, 53),
--- Credit Note permissions: view, create, edit
-(2, 41), (2, 42), (2, 43),
 -- Good Issue permissions: view (để xem phiếu xuất kho)
-(2, 56)
--- Không có Invoice permissions (do Kế toán quản lý)
+(2, 56),
+-- Purchase Requisition permissions: chỉ create (tạo yêu cầu mua hàng khi hàng sắp hết)
+(2, 72)
+-- Không có Credit Note và Invoice permissions (do Kế toán quản lý)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -407,7 +418,9 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Inbound Delivery permissions: view, create, edit, status
 (3, 61), (3, 62), (3, 63), (3, 65),
 -- Goods Receipt permissions: view (để theo dõi phiếu nhập kho)
-(3, 66)
+(3, 66),
+-- Purchase Requisition permissions: view, edit, approve (không có create vì SALE tạo, không có delete)
+(3, 71), (3, 73), (3, 75)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
@@ -424,6 +437,8 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (4, 11),
 -- Purchase permissions: view, approve
 (4, 21), (4, 25),
+-- Credit Note permissions: view, create, edit, status (quản lý Credit Note)
+(4, 41), (4, 42), (4, 43), (4, 45),
 -- Invoice permissions: view, create, edit, payment
 (4, 46), (4, 47), (4, 48), (4, 50),
 -- Good Issue permissions: view (để xem phiếu xuất kho)
@@ -462,3 +477,96 @@ AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
 
+INSERT INTO Product_Categories (name, description) VALUES
+('Robot Hút Bụi Lau Nhà Ecovacs', 'Nhóm sản phẩm robot tự động dùng để hút bụi và lau sàn trong không gian nhà ở. Thiết bị hoạt động độc lập theo chương trình, hỗ trợ điều hướng, tránh vật cản và quay về trạm sạc sau khi hoàn thành chu trình làm sạch.'),
+('Máy hút bụi cầm tay', 'Nhóm thiết bị làm sạch vận hành thủ công, dùng để hút bụi hoặc lau sàn khô ướt. Sản phẩm có thiết kế gọn nhẹ, linh hoạt, phù hợp vệ sinh sàn nhà, nội thất, khu vực hẹp và các vị trí khó tiếp cận.'),
+('Robot lau kính', 'Nhóm thiết bị tự động dùng để làm sạch bề mặt kính như cửa sổ, vách kính và kính ban công. Robot sử dụng lực hút và hệ thống điều hướng để bám bề mặt, thực hiện lau kính an toàn và giảm rủi ro cho người sử dụng.');
+
+INSERT INTO Products (
+    sku, 
+    name, 
+    description, 
+    uom, 
+    size, 
+    purchase_price, 
+    selling_price, 
+    status, 
+    image_url, 
+    category_id, 
+    created_by, 
+    updated_by
+) VALUES
+-- Sản phẩm 1
+('SKU001', 'Robot hút bụi lau nhà Ecovacs DEEBOT X11 Pro Omni',
+ 'Robot hút bụi lau nhà Ecovacs Deebot X11 Pro Omni, lực hút 19.500Pa, pin 6.400mAh, công nghệ lau OZMO Roller 2.0, thiết kế siêu mỏng 98mm, phù hợp căn hộ và nhà diện tích lớn.',
+ 'Cái', 0, 23990000, 29990000, 'OUT_OF_STOCK', '/uploads/products/EcovacsX11Pro9_8_11zon.png', 1, 1, 1),
+
+-- Sản phẩm 2
+('SKU002', 'Robot hút bụi Ecovacs Deebot T30s Omni',
+ 'Robot hút bụi lau nhà Ecovacs Deebot T30S Omni, lực hút mạnh 11.000Pa, pin 6.400mAh, trạm Omni đa nhiệm 10-in-1, tích hợp công nghệ TruEdge™, ZeroTangle™ và điều hướng thông minh AIVI 3D 2.0, phù hợp làm sạch toàn diện cho gia đình hiện đại.',
+ 'Cái', 0, 11500000, 20000000, 'OUT_OF_STOCK', '/uploads/products/ecovacs-deebot-t30s-omni.png', 1, 1, 1),
+
+-- Sản phẩm 3
+('SKU003', 'Robot hút bụi lau nhà Ecovacs Deebot T30C 2026',
+ 'Robot hút bụi lau nhà Ecovacs Deebot T30C 2026, lực hút mạnh 20.000Pa, công nghệ lau OZMO 2.0, chống rối ZeroTangle 3.0, điều hướng TrueMapping 2.0 kết hợp TruEdge 2.0 và trạm Omni tự động giặt – sấy – thu gom bụi, pin 5.200mAh',
+ 'Cái', 0, 12990000, 19990000, 'OUT_OF_STOCK', '/uploads/products/t30c5_4_11zon.png', 1, 1, 1),
+
+-- Sản phẩm 4
+('SKU004', 'Robot hút bụi lau nhà Ecovacs Deebot T30s Combo',
+ 'Robot hút bụi lau nhà Ecovacs Deebot T30S Combo, thiết kế kết hợp robot hút bụi và máy hút bụi cầm tay dùng chung trạm Omni, lực hút mạnh, công nghệ lau OZMO Turbo 2.0, chống rối ZeroTangle và điều hướng thông minh TrueMapping',
+ 'Cái', 0, 17990000, 20000000, 'OUT_OF_STOCK', '/uploads/products/T30COMBOCNT30SCOMBOOS.png', 1, 1, 1),
+
+-- Sản phẩm 5
+('SKU005', 'Robot hút bụi Ecovacs Deebot T10 Quốc Tế',
+ 'Robot hút bụi Ecovacs Deebot T10 (2022), tích hợp camera AI 3.0 và công nghệ AIVI 3.0 giúp nhận diện, né tránh vật cản thông minh, điều hướng chính xác, làm sạch hiệu quả và hỗ trợ thiết lập nhiều bản đồ không gian.',
+ 'Cái', 0, 6000000, 6250000, 'OUT_OF_STOCK', '/uploads/products/t10quocte.png', 1, 1, 1),
+
+-- Sản phẩm 6
+('SKU006', 'Robot hút bụi lau nhà Ecovacs Deebot T20e Omni',
+ 'Robot hút bụi lau nhà Ecovacs Deebot T20e Omni, lực hút 7.100Pa, công nghệ lau OZMO Turbo 2.0, tự động nâng khăn lau 9mm khi gặp thảm, điều hướng TrueDetect 3D kết hợp TrueMapping 2.0, trạm sạc Omni tự động đổ rác – giặt – sấy, pin 5.200mAh cho thời gian hoạt động lên đến 260 phút.',
+ 'Cái', 0, 14990000, 20900000, 'OUT_OF_STOCK', '/uploads/products/deebott20e.png', 1, 1, 1),
+
+-- Sản phẩm 7
+('SKU007', 'Máy hút bụi lau sàn khô ướt Tineco FLOOR ONE S6 Stretch Extreme',
+ 'Máy hút bụi lau sàn khô ướt Tineco FLOOR ONE S6 Stretch Extreme, thiết kế nằm phẳng 180° với công nghệ HyperStretch, lực hút 20.000Pa, cảm biến iLoop tự động điều chỉnh lực hút và nước',
+ 'Cái', 0, 10990000, 12990000, 'OUT_OF_STOCK', '/uploads/products/TinecoS6Extreme2_2_11zon.png', 2, 1, 1),
+
+-- Sản phẩm 8
+('SKU008', 'Máy lau sàn hút bụi Tineco Floor One S9 Artist Steam',
+ 'Máy hút bụi lau sàn Tineco Floor One S9 Artist Steam, tích hợp 3-trong-1 hút bụi – lau nhà – hơi nước diệt khuẩn, lực hút mạnh 22.000Pa, cảm biến iLoop thông minh, hệ thống tự làm sạch FlashDry sấy khí nóng 85°C, pin dung lượng lớn cho thời gian hoạt động lên đến 75 phút, thiết kế gập phẳng 180°.',
+ 'Cái', 0, 16900000, 22900000, 'OUT_OF_STOCK', '/uploads/products/tineco.png', 2, 1, 1),
+
+-- Sản phẩm 9
+('SKU009', 'Máy hút bụi lau sàn Tineco Floor One Switch S7 Stretch',
+ 'Máy hút bụi lau sàn khô ướt Tineco Floor One Switch S7 Stretch, lực hút 22.000Pa, thiết kế linh hoạt làm sạch sát cạnh tường, công nghệ chống rối DualBlock và ZeroTangle, cảm biến iLoop thông minh, hệ thống tự làm sạch FlashDry sấy khí nóng 85°C',
+ 'Cái', 0, 16900000, 20900000, 'OUT_OF_STOCK', '/uploads/products/tinecofloorstretch.png', 2, 1, 1),
+
+-- Sản phẩm 10
+('SKU010', 'Máy hút bụi lau nhà cầm tay Tineco Floor One Stretch S6 (Bản Quốc Tế)',
+ 'Máy hút bụi lau nhà Tineco Floor One Stretch S6, thiết kế gọn nhẹ công thái học, tích hợp hút bụi và lau sàn 2-trong-1, cảm biến thông minh iLoop™, công nghệ làm sạch MHCBS™, hỗ trợ nhiều chế độ làm sạch và tự động làm sạch một chạm',
+ 'Cái', 0, 8900000, 10000000, 'OUT_OF_STOCK', '/uploads/products/stretch_s6.png', 2, 1, 1),
+
+-- Sản phẩm 11
+('SKU011', 'Máy lau sàn hút bụi Tineco Floor One S9 Artist',
+ 'Máy hút bụi lau sàn Tineco Floor One S9 Artist, lực hút 18.000Pa với động cơ 230W, thiết kế gập phẳng 180° siêu mỏng 12.85cm, công nghệ HyperStretch, chống rối DualBlock, cảm biến iLoop thông minh và hệ thống tự làm sạch FlashDry sấy khí nóng 85°C',
+ 'Cái', 0, 12990000, 13990000, 'OUT_OF_STOCK', '/uploads/products/s9_artist.png', 2, 1, 1),
+
+-- Sản phẩm 12
+('SKU012', 'Máy hút bụi lau sàn khô ướt Tineco Floor One i6 Stretch Plus',
+ 'Máy lau sàn hút bụi Tineco Floor One i6 Stretch Plus, lực hút 20.000Pa, thiết kế gập phẳng 180° làm sạch 2 cạnh, công nghệ chống rối DualBlock và làm sạch chổi liên tục MHCBS',
+ 'Cái', 0, 6900000, 11900000, 'OUT_OF_STOCK', '/uploads/products/floor-onei6.png', 2, 1, 1),
+
+-- Sản phẩm 13
+('SKU013', 'Máy lau sàn hút bụi Tineco Floor One S9 Artist Steam',
+ 'Máy lau sàn hút bụi Tineco Floor One S9 Artist Steam, tích hợp 3-trong-1 hút bụi – lau nhà – hơi nước diệt khuẩn, lực hút 22.000Pa, cảm biến iLoop thông minh, hệ thống tự làm sạch FlashDry sấy khí nóng 85°C, thiết kế gập phẳng 180° siêu mỏng 12.85cm, pin dung lượng lớn cho thời gian hoạt động lên đến 75 phút.',
+ 'Cái', 0, 16900000, 22900000, 'OUT_OF_STOCK', '/uploads/products/artist-steam.png', 2, 1, 1),
+
+-- Sản phẩm 14
+('SKU014', 'Robot lau kính Ecovacs Winbot W2 Pro Omni',
+ 'Robot lau kính Ecovacs Winbot W2 Pro Omni, trang bị trạm Omni đa chức năng, công nghệ phun sương 3 vòi góc rộng, điều hướng thông minh WIN-SLAM 4.0, hệ thống leo bám chống trượt và bảo vệ đa cấp chống rơi, pin dung lượng lớn cho thời gian hoạt động lên đến 110 phút.',
+ 'Cái', 0, 11990000, 12640000, 'OUT_OF_STOCK', '/uploads/products/winbotw2pro2.png', 3, 1, 1),
+
+-- Sản phẩm 15
+('SKU015', 'Robot lau kính Ecovacs Winbot Mini',
+ 'Robot lau kính Ecovacs Winbot Mini, thiết kế nhỏ gọn dễ tiếp cận mọi góc cửa sổ, lực hút 7.500Pa, công nghệ phun sương siêu âm hạt mịn 10 µm, điều hướng thông minh WIN-SLAM 3.0 và hệ thống bảo vệ an toàn đa cấp',
+ 'Cái', 0, 7740000, 10270000, 'OUT_OF_STOCK', '/uploads/products/winbotmini3.png', 3, 1, 1);

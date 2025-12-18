@@ -357,26 +357,6 @@ export default function PurchaseRequisitionList() {
                                 Tìm kiếm
                             </button>
                         </form>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <label className="text-sm text-gray-600">Lọc trạng thái:</label>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value="ALL">Tất cả</option>
-                                <option value="Draft">Nháp</option>
-                                <option value="Pending">Chờ duyệt</option>
-                                <option value="Approved">Đã tạo</option>
-                                <option value="Rejected">Đã từ chối</option>
-                                <option value="Cancelled">Đã hủy</option>
-                            </select>
-                            {searchKeyword.trim() && (
-                                <span className="text-xs text-gray-500">
-                                    * Bộ lọc trạng thái áp dụng khi không tìm kiếm
-                                </span>
-                            )}
-                        </div>
                     </div>
 
                     <div className="overflow-x-auto">

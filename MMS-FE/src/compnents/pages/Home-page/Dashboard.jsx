@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faShield, faBars, faKey, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { 
+  faShield, faBars, faKey, faUsers,
+  faMoneyBillWave, faShoppingCart, faClock, faBoxOpen,
+  faWarehouse, faShoppingBag, faExclamationTriangle,
+  faTruck, faBox, faCreditCard, faFileInvoice,
+  faChartLine, faHourglassHalf, faBoxes, faReceipt
+} from "@fortawesome/free-solid-svg-icons";
 import useAuthStore from "../../../store/authStore";
 import { dashboardService } from "../../../api/dashboardService";
 import { activityLogService } from "../../../api/activityLogService";
@@ -12,6 +18,8 @@ export default function Dashboard() {
   const isManager = roles && roles.includes('MANAGER');
   const isWarehouse = roles && roles.includes('WAREHOUSE');
   const isAccounting = roles && roles.includes('ACCOUNTING');
+  const isSale = roles && roles.includes('SALE');
+  const isPurchase = roles && roles.includes('PURCHASE');
   
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -71,17 +79,47 @@ export default function Dashboard() {
       label: "Doanh thu bán hàng",
       value: formatCurrency(dashboardData.salesSummary?.totalRevenue || 0),
       change: `${formatNumber(dashboardData.salesSummary?.totalOrders || 0)} đơn hàng`,
-      icon: "💰",
+      icon: faMoneyBillWave,
       bgColor: "bg-green-50",
       iconColor: "text-green-600",
       changeColor: "text-slate-600",
       roles: ['MANAGER', 'SALE', 'ACCOUNTING']
     },
     {
+      label: "Đơn bán hàng",
+      value: formatNumber(dashboardData.salesSummary?.totalOrders || 0),
+      change: `${formatNumber(dashboardData.salesSummary?.deliveredOrders || 0)} đã giao`,
+      icon: faShoppingBag,
+      bgColor: "bg-orange-50",
+      iconColor: "text-orange-600",
+      changeColor: "text-slate-600",
+      roles: ['MANAGER', 'SALE']
+    },
+    {
+      label: "Đơn chờ xử lý",
+      value: formatNumber(dashboardData.salesSummary?.pendingOrders || 0),
+      change: "Cần xác nhận",
+      icon: faHourglassHalf,
+      bgColor: "bg-yellow-50",
+      iconColor: "text-yellow-600",
+      changeColor: "text-yellow-600",
+      roles: ['MANAGER', 'SALE']
+    },
+    {
+      label: "Sản phẩm sắp hết",
+      value: formatNumber(dashboardData.lowStockProducts?.length || 0),
+      change: "Cần nhập thêm",
+      icon: faExclamationTriangle,
+      bgColor: "bg-red-50",
+      iconColor: "text-red-600",
+      changeColor: "text-red-600",
+      roles: ['MANAGER', 'SALE']
+    },
+    {
       label: "Tổng tồn kho",
       value: formatNumber(dashboardData.inventorySummary?.totalQuantity || 0),
       change: "Sản phẩm",
-      icon: "📦",
+      icon: faBoxes,
       bgColor: "bg-blue-50",
       iconColor: "text-blue-600",
       changeColor: "text-slate-600",
@@ -91,21 +129,11 @@ export default function Dashboard() {
       label: "Đơn mua hàng",
       value: formatNumber(dashboardData.purchaseSummary?.totalOrders || 0),
       change: `${formatNumber(dashboardData.purchaseSummary?.pendingOrders || 0)} chờ xử lý`,
-      icon: "🛒",
+      icon: faShoppingCart,
       bgColor: "bg-purple-50",
       iconColor: "text-purple-600",
       changeColor: "text-slate-600",
       roles: ['MANAGER', 'PURCHASE']
-    },
-    {
-      label: "Đơn bán hàng",
-      value: formatNumber(dashboardData.salesSummary?.totalOrders || 0),
-      change: `${formatNumber(dashboardData.salesSummary?.deliveredOrders || 0)} đã giao`,
-      icon: "📋",
-      bgColor: "bg-orange-50",
-      iconColor: "text-orange-600",
-      changeColor: "text-slate-600",
-      roles: ['MANAGER', 'SALE']
     }
   ].filter(stat => !stat.roles || stat.roles.some(role => roles.includes(role))) : [];
 
@@ -161,7 +189,7 @@ export default function Dashboard() {
       label: "Phiếu nhập hàng hôm nay",
       value: formatNumber(todayActivity.todayGoodsReceipts || 0),
       change: `${formatNumber(todayActivity.pendingGoodsReceipts || 0)} chờ xử lý`,
-      icon: "📥",
+      icon: faBox,
       bgColor: "bg-green-50",
       iconColor: "text-green-600",
       changeColor: "text-slate-600"
@@ -170,7 +198,7 @@ export default function Dashboard() {
       label: "Phiếu xuất hàng hôm nay",
       value: formatNumber(todayActivity.todayGoodIssues || 0),
       change: `${formatNumber(todayActivity.pendingGoodIssues || 0)} chờ xử lý`,
-      icon: "📤",
+      icon: faBoxOpen,
       bgColor: "bg-blue-50",
       iconColor: "text-blue-600",
       changeColor: "text-slate-600"
@@ -179,7 +207,7 @@ export default function Dashboard() {
       label: "Lệnh nhập kho chờ",
       value: formatNumber(pendingInboundDeliveries.length || 0),
       change: "Cần xử lý",
-      icon: "🚚",
+      icon: faTruck,
       bgColor: "bg-orange-50",
       iconColor: "text-orange-600",
       changeColor: "text-orange-600"
@@ -188,7 +216,7 @@ export default function Dashboard() {
       label: "Đơn xuất kho chờ",
       value: formatNumber(pendingDeliveries.length || 0),
       change: "Cần chuẩn bị",
-      icon: "📦",
+      icon: faReceipt,
       bgColor: "bg-purple-50",
       iconColor: "text-purple-600",
       changeColor: "text-purple-600"
@@ -201,7 +229,7 @@ export default function Dashboard() {
       label: "Tổng phải trả NCC",
       value: formatCurrency(accountingSummary.totalAccountsPayable || 0),
       change: `${formatNumber(accountingSummary.pendingAPInvoicesCount || 0)} hóa đơn`,
-      icon: "💳",
+      icon: faCreditCard,
       bgColor: "bg-red-50",
       iconColor: "text-red-600",
       changeColor: "text-slate-600"
@@ -210,7 +238,7 @@ export default function Dashboard() {
       label: "Tổng phải thu KH",
       value: formatCurrency(accountingSummary.totalAccountsReceivable || 0),
       change: `${formatNumber(accountingSummary.overdueARInvoicesCount || 0)} quá hạn`,
-      icon: "💰",
+      icon: faFileInvoice,
       bgColor: "bg-green-50",
       iconColor: "text-green-600",
       changeColor: "text-orange-600"
@@ -219,7 +247,7 @@ export default function Dashboard() {
       label: "Thanh toán 7 ngày tới",
       value: formatCurrency(accountingSummary.upcomingPayments7Days || 0),
       change: "Cần chuẩn bị",
-      icon: "📅",
+      icon: faClock,
       bgColor: "bg-yellow-50",
       iconColor: "text-yellow-600",
       changeColor: "text-yellow-600"
@@ -228,7 +256,7 @@ export default function Dashboard() {
       label: "Công nợ quá hạn",
       value: formatCurrency(accountingSummary.overdueReceivables || 0),
       change: "Cần thu hồi",
-      icon: "⚠️",
+      icon: faExclamationTriangle,
       bgColor: "bg-orange-50",
       iconColor: "text-orange-600",
       changeColor: "text-orange-600"
@@ -244,8 +272,8 @@ export default function Dashboard() {
             className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center text-2xl`}>
-                {stat.icon}
+              <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
+                <FontAwesomeIcon icon={stat.icon} className={`text-2xl ${stat.iconColor}`} />
               </div>
             </div>
             <div>
@@ -543,6 +571,8 @@ export default function Dashboard() {
       {/* Charts - Show for non-warehouse and non-accounting roles */}
       {!isWarehouse && !isAccounting && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chỉ hiển thị biểu đồ nhập/xuất cho MANAGER và PURCHASE */}
+        {(isManager || isPurchase) && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4">
             Nhập/Xuất hàng theo tháng
@@ -596,7 +626,77 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
+        {/* Widget cho SALE - Sản phẩm sắp hết hàng */}
+        {isSale && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-slate-800">
+              Sản phẩm sắp hết hàng
+            </h2>
+            {lowStockProducts.length > 0 && (
+              <Link
+                to="/products"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Xem tất cả
+              </Link>
+            )}
+          </div>
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {lowStockProducts && lowStockProducts.length > 0 ? (
+              lowStockProducts.slice(0, 5).map((product) => (
+                <div
+                  key={product.productId}
+                  className="border border-slate-200 rounded-lg p-3 hover:border-orange-300 hover:shadow-sm transition"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-800 text-sm">
+                        {product.productName}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {product.categoryName}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded ${
+                      product.stockPercentage < 20 
+                        ? 'bg-red-100 text-red-700' 
+                        : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {product.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-slate-100 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          product.stockPercentage < 20 ? 'bg-red-500' : 'bg-orange-500'
+                        }`}
+                        style={{ width: `${Math.min(product.stockPercentage, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-600 whitespace-nowrap">
+                      {product.currentStock}/{product.minStock}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <svg className="w-16 h-16 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-slate-400">Tất cả sản phẩm còn đủ hàng</p>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
+
+        {/* Top kho - CHỈ cho MANAGER và PURCHASE */}
+        {(isManager || isPurchase) && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4">
             Top kho theo doanh thu
@@ -640,6 +740,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        )}
       </div>
       )}
 
@@ -687,6 +788,8 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Sản phẩm sắp hết hàng - Hiển thị cho tất cả TRỪ SALE (vì SALE đã có ở grid charts) */}
+        {!isSale && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-slate-800">
@@ -753,6 +856,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Admin Quick Links - Only for MANAGER */}

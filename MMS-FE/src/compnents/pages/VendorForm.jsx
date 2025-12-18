@@ -55,13 +55,7 @@ export default function VendorForm() {
     initializeForm();
   }, [isEdit, id]);
 
-  // Load wards khi có provinceCode (bao gồm cả khi edit mode load vendor data)
   useEffect(() => {
-    if (formData.address.provinceCode) {
-      loadWards(formData.address.provinceCode);
-    } else {
-      setWards([]);
-    }
   }, [formData.address.provinceCode]);
 
   const loadVendorData = async () => {
@@ -450,27 +444,12 @@ export default function VendorForm() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tỉnh/Thành phố <span className="text-red-500">*</span>
                   </label>
-                  <Select
-                    value={provinces.find(p => 
-                      String(p.value) === String(formData.address.provinceCode) || 
-                      p.label === formData.address.provinceName
-                    )}
-                    onChange={handleProvinceChange}
-                    options={provinces}
-                    placeholder="Chọn tỉnh/thành phố"
-                    isLoading={loadingProvinces}
-                    isSearchable
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                    styles={{
-                      control: (base, state) => ({
-                        ...base,
-                        borderColor: validationErrors.province ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
-                        '&:hover': {
-                          borderColor: validationErrors.province ? '#ef4444' : '#3b82f6'
-                        }
-                      })
-                    }}
+                  <input
+                    type="text"
+                    value={formData.address.provinceName || ''}
+                    onChange={(e) => handleInputChange("address.provinceName", e.target.value)}
+                    placeholder="Nhập tỉnh/thành phố"
+                    className={`w-full px-3 py-2 border ${validationErrors.province ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                   />
                   {validationErrors.province && (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.province}</p>
@@ -481,28 +460,12 @@ export default function VendorForm() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Phường/Xã <span className="text-red-500">*</span>
                   </label>
-                  <Select
-                    value={wards.find(w => 
-                      String(w.value) === String(formData.address.wardCode) ||
-                      w.label === formData.address.wardName
-                    )}
-                    onChange={handleWardChange}
-                    options={wards}
-                    placeholder={loadingWards ? "Đang tải..." : "Chọn phường/xã"}
-                    isLoading={loadingWards}
-                    isDisabled={!formData.address.provinceCode || loadingWards}
-                    isSearchable
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                    styles={{
-                      control: (base, state) => ({
-                        ...base,
-                        borderColor: validationErrors.ward ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
-                        '&:hover': {
-                          borderColor: validationErrors.ward ? '#ef4444' : '#3b82f6'
-                        }
-                      })
-                    }}
+                  <input
+                    type="text"
+                    value={formData.address.wardName || ''}
+                    onChange={(e) => handleInputChange("address.wardName", e.target.value)}
+                    placeholder="Nhập phường/xã"
+                    className={`w-full px-3 py-2 border ${validationErrors.ward ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                   />
                   {validationErrors.ward && (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.ward}</p>

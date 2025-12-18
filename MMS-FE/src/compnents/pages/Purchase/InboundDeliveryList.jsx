@@ -212,22 +212,6 @@ export default function InboundDeliveryList() {
                                     </button>
                                 </div>
                             </form>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value);
-                                    setCurrentPage(0);
-                                }}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="ALL">Tất cả trạng thái</option>
-                                <option value="Draft">Nháp</option>
-                                <option value="Planned">Đã lên kế hoạch</option>
-                                <option value="InTransit">Đang vận chuyển</option>
-                                <option value="Arrived">Đã đến</option>
-                                <option value="Completed">Hoàn thành</option>
-                                <option value="Cancelled">Đã hủy</option>
-                            </select>
                         </div>
                     </div>
 

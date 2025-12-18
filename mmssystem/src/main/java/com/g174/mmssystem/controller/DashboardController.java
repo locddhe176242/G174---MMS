@@ -94,7 +94,13 @@ public class DashboardController {
         Long pendingSalesOrders = salesOrderRepository.countByStatus(SalesOrder.OrderStatus.Pending);
         Long deliveredSalesOrders = salesOrderRepository.countByStatus(SalesOrder.OrderStatus.Fulfilled);
         
-        stats.setSalesSummary(new SalesSummary(totalSalesOrders, pendingSalesOrders, deliveredSalesOrders));
+        // Calculate actual sales revenue from AR Invoices
+        BigDecimal salesRevenue = arInvoiceRepository.findAllActiveInvoices().stream()
+            .filter(invoice -> invoice.getTotalAmount() != null)
+            .map(com.g174.mmssystem.entity.ARInvoice::getTotalAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        stats.setSalesSummary(new SalesSummary(totalSalesOrders, pendingSalesOrders, deliveredSalesOrders, salesRevenue));
 
         // Pending Summary
         Long pendingRequisitions = purchaseRequisitionRepository.countByStatus(RequisitionStatus.Pending);

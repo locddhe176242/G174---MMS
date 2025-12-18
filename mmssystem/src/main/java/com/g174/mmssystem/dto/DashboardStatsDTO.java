@@ -62,6 +62,7 @@ public class DashboardStatsDTO {
         private Long totalOrders;
         private Long pendingOrders;
         private Long deliveredOrders;
+        private BigDecimal totalRevenue;
     }
     
     @Data

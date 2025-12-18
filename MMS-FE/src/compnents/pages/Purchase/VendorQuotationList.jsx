@@ -359,20 +359,6 @@ const VendorQuotationList = () => {
                                     Tìm kiếm
                                 </button>
                             </form>
-
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    {STATUS_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
                     </div>
 

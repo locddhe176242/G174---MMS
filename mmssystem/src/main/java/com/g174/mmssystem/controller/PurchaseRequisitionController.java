@@ -26,7 +26,7 @@ public class PurchaseRequisitionController {
     private final IUserContextService userContextService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     @LogActivity(action = "CREATE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
             description = "Tạo yêu cầu mua hàng mới",
             entityId = "#{#result.body.requisitionId}")
@@ -42,7 +42,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/{requisitionId}")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     public ResponseEntity<PurchaseRequisitionResponseDTO> getRequisitionById(@PathVariable Long requisitionId) {
         log.info("API: Lấy purchase requisition ID: {}", requisitionId);
         PurchaseRequisitionResponseDTO response = requisitionService.getRequisitionById(requisitionId);
@@ -50,7 +50,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     public ResponseEntity<Page<PurchaseRequisitionResponseDTO>> getAllRequisitionsPaged(
             @RequestParam(required = false) String status,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -71,7 +71,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/search/page")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     public ResponseEntity<Page<PurchaseRequisitionResponseDTO>> searchRequisitionsPaged(
             @RequestParam String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -101,7 +101,7 @@ public class PurchaseRequisitionController {
     }
 
     @PostMapping("/{requisitionId}/submit")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     @LogActivity(action = "SUBMIT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
             description = "Gửi yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
@@ -116,7 +116,7 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{requisitionId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "APPROVE_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
             description = "Phê duyệt yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
@@ -131,7 +131,7 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{requisitionId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
     @LogActivity(action = "REJECT_PURCHASE_REQUISITION", activityType = "PURCHASE_MANAGEMENT",
             description = "Từ chối yêu cầu mua hàng",
             entityId = "#{#requisitionId}")
@@ -181,7 +181,7 @@ public class PurchaseRequisitionController {
     }
 
     @GetMapping("/generate-number")
-    @PreAuthorize("hasAnyRole('MANAGER','PURCHASE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','PURCHASE')")
     public ResponseEntity<String> generateRequisitionNo() {
         log.info("API: Generate requisition number");
         String requisitionNo = requisitionService.generateRequisitionNo();

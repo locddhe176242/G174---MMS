@@ -3,7 +3,6 @@ package com.g174.mmssystem.service.Impl;
 import com.g174.mmssystem.dto.requestDTO.GoodsReceiptRequestDTO;
 import com.g174.mmssystem.dto.responseDTO.GoodsReceiptResponseDTO;
 import com.g174.mmssystem.entity.*;
-import com.g174.mmssystem.enums.PurchaseOrderApprovalStatus;
 import com.g174.mmssystem.enums.PurchaseOrderStatus;
 import com.g174.mmssystem.exception.DuplicateResourceException;
 import com.g174.mmssystem.exception.ResourceNotFoundException;

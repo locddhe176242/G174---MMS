@@ -60,6 +60,19 @@ export default function APaymentList() {
     );
   };
 
+  const getPaymentMethodLabel = (method) => {
+    const methodMap = {
+      'Cash': 'Tiền mặt',
+      'cash': 'Tiền mặt',
+      'Bank Transfer': 'Chuyển khoản',
+      'bank_transfer': 'Chuyển khoản',
+      'Credit Card': 'Thẻ tín dụng',
+      'credit_card': 'Thẻ tín dụng',
+      'Check': 'Séc',
+      'check': 'Séc'
+    };
+    return methodMap[method] || method || 'Chuyển khoản';
+  };
 
 
   const getStatusBadge = (status) => {
@@ -122,6 +135,47 @@ export default function APaymentList() {
     fetchPayments(newPage, searchKeyword, sortField, sortDirection);
   };
 
+  const handleExportCSV = () => {
+    if (payments.length === 0) {
+      toast.warning("Không có dữ liệu để xuất");
+      return;
+    }
+
+    // Tạo CSV header
+    const headers = ["Ngày thanh toán", "Số hóa đơn", "Nhà cung cấp", "Phương thức", "Số tiền", "Trạng thái"];
+    
+    // Tạo CSV rows
+    const rows = payments.map(payment => [
+      formatDate(payment.paymentDate),
+      payment.invoiceNo || `INV-${payment.apInvoiceId || payment.invoiceId}`,
+      payment.vendorName || "-",
+      getPaymentMethodLabel(payment.method),
+      payment.amount || 0,
+      payment.status === 'Completed' ? 'Đã thanh toán' : 'Chưa thanh toán'
+    ]);
+
+    // Kết hợp headers và rows
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    // Tạo blob và download
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `payment_list_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Đã xuất file CSV thành công");
+  };
+
   const renderTableBody = () => {
     if (loading) {
       return (
@@ -171,9 +225,6 @@ export default function APaymentList() {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               PHƯƠNG THỨC
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              MÃ THAM CHIẾU
-            </th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort("amount")}>
               <div className="flex items-center justify-end gap-1">
                 SỐ TIỀN
@@ -182,12 +233,6 @@ export default function APaymentList() {
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               TRẠNG THÁI
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              LÝ DO
-            </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              HÀNH ĐỘNG
             </th>
           </tr>
         </thead>
@@ -212,11 +257,8 @@ export default function APaymentList() {
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                  {payment.method || "Chuyển khoản"}
+                  {getPaymentMethodLabel(payment.method)}
                 </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {payment.referenceNo || "-"}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold text-green-600">
                 {formatCurrency(payment.amount)}
@@ -224,36 +266,15 @@ export default function APaymentList() {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {payment.status ? (
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    payment.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                    payment.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                    payment.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
+                    payment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {payment.status === 'Completed' ? 'Hoàn thành' :
-                     payment.status === 'Pending' ? 'Chờ xử lý' :
-                     payment.status === 'Cancelled' ? 'Đã hủy' :
-                     payment.status}
+                    {payment.status === 'Completed' ? 'Đã thanh toán' : 'Chưa thanh toán hết'}
                   </span>
-                ) : '-'}
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                <div className="truncate" title={payment.remark || payment.remarks}>
-                  {payment.remark || payment.remarks || '-'}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div className="flex items-center justify-center gap-1">
-                  <button
-                    onClick={() => navigate(`/purchase/ap-payments/${payment.apPaymentId}`)}
-                    className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
-                    title="Xem chi tiết thanh toán"
-                  >
-                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </button>
-                </div>
+                ) : (
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                    Chưa thanh toán hết
+                  </span>
+                )}
               </td>
             </tr>
           ))}
@@ -309,13 +330,10 @@ export default function APaymentList() {
               </form>
 
               <div className="flex items-center gap-2">
-                <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                  <option value="">Tất cả phương thức</option>
-                  <option value="bank_transfer">Chuyển khoản</option>
-                  <option value="cash">Tiền mặt</option>
-                  <option value="check">Séc</option>
-                </select>
-                <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <button 
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>

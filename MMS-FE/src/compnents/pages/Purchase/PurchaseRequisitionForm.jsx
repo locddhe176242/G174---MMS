@@ -785,10 +785,9 @@ const PurchaseRequisitionForm = () => {
                 requisitionDate: formData.requisition_date ? formData.requisition_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 requesterId: formData.requester_id,
                 purpose: formData.purpose,
-                // Tự động approved - không cần chờ duyệt
-                status: isEdit ? formData.status : 'Approved',
-                approverId: isEdit ? formData.approver_id : (formData.approver_id || formData.requester_id), // Tự động set approver = requester nếu chưa có
-                approvedAt: isEdit ? (formData.approved_at ? formData.approved_at.toISOString() : null) : new Date().toISOString(), // Tự động set thời gian approved
+                status: isEdit ? formData.status : undefined, // Không set status, để backend tự xử lý
+                approverId: formData.approver_id,
+                approvedAt: formData.approved_at ? formData.approved_at.toISOString() : null,
                 items: formData.items.map(item => ({
                     productId: item.product_id,
                     productName: item.product_name || '',

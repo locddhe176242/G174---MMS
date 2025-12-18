@@ -41,7 +41,7 @@ export default function CustomerForm() {
 
   // Load provinces on mount
   useEffect(() => {
-    loadProvinces();
+    // loadProvinces(); // Disabled due to CORS - using text input instead
   }, []);
 
   useEffect(() => {
@@ -55,17 +55,18 @@ export default function CustomerForm() {
 
   // Load wards khi chọn province HOẶC khi provinces load xong
   useEffect(() => {
-    if (formData.address.provinceCode && provinces.length > 0) {
-      loadWards(formData.address.provinceCode);
-    } else {
-      setWards([]);
-    }
+    // Disabled - using text input instead
+    // if (formData.address.provinceCode && provinces.length > 0) {
+    //   loadWards(formData.address.provinceCode);
+    // } else {
+    //   setWards([]);
+    // }
   }, [formData.address.provinceCode, provinces]);
 
   const loadProvinces = async () => {
     try {
       setLoadingProvinces(true);
-      const response = await fetch('https://provinces.open-api.vn/api/v2/p/');
+      const response = await fetch('https://provinces.open-api.vn/api/?depth=1');
       const data = await response.json();
       const formattedProvinces = data.map(province => ({
         value: province.code,
@@ -83,7 +84,7 @@ export default function CustomerForm() {
   const loadWards = async (provinceCode) => {
     try {
       setLoadingWards(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/v2/p/${provinceCode}?depth=2`);
+      const response = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
       const provinceData = await response.json();
 
       const allWards = [];
@@ -211,7 +212,7 @@ export default function CustomerForm() {
 
   // Validation functions
   const validateEmail = (email) => {
-    if (!email) return true; // Email không bắt buộc
+    if (!email) return false; // Email bắt buộc
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
   };
@@ -246,8 +247,10 @@ export default function CustomerForm() {
       errors.ward = "Vui lòng chọn phường/xã";
     }
 
-    // Validate email (không bắt buộc nhưng phải đúng format)
-    if (formData.contact.email && !validateEmail(formData.contact.email)) {
+    // Validate email (bắt buộc)
+    if (!formData.contact.email || formData.contact.email.trim() === '') {
+      errors.email = "Vui lòng nhập email";
+    } else if (!validateEmail(formData.contact.email)) {
       errors.email = "Email không đúng định dạng (vd: example@gmail.com)";
     }
 
@@ -427,24 +430,12 @@ export default function CustomerForm() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tỉnh/Thành phố <span className="text-red-500">*</span>
                     </label>
-                    <Select
-                      value={provinces.find(p => p.value === formData.address.provinceCode)}
-                      onChange={handleProvinceChange}
-                      options={provinces}
-                      placeholder="Chọn tỉnh/thành phố"
-                      isLoading={loadingProvinces}
-                      isSearchable
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          borderColor: validationErrors.province ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
-                          '&:hover': {
-                            borderColor: validationErrors.province ? '#ef4444' : '#3b82f6'
-                          }
-                        })
-                      }}
+                    <input
+                      type="text"
+                      value={formData.address.province || ''}
+                      onChange={(e) => handleInputChange("address.province", e.target.value)}
+                      placeholder="Nhập tỉnh/thành phố"
+                      className={`w-full px-3 py-2 border ${validationErrors.province ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     />
                     {validationErrors.province && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.province}</p>
@@ -455,25 +446,12 @@ export default function CustomerForm() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phường/Xã <span className="text-red-500">*</span>
                     </label>
-                    <Select
-                      value={wards.find(w => w.value === formData.address.wardCode)}
-                      onChange={handleWardChange}
-                      options={wards}
-                      placeholder={loadingWards ? "Đang tải..." : "Chọn phường/xã"}
-                      isLoading={loadingWards}
-                      isDisabled={!formData.address.provinceCode || loadingWards}
-                      isSearchable
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          borderColor: validationErrors.ward ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
-                          '&:hover': {
-                            borderColor: validationErrors.ward ? '#ef4444' : '#3b82f6'
-                          }
-                        })
-                      }}
+                    <input
+                      type="text"
+                      value={formData.address.ward || ''}
+                      onChange={(e) => handleInputChange("address.ward", e.target.value)}
+                      placeholder="Nhập phường/xã"
+                      className={`w-full px-3 py-2 border ${validationErrors.ward ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     />
                     {validationErrors.ward && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.ward}</p>
@@ -517,7 +495,7 @@ export default function CustomerForm() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
+                      Email <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"

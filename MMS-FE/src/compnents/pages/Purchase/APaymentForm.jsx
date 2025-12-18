@@ -96,11 +96,14 @@ export default function APaymentForm() {
       errors.paymentDate = "Chọn ngày thanh toán";
     }
     
-    if (!formData.amount || Number(formData.amount) <= 0) {
-      errors.amount = "Số tiền phải > 0";
-    }
-    
-    if (invoice && Number(formData.amount) > Number(invoice.balanceAmount)) {
+    // Validate amount
+    if (!formData.amount || formData.amount === "" || formData.amount === null) {
+      errors.amount = "Vui lòng nhập số tiền";
+    } else if (isNaN(Number(formData.amount))) {
+      errors.amount = "Số tiền phải là số hợp lệ";
+    } else if (Number(formData.amount) <= 0) {
+      errors.amount = "Số tiền phải lớn hơn 0";
+    } else if (invoice && Number(formData.amount) > Number(invoice.balanceAmount)) {
       errors.amount = `Số tiền không thể lớn hơn công nợ còn lại (${formatCurrency(invoice.balanceAmount)})`;
     }
 

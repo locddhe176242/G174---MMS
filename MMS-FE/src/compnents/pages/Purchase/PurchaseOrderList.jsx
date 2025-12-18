@@ -253,26 +253,6 @@ export default function PurchaseOrderList() {
                                     Tìm kiếm
                                 </button>
                             </form>
-
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value="ALL">Tất cả</option>
-                                    <option value="Pending">Đang chờ</option>
-                                    <option value="Approved">Đã phê duyệt</option>
-                                    <option value="Sent">Đã gửi</option>
-                                    <option value="Completed">Hoàn thành</option>
-                                    <option value="Cancelled">Đã hủy</option>
-                                </select>
-                                {searchKeyword.trim() && (
-                                    <span className="text-xs text-gray-500">
-                                        * Bộ lọc chỉ áp dụng khi không tìm kiếm
-                                    </span>
-                                )}
-                            </div>
                         </div>
                     </div>
 
