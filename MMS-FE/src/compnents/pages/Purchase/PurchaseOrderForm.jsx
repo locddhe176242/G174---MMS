@@ -914,7 +914,6 @@ export default function PurchaseOrderForm() {
                 pq_id: selectedQuotation.value,
                 payment_terms: paymentTerms || "",
                 delivery_date: deliveryDate || "",
-                shipping_address: deliveryTerms || "",
                 header_discount: headerDiscount,
                 items: mapped 
             };
@@ -923,7 +922,6 @@ export default function PurchaseOrderForm() {
                 vendor_id: vendorId,
                 payment_terms: paymentTerms,
                 delivery_date: deliveryDate,
-                shipping_address: deliveryTerms,
                 header_discount: headerDiscount,
                 items_count: mapped.length,
                 items: mapped
@@ -940,6 +938,34 @@ export default function PurchaseOrderForm() {
             console.error("Import quotation items error:", err);
             toast.error("Không thể nhập từ báo giá");
         }
+    };
+
+    const handleResetImport = () => {
+        // Reset form về trạng thái ban đầu
+        setIsImportedFromPQ(false);
+        setFormData(prev => ({
+            ...prev,
+            vendor_id: null,
+            pq_id: null,
+            payment_terms: '',
+            delivery_date: null,
+            shipping_address: '',
+            header_discount: 0,
+            items: [{
+                product_id: null,
+                productName: "",
+                productCode: "",
+                uom: "",
+                quantity: 1,
+                unit_price: 0,
+                tax_rate: 0,
+                tax_amount: 0,
+                line_total: 0,
+                delivery_date: null,
+                note: "",
+            }]
+        }));
+        toast.success("Đã reset form để tạo PO mới");
     };
 
     const handleSubmit = async (e) => {
@@ -1137,6 +1163,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
                                             onChange={(date) => handleInputChange("order_date", date)}
                                             dateFormat="dd/MM/yyyy"
+                                            minDate={new Date()}
                                             className={
                                                 validationErrors.order_date
                                                     ? "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-red-500"
@@ -1158,7 +1185,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.delivery_date instanceof Date ? formData.delivery_date : (formData.delivery_date ? new Date(formData.delivery_date) : null)}
                                             onChange={(date) => handleInputChange("delivery_date", date)}
                                             dateFormat="dd/MM/yyyy"
-                                            minDate={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
+                                            minDate={new Date()}
                                             isClearable
                                             placeholderText="Chọn ngày giao hàng"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1249,14 +1276,6 @@ export default function PurchaseOrderForm() {
                                         </button>
                                     )}
                                 </div>
-                                
-                                {isImportedFromPQ && (
-                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                        <p className="text-sm text-blue-800">
-                                            ℹ️ Danh sách sản phẩm đã được nhập từ báo giá. Chỉ có thể import lại từ báo giá khác hoặc chỉnh sửa thông tin hiện tại.
-                                        </p>
-                                    </div>
-                                )}
 
                                 {validationErrors.items && (
                                     <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
@@ -1276,8 +1295,8 @@ export default function PurchaseOrderForm() {
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">ĐVT</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">CK (%)</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Chiết khấu (%)</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền (VND)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                             </tr>
                                             </thead>
@@ -1285,6 +1304,29 @@ export default function PurchaseOrderForm() {
                                             {formData.items.map((item, index) => {
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 const selectedProduct = products.find((o) => o.value === item.product_id);
+                                                
+                                                // Filter out products already selected in other rows
+                                                const availableProducts = products.filter((option) => {
+                                                    return !formData.items.some((it, idx) => {
+                                                        if (idx === index) return false;
+                                                        
+                                                        // Check by product_id
+                                                        const productId = it.product_id || it.productId;
+                                                        if (productId && (String(productId) === String(option.value) || Number(productId) === Number(option.value))) {
+                                                            return true;
+                                                        }
+                                                        
+                                                        // Check by productCode (for imported items)
+                                                        if (it.productCode && option.product) {
+                                                            const optionSku = option.product.sku || option.product.productCode;
+                                                            if (optionSku && String(it.productCode) === String(optionSku)) {
+                                                                return true;
+                                                            }
+                                                        }
+                                                        
+                                                        return false;
+                                                    });
+                                                });
                                                 
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
@@ -1301,7 +1343,7 @@ export default function PurchaseOrderForm() {
                                                                 <Select
                                                                     value={selectedProduct || null}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
-                                                                    options={products}
+                                                                    options={availableProducts}
                                                                     placeholder="Chọn sản phẩm"
                                                                     menuPortalTarget={document.body}
                                                                     menuPosition="fixed"

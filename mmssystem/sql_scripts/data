@@ -322,7 +322,14 @@ INSERT INTO permissions (permission_id, permission_key, permission_name, resourc
 
 -- User Profile permissions (76-77)
 (76, 'profile.view', 'Xem thông tin cá nhân', 'profile', 'view'),
-(77, 'profile.update', 'Cập nhật thông tin cá nhân', 'profile', 'update')
+(77, 'profile.update', 'Cập nhật thông tin cá nhân', 'profile', 'update'),
+
+-- Category permissions (78-82) - THÊM MỚI
+(78, 'category.view', 'Xem danh mục', 'category', 'view'),
+(79, 'category.create', 'Tạo danh mục', 'category', 'create'),
+(80, 'category.edit', 'Sửa danh mục', 'category', 'edit'),
+(81, 'category.delete', 'Xóa danh mục', 'category', 'delete'),
+(82, 'category.export', 'Xuất danh sách danh mục', 'category', 'export')
 AS new_perm
 ON DUPLICATE KEY UPDATE
   permission_name = new_perm.permission_name,
@@ -364,18 +371,22 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Purchase Requisition permissions (71-75)
 (1, 71), (1, 72), (1, 73), (1, 74),
 -- Profile permissions (76-77)
-(1, 76), (1, 77)
+(1, 76), (1, 77),
+-- Category permissions (78-82) - THÊM MỚI
+(1, 78), (1, 79), (1, 80), (1, 81), (1, 82)
 AS new_rp
 ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
 
 -- ========================================
--- ROLE 2: SALE - Quản lý bán hàng
+-- ROLE 2: SALE - Quản lý bán hàng (CẬP NHẬT: thêm view category, chỉ view product)
 -- ========================================
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Customer permissions: view, create, edit, export (không có delete)
 (2, 1), (2, 2), (2, 3), (2, 5),
--- Product permissions: view (để tạo đơn hàng)
+-- Category permissions: chỉ view
+(2, 78),
+-- Product permissions: chỉ view (xóa create, edit)
 (2, 11),
 -- Sales permissions: view, create, edit (không có delete, approve)
 (2, 16), (2, 17), (2, 18),
@@ -405,6 +416,8 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (3, 6), (3, 7), (3, 8), (3, 10),
 -- Product permissions: view, create, edit, export
 (3, 11), (3, 12), (3, 13), (3, 15),
+-- Category permissions: view, create, edit, export (không có delete)
+(3, 78), (3, 79), (3, 80), (3, 82),
 -- Purchase permissions: view, create, edit (không có delete, approve)
 (3, 21), (3, 22), (3, 23),
 -- Warehouse permissions: chỉ view
@@ -420,7 +433,7 @@ ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
 
 -- ========================================
--- ROLE 4: ACCOUNTING - Kế toán
+-- ROLE 4: ACCOUNTING - Kế toán (CẬP NHẬT: thêm quyền xem phiếu xuất kho)
 -- ========================================
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Customer permissions: chỉ view
@@ -429,13 +442,15 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 (4, 6),
 -- Product permissions: chỉ view (để xem sản phẩm khi tạo hóa đơn)
 (4, 11),
+-- Category permissions: chỉ view
+(4, 78),
 -- Purchase permissions: chỉ view (bỏ approve)
 (4, 21),
 -- Credit Note permissions: view, create, edit, status (quản lý Credit Note)
 (4, 41), (4, 42), (4, 43), (4, 45),
 -- Invoice permissions: view, create, edit, payment
 (4, 46), (4, 47), (4, 48), (4, 50),
--- Good Issue permissions: view (để xem phiếu xuất kho)
+-- Good Issue permissions: view (THÊM MỚI - để xem phiếu xuất kho)
 (4, 56),
 -- Goods Receipt permissions: view (để xem phiếu nhập kho và tạo hóa đơn)
 (4, 66),
@@ -446,23 +461,17 @@ ON DUPLICATE KEY UPDATE
   role_id = new_rp.role_id;
 
 -- ========================================
--- ROLE 5: WAREHOUSE - Quản lý kho
+-- ROLE 5: WAREHOUSE - Quản lý kho (CẬP NHẬT: xóa Sales Orders, Return Orders, Sales Return Inbound Orders)
 -- ========================================
 INSERT INTO role_permissions (role_id, permission_id) VALUES
 -- Product permissions: view, edit
 (5, 11), (5, 13),
--- Sales permissions: chỉ view
-(5, 16),
--- Purchase permissions: chỉ view (để xem PO khi tạo Goods Receipt)
-(5, 21),
+-- Category permissions: view (để xem danh mục)
+(5, 78),
 -- Warehouse permissions: tất cả
 (5, 26), (5, 27), (5, 28), (5, 29), (5, 30),
--- Delivery permissions: view, create, edit, status
+-- Delivery permissions: view, create, edit, status (chỉ giữ deliveries)
 (5, 31), (5, 32), (5, 33), (5, 35),
--- Return Order permissions: view, create, edit, status
-(5, 36), (5, 37), (5, 38), (5, 40),
--- Sales Return Inbound Order permissions: view, create, edit
-(5, 51), (5, 52), (5, 53),
 -- Good Issue permissions: view, create, edit, approve (quản lý xuất kho)
 (5, 56), (5, 57), (5, 58), (5, 60),
 -- Goods Receipt permissions: view, create, edit, approve (quản lý nhập kho - tạo trực tiếp từ PO)

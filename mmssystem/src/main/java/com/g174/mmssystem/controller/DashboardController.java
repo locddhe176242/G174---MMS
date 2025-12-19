@@ -89,7 +89,9 @@ public class DashboardController {
 
         // Sales Summary (current month)
         Long totalSalesOrders = salesOrderRepository.count();
+        Long draftSalesOrders = salesOrderRepository.countByStatus(SalesOrder.OrderStatus.Draft);
         Long pendingSalesOrders = salesOrderRepository.countByStatus(SalesOrder.OrderStatus.Pending);
+        Long pendingSalesOrdersTotal = draftSalesOrders + pendingSalesOrders;
         Long deliveredSalesOrders = salesOrderRepository.countByStatus(SalesOrder.OrderStatus.Fulfilled);
         
         // Calculate actual sales revenue from AR Invoices
@@ -98,7 +100,7 @@ public class DashboardController {
             .map(com.g174.mmssystem.entity.ARInvoice::getTotalAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         
-        stats.setSalesSummary(new SalesSummary(totalSalesOrders, pendingSalesOrders, deliveredSalesOrders, salesRevenue));
+        stats.setSalesSummary(new SalesSummary(totalSalesOrders, pendingSalesOrdersTotal, deliveredSalesOrders, salesRevenue));
 
         // Pending Summary
         Long pendingRequisitions = purchaseRequisitionRepository.countByStatus(RequisitionStatus.Pending);
@@ -112,6 +114,9 @@ public class DashboardController {
         
         // Monthly Import/Export Statistics (last 6 months)
         stats.setMonthlyImportExport(getMonthlyImportExportStats());
+        
+        // Weekly Import/Export Statistics (last 4 weeks)
+        stats.setWeeklyImportExport(getWeeklyImportExportStats());
         
         // Daily Import/Export Statistics (last 7 days)
         stats.setDailyImportExport(getDailyImportExportStats());
@@ -127,6 +132,9 @@ public class DashboardController {
         stats.setPendingAPInvoices(getPendingAPInvoices(10));
         stats.setOverdueARInvoices(getOverdueARInvoices(10));
         stats.setAccountingSummary(getAccountingSummary());
+        
+        // Approval Summary
+        stats.setApprovalSummary(getApprovalSummary());
 
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
@@ -190,6 +198,50 @@ public class DashboardController {
         }
         
         return monthlyStats;
+    }
+    
+    // Helper method to get weekly import/export statistics (last 4 weeks)
+    private List<WeeklyImportExport> getWeeklyImportExportStats() {
+        List<WeeklyImportExport> weeklyStats = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM");
+        
+        // Get data for last 4 weeks (from now going back)
+        for (int i = 3; i >= 0; i--) {
+            LocalDateTime weekStart = now.minusWeeks(i).withHour(0).withMinute(0).withSecond(0);
+            LocalDateTime weekEnd = weekStart.plusWeeks(1).minusSeconds(1);
+            String weekLabel = weekStart.format(formatter);
+            String weekName = "T" + (4 - i);
+            
+            // Count imports (Goods Receipts) during this week
+            Long importCount = goodsReceiptRepository.findAllActive().stream()
+                .filter(gr -> {
+                    LocalDateTime dateToCheck = gr.getReceivedDate() != null ? gr.getReceivedDate() : gr.getCreatedAt();
+                    return dateToCheck != null 
+                        && !dateToCheck.isBefore(weekStart) 
+                        && !dateToCheck.isAfter(weekEnd);
+                })
+                .count();
+            
+            // Count exports (Good Issues) during this week
+            Long exportCount = goodIssueRepository.findAllActive().stream()
+                .filter(gi -> {
+                    LocalDateTime dateToCheck = gi.getIssueDate() != null ? gi.getIssueDate() : gi.getCreatedAt();
+                    return dateToCheck != null 
+                        && !dateToCheck.isBefore(weekStart) 
+                        && !dateToCheck.isAfter(weekEnd);
+                })
+                .count();
+            
+            weeklyStats.add(new WeeklyImportExport(
+                weekName,
+                weekLabel,
+                importCount,
+                exportCount
+            ));
+        }
+        
+        return weeklyStats;
     }
     
     // Helper method to get daily import/export statistics (last 7 days)
@@ -546,6 +598,26 @@ public class DashboardController {
         );
     }
     
+    private ApprovalSummary getApprovalSummary() {
+        Long pendingPQ = purchaseQuotationRepository.findAll().stream()
+            .filter(pq -> pq.getDeletedAt() == null && pq.getStatus() == com.g174.mmssystem.enums.PurchaseQuotationStatus.Pending)
+            .count();
+        
+        Long pendingPO = purchaseOrderRepository.findAll().stream()
+            .filter(po -> po.getDeletedAt() == null && 
+                po.getApprovalStatus() == com.g174.mmssystem.enums.PurchaseOrderApprovalStatus.Pending)
+            .count();
+        
+        Long pendingSO = salesOrderRepository.findAll().stream()
+            .filter(so -> so.getDeletedAt() == null && 
+                so.getApprovalStatus() == SalesOrder.ApprovalStatus.Pending)
+            .count();
+        
+        Long totalPending = pendingPQ + pendingPO + pendingSO;
+        
+        return new ApprovalSummary(totalPending, pendingPQ, pendingPO, pendingSO);
+    }
+    
     @GetMapping("/notifications")
     @PreAuthorize("hasAnyRole('MANAGER','PURCHASE','WAREHOUSE','SALE','ACCOUNTING')")
     public ResponseEntity<NotificationDTO> getNotifications(Authentication authentication) {
@@ -795,7 +867,7 @@ public class DashboardController {
                 "📝",
                 "Sales Orders chờ xác nhận",
                 pendingSO + " Sales Orders cần xác nhận",
-                "/sales/sales-orders",
+                "/sales/orders",
                 now,
                 false,
                 "high"
@@ -902,7 +974,7 @@ public class DashboardController {
                 "🎯",
                 "Đơn hàng mới",
                 pendingOrders + " đơn hàng mới cần xử lý",
-                "/sales/sales-orders",
+                "/sales/orders",
                 now,
                 false,
                 "high"

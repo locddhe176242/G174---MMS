@@ -41,5 +41,9 @@ public class GoodsReceiptResponseDTO {
     private LocalDateTime updatedAt;
     private List<GoodsReceiptItemResponseDTO> items;
     private Boolean hasInvoice; // Đánh dấu GR đã được tạo invoice
+    
+    // Progress tracking fields for partial delivery
+    private Integer totalReceivedQty;  // Tổng số lượng đã nhận (từ tất cả GR của PO)
+    private Integer totalExpectedQty;   // Tổng số lượng dự kiến (từ PO)
+    private String poStatus;            // Trạng thái của Purchase Order
 }
-

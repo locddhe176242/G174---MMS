@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+
 import { getCurrentUser } from '../../../api/authService';
 import { getProducts } from '../../../api/productService';
 import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
@@ -204,7 +205,6 @@ const PurchaseRequisitionForm = () => {
                             product_name: item.product_name || item.productName || '',
                             requested_qty: item.requested_qty || item.requestedQty || 1,
                             unit: item.unit || item.uom || '',
-                            delivery_date: item.delivery_date ? new Date(item.delivery_date) : (item.deliveryDate ? new Date(item.deliveryDate) : new Date()),
                             note: item.note || ''
                         }))
                     });
@@ -268,7 +268,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -366,7 +365,29 @@ const PurchaseRequisitionForm = () => {
                     items: newItems
                 };
             });
+            // Clear any quantity validation errors when field is emptied
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[`item_${index}_qty`];
+                return newErrors;
+            });
             return;
+        }
+
+        // Check for negative values immediately
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue < 0) {
+            setValidationErrors(prev => ({
+                ...prev,
+                [`item_${index}_qty`]: 'Số lượng không được là số âm'
+            }));
+        } else if (!isNaN(numValue) && numValue > 0) {
+            // Clear error if value becomes valid
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[`item_${index}_qty`];
+                return newErrors;
+            });
         }
 
         // Allow any value during typing (validation happens on blur)
@@ -405,7 +426,6 @@ const PurchaseRequisitionForm = () => {
             product_name: '',
             requested_qty: 1,
             unit: '',
-            delivery_date: new Date(),
             note: ''
         };
 
@@ -423,6 +443,219 @@ const PurchaseRequisitionForm = () => {
             items: newItems
         }));
     };
+
+    // Handle Excel import
+    const handleExcelImport = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Check file extension
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        if (!['xlsx', 'xls'].includes(fileExtension)) {
+            toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+            return;
+        }
+
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const arrayBuffer = await file.arrayBuffer();
+            await workbook.xlsx.load(arrayBuffer);
+
+            // Get first worksheet
+            const worksheet = workbook.worksheets[0];
+            if (!worksheet) {
+                toast.error('File Excel không có dữ liệu');
+                return;
+            }
+
+            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ghi chú
+            // Skip header row (row 1), start from row 2
+            const importedItems = [];
+
+            worksheet.eachRow((row, rowNum) => {
+                if (rowNum === 1) return; // Skip header
+
+                // Get cell values - ExcelJS uses 1-based indexing
+                const getCellValue = (colIndex, isDateColumn = false) => {
+                    const cell = row.getCell(colIndex);
+                    if (!cell || cell.value === null || cell.value === undefined) return null;
+
+                    // For date column, check if cell is formatted as date
+                    if (isDateColumn) {
+                        // Check if cell has date format
+                        if (cell.type === ExcelJS.ValueType.Date || cell.value instanceof Date) {
+                            if (cell.value instanceof Date) {
+                                // Create new date to avoid timezone issues
+                                return new Date(cell.value.getFullYear(), cell.value.getMonth(), cell.value.getDate());
+                            }
+                            return new Date(cell.value);
+                        }
+
+                        // If number and cell format suggests date, treat as Excel date serial
+                        if (cell.type === ExcelJS.ValueType.Number && cell.numFmt) {
+                            // Check if format contains date indicators (d, m, y)
+                            const dateFormats = ['d', 'm', 'y', 'dd', 'mm', 'yy', 'yyyy', 'mmm', 'mmmm'];
+                            const hasDateFormat = dateFormats.some(fmt => cell.numFmt.toLowerCase().includes(fmt));
+                            if (hasDateFormat) {
+                                // This is an Excel date serial number
+                                return { isExcelDateSerial: true, value: cell.value };
+                            }
+                        }
+                    }
+
+                    // Handle date cells - ExcelJS may return Date object or number
+                    if (cell.type === ExcelJS.ValueType.Date || cell.value instanceof Date) {
+                        if (cell.value instanceof Date) {
+                            // Create new date to avoid timezone issues
+                            return new Date(cell.value.getFullYear(), cell.value.getMonth(), cell.value.getDate());
+                        }
+                        return new Date(cell.value);
+                    }
+
+                    // Handle number cells
+                    if (cell.type === ExcelJS.ValueType.Number) {
+                        return cell.value;
+                    }
+
+                    // Handle formula cells
+                    if (cell.type === ExcelJS.ValueType.Formula) {
+                        return cell.result;
+                    }
+
+                    // Default: convert to string
+                    return cell.value?.toString() || '';
+                };
+
+                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ghi chú
+                const productNameValue = getCellValue(1);
+                const qtyValue = getCellValue(2);
+                const unitValue = getCellValue(3);
+                const noteValue = getCellValue(4);
+
+                const productName = productNameValue ? productNameValue.toString().trim() : '';
+                const qty = qtyValue ? (typeof qtyValue === 'number' ? qtyValue : parseFloat(qtyValue)) : 1;
+                const unit = unitValue ? unitValue.toString().trim() : '';
+                const note = noteValue ? noteValue.toString().trim() : '';
+
+                // Skip empty rows
+                if (!productName) return;
+
+                // Try to find product by name in products list
+                let productId = null;
+                const foundProduct = products.find(p => {
+                    const label = p.label || '';
+                    return label.includes(productName) || label.toLowerCase().includes(productName.toLowerCase());
+                });
+                if (foundProduct) {
+                    productId = foundProduct.value;
+                }
+
+                importedItems.push({
+                    product_id: productId,
+                    product_name: productId ? '' : productName,
+                    requested_qty: isNaN(qty) || qty <= 0 ? 1 : qty,
+                    unit: unit,
+                    note: note
+                });
+            });
+
+            if (importedItems.length === 0) {
+                toast.error('Không tìm thấy dữ liệu hợp lệ trong file Excel');
+                return;
+            }
+
+            // Add imported items to form
+            setFormData(prev => ({
+                ...prev,
+                items: [...prev.items, ...importedItems]
+            }));
+
+            toast.success(`Đã import ${importedItems.length} sản phẩm từ Excel`);
+
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            console.error('Error importing Excel:', error);
+            toast.error('Lỗi khi đọc file Excel: ' + error.message);
+        }
+    };
+
+    // Trigger file input
+    const triggerFileInput = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+
+    // Download Excel template
+    const downloadExcelTemplate = async () => {
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Template');
+
+            // Set column headers
+            worksheet.columns = [
+                { header: 'Sản phẩm', key: 'product', width: 30 },
+                { header: 'Số lượng', key: 'quantity', width: 12 },
+                { header: 'Đơn vị', key: 'unit', width: 12 },
+                { header: 'Ghi chú', key: 'note', width: 30 }
+            ];
+
+            // Style header row
+            worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            worksheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF4472C4' }
+            };
+            worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+            // Add example row
+            const exampleRow = worksheet.addRow({
+                product: 'Ví dụ: Máy tính Dell XPS 13',
+                quantity: 5,
+                unit: 'Cái',
+                note: 'Ghi chú mẫu'
+            });
+
+            // Style example row (light gray background)
+            exampleRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF2F2F2' }
+            };
+
+            // Format date column
+
+
+            // Freeze header row
+            worksheet.views = [
+                { state: 'frozen', ySplit: 1 }
+            ];
+
+            // Generate buffer and download
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Template_Phieu_Yeu_Cau_Mua_Hang_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            toast.success('Đã tải template Excel thành công!');
+        } catch (error) {
+            console.error('Error downloading Excel template:', error);
+            toast.error('Lỗi khi tải template Excel: ' + error.message);
+        }
+    };
+
 
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption && selectedOption.product) {
@@ -481,12 +714,20 @@ const PurchaseRequisitionForm = () => {
             if (!item.product_id && (!item.product_name || !item.product_name.trim())) {
                 errors[`item_${index}_product`] = 'Sản phẩm là bắt buộc';
             }
-            if (!item.requested_qty || parseFloat(item.requested_qty) <= 0) {
+            
+            // Validate quantity more specifically
+            const qty = parseFloat(item.requested_qty);
+            if (!item.requested_qty) {
+                errors[`item_${index}_qty`] = 'Số lượng là bắt buộc';
+            } else if (isNaN(qty)) {
+                errors[`item_${index}_qty`] = 'Số lượng phải là một số';
+            } else if (qty < 0) {
+                errors[`item_${index}_qty`] = 'Số lượng không được là số âm';
+            } else if (qty <= 0) {
                 errors[`item_${index}_qty`] = 'Số lượng phải lớn hơn 0';
             }
-            if (!item.delivery_date) {
-                errors[`item_${index}_delivery_date`] = 'Ngày giao hàng là bắt buộc';
-            }
+            
+
         });
 
         return errors;
@@ -522,7 +763,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -563,7 +803,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -747,7 +986,6 @@ const PurchaseRequisitionForm = () => {
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
                                         <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Số lượng</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn vị</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ngày giao hàng</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
                                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Thao tác</th>
                                     </tr>
@@ -794,6 +1032,25 @@ const PurchaseRequisitionForm = () => {
                                                     onBlur={(e) => {
                                                         const value = e.target.value;
                                                         const numValue = parseFloat(value);
+                                                        
+                                                        // Check for negative values first
+                                                        if (numValue < 0) {
+                                                            setValidationErrors(prev => ({
+                                                                ...prev,
+                                                                [`item_${index}_qty`]: 'Số lượng không được là số âm'
+                                                            }));
+                                                            return;
+                                                        }
+                                                        
+                                                        // Clear error if value is valid
+                                                        if (numValue > 0) {
+                                                            setValidationErrors(prev => {
+                                                                const newErrors = { ...prev };
+                                                                delete newErrors[`item_${index}_qty`];
+                                                                return newErrors;
+                                                            });
+                                                        }
+                                                        
                                                         // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
                                                         if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
                                                             setFormData(prev => {
@@ -811,7 +1068,7 @@ const PurchaseRequisitionForm = () => {
                                                     }}
                                                     className={`w-20 px-2 py-1 border rounded text-sm text-right ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
                                                     step="1"
-                                                    min="1"
+                                                    onInvalid={(e) => e.preventDefault()}
                                                 />
                                                 {validationErrors[`item_${index}_qty`] && (
                                                     <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_qty`]}</p>
@@ -828,18 +1085,6 @@ const PurchaseRequisitionForm = () => {
                                                 />
                                                 {validationErrors[`item_${index}_unit`] && (
                                                     <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_unit`]}</p>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <DatePicker
-                                                    selected={item.delivery_date}
-                                                    onChange={(date) => handleItemChange(index, 'delivery_date', date)}
-                                                    dateFormat="dd/MM/yyyy"
-                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    placeholderText="Chọn ngày"
-                                                />
-                                                {validationErrors[`item_${index}_delivery_date`] && (
-                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_delivery_date`]}</p>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">

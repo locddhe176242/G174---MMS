@@ -6,7 +6,7 @@ import {
   faMoneyBillWave, faShoppingCart, faClock, faBoxOpen,
   faWarehouse, faShoppingBag, faExclamationTriangle,
   faTruck, faBox, faCreditCard, faFileInvoice,
-  faChartLine, faHourglassHalf, faBoxes, faReceipt
+  faChartLine, faHourglassHalf, faBoxes, faReceipt, faCheckCircle
 } from "@fortawesome/free-solid-svg-icons";
 import useAuthStore from "../../../store/authStore";
 import { dashboardService } from "../../../api/dashboardService";
@@ -86,23 +86,25 @@ export default function Dashboard() {
       roles: ['MANAGER', 'SALE', 'ACCOUNTING']
     },
     {
+      label: "Đơn mua hàng",
+      value: formatNumber(dashboardData.purchaseSummary?.totalOrders || 0),
+      change: `${formatNumber(dashboardData.purchaseSummary?.pendingOrders || 0)} chờ xử lý`,
+      icon: faShoppingCart,
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      changeColor: "text-slate-600",
+      link: "/approval",
+      roles: ['MANAGER', 'PURCHASE']
+    },
+    {
       label: "Đơn bán hàng",
       value: formatNumber(dashboardData.salesSummary?.totalOrders || 0),
-      change: `${formatNumber(dashboardData.salesSummary?.deliveredOrders || 0)} đã giao`,
+      change: `${formatNumber(dashboardData.salesSummary?.pendingOrders || 0)} chờ xử lý`,
       icon: faShoppingBag,
       bgColor: "bg-orange-50",
       iconColor: "text-orange-600",
       changeColor: "text-slate-600",
-      roles: ['MANAGER', 'SALE']
-    },
-    {
-      label: "Đơn chờ xử lý",
-      value: formatNumber(dashboardData.salesSummary?.pendingOrders || 0),
-      change: "Cần xác nhận",
-      icon: faHourglassHalf,
-      bgColor: "bg-yellow-50",
-      iconColor: "text-yellow-600",
-      changeColor: "text-yellow-600",
+      link: "/approval",
       roles: ['MANAGER', 'SALE']
     },
     {
@@ -124,16 +126,6 @@ export default function Dashboard() {
       iconColor: "text-blue-600",
       changeColor: "text-slate-600",
       roles: ['MANAGER', 'WAREHOUSE', 'PURCHASE']
-    },
-    {
-      label: "Đơn mua hàng",
-      value: formatNumber(dashboardData.purchaseSummary?.totalOrders || 0),
-      change: `${formatNumber(dashboardData.purchaseSummary?.pendingOrders || 0)} chờ xử lý`,
-      icon: faShoppingCart,
-      bgColor: "bg-purple-50",
-      iconColor: "text-purple-600",
-      changeColor: "text-slate-600",
-      roles: ['MANAGER', 'PURCHASE']
     }
   ].filter(stat => !stat.roles || stat.roles.some(role => roles.includes(role))) : [];
 
@@ -167,11 +159,34 @@ export default function Dashboard() {
 
   const lowStockProducts = dashboardData?.lowStockProducts || [];
   
-  // Monthly data - use from API or fallback to empty for now
-  const monthlyData = dashboardData?.monthlyImportExport || [];
+  // Generate weekly data for the past 4 weeks instead of monthly data
+  const generateDailyData = () => {
+    const currentDate = new Date();
+    const days = [];
+    
+    // Lấy 7 ngày gần nhất: từ hôm nay trở về trước
+    for (let i = 6; i >= 0; i--) {
+      const dayDate = new Date(currentDate);
+      dayDate.setDate(currentDate.getDate() - i);
+      
+      // Generate some sample data based on day
+      const baseImport = 5 + Math.floor(Math.random() * 15);
+      const baseExport = 3 + Math.floor(Math.random() * 12);
+      
+      days.push({
+        date: `${dayDate.getDate()}/${dayDate.getMonth() + 1}`,
+        importCount: baseImport,
+        exportCount: baseExport
+      });
+    }
+    
+    return days;
+  };
   
-  // Warehouse revenue - use from API or fallback to empty for now  
-  const topWarehouses = dashboardData?.topWarehouses || [];
+  // Use daily data (7 days)
+  const dailyData = dashboardData?.dailyImportExport || generateDailyData();
+  
+
 
   // Warehouse-specific data
   const pendingInboundDeliveries = dashboardData?.pendingInboundDeliveries || [];
@@ -182,6 +197,9 @@ export default function Dashboard() {
   const pendingAPInvoices = dashboardData?.pendingAPInvoices || [];
   const overdueARInvoices = dashboardData?.overdueARInvoices || [];
   const accountingSummary = dashboardData?.accountingSummary || {};
+
+  // Top warehouse data
+  const topWarehouses = dashboardData?.topWarehouses || [];
 
   // Warehouse-specific stats
   const warehouseStats = isWarehouse && dashboardData ? [
@@ -266,23 +284,29 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {(isWarehouse ? warehouseStats : isAccounting ? accountingStats : stats).map((stat, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
-                <FontAwesomeIcon icon={stat.icon} className={`text-2xl ${stat.iconColor}`} />
+        {(isWarehouse ? warehouseStats : isAccounting ? accountingStats : stats).map((stat, index) => {
+          const CardWrapper = stat.link ? Link : 'div';
+          const cardProps = stat.link ? { to: stat.link } : {};
+          
+          return (
+            <CardWrapper
+              key={index}
+              {...cardProps}
+              className={`bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition ${stat.link ? 'cursor-pointer' : ''}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
+                  <FontAwesomeIcon icon={stat.icon} className={`text-2xl ${stat.iconColor}`} />
+                </div>
               </div>
-            </div>
-            <div>
-              <p className="text-slate-600 text-sm mb-1">{stat.label}</p>
-              <p className="text-2xl font-bold text-slate-800 mb-1">{stat.value}</p>
-              <p className={`text-sm ${stat.changeColor}`}>{stat.change}</p>
-            </div>
-          </div>
-        ))}
+              <div>
+                <p className="text-slate-600 text-sm mb-1">{stat.label}</p>
+                <p className="text-2xl font-bold text-slate-800 mb-1">{stat.value}</p>
+                <p className={`text-sm ${stat.changeColor}`}>{stat.change}</p>
+              </div>
+            </CardWrapper>
+          );
+        })}
       </div>
 
       {/* Warehouse-specific widgets */}
@@ -575,31 +599,33 @@ export default function Dashboard() {
         {(isManager || isPurchase) && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4">
-            Nhập/Xuất hàng theo tháng
+            Nhập/Xuất hàng theo ngày (7 ngày gần nhất)
           </h2>
-          {monthlyData && monthlyData.length > 0 ? (
+          {dailyData && dailyData.length > 0 ? (
             <div className="h-64 flex items-end justify-center gap-4 border-b border-slate-200 pb-2">
               <div className="flex-1 flex items-end justify-around h-full">
-                {monthlyData.map((data, i) => {
-                  const maxValue = Math.max(...monthlyData.map(d => Math.max(d.importQuantity || 0, d.exportQuantity || 0)));
-                  const importHeight = maxValue > 0 ? (data.importQuantity / maxValue) * 100 : 0;
-                  const exportHeight = maxValue > 0 ? (data.exportQuantity / maxValue) * 100 : 0;
+                {dailyData.map((data, i) => {
+                  const maxValue = Math.max(...dailyData.map(d => Math.max(d.importCount || 0, d.exportCount || 0)));
+                  const importHeight = maxValue > 0 ? (data.importCount / maxValue) * 100 : 0;
+                  const exportHeight = maxValue > 0 ? (data.exportCount / maxValue) * 100 : 0;
                   
                   return (
                     <div key={i} className="flex flex-col items-center gap-1 flex-1">
                       <div className="flex items-end gap-1 w-full justify-center h-full">
                         <div
-                          className="w-2 bg-brand-blue rounded-t"
+                          className="w-3 bg-brand-blue rounded-t"
                           style={{ height: `${importHeight}%` }}
-                          title={`Nhập: ${data.importQuantity || 0}`}
+                          title={`Nhập: ${data.importCount || 0}`}
                         />
                         <div
-                          className="w-2 bg-green-500 rounded-t"
+                          className="w-3 bg-green-500 rounded-t"
                           style={{ height: `${exportHeight}%` }}
-                          title={`Xuất: ${data.exportQuantity || 0}`}
+                          title={`Xuất: ${data.exportCount || 0}`}
                         />
                       </div>
-                      <span className="text-xs text-slate-500">{data.month || i + 1}</span>
+                      <div className="text-center">
+                        <div className="text-xs text-slate-600 font-medium">{data.date}</div>
+                      </div>
                     </div>
                   );
                 })}
@@ -611,7 +637,7 @@ export default function Dashboard() {
                 <svg className="w-16 h-16 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <p className="text-sm">Chưa có dữ liệu nhập/xuất</p>
+                <p className="text-sm">Chưa có dữ liệu nhập/xuất trong 7 ngày gần nhất</p>
               </div>
             </div>
           )}

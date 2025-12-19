@@ -40,8 +40,9 @@ public class RFQController {
             entityId = "#{#result.body.data.rfqId}"
     )
     public ResponseEntity<Map<String, Object>> createRFQ(
-            @Valid @RequestBody RFQRequestDTO requestDTO) {
-        log.info("REST: Creating RFQ");
+            @Valid @RequestBody RFQRequestDTO requestDTO,
+            @RequestParam(defaultValue = "true") boolean sendEmail) {
+        log.info("REST: Creating RFQ, sendEmail: {}", sendEmail);
 
         Integer createdById = userContextService.getCurrentUserId();
         if (createdById == null) {
@@ -49,7 +50,7 @@ public class RFQController {
                     .body(Map.of("success", false, "message", "Không thể xác định người dùng hiện tại"));
         }
 
-        RFQResponseDTO response = rfqService.createRFQ(requestDTO, createdById);
+        RFQResponseDTO response = rfqService.createRFQ(requestDTO, createdById, sendEmail);
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("message", "Tạo RFQ thành công");
@@ -130,8 +131,9 @@ public class RFQController {
     )
     public ResponseEntity<Map<String, Object>> updateRFQ(
             @PathVariable Integer rfqId,
-            @Valid @RequestBody RFQRequestDTO requestDTO) {
-        log.info("REST: Updating RFQ ID: {}", rfqId);
+            @Valid @RequestBody RFQRequestDTO requestDTO,
+            @RequestParam(defaultValue = "true") boolean sendEmail) {
+        log.info("REST: Updating RFQ ID: {}, sendEmail: {}", rfqId, sendEmail);
 
         Integer updatedById = userContextService.getCurrentUserId();
         if (updatedById == null) {
@@ -139,7 +141,7 @@ public class RFQController {
                     .body(Map.of("success", false, "message", "Không thể xác định người dùng hiện tại"));
         }
 
-        RFQResponseDTO response = rfqService.updateRFQ(rfqId, requestDTO, updatedById);
+        RFQResponseDTO response = rfqService.updateRFQ(rfqId, requestDTO, updatedById, sendEmail);
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("message", "Cập nhật RFQ thành công");
