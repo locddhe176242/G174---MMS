@@ -192,7 +192,6 @@ export default function SalesOrderList() {
         <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn bán hàng</h1>
-            <p className="text-gray-500">Theo dõi đơn bán hàng và trạng thái thực hiện</p>
           </div>
           <button
             onClick={() => navigate("/sales/orders/new")}

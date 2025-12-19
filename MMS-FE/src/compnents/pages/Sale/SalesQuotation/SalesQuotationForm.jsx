@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -650,74 +652,77 @@ export default function SalesQuotationForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
-              </h1>
-              {isEdit && quotationData && (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    isDraft
-                      ? "bg-gray-100 text-gray-700"
-                      : isActive
-                      ? "bg-blue-100 text-blue-700"
-                      : quotationData.status === "Converted"
-                      ? "bg-green-100 text-green-700"
-                      : quotationData.status === "Cancelled"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {isDraft
-                    ? "Nháp"
-                    : isActive
-                    ? "Đang mở"
-                    : quotationData.status === "Converted"
-                    ? "Đã chuyển đổi"
-                    : quotationData.status === "Cancelled"
-                    ? "Đã hủy"
-                    : quotationData.status === "Expired"
-                    ? "Hết hạn"
-                    : quotationData.status}
-                </span>
-              )}
-            </div>
-
-            {isActive && !isManager && (
-              <p className="text-sm text-yellow-600 mt-1">
-                Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {isEdit && isDraft && (
-              <button
-                type="button"
-                onClick={handleSendToCustomer}
-                disabled={submitting}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang gửi..." : "Gửi cho khách"}
-              </button>
-            )}
-            {isEdit && isActive && (
-              <button
-                type="button"
-                onClick={handleCloneToDraft}
-                disabled={submitting}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang xử lý..." : "Tạo bản nháp mới"}
-              </button>
-            )}
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/sales/quotations")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
             >
-              Quay lại
+              <FontAwesomeIcon icon={faArrowLeft} />
             </button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold">
+                  {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
+                </h1>
+                {isEdit && quotationData && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      isDraft
+                        ? "bg-gray-100 text-gray-700"
+                        : isActive
+                        ? "bg-blue-100 text-blue-700"
+                        : quotationData.status === "Converted"
+                        ? "bg-green-100 text-green-700"
+                        : quotationData.status === "Cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {isDraft
+                      ? "Nháp"
+                      : isActive
+                      ? "Đang mở"
+                      : quotationData.status === "Converted"
+                      ? "Đã chuyển đổi"
+                      : quotationData.status === "Cancelled"
+                      ? "Đã hủy"
+                      : quotationData.status === "Expired"
+                      ? "Hết hạn"
+                      : quotationData.status}
+                  </span>
+                )}
+              </div>
+              {isActive && !isManager && (
+                <p className="text-sm text-yellow-600 mt-1">
+                  Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
+                </p>
+              )}
+            </div>
+            <div className="flex-1"></div>
+            <div className="flex gap-2">
+              {isEdit && isDraft && (
+                <button
+                  type="button"
+                  onClick={handleSendToCustomer}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {submitting ? "Đang gửi..." : "Gửi cho khách"}
+                </button>
+              )}
+              {isEdit && isActive && (
+                <button
+                  type="button"
+                  onClick={handleCloneToDraft}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {submitting ? "Đang xử lý..." : "Tạo bản nháp mới"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

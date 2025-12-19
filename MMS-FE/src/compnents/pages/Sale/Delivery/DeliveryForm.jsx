@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -560,21 +562,21 @@ export default function DeliveryForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Cập nhật Phiếu Giao Hàng" : "Tạo Phiếu Giao Hàng"}
-            </h1>
-            <p className="text-gray-500">Nhập thông tin phiếu giao hàng</p>
-          </div>
-          <div className="flex gap-2">
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => navigate("/sales/deliveries")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
             >
-              Quay lại
+              <FontAwesomeIcon icon={faArrowLeft} />
             </button>
+            <div>
+              <h1 className="text-2xl font-semibold">
+                {isEdit ? "Cập nhật Phiếu Giao Hàng" : "Tạo Phiếu Giao Hàng"}
+              </h1>
+            </div>
           </div>
         </div>
       </div>

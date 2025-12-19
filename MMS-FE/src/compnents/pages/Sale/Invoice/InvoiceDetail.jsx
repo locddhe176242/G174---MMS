@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
@@ -140,23 +142,23 @@ export default function InvoiceDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Hóa đơn: {data.invoiceNo}</h1>
-          </div>
+        <div className="px-6 py-6">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/invoices")}
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+            <h1 className="text-2xl font-semibold">Hóa đơn: {data.invoiceNo}</h1>
+            <div className="flex-1"></div>
             <button
               onClick={() => navigate(`/sales/invoices/${id}/print`)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
             >
               In hóa đơn
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/sales/invoices")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-            >
-              Quay lại
             </button>
           </div>
         </div>

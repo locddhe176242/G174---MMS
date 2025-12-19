@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -791,9 +793,10 @@ export default function SalesOrderForm() {
             <button
               type="button"
               onClick={() => navigate("/sales/orders")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
             >
-              Quay lại
+              <FontAwesomeIcon icon={faArrowLeft} />
             </button>
           </div>
         </div>

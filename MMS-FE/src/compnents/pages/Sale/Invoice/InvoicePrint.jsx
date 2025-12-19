@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { invoiceService } from "../../../../api/invoiceService";
 import html2pdf from "html2pdf.js";
@@ -198,9 +200,10 @@ export default function InvoicePrint() {
         </button>
         <button
           onClick={() => navigate(`/sales/invoices/${id}`)}
-          className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          className="px-3 py-1.5 rounded border hover:bg-gray-50"
+          title="Quay lại trang trước"
         >
-          Quay lại
+          <FontAwesomeIcon icon={faArrowLeft} />
         </button>
       </div>
       <div 

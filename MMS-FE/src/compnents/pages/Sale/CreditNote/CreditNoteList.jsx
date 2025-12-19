@@ -158,7 +158,6 @@ export default function CreditNoteList() {
         <div className="px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Danh sách hoá đơn điều chỉnh</h1>
-            <p className="text-gray-500">Quản lý các hoá đơn điều chỉnh hoá đơn bán hàng</p>
           </div>
           <button
             onClick={() => navigate("/sales/credit-notes/new")}

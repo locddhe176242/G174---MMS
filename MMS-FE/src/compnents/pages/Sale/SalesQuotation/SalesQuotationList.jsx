@@ -162,9 +162,6 @@ export default function SalesQuotationList() {
             <h1 className="text-2xl font-bold text-gray-900">
               Quản lý báo giá bán hàng
             </h1>
-            <p className="text-gray-500">
-              Theo dõi và quản lý báo giá cho khách hàng
-            </p>
           </div>
           <button
             onClick={() => navigate("/sales/quotations/new")}

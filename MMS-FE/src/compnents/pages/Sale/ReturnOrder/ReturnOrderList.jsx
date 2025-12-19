@@ -158,7 +158,6 @@ export default function ReturnOrderList() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Danh sách đơn trả hàng</h1>
-                <p className="mt-1 text-sm text-gray-500">Quản lý các đơn trả hàng từ khách hàng</p>
               </div>
               <button
                 onClick={() => navigate("/sales/return-orders/new")}
