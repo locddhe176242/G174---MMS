@@ -8,10 +8,19 @@ import { apInvoiceService } from "../../../api/apInvoiceService";
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser, getCurrentRoles } from "../../../api/authService";
 import { formatCurrency } from "../../../utils/formatters";
+import useAuthStore from "../../../store/authStore";
 
 export default function GoodsReceiptDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or WAREHOUSE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+    }) || false;
 
     const [data, setData] = useState(null);
     const [items, setItems] = useState([]);
@@ -318,7 +327,7 @@ export default function GoodsReceiptDetail() {
                                     ✓ Đã tạo hóa đơn
                                 </div>
                             )}
-                            {data.status === "Pending" && (
+                            {canEdit && data.status === "Pending" && (
                                 <>
                                     <button
                                         onClick={handleApproveClick}

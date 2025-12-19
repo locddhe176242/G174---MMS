@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
 import { getCurrentUser, hasRole } from "../../../api/authService";
 import apiClient from "../../../api/apiClient";
+import useAuthStore from "../../../store/authStore";
 
 const Stat = ({ label, value }) => (
     <div className="flex-1 text-center">
@@ -17,6 +18,14 @@ const Stat = ({ label, value }) => (
 export default function PurchaseOrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or PURCHASE
+    const canEditOrder = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+    }) || false;
 
     const [data, setData] = useState(null);
     const [items, setItems] = useState([]);
@@ -260,8 +269,8 @@ export default function PurchaseOrderDetail() {
     const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
     const canCreateGR = (hasRole("WAREHOUSE") || hasRole("MANAGER")) && normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent" && !data?.hasGoodsReceipt;
-    // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
-    const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
+    // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved) và user có quyền
+    const canEdit = canEditOrder && (normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected");
 
     return (
         <div className="min-h-screen bg-gray-50">

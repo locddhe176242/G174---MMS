@@ -7,9 +7,18 @@ import {
 import { getCategories, getDeletedCategories, deleteCategory, restoreCategory } from '../../../api/categoryService';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import useAuthStore from '../../../store/authStore';
 
 const CategoryList = () => {
   const navigate = useNavigate();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or PURCHASE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+  }) || false;
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(null);
@@ -142,12 +151,14 @@ const CategoryList = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Quản lý danh mục</h1>
               </div>
             </div>
-            <button
-              onClick={handleAdd}
-              className="group flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
-            >
-              <span className="group-hover:font-medium transition-all duration-200">Thêm danh mục</span>
-            </button>
+            {canEdit && (
+              <button
+                onClick={handleAdd}
+                className="group flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
+              >
+                <span className="group-hover:font-medium transition-all duration-200">Thêm danh mục</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -220,7 +231,7 @@ const CategoryList = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        {!category.deletedAt && (
+                        {canEdit && !category.deletedAt && (
                           <>
                             <button
                               onClick={() => handleEdit(category)}
@@ -242,7 +253,7 @@ const CategoryList = () => {
                             </button>
                           </>
                         )}
-                        {category.deletedAt && (
+                        {canEdit && category.deletedAt && (
                           <button
                             onClick={() => handleRestore(category.categoryId)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

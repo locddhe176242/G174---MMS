@@ -4,9 +4,18 @@ import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService.js";
 import { hasRole } from "../../../api/authService";
 import Pagination from "../../common/Pagination";
+import useAuthStore from "../../../store/authStore";
 
 export default function GoodsReceiptList() {
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or WAREHOUSE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+    }) || false;
 
     const [receipts, setReceipts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -184,7 +193,7 @@ export default function GoodsReceiptList() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu nhập kho</h1>
                         </div>
-                        {(hasRole("WAREHOUSE") || hasRole("MANAGER")) && (
+                        {canEdit && (
                             <button
                                 onClick={() => navigate("/purchase/goods-receipts/new")}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -372,7 +381,7 @@ export default function GoodsReceiptList() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
-                                                {receipt.status === "Pending" && !receipt.hasInvoice && (
+                                                {canEdit && receipt.status === "Pending" && !receipt.hasInvoice && (
                                                     <>
                                                         <button
                                                             onClick={() => navigate(`/purchase/goods-receipts/${receipt.receiptId || receipt.receipt_id || receipt.id}/edit`)}

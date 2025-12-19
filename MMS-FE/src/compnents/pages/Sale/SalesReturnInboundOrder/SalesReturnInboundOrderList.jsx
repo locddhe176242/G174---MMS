@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { salesReturnInboundOrderService } from "../../../../api/salesReturnInboundOrderService";
 import Pagination from "../../../common/Pagination";
+import useAuthStore from "../../../../store/authStore";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
@@ -48,6 +49,15 @@ const formatDate = (value) =>
 
 export default function SalesReturnInboundOrderList() {
   const navigate = useNavigate();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -165,12 +175,14 @@ export default function SalesReturnInboundOrderList() {
               Đơn nhập hàng trả lại
             </h1>
           </div>
-          <button
-            onClick={() => navigate("/sales/return-inbound-orders/new")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + Tạo Đơn nhập hàng trả lại
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => navigate("/sales/return-inbound-orders/new")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + Tạo Đơn nhập hàng trả lại
+            </button>
+          )}
         </div>
       </div>
 

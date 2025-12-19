@@ -12,6 +12,7 @@ import { warehouseService } from "../../../../api/warehouseService";
 import { warehouseStockService } from "../../../../api/warehouseStockService";
 import { getCurrentUser, hasRole } from "../../../../api/authService";
 import apiClient from "../../../../api/apiClient";
+import useAuthStore from "../../../../store/authStore";
 
 const selectStyles = {
   control: (base, state) => ({
@@ -57,6 +58,22 @@ export default function GoodIssueForm() {
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const deliveryIdFromQuery = searchParams.get("deliveryId");
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or WAREHOUSE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+  }) || false;
+  
+  // Redirect users without permission
+  useEffect(() => {
+    if (!canEdit) {
+      toast.error('Bạn không có quyền truy cập trang này!');
+      navigate('/sales/good-issues');
+    }
+  }, [canEdit, navigate]);
 
   const [loading, setLoading] = useState(false);
   const [deliveries, setDeliveries] = useState([]);

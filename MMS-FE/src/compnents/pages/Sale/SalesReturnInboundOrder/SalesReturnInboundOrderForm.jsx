@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { salesReturnInboundOrderService } from "../../../../api/salesReturnInboundOrderService";
 import { returnOrderService } from "../../../../api/returnOrderService";
 import { warehouseService } from "../../../../api/warehouseService";
+import useAuthStore from "../../../../store/authStore";
 
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "—";
@@ -37,6 +38,22 @@ export default function SalesReturnInboundOrderForm() {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const location = useLocation();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
+  // Redirect users without permission
+  useEffect(() => {
+    if (!canEdit) {
+      toast.error('Bạn không có quyền truy cập trang này!');
+      navigate('/sales/return-inbound-orders');
+    }
+  }, [canEdit, navigate]);
 
   const searchParams = new URLSearchParams(location.search);
   const preselectedRoId = searchParams.get("roId");

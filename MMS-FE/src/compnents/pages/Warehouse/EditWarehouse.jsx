@@ -4,11 +4,27 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { warehouseService } from "../../../api/warehouseService.js";
 import useAuthStore from "../../../store/authStore";
+import { toast } from "react-toastify";
 
 export default function EditWarehouse() {
 	const navigate = useNavigate();
 	const { id } = useParams();
-	const { user } = useAuthStore();
+	const { user, roles } = useAuthStore();
+	
+	// Check if user is MANAGER or WAREHOUSE
+	const canEdit = roles?.some(role => {
+		const roleName = typeof role === 'string' ? role : role?.name;
+		return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+		       roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+	}) || false;
+	
+	// Redirect users without permission
+	useEffect(() => {
+		if (!canEdit) {
+			toast.error('Bạn không có quyền truy cập trang này!');
+			navigate('/warehouse');
+		}
+	}, [canEdit, navigate]);
 
 	const [form, setForm] = useState({
 		code: "",

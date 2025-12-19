@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { deliveryService } from "../../../../api/deliveryService";
+import useAuthStore from "../../../../store/authStore";
 
 const getStatusLabel = (status) => {
   const statusMap = {
@@ -49,6 +50,15 @@ const getNextStatus = (currentStatus) => {
 export default function DeliveryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
   const [loading, setLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(false);
   const [data, setData] = useState(null);
@@ -103,7 +113,7 @@ export default function DeliveryDetail() {
 
   const nextStatus = getNextStatus(data.status);
   const canChangeStatus = data.status !== "Delivered" && data.status !== "Cancelled";
-  const canEdit = data.status === "Draft";
+  const canEditDelivery = canEdit && data.status === "Draft";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -126,7 +136,7 @@ export default function DeliveryDetail() {
               </p>
             </div>
             <div className="flex-1"></div>
-            {canEdit && (
+            {canEditDelivery && (
               <button
                 onClick={() => navigate(`/sales/deliveries/${id}/edit`)}
                 className="px-4 py-2 border rounded-lg hover:bg-gray-100"

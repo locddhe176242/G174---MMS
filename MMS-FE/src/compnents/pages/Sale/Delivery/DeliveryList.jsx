@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { deliveryService } from "../../../../api/deliveryService";
 import Pagination from "../../../common/Pagination";
 import { hasRole } from "../../../../api/authService";
+import useAuthStore from "../../../../store/authStore";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
@@ -30,6 +31,15 @@ const formatDateTime = (value) => (value ? new Date(value).toLocaleString("vi-VN
 
 export default function DeliveryList() {
   const navigate = useNavigate();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -164,12 +174,14 @@ export default function DeliveryList() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu Giao Hàng</h1>
           </div>
-          <button
-            onClick={() => navigate("/sales/deliveries/new")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + Tạo Phiếu Giao Hàng
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => navigate("/sales/deliveries/new")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + Tạo Phiếu Giao Hàng
+            </button>
+          )}
         </div>
       </div>
 
@@ -296,8 +308,8 @@ export default function DeliveryList() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          {/* Chỉ cho sửa/xóa khi còn trạng thái Nháp. Từ 'Đang chuẩn bị hàng' trở đi chỉ được xem. */}
-                          {delivery.status === "Draft" && (
+                          {/* Chỉ cho sửa/xóa khi còn trạng thái Nháp và user có quyền. Từ 'Đang chuẩn bị hàng' trở đi chỉ được xem. */}
+                          {canEdit && delivery.status === "Draft" && (
                             <>
                               <button
                                 onClick={() => navigate(`/sales/deliveries/${delivery.deliveryId}/edit`)}

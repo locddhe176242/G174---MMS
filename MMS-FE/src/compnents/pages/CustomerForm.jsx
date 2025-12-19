@@ -5,11 +5,28 @@ import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
 import { customerService } from "../../api/customerService";
 import { toast } from "react-toastify";
+import useAuthStore from "../../store/authStore";
 
 export default function CustomerForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
+  // Redirect users without permission
+  useEffect(() => {
+    if (!canEdit) {
+      toast.error('Bạn không có quyền truy cập trang này!');
+      navigate('/customers');
+    }
+  }, [canEdit, navigate]);
 
   const [formData, setFormData] = useState({
     customerCode: "",
