@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { apInvoiceService } from "../../../api/apInvoiceService";
 import { apPaymentService } from "../../../api/apPaymentService";
@@ -168,8 +170,9 @@ export default function APInvoiceDetail() {
               <button
                 onClick={() => navigate("/purchase/ap-invoices")}
                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                title="Quay lại trang trước"
               >
-                ← Quay lại
+                <FontAwesomeIcon icon={faArrowLeft} />
               </button>
               <h1 className="text-2xl font-semibold">
                 Hóa đơn phải trả: {data.invoice_no || data.invoiceNo || `#${id}`}

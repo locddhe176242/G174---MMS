@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
@@ -882,18 +884,19 @@ const PurchaseRequisitionForm = () => {
     return (
         <div className="max-w-7xl mx-auto p-6">
             <div className="bg-white shadow-sm">
-                <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                <div className="container mx-auto px-4 py-6">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate("/purchase/purchase-requisitions")}
+                            className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                            title="Quay lại trang trước"
+                        >
+                            <FontAwesomeIcon icon={faArrowLeft} />
+                        </button>
+                        <h1 className="text-2xl font-semibold">
                             {isEdit ? 'Cập nhật phiếu yêu cầu' : 'Tạo phiếu yêu cầu'}
                         </h1>
                     </div>
-                    <button
-                        onClick={() => navigate("/purchase/purchase-requisitions")}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-                    >
-                        ← Quay lại
-                    </button>
                 </div>
                 <div className="border-t border-gray-200" />
             </div>

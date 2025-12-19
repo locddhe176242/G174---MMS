@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-toastify';
 import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
@@ -582,13 +584,12 @@ const VendorQuotationForm = () => {
                                 navigate('/purchase/rfqs');
                             }
                         }}
-                        className="text-gray-600 hover:text-gray-800"
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-800">
+                    <h1 className="text-2xl font-semibold">
                         Tạo báo giá từ nhà cung cấp
                     </h1>
                 </div>

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
 import { getCurrentUser, hasRole } from "../../../api/authService";
@@ -270,8 +272,9 @@ export default function PurchaseOrderDetail() {
                             <button
                                 onClick={() => navigate("/purchase/purchase-orders")}
                                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                                title="Quay lại trang trước"
                             >
-                                ← Quay lại
+                                <FontAwesomeIcon icon={faArrowLeft} />
                             </button>
                             <h1 className="text-2xl font-semibold">
                                 Đơn hàng mua: {data.po_no || data.poNo || `#${id}`}

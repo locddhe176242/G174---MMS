@@ -665,7 +665,6 @@ export default function GoodIssueForm() {
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Cập nhật Phiếu Xuất Kho" : "Tạo Phiếu Xuất Kho"}
             </h1>
-            <p className="text-gray-500">Nhập thông tin phiếu xuất kho</p>
           </div>
           <div className="flex gap-2">
             <button

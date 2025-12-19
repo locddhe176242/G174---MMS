@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
 import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
@@ -482,9 +484,10 @@ export default function CompareSupplierQuotations() {
                     <div className="text-red-600 mb-4">Lỗi: {err}</div>
                     <button
                         onClick={() => navigate("/purchase/rfqs")}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        Quay lại danh sách
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                 </div>
             </div>
@@ -629,9 +632,10 @@ export default function CompareSupplierQuotations() {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => navigate(`/purchase/rfqs/${id}`)}
-                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                                title="Quay lại trang trước"
                             >
-                                Quay lại
+                                <FontAwesomeIcon icon={faArrowLeft} />
                             </button>
                             {!hasPurchaseOrder && (
                                 <button

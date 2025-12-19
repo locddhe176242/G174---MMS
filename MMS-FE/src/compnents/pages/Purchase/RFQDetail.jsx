@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { rfqService } from "../../../api/rfqService";
 import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
@@ -277,8 +279,9 @@ export default function RFQDetail() {
               <button
                 onClick={() => navigate("/purchase/rfqs")}
                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                title="Quay lại trang trước"
               >
-                ← Quay lại
+                <FontAwesomeIcon icon={faArrowLeft} />
               </button>
               <h1 className="text-2xl font-semibold">
                 Yêu cầu báo giá: {data.rfqNo || data.rfq_no || `#${id}`}

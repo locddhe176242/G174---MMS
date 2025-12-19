@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { goodsReceiptService } from "../../../api/goodsReceiptService";
 import { apInvoiceService } from "../../../api/apInvoiceService";
@@ -286,8 +288,9 @@ export default function GoodsReceiptDetail() {
                             <button
                                 onClick={() => navigate("/purchase/goods-receipts")}
                                 className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                                title="Quay lại trang trước"
                             >
-                                ← Quay lại
+                                <FontAwesomeIcon icon={faArrowLeft} />
                             </button>
                             <h1 className="text-2xl font-semibold">
                                 Phiếu nhập kho: {data.receipt_no || data.receiptNo}
