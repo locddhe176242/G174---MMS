@@ -341,6 +341,20 @@ export default function CreditNoteForm() {
     });
   };
 
+  // Get available products for a specific item (exclude already selected products)
+  const getAvailableProducts = (currentIndex) => {
+    // Get list of product_ids already selected in other items
+    const selectedProductIds = formData.items
+      .map((item, idx) => idx !== currentIndex ? item.productId : null)
+      .filter(id => id !== null && id !== undefined);
+
+    // Filter out products that are already selected
+    return products.filter(product => {
+      const productId = Number(product.value);
+      return !selectedProductIds.some(selectedId => Number(selectedId) === productId);
+    });
+  };
+
   const handleProductSelect = (index, selectedOption) => {
     if (!selectedOption) {
       handleItemChange(index, "productId", null);
@@ -517,9 +531,6 @@ export default function CreditNoteForm() {
               <h1 className="text-2xl font-semibold">
                 {isEdit ? "Cập nhật hóa đơn điều chỉnh" : "Tạo hóa đơn điều chỉnh mới"}
               </h1>
-              <p className="text-gray-500">
-                {isEdit ? "Cập nhật thông tin hóa đơn điều chỉnh" : "Nhập thông tin hóa đơn điều chỉnh"}
-              </p>
             </div>
           </div>
         </div>
@@ -722,7 +733,7 @@ export default function CreditNoteForm() {
                               placeholder="Chọn sản phẩm"
                               value={products.find((opt) => opt.value === item.productId)}
                               onChange={(option) => handleProductSelect(index, option)}
-                              options={products}
+                              options={getAvailableProducts(index)}
                               isClearable
                             />
                             {itemError.productId && (

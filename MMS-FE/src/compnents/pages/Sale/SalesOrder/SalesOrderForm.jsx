@@ -1079,12 +1079,13 @@ export default function SalesOrderForm() {
                 <tbody className="divide-y">
                   {formData.items.map((item, index) => {
                     // Không cho chọn trùng sản phẩm trong nhiều dòng
-                    const usedProductIds = formData.items
-                      .map((it, idx) => (idx === index ? null : it.productId))
+                    const selectedProductIds = formData.items
+                      .map((it, idx) => idx !== index ? it.productId : null)
                       .filter((id) => id !== null && id !== undefined);
-                    const availableProducts = products.filter(
-                      (opt) => !usedProductIds.includes(opt.value)
-                    );
+                    const availableProducts = products.filter(product => {
+                      const productId = Number(product.value);
+                      return !selectedProductIds.some(selectedId => Number(selectedId) === productId);
+                    });
 
                     const itemError = errors.itemDetails?.[index] || {};
                     const qty = Number(item.quantity || 0);
