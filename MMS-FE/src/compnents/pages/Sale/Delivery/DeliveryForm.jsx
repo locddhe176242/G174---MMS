@@ -648,7 +648,7 @@ export default function DeliveryForm() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`grid grid-cols-1 ${isEdit ? 'lg:grid-cols-2' : ''} gap-6`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Ngày giao dự kiến
@@ -660,20 +660,22 @@ export default function DeliveryForm() {
                 dateFormat="dd/MM/yyyy"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ngày giao thực tế
-              </label>
-              <DatePicker
-                selected={formData.actualDate}
-                onChange={(date) => setFormData((prev) => ({ ...prev, actualDate: date }))}
-                className="w-full px-3 py-2 border rounded-lg bg-gray-100"
-                dateFormat="dd/MM/yyyy"
-                isClearable
-                disabled={true}
-                readOnly
-              />
-            </div>
+            {isEdit && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ngày giao thực tế
+                </label>
+                <DatePicker
+                  selected={formData.actualDate}
+                  onChange={(date) => setFormData((prev) => ({ ...prev, actualDate: date }))}
+                  className="w-full px-3 py-2 border rounded-lg bg-gray-100"
+                  dateFormat="dd/MM/yyyy"
+                  isClearable
+                  disabled={true}
+                  readOnly
+                />
+              </div>
+            )}
           </div>
 
           <div>

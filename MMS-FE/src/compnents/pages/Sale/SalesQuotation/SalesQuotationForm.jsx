@@ -3,8 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { salesQuotationService } from "../../../../api/salesQuotationService";
 import customerService from "../../../../api/customerService";
@@ -240,13 +238,14 @@ export default function SalesQuotationForm() {
     try {
       setLoading(true);
       const quotation = await salesQuotationService.getQuotationById(id);
+      const today = new Date().toISOString().slice(0, 10);
       setFormData({
         quotationNo: quotation.quotationNo || "",
         customerId: quotation.customerId || quotation.customer?.customerId || null,
         status: quotation.status || "Draft",
         quotationDate: quotation.quotationDate
           ? quotation.quotationDate.slice(0, 10)
-          : "",
+          : today, // Nếu không có ngày, dùng ngày hiện tại
         paymentTerms: quotation.paymentTerms || "",
         deliveryTerms: quotation.deliveryTerms || "",
         notes: quotation.notes || "",
@@ -289,9 +288,11 @@ export default function SalesQuotationForm() {
 
   const generateTempQuotationNo = () => {
     const ts = Date.now().toString().slice(-5);
+    const today = new Date().toISOString().slice(0, 10);
     setFormData((prev) => ({
       ...prev,
       quotationNo: prev.quotationNo || `SQ-${ts}`,
+      quotationDate: prev.quotationDate || today,
     }));
   };
 
@@ -302,9 +303,6 @@ export default function SalesQuotationForm() {
     }));
   };
 
-  const handleDateChange = (field, date) => {
-    handleInputChange(field, date ? date.toISOString().slice(0, 10) : "");
-  };
 
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
@@ -505,33 +503,38 @@ export default function SalesQuotationForm() {
     return errors;
   };
 
-  const buildPayload = () => ({
-    quotationNo: formData.quotationNo || null,
-    customerId: formData.customerId,
-    status: formData.status,
-    quotationDate: formData.quotationDate,
-    paymentTerms: formData.paymentTerms || null,
-    deliveryTerms: formData.deliveryTerms || null,
-    notes: formData.notes || null,
-    headerDiscountPercent: Number(formData.commonDiscountRate || 0),
-    taxRate: Number(formData.taxRate || 0),
-    subtotal: totals.subtotal,
-    taxAmount: totals.taxAmount,
-    totalAmount: totals.totalAmount,
-    items: formData.items.map((item) => ({
-      productId: item.productId,
-      productCode: item.productCode,
-      productName: item.productName,
-      uom: item.uom,
-      quantity: Number(item.quantity || 0),
-      unitPrice: Number(item.unitPrice || 0),
-      discountPercent:
-        item.discountRate !== null && item.discountRate !== undefined
-          ? Number(item.discountRate || 0)
-          : 0, // Không tự động điền từ commonDiscountRate
-      taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
-    })),
-  });
+  const buildPayload = () => {
+    // Đảm bảo quotationDate luôn có giá trị (ngày hiện tại nếu không có)
+    const quotationDate = formData.quotationDate || new Date().toISOString().slice(0, 10);
+    
+    return {
+      quotationNo: formData.quotationNo || null,
+      customerId: formData.customerId,
+      status: formData.status,
+      quotationDate: quotationDate,
+      paymentTerms: formData.paymentTerms || null,
+      deliveryTerms: formData.deliveryTerms || null,
+      notes: formData.notes || null,
+      headerDiscountPercent: Number(formData.commonDiscountRate || 0),
+      taxRate: Number(formData.taxRate || 0),
+      subtotal: totals.subtotal,
+      taxAmount: totals.taxAmount,
+      totalAmount: totals.totalAmount,
+      items: formData.items.map((item) => ({
+        productId: item.productId,
+        productCode: item.productCode,
+        productName: item.productName,
+        uom: item.uom,
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+        discountPercent:
+          item.discountRate !== null && item.discountRate !== undefined
+            ? Number(item.discountRate || 0)
+            : 0, // Không tự động điền từ commonDiscountRate
+        taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
+      })),
+    };
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -780,16 +783,17 @@ export default function SalesQuotationForm() {
                   <label className="block text-sm text-gray-600">
                     Ngày báo giá <span className="text-red-500">*</span>
                   </label>
-                  <DatePicker
-                    selected={
-                      formData.quotationDate
-                        ? new Date(formData.quotationDate)
-                        : null
-                    }
-                    onChange={(date) => handleDateChange("quotationDate", date)}
-                    dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full h-10 border rounded-lg px-3 py-2"
-                    disabled={!canEdit}
+                  <input
+                    type="text"
+                    value={(() => {
+                      if (!formData.quotationDate) {
+                        return new Date().toLocaleDateString('vi-VN');
+                      }
+                      const date = new Date(formData.quotationDate);
+                      return date.toLocaleDateString('vi-VN');
+                    })()}
+                    readOnly
+                    className="mt-1 w-full h-10 border rounded-lg px-3 py-2 bg-gray-50"
                   />
                   {validationErrors.quotationDate && (
                     <p className="text-sm text-red-600 mt-1">
