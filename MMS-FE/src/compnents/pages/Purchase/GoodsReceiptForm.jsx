@@ -1346,7 +1346,59 @@ export default function GoodsReceiptForm() {
                                                             <input
                                                                 type="number"
                                                                 value={item.received_qty}
-                                                                onChange={(e) => handleItemChange(index, "received_qty", parseFloat(e.target.value) || 0)}
+                                                                onChange={(e) => {
+                                                                    const value = e.target.value;
+                                                                    // Xóa validation error khi người dùng bắt đầu nhập
+                                                                    if (validationErrors.itemDetails?.[index]?.received_qty) {
+                                                                        setValidationErrors((prev) => {
+                                                                            const next = { ...prev };
+                                                                            if (next.itemDetails?.[index]) {
+                                                                                const itemErr = { ...next.itemDetails[index] };
+                                                                                delete itemErr.received_qty;
+                                                                                next.itemDetails[index] = itemErr;
+                                                                            }
+                                                                            return next;
+                                                                        });
+                                                                    }
+                                                                    
+                                                                    // Ngăn giá trị âm
+                                                                    if (value === "" || value === "-") {
+                                                                        handleItemChange(index, "received_qty", "");
+                                                                    } else {
+                                                                        const numValue = parseFloat(value);
+                                                                        if (!isNaN(numValue)) {
+                                                                            if (numValue < 0) {
+                                                                                // Hiển thị thông báo lỗi tiếng Việt và đặt giá trị về 0
+                                                                                setValidationErrors((prev) => {
+                                                                                    const next = { ...prev };
+                                                                                    if (!next.itemDetails) next.itemDetails = [];
+                                                                                    if (!next.itemDetails[index]) next.itemDetails[index] = {};
+                                                                                    next.itemDetails[index].received_qty = "Giá trị phải lớn hơn hoặc bằng 0";
+                                                                                    return next;
+                                                                                });
+                                                                                handleItemChange(index, "received_qty", 0);
+                                                                            } else {
+                                                                                handleItemChange(index, "received_qty", numValue);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                onInvalid={(e) => {
+                                                                    e.preventDefault();
+                                                                    // Đặt thông báo lỗi tùy chỉnh bằng tiếng Việt
+                                                                    e.target.setCustomValidity("Giá trị phải lớn hơn hoặc bằng 0");
+                                                                    setValidationErrors((prev) => {
+                                                                        const next = { ...prev };
+                                                                        if (!next.itemDetails) next.itemDetails = [];
+                                                                        if (!next.itemDetails[index]) next.itemDetails[index] = {};
+                                                                        next.itemDetails[index].received_qty = "Giá trị phải lớn hơn hoặc bằng 0";
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                                onInput={(e) => {
+                                                                    // Xóa thông báo lỗi tùy chỉnh khi người dùng bắt đầu nhập lại
+                                                                    e.target.setCustomValidity("");
+                                                                }}
                                                                 className={`w-24 px-2 py-1 border rounded text-sm text-right ${
                                                                     isCompleted ? "bg-gray-100 cursor-not-allowed" : 
                                                                     itemErr.received_qty ? "border-red-500" : "border-gray-300"
@@ -1354,6 +1406,7 @@ export default function GoodsReceiptForm() {
                                                                 min="0"
                                                                 step="0.01"
                                                                 disabled={isCompleted}
+                                                                title="Nhập số lượng lớn hơn hoặc bằng 0"
                                                             />
                                                             {itemErr.received_qty && (
                                                                 <p className="text-red-500 text-xs mt-0.5">{itemErr.received_qty}</p>

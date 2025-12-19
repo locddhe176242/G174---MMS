@@ -91,7 +91,7 @@ public class ReturnOrderMapper {
                 .build();
     }
 
-    public ReturnOrderListResponseDTO toListResponse(ReturnOrder returnOrder) {
+    public ReturnOrderListResponseDTO toListResponse(ReturnOrder returnOrder, List<ReturnOrderItem> items) {
         Delivery delivery = returnOrder.getDelivery();
         SalesOrder salesOrder = delivery != null ? delivery.getSalesOrder() : null;
         Customer customer = salesOrder != null ? salesOrder.getCustomer() : null;
@@ -99,6 +99,44 @@ public class ReturnOrderMapper {
         Warehouse warehouse = returnOrder.getWarehouse();
         User createdBy = returnOrder.getCreatedBy();
         User updatedBy = returnOrder.getUpdatedBy();
+
+        // Tính tổng tiền từ items
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+        if (items != null && !items.isEmpty()) {
+            for (ReturnOrderItem item : items) {
+                DeliveryItem deliveryItem = item.getDeliveryItem();
+                SalesOrderItem salesOrderItem = deliveryItem != null ? deliveryItem.getSalesOrderItem() : null;
+                
+                if (salesOrderItem != null) {
+                    java.math.BigDecimal unitPrice = salesOrderItem.getUnitPrice() != null 
+                            ? salesOrderItem.getUnitPrice() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal discountAmount = salesOrderItem.getDiscountAmount() != null 
+                            ? salesOrderItem.getDiscountAmount() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal taxRate = salesOrderItem.getTaxRate() != null 
+                            ? salesOrderItem.getTaxRate() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal returnedQty = item.getReturnedQty() != null 
+                            ? item.getReturnedQty() : java.math.BigDecimal.ZERO;
+                    
+                    // Tính theo công thức: (returnedQty * unitPrice - discountAmount) * (1 + taxRate / 100)
+                    // Tương tự như cách tính trong SalesOrderServiceImpl
+                    java.math.BigDecimal lineSubtotal = returnedQty.multiply(unitPrice);
+                    java.math.BigDecimal lineTaxable = lineSubtotal.subtract(discountAmount);
+                    // Đảm bảo lineTaxable không âm
+                    if (lineTaxable.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                        lineTaxable = java.math.BigDecimal.ZERO;
+                    }
+                    
+                    // Tính thuế: lineTaxable * taxRate / 100
+                    java.math.BigDecimal taxAmount = lineTaxable.multiply(taxRate)
+                            .divide(java.math.BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    
+                    // Tổng tiền dòng = lineTaxable + taxAmount
+                    java.math.BigDecimal lineTotal = lineTaxable.add(taxAmount);
+                    
+                    totalAmount = totalAmount.add(lineTotal);
+                }
+            }
+        }
 
         return ReturnOrderListResponseDTO.builder()
                 .roId(returnOrder.getRoId())
@@ -120,7 +158,13 @@ public class ReturnOrderMapper {
                 .updatedAt(returnOrder.getUpdatedAt())
                 .createdByDisplay(buildUserDisplay(createdBy))
                 .updatedByDisplay(buildUserDisplay(updatedBy))
+                .totalAmount(totalAmount)
                 .build();
+    }
+    
+    // Overload method để backward compatibility (nếu không có items)
+    public ReturnOrderListResponseDTO toListResponse(ReturnOrder returnOrder) {
+        return toListResponse(returnOrder, null);
     }
 
     private String getCustomerName(Customer customer) {

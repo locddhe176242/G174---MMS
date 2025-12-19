@@ -4,6 +4,7 @@ import com.g174.mmssystem.entity.ReturnOrder;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Data
@@ -35,5 +36,7 @@ public class ReturnOrderListResponseDTO {
     private Instant updatedAt;
     private String createdByDisplay;
     private String updatedByDisplay;
+    
+    private BigDecimal totalAmount;
 }
 

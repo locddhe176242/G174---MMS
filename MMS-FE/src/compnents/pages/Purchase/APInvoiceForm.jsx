@@ -90,7 +90,7 @@ export default function APInvoiceForm() {
   }, [formData.items]);
 
   const headerDiscountAmount = useMemo(() => {
-    const discountPercent = Number(formData.header_discount || 0);
+    const discountPercent = Number(formData.header_discount ?? 0);
     // Header discount áp dụng trên tổng sau khi trừ chiết khấu dòng
     return totalAfterLineDiscount * (discountPercent / 100);
   }, [totalAfterLineDiscount, formData.header_discount]);
@@ -173,7 +173,7 @@ export default function APInvoiceForm() {
       console.log("Extracted receipt_id:", extractedReceiptId);
 
       // Get PO info (vendor + header discount + payment terms) if available
-      let headerDiscount = 0;
+      let headerDiscount = null; // Use null instead of 0 to distinguish between "no value" and "0%"
       let vendorId = null;
       let paymentTerms = null;
       const extractedOrderId = gr.orderId || gr.order_id || gr.purchaseOrder?.orderId || gr.purchaseOrder?.order_id || gr.order?.orderId || gr.order?.order_id;
@@ -182,7 +182,12 @@ export default function APInvoiceForm() {
         try {
           const poResponse = await apiClient.get(`/purchase-orders/${extractedOrderId}`);
           const poData = poResponse.data;
-          headerDiscount = poData?.headerDiscount || poData?.header_discount || 0;
+          // Only set headerDiscount if PO actually has a value (not null/undefined)
+          if (poData?.headerDiscount !== null && poData?.headerDiscount !== undefined) {
+            headerDiscount = poData.headerDiscount;
+          } else if (poData?.header_discount !== null && poData?.header_discount !== undefined) {
+            headerDiscount = poData.header_discount;
+          }
           vendorId = poData?.vendorId || poData?.vendor_id || poData?.vendor?.vendorId || poData?.vendor?.vendor_id;
           paymentTerms = poData?.paymentTerms || poData?.payment_terms;
           console.log("PO header discount:", headerDiscount);
@@ -225,7 +230,7 @@ export default function APInvoiceForm() {
         receipt_id: extractedReceiptId,
         invoice_date: new Date(),
         due_date: dueDate,
-        header_discount: headerDiscount,
+        header_discount: headerDiscount !== null ? headerDiscount : 0,
         notes: `Tạo từ phiếu nhập kho ${gr.receiptNo || gr.receipt_no || ''}`,
         items: (gr.items || []).map((item, idx) => {
           console.log(`Item ${idx}:`, item);
@@ -234,8 +239,18 @@ export default function APInvoiceForm() {
             uom: item.uom || '',
             quantity: item.receivedQty || item.receivedQuantity || item.received_quantity || item.quantity || 0,
             unit_price: item.unitPrice || item.unit_price || 0,
-            discount_percent: item.discountPercent || item.discount_percent || 0,
-            tax_rate: item.taxRate || item.tax_rate || 10
+            // Only set discount_percent if it exists in GR item (from PO), otherwise null
+            discount_percent: (item.discountPercent !== null && item.discountPercent !== undefined) 
+              ? item.discountPercent 
+              : ((item.discount_percent !== null && item.discount_percent !== undefined) 
+                  ? item.discount_percent 
+                  : null),
+            // Only set tax_rate if it exists in GR item (from PO), otherwise null (no default value)
+            tax_rate: (item.taxRate !== null && item.taxRate !== undefined) 
+              ? item.taxRate 
+              : ((item.tax_rate !== null && item.tax_rate !== undefined) 
+                  ? item.tax_rate 
+                  : null)
           };
           // Calculate line_total using the same formula
           const totals = calculateItemTotal(itemData);
@@ -699,14 +714,14 @@ export default function APInvoiceForm() {
                     </label>
                     <input
                       type="number"
-                      value={formData.header_discount || 0}
-                      onChange={(e) => handleInputChange("header_discount", parseFloat(e.target.value) || 0)}
+                      value={formData.header_discount ?? ""}
+                      onChange={(e) => handleInputChange("header_discount", e.target.value === "" ? null : (parseFloat(e.target.value) || 0))}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isFromGR ? "bg-gray-100" : "border-gray-300"}`}
                       min="0"
                       max="100"
                       step="0.01"
                       readOnly={isFromGR}
-                      placeholder="0.00"
+                      placeholder="Nhập chiết khấu (%)"
                     />
                     <p className="mt-1 text-xs text-gray-500">Áp dụng trước khi tính thuế</p>
                   </div>
@@ -717,9 +732,9 @@ export default function APInvoiceForm() {
                     </label>
                     <input
                       type="number"
-                      value={formData.items.length > 0 ? formData.items[0].tax_rate || 10 : 10}
+                      value={formData.items.length > 0 ? (formData.items[0].tax_rate ?? "") : ""}
                       onChange={(e) => {
-                        const newTaxRate = parseFloat(e.target.value) || 0;
+                        const newTaxRate = e.target.value === "" ? null : parseFloat(e.target.value) || 0;
                         setFormData(prev => ({
                           ...prev,
                           items: prev.items.map(item => ({ ...item, tax_rate: newTaxRate }))
@@ -730,7 +745,7 @@ export default function APInvoiceForm() {
                       max="100"
                       step="0.01"
                       readOnly={isFromGR}
-                      placeholder="10.00"
+                      placeholder="Nhập thuế VAT (%)"
                     />
                     <p className="mt-1 text-xs text-gray-500">Thuế tính trên tổng sau tất cả chiết khấu</p>
                   </div>

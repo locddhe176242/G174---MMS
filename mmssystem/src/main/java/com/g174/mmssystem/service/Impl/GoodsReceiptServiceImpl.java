@@ -211,30 +211,30 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 }
             }
 
-            User createdBy = userRepository.findById(createdById)
+        User createdBy = userRepository.findById(createdById)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found  " + createdById));
 
-            // Generate receipt number if not provided
-            String receiptNo = dto.getReceiptNo();
-            if (receiptNo == null || receiptNo.trim().isEmpty()) {
-                receiptNo = generateReceiptNo();
-            } else if (receiptRepository.existsByReceiptNo(receiptNo)) {
-                throw new DuplicateResourceException("Goods Receipt number already exists: " + receiptNo);
-            }
+        // Generate receipt number if not provided
+        String receiptNo = dto.getReceiptNo();
+        if (receiptNo == null || receiptNo.trim().isEmpty()) {
+            receiptNo = generateReceiptNo();
+        } else if (receiptRepository.existsByReceiptNo(receiptNo)) {
+            throw new DuplicateResourceException("Goods Receipt number already exists: " + receiptNo);
+        }
 
-            // Create receipt entity
-            GoodsReceipt receipt = GoodsReceipt.builder()
-                    .receiptNo(receiptNo)
+        // Create receipt entity
+        GoodsReceipt receipt = GoodsReceipt.builder()
+                .receiptNo(receiptNo)
                     .sourceType(GoodsReceipt.SourceType.SalesReturn)
                     .returnOrder(inboundOrder.getReturnOrder())
-                    .warehouse(warehouse)
+                .warehouse(warehouse)
                     .receivedDate(dto.getReceivedDate() != null ? dto.getReceivedDate().toLocalDateTime()
                             : LocalDateTime.now())
-                    .status(GoodsReceipt.GoodsReceiptStatus.Pending)
-                    .createdBy(createdBy)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
+                .status(GoodsReceipt.GoodsReceiptStatus.Pending)
+                .createdBy(createdBy)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
 
             // Inbound items already loaded above for validation
             log.info("Loaded {} inbound items for SRI ID: {}", inboundItems != null ? inboundItems.size() : 0, sriId);
@@ -244,10 +244,10 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             }
 
             // Create Goods Receipt items from Sales Return Inbound Order items
-            if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
                 log.info("Processing {} items from DTO", dto.getItems().size());
-                List<GoodsReceiptItem> items = dto.getItems().stream()
-                        .map(itemDto -> {
+            List<GoodsReceiptItem> items = dto.getItems().stream()
+                    .map(itemDto -> {
                             log.info("Processing item: roiId={}, productId={}, receivedQty={}",
                                     itemDto.getRoiId(), itemDto.getProductId(), itemDto.getReceivedQty());
 
@@ -294,7 +294,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                                 log.info("Using roiId from sriItem: {}", roi.getRoiId());
                             }
 
-                            Product product = productRepository.findById(itemDto.getProductId())
+                        Product product = productRepository.findById(itemDto.getProductId())
                                     .orElseThrow(() -> new ResourceNotFoundException(
                                             "Product not found  " + itemDto.getProductId()));
 
@@ -323,17 +323,17 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                                                 acceptedQty, itemDto.getReceivedQty()));
                             }
 
-                            return GoodsReceiptItem.builder()
-                                    .goodsReceipt(receipt)
+                        return GoodsReceiptItem.builder()
+                                .goodsReceipt(receipt)
                                     .returnOrderItem(roi)
-                                    .product(product)
-                                    .receivedQty(itemDto.getReceivedQty())
+                                .product(product)
+                                .receivedQty(itemDto.getReceivedQty())
                                     .acceptedQty(acceptedQty)
-                                    .remark(itemDto.getRemark())
-                                    .build();
-                        })
-                        .collect(Collectors.toList());
-                receipt.setItems(items);
+                                .remark(itemDto.getRemark())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+            receipt.setItems(items);
             } else {
                 // Auto-create items from Sales Return Inbound Order items if not provided
                 List<GoodsReceiptItem> items = inboundItems.stream()
@@ -368,15 +368,15 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 }
 
                 receipt.setItems(items);
-            }
+        }
 
-            GoodsReceipt saved = receiptRepository.save(receipt);
-            GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
-                    .orElse(saved);
+        GoodsReceipt saved = receiptRepository.save(receipt);
+        GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
+                .orElse(saved);
 
             log.info("Goods receipt created successfully from Sales Return Inbound Order with ID: {} and number: {}",
                     saved.getReceiptId(), saved.getReceiptNo());
-            return receiptMapper.toResponseDTO(savedWithRelations);
+        return receiptMapper.toResponseDTO(savedWithRelations);
         } catch (Exception e) {
             log.error("Error creating goods receipt from Sales Return Inbound Order ID: {}", sriId, e);
             log.error("Exception type: {}, Message: {}", e.getClass().getName(), e.getMessage());
@@ -395,13 +395,13 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         // Then fetch items separately
         GoodsReceipt receiptWithItems = receiptRepository.findByIdWithItems(receiptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goods Receipt not found  " + receiptId));
-
+        
         // Set items to the main receipt
         receipt.setItems(receiptWithItems.getItems());
 
         GoodsReceiptResponseDTO dto = receiptMapper.toResponseDTO(receipt);
         dto.setHasInvoice(checkIfReceiptHasInvoice(receipt.getReceiptId()));
-
+        
         return dto;
     }
 
@@ -425,7 +425,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             return dto;
         });
     }
-
+    
     private boolean checkIfReceiptHasInvoice(Integer receiptId) {
         // Only count active invoices (not Cancelled)
         return apInvoiceRepository.findByReceiptId(receiptId).stream()
@@ -480,7 +480,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
                 // Create a copy to avoid ConcurrentModificationException
                 List<GoodsReceiptItem> itemsToRemove = new ArrayList<>(receipt.getItems());
-                receipt.getItems().clear();
+            receipt.getItems().clear();
                 // The orphan removal will handle deletion
             }
 
@@ -543,7 +543,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         receipt.setUpdatedAt(LocalDateTime.now());
 
         GoodsReceipt saved = receiptRepository.save(receipt);
-
+        
         // Load items with relations before processing
         GoodsReceipt savedWithItems = receiptRepository.findByIdWithItems(saved.getReceiptId())
                 .orElseThrow(() -> new IllegalStateException("Failed to load Goods Receipt items after save"));
@@ -560,24 +560,24 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             // Update PO Items: Track received quantities directly from Purchase Order Items
             log.info("Updating PO items received_qty for {} GRN items", savedWithItems.getItems().size());
             for (GoodsReceiptItem grItem : savedWithItems.getItems()) {
-                PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
-                if (poItem != null) {
-                    BigDecimal acceptedQty = grItem.getAcceptedQty();
+            PurchaseOrderItem poItem = grItem.getPurchaseOrderItem();
+            if (poItem != null) {
+                BigDecimal acceptedQty = grItem.getAcceptedQty();
                     BigDecimal currentReceived = poItem.getReceivedQty() != null ? poItem.getReceivedQty()
                             : BigDecimal.ZERO;
-                    BigDecimal newReceived = currentReceived.add(acceptedQty);
-
-                    poItem.setReceivedQty(newReceived);
-                    orderItemRepository.save(poItem);
-
-                    log.info("POI {} received_qty: {} + {} = {} (ordered: {})",
-                            poItem.getPoiId(), currentReceived, acceptedQty, newReceived, poItem.getQuantity());
-
-                    // Check over-receipt
-                    if (newReceived.compareTo(poItem.getQuantity()) > 0) {
-                        log.warn("Over-receipt detected! POI {}: received {} > ordered {}",
-                                poItem.getPoiId(), newReceived, poItem.getQuantity());
-                    }
+                BigDecimal newReceived = currentReceived.add(acceptedQty);
+                
+                poItem.setReceivedQty(newReceived);
+                orderItemRepository.save(poItem);
+                
+                log.info("POI {} received_qty: {} + {} = {} (ordered: {})", 
+                         poItem.getPoiId(), currentReceived, acceptedQty, newReceived, poItem.getQuantity());
+                
+                // Check over-receipt
+                if (newReceived.compareTo(poItem.getQuantity()) > 0) {
+                    log.warn("Over-receipt detected! POI {}: received {} > ordered {}", 
+                             poItem.getPoiId(), newReceived, poItem.getQuantity());
+                }
                 }
             }
         } else if (saved.getSourceType() == GoodsReceipt.SourceType.SalesReturn) {
@@ -657,10 +657,10 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             }
 
             log.info("Processing stock update for warehouse {} product {} with acceptedQty {}", warehouseId, productId, acceptedQty);
-
+            
             // Try to update existing stock
             int updated = warehouseStockRepository.updateStockQuantity(warehouseId, productId, acceptedQty);
-
+            
             if (updated == 0) {
                 // Stock record doesn't exist, create new one
                 log.info("Creating new stock record for warehouse {} product {} with quantity {}", warehouseId,
@@ -675,7 +675,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 log.info("Updated stock: warehouse {} product {} +{}", warehouseId, productId, acceptedQty);
             }
         }
-
+        
         log.info("Goods receipt approved successfully, items and warehouse stock updated");
 
         // Auto-create AP Invoice only for Purchase (not for SalesReturn)
@@ -705,13 +705,13 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 }
 
                 // Auto-create AP Invoice from this Goods Receipt
-                try {
-                    log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
-                    apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
-                    log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
-                } catch (IllegalStateException e) {
-                    log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
-                } catch (Exception e) {
+        try {
+            log.info("Auto-creating AP Invoice for Goods Receipt ID: {}", receiptId);
+            apInvoiceService.createInvoiceFromGoodsReceipt(receiptId);
+            log.info("AP Invoice created successfully for Goods Receipt ID: {}", receiptId);
+        } catch (IllegalStateException e) {
+            log.warn("AP Invoice not created for Goods Receipt ID: {}. Reason: {}", receiptId, e.getMessage());
+        } catch (Exception e) {
                     log.error("Failed to auto-create AP Invoice for Goods Receipt ID: {}. Error: {}", receiptId,
                             e.getMessage(), e);
                 }
@@ -730,7 +730,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         } else {
             log.info("Skipping AP Invoice creation for SalesReturn Goods Receipt ID: {}", receiptId);
         }
-
+        
         // Load full relations for response - split queries to avoid cartesian product
         GoodsReceipt savedWithRelations = receiptRepository.findByIdWithRelations(saved.getReceiptId())
                 .orElse(saved);
@@ -806,7 +806,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         String prefix = "GR" + java.time.Year.now().getValue();
         java.util.Optional<GoodsReceipt> lastReceipt = receiptRepository
                 .findTopByReceiptNoStartingWithOrderByReceiptNoDesc(prefix);
-
+        
         int nextNumber = 1;
         if (lastReceipt.isPresent()) {
             String lastNo = lastReceipt.get().getReceiptNo();
@@ -817,7 +817,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 log.warn("Could not parse number from Receipt number: {}", lastNo);
             }
         }
-
+        
         // Kiểm tra và tìm số tiếp theo nếu bị trùng
         String receiptNo;
         int maxAttempts = 100;
