@@ -124,24 +124,7 @@ public class ReportService {
             
             log.info("Built {} inventory items for report", inventoryItems.size());
             
-            // If no warehouse stock data, add sample data for testing
-            if (inventoryItems.isEmpty()) {
-                log.warn("No warehouse stock data found, adding sample data");
-                Map<String, Object> sampleItem = new HashMap<>();
-                sampleItem.put("productId", 0);
-                sampleItem.put("productCode", "SAMPLE-001");
-                sampleItem.put("productName", "Sample Product");
-                sampleItem.put("unit", "PCS");
-                sampleItem.put("warehouseName", "Main Warehouse");
-                sampleItem.put("currentQty", BigDecimal.valueOf(100));
-                sampleItem.put("minStock", BigDecimal.valueOf(10));
-                sampleItem.put("maxStock", BigDecimal.valueOf(200));
-                sampleItem.put("openingQty", BigDecimal.valueOf(80));
-                sampleItem.put("inboundQty", BigDecimal.valueOf(30));
-                sampleItem.put("outboundQty", BigDecimal.valueOf(10));
-                sampleItem.put("closingQty", BigDecimal.valueOf(100));
-                inventoryItems.add(sampleItem);
-            }
+            // No sample data - return actual data only
             
             Map<String, Object> reportData = new HashMap<>();
             reportData.put("generatedAt", LocalDateTime.now());

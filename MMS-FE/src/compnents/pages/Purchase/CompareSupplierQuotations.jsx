@@ -506,11 +506,25 @@ export default function CompareSupplierQuotations() {
     // Số NCC được mời = selectedVendorIds từ RFQ, nếu không có thì dùng số quotation
     // Số báo giá nhận được = số quotation
     const selectedVendorIds = rfqData.selectedVendorIds || [];
+    const selectedVendors = rfqData.selectedVendors || [];
+    
+    // Tính số nhà cung cấp được mời một cách chính xác
+    let invitedVendorCount = 0;
+    if (selectedVendorIds.length > 0) {
+        invitedVendorCount = selectedVendorIds.length;
+    } else if (selectedVendors.length > 0) {
+        invitedVendorCount = selectedVendors.length;
+    } else {
+        // Nếu không có thông tin về NCC được mời, dùng unique vendor IDs từ quotations
+        const uniqueVendorIds = new Set(quotations.map(q => q.vendorId || q.vendor_id));
+        invitedVendorCount = Math.max(uniqueVendorIds.size, quotations.length);
+    }
+    
     console.log('=== DEBUG CompareSupplierQuotations ===');
     console.log('rfqData.selectedVendorIds:', rfqData.selectedVendorIds);
     console.log('selectedVendorIds:', selectedVendorIds);
+    console.log('selectedVendors:', selectedVendors);
     console.log('quotations.length:', quotations.length);
-    const invitedVendorCount = selectedVendorIds.length > 0 ? selectedVendorIds.length : quotations.length;
     const receivedQuotationCount = quotations.length;
     console.log('invitedVendorCount:', invitedVendorCount);
     console.log('receivedQuotationCount:', receivedQuotationCount);

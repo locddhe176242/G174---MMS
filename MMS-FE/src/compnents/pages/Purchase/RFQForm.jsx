@@ -29,7 +29,6 @@ export default function RFQForm() {
                 productName: "",
                 uom: "",
                 quantity: 1,
-                deliveryDate: null,
                 targetPrice: 0,
                 priceUnit: 1,
                 note: "",
@@ -227,7 +226,6 @@ export default function RFQForm() {
                     spec: it.spec || "",
                     uom: it.uom || "",
                     quantity: it.quantity ?? it.requestedQty ?? 0,
-                    deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
                     targetPrice: it.targetPrice ?? it.valuation_price ?? 0,
                     priceUnit: it.priceUnit ?? it.price_unit ?? 1,
                     note: it.note || "",
@@ -251,9 +249,11 @@ export default function RFQForm() {
     };
 
     const handleItemChange = (index, field, value) => {
+        console.log("handleItemChange:", { index, field, value });
         setFormData((prev) => {
             const next = [...prev.items];
             next[index] = { ...next[index], [field]: value };
+            console.log("Updated item:", next[index]);
             return { ...prev, items: next };
         });
     };
@@ -268,7 +268,7 @@ export default function RFQForm() {
             ...prev,
             items: [
                 ...prev.items,
-                { rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" },
+                { rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, targetPrice: 0, priceUnit: 1, note: "" },
             ],
         }));
     };
@@ -282,20 +282,29 @@ export default function RFQForm() {
         setFormData((prev) => {
             const next = [...prev.items];
             next.splice(index, 1);
-            return { ...prev, items: next.length ? next : [{ rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, deliveryDate: null, targetPrice: 0, priceUnit: 1, note: "" }] };
+            return { ...prev, items: next.length ? next : [{ rfqItemId: null, productId: null, productCode: "", productName: "", uom: "", quantity: 1, targetPrice: 0, priceUnit: 1, note: "" }] };
         });
     };
 
     const handleProductSelect = (index, selectedOption) => {
+        console.log("handleProductSelect called:", { index, selectedOption });
         if (selectedOption) {
             const product = selectedOption.product;
-            handleItemChange(index, "productId", product.product_id || product.id);
+            console.log("Product data:", product);
+            // Use selectedOption.value instead of trying to get ID from product object
+            handleItemChange(index, "productId", selectedOption.value);
             handleItemChange(index, "productCode", product.sku || product.productCode || "");
             handleItemChange(index, "productName", product.name || "");
             handleItemChange(index, "uom", product.uom || product.unit || "");
             if (product.purchase_price) {
                 handleItemChange(index, "targetPrice", product.purchase_price);
             }
+            console.log("After product select, item should be:", {
+                productId: selectedOption.value,
+                productCode: product.sku || product.productCode || "",
+                productName: product.name || "",
+                uom: product.uom || product.unit || ""
+            });
         }
     };
 
@@ -304,18 +313,14 @@ export default function RFQForm() {
         if (!formData.rfqNo || !formData.rfqNo.trim()) {
             errors.rfqNo = "Số Yêu cầu báo giá là bắt buộc";
         }
-        if (!formData.issueDate) {
-            errors.issueDate = "Ngày phát hành là bắt buộc";
-        }
         if (!formData.dueDate) {
             errors.dueDate = "Hạn phản hồi là bắt buộc";
         }
-        if (formData.issueDate && formData.dueDate) {
-            const i = new Date(formData.issueDate);
-            const d = new Date(formData.dueDate);
-            if (d < i) {
-                errors.dueDate = "Hạn phản hồi phải sau Ngày phát hành";
-            }
+        // Always use current date for comparison since issueDate is auto-set to today
+        const today = new Date();
+        const d = new Date(formData.dueDate);
+        if (formData.dueDate && d < today) {
+            errors.dueDate = "Hạn phản hồi phải từ hôm nay trở đi";
         }
         // Validate items (ít nhất 1 dòng có quantity > 0)
         if (!formData.items || formData.items.length === 0) {
@@ -328,9 +333,6 @@ export default function RFQForm() {
                 }
                 if (!it.quantity || Number(it.quantity) <= 0) {
                     e.quantity = "Số lượng phải > 0";
-                }
-                if (!it.deliveryDate) {
-                    e.deliveryDate = "Chọn ngày";
                 }
                 return e;
             });
@@ -548,7 +550,6 @@ export default function RFQForm() {
                         spec: it.spec || "",
                         uom: productObj?.uom || productObj?.unit || it.uom || it.product?.uom || "",
                         quantity: it.quantity ?? it.requestedQty ?? 1,
-                        deliveryDate: it.deliveryDate ? new Date(it.deliveryDate) : null,
                         targetPrice: it.targetPrice ?? it.valuation_price ?? it.estimatedUnitPrice ?? productObj?.purchase_price ?? 0,
                         priceUnit: it.priceUnit ?? 1,
                         note: it.note || it.remark || "",
@@ -569,20 +570,20 @@ export default function RFQForm() {
                 return;
             }
 
-            // Check if already imported from different PR
-            if (importedPrId && importedPrId !== prId) {
-                toast.error("RFQ chỉ có thể import từ 1 PR duy nhất. Vui lòng xóa items hiện tại trước khi import PR khác.");
-                return;
+            // Check if already imported (either same PR or different PR)
+            if (importedPrId) {
+                if (importedPrId === prId) {
+                    toast.error("Đã import từ PR này rồi. Không thể import nhiều lần từ cùng một PR.");
+                    return;
+                } else {
+                    toast.error("RFQ chỉ có thể import từ 1 PR duy nhất. Vui lòng xóa items hiện tại trước khi import PR khác.");
+                    return;
+                }
             }
             
             setFormData((prev) => {
-                // Replace existing items instead of appending
-                // Remove empty default item if exists
-                const hasOnlyEmptyItem = prev.items.length === 1 && 
-                    !prev.items[0].productId && 
-                    !prev.items[0].productName;
-                
-                const newItems = hasOnlyEmptyItem ? mapped : [...prev.items, ...mapped];
+                // Replace all existing items with imported items
+                const newItems = mapped;
                 console.log("Setting formData items:", newItems);
                 return { ...prev, items: newItems };
             });
@@ -633,7 +634,7 @@ export default function RFQForm() {
             const payload = {
                 rfqNo: formData.rfqNo,
                 requisitionId: importedPrId || null, // Link to source PR
-                issueDate: formatDateForBackend(formData.issueDate),
+                issueDate: new Date().toISOString().split('T')[0], // Always use current date
                 dueDate: formatDateForBackend(formData.dueDate),
                 status: formData.status || "Draft",
                 selectedVendorIds: formData.selectedVendorIds || [],
@@ -649,7 +650,6 @@ export default function RFQForm() {
                         spec: it.spec || "",
                         uom: it.uom || "",
                         quantity: Number(it.quantity) || 1,
-                        deliveryDate: formatDateForBackend(it.deliveryDate),
                         targetPrice: Number(it.targetPrice || 0),
                         priceUnit: Number(it.priceUnit || 1),
                         note: it.note || "",
@@ -686,6 +686,75 @@ export default function RFQForm() {
             console.error("Error saving RFQ:", err);
             const msg = err?.response?.data?.message || (isEdit ? "Không thể cập nhật Yêu cầu báo giá" : "Không thể tạo Yêu cầu báo giá");
             setError(msg);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Handle save draft
+    const handleSaveDraft = async () => {
+        setIsSubmitting(true);
+        setError(null);
+        setValidationErrors({});
+
+        try {
+            // Format dates to YYYY-MM-DD for LocalDate
+            const formatDateForBackend = (date) => {
+                if (!date) return null;
+                if (typeof date === 'string') {
+                    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+                    const d = new Date(date);
+                    return d.toISOString().split('T')[0];
+                }
+                if (date instanceof Date) {
+                    return date.toISOString().split('T')[0];
+                }
+                return null;
+            };
+
+            const saveData = {
+                rfqNo: formData.rfqNo,
+                requisitionId: importedPrId || null,
+                issueDate: new Date().toISOString().split('T')[0], // Always use current date
+                dueDate: formatDateForBackend(formData.dueDate),
+                status: 'Draft', // Always save as Draft
+                selectedVendorIds: formData.selectedVendorIds || [],
+                notes: formData.notes || "",
+                items: (formData.items || []).map(item => ({
+                    rfqItemId: item.rfqItemId || null,
+                    priId: item.priId || null,
+                    productId: item.productId || null,
+                    productCode: item.productCode || "",
+                    productName: item.productName || "",
+                    spec: item.spec || "",
+                    uom: item.uom || "",
+                    quantity: item.quantity || 1,
+                    targetPrice: item.targetPrice || 0,
+                    priceUnit: item.priceUnit || 1,
+                    note: item.note || ""
+                }))
+            };
+
+            if (isEdit) {
+                await rfqService.updateRFQ(id, saveData);
+                toast.success('Đã lưu nháp RFQ thành công!');
+            } else {
+                await rfqService.createRFQ(saveData);
+                toast.success('Đã lưu nháp RFQ thành công!');
+                
+                if (importedPrId) {
+                    try {
+                        await apiClient.put(`/purchase-requisitions/${importedPrId}/convert`);
+                    } catch (convertErr) {
+                        console.error(`Failed to convert PR ${importedPrId}:`, convertErr);
+                    }
+                }
+                navigate('/purchase/rfqs');
+            }
+        } catch (err) {
+            console.error('Save draft error:', err);
+            setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu nháp');
+            toast.error('Không thể lưu nháp: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsSubmitting(false);
         }
@@ -823,15 +892,12 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
-                                        <DatePicker
-                                            selected={formData.issueDate instanceof Date ? formData.issueDate : (formData.issueDate ? new Date(formData.issueDate) : new Date())}
-                                            onChange={(date) => handleInputChange("issueDate", date)}
-                                            dateFormat="dd/MM/yyyy"
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
+                                        <input
+                                            type="text"
+                                            value={new Date().toLocaleDateString('vi-VN')}
+                                            readOnly
+                                            className="w-full px-3 py-2 border rounded-lg bg-gray-100 border-gray-300"
                                         />
-                                        {validationErrors.issueDate && (
-                                            <p className="mt-1 text-sm text-red-600">{validationErrors.issueDate}</p>
-                                        )}
                                     </div>
 
                                     <div>
@@ -857,14 +923,16 @@ export default function RFQForm() {
                             <div className="bg-white rounded-lg">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
-                                    <button
-                                        type="button"
-                                        onClick={addItem}
-                                        disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                    >
-                                        Thêm sản phẩm
-                                    </button>
+                                    {!importedPrId && (
+                                        <button
+                                            type="button"
+                                            onClick={addItem}
+                                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                        >
+                                            Thêm sản phẩm
+                                        </button>
+                                    )}
                                 </div>
 
                                 {validationErrors.items && (
@@ -883,7 +951,6 @@ export default function RFQForm() {
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">#</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
-                                                    <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Ngày cần</th>
                                                     <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                                 </tr>
                                             </thead>
@@ -906,8 +973,8 @@ export default function RFQForm() {
                                                                     })()}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
                                                                     options={products}
-                                                                    isDisabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                                                    placeholder="Chọn sản phẩm"
+                                                                    isDisabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status) || importedPrId}
+                                                                    placeholder={importedPrId ? "Sản phẩm từ PR" : "Chọn sản phẩm"}
                                                                     menuPortalTarget={document.body}
                                                                     menuPosition="fixed"
                                                                     menuShouldScrollIntoView={false}
@@ -925,33 +992,20 @@ export default function RFQForm() {
                                                                     type="number"
                                                                     value={item.quantity}
                                                                     onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 1)}
-                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status) || importedPrId}
                                                                     className="w-20 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                                                    min="1"
                                                                     step="1"
+                                                                    onInvalid={(e) => e.preventDefault()}
                                                                 />
                                                                 {itemErr.quantity && (
                                                                     <p className="text-red-500 text-xs mt-1">{itemErr.quantity}</p>
                                                                 )}
                                                             </td>
                                                             <td className="border border-gray-200 px-4 py-2">
-                                                                <DatePicker
-                                                                    selected={item.deliveryDate}
-                                                                    onChange={(date) => handleItemChange(index, "deliveryDate", date)}
-                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                                                    dateFormat="dd/MM/yyyy"
-                                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                                                    placeholderText="Chọn ngày"
-                                                                />
-                                                                {itemErr.deliveryDate && (
-                                                                    <p className="text-red-500 text-xs mt-1">{itemErr.deliveryDate}</p>
-                                                                )}
-                                                            </td>
-                                                            <td className="border border-gray-200 px-4 py-2">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeItem(index)}
-                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                                                                    disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status) || importedPrId}
                                                                     className="text-red-600 hover:text-red-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
                                                                 >
                                                                     Xóa
@@ -992,6 +1046,14 @@ export default function RFQForm() {
                                     className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     Hủy
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveDraft}
+                                    disabled={isSubmitting}
+                                    className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                                >
+                                    {isSubmitting ? "Đang lưu..." : "Lưu nháp"}
                                 </button>
                                 <button
                                     type="submit"

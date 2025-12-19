@@ -923,6 +923,34 @@ export default function PurchaseOrderForm() {
         }
     };
 
+    const handleResetImport = () => {
+        // Reset form về trạng thái ban đầu
+        setIsImportedFromPQ(false);
+        setFormData(prev => ({
+            ...prev,
+            vendor_id: null,
+            pq_id: null,
+            payment_terms: '',
+            delivery_date: null,
+            shipping_address: '',
+            header_discount: 0,
+            items: [{
+                product_id: null,
+                productName: "",
+                productCode: "",
+                uom: "",
+                quantity: 1,
+                unit_price: 0,
+                tax_rate: 0,
+                tax_amount: 0,
+                line_total: 0,
+                delivery_date: null,
+                note: "",
+            }]
+        }));
+        toast.success("Đã reset form để tạo PO mới");
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -1118,6 +1146,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
                                             onChange={(date) => handleInputChange("order_date", date)}
                                             dateFormat="dd/MM/yyyy"
+                                            minDate={new Date()}
                                             className={
                                                 validationErrors.order_date
                                                     ? "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-red-500"
@@ -1139,6 +1168,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.delivery_date instanceof Date ? formData.delivery_date : (formData.delivery_date ? new Date(formData.delivery_date) : null)}
                                             onChange={(date) => handleInputChange("delivery_date", date)}
                                             dateFormat="dd/MM/yyyy"
+                                            minDate={new Date()}
                                             isClearable
                                             placeholderText="Chọn ngày giao hàng"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1228,15 +1258,17 @@ export default function PurchaseOrderForm() {
                                             Thêm sản phẩm
                                         </button>
                                     )}
+                                    {isImportedFromPQ && (
+                                        <button
+                                            type="button"
+                                            onClick={handleResetImport}
+                                            className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition"
+                                            title="Tạo PO mới không sử dụng báo giá"
+                                        >
+                                            Tạo PO mới
+                                        </button>
+                                    )}
                                 </div>
-                                
-                                {isImportedFromPQ && (
-                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                        <p className="text-sm text-blue-800">
-                                            ℹ️ Danh sách sản phẩm đã được nhập từ báo giá. Chỉ có thể import lại từ báo giá khác hoặc chỉnh sửa thông tin hiện tại.
-                                        </p>
-                                    </div>
-                                )}
 
                                 {validationErrors.items && (
                                     <p className="text-red-500 text-sm mb-4">{validationErrors.items}</p>
@@ -1257,7 +1289,7 @@ export default function PurchaseOrderForm() {
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">CK (%)</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền (VND)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                             </tr>
                                             </thead>
