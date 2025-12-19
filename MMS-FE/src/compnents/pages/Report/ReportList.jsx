@@ -150,7 +150,6 @@ export default function ReportList() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Báo cáo tồn kho</h1>
-                            <p className="text-sm text-gray-600 mt-1">Theo dõi số lượng đầu kỳ, nhập, xuất và tồn kho cuối kỳ</p>
                         </div>
                     </div>
                 </div>

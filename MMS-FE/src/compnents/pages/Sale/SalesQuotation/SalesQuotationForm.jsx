@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import { salesQuotationService } from "../../../../api/salesQuotationService";
 import customerService from "../../../../api/customerService";
@@ -238,13 +238,14 @@ export default function SalesQuotationForm() {
     try {
       setLoading(true);
       const quotation = await salesQuotationService.getQuotationById(id);
+      const today = new Date().toISOString().slice(0, 10);
       setFormData({
         quotationNo: quotation.quotationNo || "",
         customerId: quotation.customerId || quotation.customer?.customerId || null,
         status: quotation.status || "Draft",
         quotationDate: quotation.quotationDate
           ? quotation.quotationDate.slice(0, 10)
-          : "",
+          : today, // Nếu không có ngày, dùng ngày hiện tại
         paymentTerms: quotation.paymentTerms || "",
         deliveryTerms: quotation.deliveryTerms || "",
         notes: quotation.notes || "",
@@ -287,9 +288,11 @@ export default function SalesQuotationForm() {
 
   const generateTempQuotationNo = () => {
     const ts = Date.now().toString().slice(-5);
+    const today = new Date().toISOString().slice(0, 10);
     setFormData((prev) => ({
       ...prev,
       quotationNo: prev.quotationNo || `SQ-${ts}`,
+      quotationDate: prev.quotationDate || today,
     }));
   };
 
@@ -300,9 +303,6 @@ export default function SalesQuotationForm() {
     }));
   };
 
-  const handleDateChange = (field, date) => {
-    handleInputChange(field, date ? date.toISOString().slice(0, 10) : "");
-  };
 
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
@@ -503,33 +503,38 @@ export default function SalesQuotationForm() {
     return errors;
   };
 
-  const buildPayload = () => ({
-    quotationNo: formData.quotationNo || null,
-    customerId: formData.customerId,
-    status: formData.status,
-    quotationDate: formData.quotationDate,
-    paymentTerms: formData.paymentTerms || null,
-    deliveryTerms: formData.deliveryTerms || null,
-    notes: formData.notes || null,
-    headerDiscountPercent: Number(formData.commonDiscountRate || 0),
-    taxRate: Number(formData.taxRate || 0),
-    subtotal: totals.subtotal,
-    taxAmount: totals.taxAmount,
-    totalAmount: totals.totalAmount,
-    items: formData.items.map((item) => ({
-      productId: item.productId,
-      productCode: item.productCode,
-      productName: item.productName,
-      uom: item.uom,
-      quantity: Number(item.quantity || 0),
-      unitPrice: Number(item.unitPrice || 0),
-      discountPercent:
-        item.discountRate !== null && item.discountRate !== undefined
-          ? Number(item.discountRate || 0)
-          : 0, // Không tự động điền từ commonDiscountRate
-      taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
-    })),
-  });
+  const buildPayload = () => {
+    // Đảm bảo quotationDate luôn có giá trị (ngày hiện tại nếu không có)
+    const quotationDate = formData.quotationDate || new Date().toISOString().slice(0, 10);
+    
+    return {
+      quotationNo: formData.quotationNo || null,
+      customerId: formData.customerId,
+      status: formData.status,
+      quotationDate: quotationDate,
+      paymentTerms: formData.paymentTerms || null,
+      deliveryTerms: formData.deliveryTerms || null,
+      notes: formData.notes || null,
+      headerDiscountPercent: Number(formData.commonDiscountRate || 0),
+      taxRate: Number(formData.taxRate || 0),
+      subtotal: totals.subtotal,
+      taxAmount: totals.taxAmount,
+      totalAmount: totals.totalAmount,
+      items: formData.items.map((item) => ({
+        productId: item.productId,
+        productCode: item.productCode,
+        productName: item.productName,
+        uom: item.uom,
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+        discountPercent:
+          item.discountRate !== null && item.discountRate !== undefined
+            ? Number(item.discountRate || 0)
+            : 0, // Không tự động điền từ commonDiscountRate
+        taxRate: getEffectiveTaxRate(item.taxRate, formData.taxRate),
+      })),
+    };
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -650,74 +655,77 @@ export default function SalesQuotationForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
-              </h1>
-              {isEdit && quotationData && (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    isDraft
-                      ? "bg-gray-100 text-gray-700"
-                      : isActive
-                      ? "bg-blue-100 text-blue-700"
-                      : quotationData.status === "Converted"
-                      ? "bg-green-100 text-green-700"
-                      : quotationData.status === "Cancelled"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {isDraft
-                    ? "Nháp"
-                    : isActive
-                    ? "Đang mở"
-                    : quotationData.status === "Converted"
-                    ? "Đã chuyển đổi"
-                    : quotationData.status === "Cancelled"
-                    ? "Đã hủy"
-                    : quotationData.status === "Expired"
-                    ? "Hết hạn"
-                    : quotationData.status}
-                </span>
-              )}
-            </div>
-
-            {isActive && !isManager && (
-              <p className="text-sm text-yellow-600 mt-1">
-                Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {isEdit && isDraft && (
-              <button
-                type="button"
-                onClick={handleSendToCustomer}
-                disabled={submitting}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang gửi..." : "Gửi cho khách"}
-              </button>
-            )}
-            {isEdit && isActive && (
-              <button
-                type="button"
-                onClick={handleCloneToDraft}
-                disabled={submitting}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang xử lý..." : "Tạo bản nháp mới"}
-              </button>
-            )}
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/sales/quotations")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
             >
-              Quay lại
+              <FontAwesomeIcon icon={faArrowLeft} />
             </button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold">
+                  {isEdit ? "Chỉnh sửa báo giá" : "Tạo báo giá mới"}
+                </h1>
+                {isEdit && quotationData && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      isDraft
+                        ? "bg-gray-100 text-gray-700"
+                        : isActive
+                        ? "bg-blue-100 text-blue-700"
+                        : quotationData.status === "Converted"
+                        ? "bg-green-100 text-green-700"
+                        : quotationData.status === "Cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {isDraft
+                      ? "Nháp"
+                      : isActive
+                      ? "Đang mở"
+                      : quotationData.status === "Converted"
+                      ? "Đã chuyển đổi"
+                      : quotationData.status === "Cancelled"
+                      ? "Đã hủy"
+                      : quotationData.status === "Expired"
+                      ? "Hết hạn"
+                      : quotationData.status}
+                  </span>
+                )}
+              </div>
+              {isActive && !isManager && (
+                <p className="text-sm text-yellow-600 mt-1">
+                  Báo giá đã gửi khách, chỉ Manager mới được chỉnh sửa
+                </p>
+              )}
+            </div>
+            <div className="flex-1"></div>
+            <div className="flex gap-2">
+              {isEdit && isDraft && (
+                <button
+                  type="button"
+                  onClick={handleSendToCustomer}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {submitting ? "Đang gửi..." : "Gửi cho khách"}
+                </button>
+              )}
+              {isEdit && isActive && (
+                <button
+                  type="button"
+                  onClick={handleCloneToDraft}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {submitting ? "Đang xử lý..." : "Tạo bản nháp mới"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -775,16 +783,17 @@ export default function SalesQuotationForm() {
                   <label className="block text-sm text-gray-600">
                     Ngày báo giá <span className="text-red-500">*</span>
                   </label>
-                  <DatePicker
-                    selected={
-                      formData.quotationDate
-                        ? new Date(formData.quotationDate)
-                        : null
-                    }
-                    onChange={(date) => handleDateChange("quotationDate", date)}
-                    dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full h-10 border rounded-lg px-3 py-2"
-                    disabled={!canEdit}
+                  <input
+                    type="text"
+                    value={(() => {
+                      if (!formData.quotationDate) {
+                        return new Date().toLocaleDateString('vi-VN');
+                      }
+                      const date = new Date(formData.quotationDate);
+                      return date.toLocaleDateString('vi-VN');
+                    })()}
+                    readOnly
+                    className="mt-1 w-full h-10 border rounded-lg px-3 py-2 bg-gray-50"
                   />
                   {validationErrors.quotationDate && (
                     <p className="text-sm text-red-600 mt-1">
@@ -969,12 +978,13 @@ export default function SalesQuotationForm() {
                 <tbody className="divide-y">
                   {formData.items.map((item, index) => {
                     // Không cho chọn trùng sản phẩm trong nhiều dòng
-                    const usedProductIds = formData.items
-                      .map((it, idx) => (idx === index ? null : it.productId))
+                    const selectedProductIds = formData.items
+                      .map((it, idx) => idx !== index ? it.productId : null)
                       .filter((id) => id !== null && id !== undefined);
-                    const availableProducts = products.filter(
-                      (opt) => !usedProductIds.includes(opt.value)
-                    );
+                    const availableProducts = products.filter(product => {
+                      const productId = Number(product.value);
+                      return !selectedProductIds.some(selectedId => Number(selectedId) === productId);
+                    });
 
                     const baseTotal =
                       Number(item.quantity || 0) * Number(item.unitPrice || 0);

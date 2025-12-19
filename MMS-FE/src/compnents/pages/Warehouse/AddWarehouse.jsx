@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { warehouseService } from "../../../api/warehouseService.js";
 import useAuthStore from "../../../store/authStore";
 
@@ -92,9 +94,15 @@ export default function AddWarehouse() {
 		<div className="min-h-screen bg-gray-50">
 			<div className="bg-white shadow-sm">
 				<div className="container mx-auto px-4 py-6">
-					<div className="flex items-center justify-between">
-						<h1 className="text-2xl font-bold text-gray-900">Thêm kho mới</h1>
-						<Link to="/warehouse" className="px-4 py-2 border rounded-lg hover:bg-blue-500">Trở về danh sách</Link>
+					<div className="flex items-center gap-3">
+						<button
+							onClick={() => navigate("/warehouse")}
+							className="px-3 py-1.5 rounded border hover:bg-gray-50"
+							title="Quay lại trang trước"
+						>
+							<FontAwesomeIcon icon={faArrowLeft} />
+						</button>
+						<h1 className="text-2xl font-semibold">Thêm kho mới</h1>
 					</div>
 				</div>
 			</div>
@@ -141,7 +149,13 @@ export default function AddWarehouse() {
 
 						<div className="pt-4 flex items-center gap-3">
 							<button type="submit" disabled={submitting} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-500 disabled:opacity-50">{submitting ? "Đang lưu..." : "Lưu"}</button>
-							<Link to="/warehouse" className="px-4 py-2 border rounded-lg hover:bg-gray-50">Huỷ</Link>
+							<button
+								type="button"
+								onClick={() => navigate("/warehouse")}
+								className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+							>
+								Hủy
+							</button>
 						</div>
 					</form>
 				</div>

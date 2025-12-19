@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { warehouseService } from "../../../api/warehouseService.js";
 import { warehouseStockService } from "../../../api/warehouseStockService.js";
 import dayjs from "dayjs";
@@ -7,6 +9,7 @@ import {Card, Spin, Alert, Descriptions, Tag, Table} from "antd";
 
 export default function WarehouseDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [warehouse, setWarehouse] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -59,12 +62,13 @@ export default function WarehouseDetail() {
             <div className="p-3">
                 <Alert message={error} type="error" showIcon />
                 <div className="mt-4">
-                    <Link
-                        to="/warehouse"
-                        className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                    <button
+                        onClick={() => navigate("/warehouse")}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        ← Quay lại danh sách
-                    </Link>
+                        <FontAwesomeIcon icon={faArrowLeft} />
+                    </button>
                 </div>
             </div>
         );
@@ -74,36 +78,38 @@ export default function WarehouseDetail() {
             <div className="p-3">
                 <Alert message="Không tìm thấy thông tin kho." type="warning" showIcon />
                 <div className="mt-4">
-                    <Link
-                        to="/warehouse"
-                        className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                    <button
+                        onClick={() => navigate("/warehouse")}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        ← Quay lại danh sách
-                    </Link>
+                        <FontAwesomeIcon icon={faArrowLeft} />
+                    </button>
                 </div>
             </div>
         );
 
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate("/warehouse")}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
+                    >
+                        <FontAwesomeIcon icon={faArrowLeft} />
+                    </button>
+                    <h1 className="text-2xl font-semibold">
+                        Chi tiết kho: <strong>{warehouse.code}</strong>{" "}
+                        <Tag color={warehouse.status === "Active" ? "green" : "red"}>
+                            {warehouse.status === "Active" ? "Hoạt động" : "Không hoạt động"}
+                        </Tag>
+                    </h1>
+                </div>
+            </div>
             <div className="bg-white rounded-lg shadow-sm p-6">
                 <Card
-                    title={
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-800">
-                                Chi tiết kho: <strong>{warehouse.code}</strong>{" "}
-                                <Tag color={warehouse.status === "Active" ? "green" : "red"}>
-                                    {warehouse.status === "Active" ? "Hoạt động" : "Không hoạt động"}
-                                </Tag>
-                            </h2>
-                            <Link
-                                to="/warehouse"
-                                className="inline-flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
-                            >
-                                ← Quay lại danh sách
-                            </Link>
-                        </div>
-                    }
                     bordered={false}
                     className="shadow-none"
                 >

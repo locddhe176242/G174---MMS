@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -147,16 +149,16 @@ export default function RFQForm() {
         try {
             const rfqNo = await rfqService.generateRFQNo();
             if (rfqNo) {
-                setFormData((prev) => ({ ...prev, rfqNo }));
+                setFormData((prev) => ({ ...prev, rfqNo, issueDate: new Date() }));
                 return;
             }
             // Fallback
             const ts = Date.now().toString().slice(-6);
-            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}` }));
+            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}`, issueDate: new Date() }));
         } catch (err) {
             console.error("Error generating RFQ number:", err);
             const ts = Date.now().toString().slice(-6);
-            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}` }));
+            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}`, issueDate: new Date() }));
         }
     };
 
@@ -210,7 +212,7 @@ export default function RFQForm() {
             
             setFormData({
                 rfqNo: rfq.rfqNo || "",
-                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? rfq.issueDate.slice(0, 10) : rfq.issueDate) : "",
+                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? new Date(rfq.issueDate) : (rfq.issueDate instanceof Date ? rfq.issueDate : new Date(rfq.issueDate))) : new Date(),
                 dueDate: rfq.dueDate ? (typeof rfq.dueDate === 'string' ? rfq.dueDate.slice(0, 10) : rfq.dueDate) : "",
                 status: statusValue,
                 selectedVendorIds: rfq.selectedVendorIds || 
@@ -707,26 +709,26 @@ export default function RFQForm() {
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm">
                 <div className="container mx-auto px-4 py-6">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleCancel}
+                            className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                            title="Quay lại trang trước"
+                        >
+                            <FontAwesomeIcon icon={faArrowLeft} />
+                        </button>
+                        <h1 className="text-2xl font-semibold">
                             {isEdit ? "Cập nhật Yêu cầu báo giá" : "Thêm Yêu cầu báo giá"}
                         </h1>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={openImportModal}
-                                disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
-                                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                Nhập từ <strong>Phiếu yêu cầu</strong>
-                            </button>
-                            <button
-                                onClick={handleCancel}
-                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Quay lại
-                            </button>
-                        </div>
+                        <div className="flex-1"></div>
+                        <button
+                            type="button"
+                            onClick={openImportModal}
+                            disabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status)}
+                            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            Nhập từ <strong>Phiếu yêu cầu</strong>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -823,11 +825,17 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
-                                        <DatePicker
-                                            selected={formData.issueDate instanceof Date ? formData.issueDate : (formData.issueDate ? new Date(formData.issueDate) : new Date())}
-                                            onChange={(date) => handleInputChange("issueDate", date)}
-                                            dateFormat="dd/MM/yyyy"
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
+                                        <input
+                                            type="text"
+                                            value={(() => {
+                                                if (!formData.issueDate) return new Date().toLocaleDateString('vi-VN');
+                                                const date = formData.issueDate instanceof Date 
+                                                    ? formData.issueDate 
+                                                    : new Date(formData.issueDate);
+                                                return date.toLocaleDateString('vi-VN');
+                                            })()}
+                                            readOnly
+                                            className={`w-full px-3 py-2 border rounded-lg bg-gray-50 ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
                                         {validationErrors.issueDate && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.issueDate}</p>

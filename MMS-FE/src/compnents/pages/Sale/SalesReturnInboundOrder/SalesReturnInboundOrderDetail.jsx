@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { salesReturnInboundOrderService } from "../../../../api/salesReturnInboundOrderService";
 
@@ -76,29 +78,38 @@ export default function SalesReturnInboundOrderDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Đơn nhập hàng lại: {data.sriNo || `SRI-${data.sriId}`}
-            </h1>
-            <p className="text-gray-500">
-              Từ Đơn trả hàng:{" "}
-              {data.returnNo ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    data.roId && navigate(`/sales/return-orders/${data.roId}`)
-                  }
-                  className="text-blue-600 hover:underline"
-                >
-                  {data.returnNo}
-                </button>
-              ) : (
-                "—"
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/return-inbound-orders")}
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-semibold">
+                Đơn nhập hàng lại: {data.sriNo || `SRI-${data.sriId}`}
+              </h1>
+              <p className="text-gray-500">
+                Từ Đơn trả hàng:{" "}
+                {data.returnNo ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      data.roId && navigate(`/sales/return-orders/${data.roId}`)
+                    }
+                    className="text-blue-600 hover:underline"
+                  >
+                    {data.returnNo}
+                  </button>
+                ) : (
+                  "—"
+                )}
+              </p>
+            </div>
+            <div className="flex-1"></div>
             <span
               className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
                 data.status
@@ -106,13 +117,6 @@ export default function SalesReturnInboundOrderDetail() {
             >
               {getStatusLabel(data.status)}
             </span>
-            <button
-              type="button"
-              onClick={() => navigate("/sales/return-inbound-orders")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-            >
-              Quay lại
-            </button>
           </div>
         </div>
       </div>

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -510,7 +512,7 @@ export default function PurchaseOrderForm() {
             });
         } catch (err) {
             console.error("Error loading Purchase Order:", err);
-            setError("Không thể tải thông tin Đơn hàng mua");
+            setError("Không thể tải thông tin Đơn mua hàng");
         } finally {
             setLoading(false);
         }
@@ -973,11 +975,11 @@ export default function PurchaseOrderForm() {
 
             if (isEdit) {
                 await purchaseOrderService.updatePurchaseOrder(id, payload, currentUserId);
-                toast.success("Cập nhật Đơn hàng mua thành công!");
+                toast.success("Cập nhật Đơn mua hàng thành công!");
             } else {
                 const response = await purchaseOrderService.createPurchaseOrder(payload, currentUserId);
                 console.log("Create response:", response);
-                toast.success("Tạo Đơn hàng mua thành công!");
+                toast.success("Tạo Đơn mua hàng thành công!");
                 
                 // Close PR after creating PO
                 if (prIdFromQuery) {
@@ -995,7 +997,7 @@ export default function PurchaseOrderForm() {
             console.error("Error object:", err);
             console.error("Response data:", err?.response?.data);
             console.error("Response status:", err?.response?.status);
-            const msg = err?.response?.data?.message || err?.message || (isEdit ? "Không thể cập nhật Đơn hàng mua" : "Không thể tạo Đơn hàng mua");
+            const msg = err?.response?.data?.message || err?.message || (isEdit ? "Không thể cập nhật Đơn mua hàng" : "Không thể tạo Đơn mua hàng");
             setError(msg);
             toast.error(msg);
         } finally {
@@ -1019,25 +1021,25 @@ export default function PurchaseOrderForm() {
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm">
                 <div className="container mx-auto px-4 py-6">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {isEdit ? "Cập nhật Đơn hàng mua" : "Thêm Đơn hàng mua"}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleCancel}
+                            className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                            title="Quay lại trang trước"
+                        >
+                            <FontAwesomeIcon icon={faArrowLeft} />
+                        </button>
+                        <h1 className="text-2xl font-semibold">
+                            {isEdit ? "Cập nhật Đơn mua hàng" : "Thêm Đơn mua hàng"}
                         </h1>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={openImportModal}
-                                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                            >
-                                Nhập từ báo giá
-                            </button>
-                            <button
-                                onClick={handleCancel}
-                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Quay lại
-                            </button>
-                        </div>
+                        <div className="flex-1"></div>
+                        <button
+                            type="button"
+                            onClick={openImportModal}
+                            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                        >
+                            Nhập từ báo giá
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1139,6 +1141,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.delivery_date instanceof Date ? formData.delivery_date : (formData.delivery_date ? new Date(formData.delivery_date) : null)}
                                             onChange={(date) => handleInputChange("delivery_date", date)}
                                             dateFormat="dd/MM/yyyy"
+                                            minDate={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
                                             isClearable
                                             placeholderText="Chọn ngày giao hàng"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

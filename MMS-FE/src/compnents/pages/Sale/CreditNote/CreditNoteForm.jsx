@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -339,6 +341,20 @@ export default function CreditNoteForm() {
     });
   };
 
+  // Get available products for a specific item (exclude already selected products)
+  const getAvailableProducts = (currentIndex) => {
+    // Get list of product_ids already selected in other items
+    const selectedProductIds = formData.items
+      .map((item, idx) => idx !== currentIndex ? item.productId : null)
+      .filter(id => id !== null && id !== undefined);
+
+    // Filter out products that are already selected
+    return products.filter(product => {
+      const productId = Number(product.value);
+      return !selectedProductIds.some(selectedId => Number(selectedId) === productId);
+    });
+  };
+
   const handleProductSelect = (index, selectedOption) => {
     if (!selectedOption) {
       handleItemChange(index, "productId", null);
@@ -501,22 +517,22 @@ export default function CreditNoteForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Cập nhật hóa đơn điều chỉnh" : "Tạo hóa đơn điều chỉnh mới"}
-            </h1>
-            <p className="text-gray-500">
-              {isEdit ? "Cập nhật thông tin hóa đơn điều chỉnh" : "Nhập thông tin hóa đơn điều chỉnh"}
-            </p>
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/credit-notes")}
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-semibold">
+                {isEdit ? "Cập nhật hóa đơn điều chỉnh" : "Tạo hóa đơn điều chỉnh mới"}
+              </h1>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/sales/credit-notes")}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-          >
-            Quay lại
-          </button>
         </div>
       </div>
 
@@ -717,7 +733,7 @@ export default function CreditNoteForm() {
                               placeholder="Chọn sản phẩm"
                               value={products.find((opt) => opt.value === item.productId)}
                               onChange={(option) => handleProductSelect(index, option)}
-                              options={products}
+                              options={getAvailableProducts(index)}
                               isClearable
                             />
                             {itemError.productId && (

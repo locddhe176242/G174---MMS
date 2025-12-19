@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { goodIssueService } from "../../../../api/goodIssueService";
 
@@ -85,9 +87,10 @@ export default function GoodIssueDetail() {
                     <div className="text-red-600 mb-4">Lỗi: {err}</div>
                     <button
                         onClick={() => navigate("/sales/good-issues")}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        Quay lại danh sách
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                 </div>
             </div>
@@ -105,21 +108,23 @@ export default function GoodIssueDetail() {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm">
-                <div className="px-6 py-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            Phiếu xuất kho: {data.issueNo || data.issue_no}
-                        </h1>
-                        <p className="text-gray-500">Chi tiết phiếu xuất kho</p>
-                    </div>
-                    <div className="flex gap-2">
+                <div className="px-6 py-6">
+                    <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => navigate("/sales/good-issues")}
-                            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                            className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                            title="Quay lại trang trước"
                         >
-                            Quay lại
+                            <FontAwesomeIcon icon={faArrowLeft} />
                         </button>
+                        <div>
+                            <h1 className="text-2xl font-semibold">
+                                Phiếu xuất kho: {data.issueNo || data.issue_no}
+                            </h1>
+                            <p className="text-gray-500">Chi tiết phiếu xuất kho</p>
+                        </div>
+                        <div className="flex-1"></div>
                         {data.status === "Draft" && (
                             <button
                                 type="button"

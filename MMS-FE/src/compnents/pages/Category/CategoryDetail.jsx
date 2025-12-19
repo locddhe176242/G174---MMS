@@ -1,29 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faTag, faCalendarAlt, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarAlt, faInfoCircle, faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { getCategory } from '../../../api/categoryService';
+import { toast } from 'react-toastify';
 
-const CategoryDetail = ({ category, onClose }) => {
+const CategoryDetail = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [category, setCategory] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCategory = async () => {
+            try {
+                setLoading(true);
+                const data = await getCategory(id);
+                setCategory(data);
+            } catch (error) {
+                console.error('Lỗi khi tải danh mục:', error);
+                toast.error('Không thể tải thông tin danh mục!');
+                navigate('/categories');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) {
+            fetchCategory();
+        }
+    }, [id, navigate]);
+
+    if (loading) {
+        return (
+            <div className="p-6 flex items-center justify-center min-h-screen">
+                <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-blue-500" />
+            </div>
+        );
+    }
+
     if (!category) {
         return null;
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl my-8 mx-4">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <FontAwesomeIcon icon={faTag} className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-slate-800">Chi tiết danh mục</h2>
-                            <p className="text-sm text-slate-600">Thông tin chi tiết về danh mục sản phẩm</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                        <FontAwesomeIcon icon={faXmark} className="w-6 h-6" />
+        <div className="p-6">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/categories')}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
+                    >
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
+                    <h1 className="text-2xl font-semibold">Chi tiết danh mục</h1>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
 
                 <div className="space-y-6">
                     <div className="bg-slate-50 rounded-lg p-4">
@@ -115,14 +150,6 @@ const CategoryDetail = ({ category, onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 mt-6 pt-4 border-t">
-                    <button
-                        onClick={onClose}
-                        className="group px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all duration-200 hover:scale-105 hover:shadow-sm"
-                    >
-                        <span className="group-hover:font-medium transition-all duration-200">Đóng</span>
-                    </button>
-                </div>
             </div>
         </div>
     );

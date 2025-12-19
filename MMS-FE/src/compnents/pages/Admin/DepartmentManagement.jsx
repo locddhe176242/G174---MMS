@@ -222,7 +222,6 @@ export default function DepartmentManagement() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             Quản lý Phòng ban
           </h1>
-          <p className="text-slate-600 mt-1">Danh sách và tìm kiếm phòng ban</p>
         </div>
 
         <button

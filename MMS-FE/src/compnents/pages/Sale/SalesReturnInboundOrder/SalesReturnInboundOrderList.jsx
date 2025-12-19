@@ -304,12 +304,7 @@ export default function SalesReturnInboundOrderList() {
                         {formatDate(row.expectedReceiptDate)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {row.createdByName || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(row.createdAt)}
-                        </div>
+                        {row.createdByName || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <button
@@ -318,9 +313,13 @@ export default function SalesReturnInboundOrderList() {
                               `/sales/return-inbound-orders/${row.sriId}`
                             )
                           }
-                          className="text-blue-600 hover:underline"
+                          className="group p-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-blue-200 hover:border-blue-300"
+                          title="Xem chi tiết"
                         >
-                          Xem
+                          <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                         </button>
                       </td>
                     </tr>

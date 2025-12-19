@@ -325,12 +325,6 @@ const VendorQuotationList = () => {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Báo giá nhà cung cấp</h1>
                         </div>
-                        <button
-                            onClick={navigateToCreate}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            + Tạo báo giá mới
-                        </button>
                     </div>
                 </div>
             </div>

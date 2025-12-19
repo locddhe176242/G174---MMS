@@ -1,6 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import purchaseRequisitionService from "../../../api/purchaseRequisitionService";
 import { getProducts } from "../../../api/productService";
@@ -245,11 +247,11 @@ export default function PurchaseRequisitionDetail() {
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => navigate("/purchase/purchase-requisitions")}
                         className="px-3 py-1.5 rounded border hover:bg-gray-50"
                         title="Quay lại trang trước"
                     >
-                        ←
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                     <h1 className="text-2xl font-semibold">
                         Phiếu yêu cầu: {data.requisitionNo || `#${id}`}

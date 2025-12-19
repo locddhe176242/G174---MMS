@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -758,8 +760,16 @@ export default function SalesOrderForm() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div>
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/sales/orders")}
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
                 {isEdit ? "Cập nhật đơn bán hàng" : "Tạo đơn bán hàng"}
@@ -776,25 +786,19 @@ export default function SalesOrderForm() {
                 </span>
               )}
             </div>
-          </div>
-          <div className="flex gap-2">
-            {canSendToCustomer && (
-              <button
-                type="button"
-                onClick={handleSendToCustomer}
-                disabled={submitting}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                {submitting ? "Đang gửi..." : "Gửi cho khách"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => navigate("/sales/orders")}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-            >
-              Quay lại
-            </button>
+            <div className="flex-1"></div>
+            <div className="flex gap-2">
+              {canSendToCustomer && (
+                <button
+                  type="button"
+                  onClick={handleSendToCustomer}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {submitting ? "Đang gửi..." : "Gửi cho khách"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1076,12 +1080,13 @@ export default function SalesOrderForm() {
                 <tbody className="divide-y">
                   {formData.items.map((item, index) => {
                     // Không cho chọn trùng sản phẩm trong nhiều dòng
-                    const usedProductIds = formData.items
-                      .map((it, idx) => (idx === index ? null : it.productId))
+                    const selectedProductIds = formData.items
+                      .map((it, idx) => idx !== index ? it.productId : null)
                       .filter((id) => id !== null && id !== undefined);
-                    const availableProducts = products.filter(
-                      (opt) => !usedProductIds.includes(opt.value)
-                    );
+                    const availableProducts = products.filter(product => {
+                      const productId = Number(product.value);
+                      return !selectedProductIds.some(selectedId => Number(selectedId) === productId);
+                    });
 
                     const itemError = errors.itemDetails?.[index] || {};
                     const qty = Number(item.quantity || 0);
