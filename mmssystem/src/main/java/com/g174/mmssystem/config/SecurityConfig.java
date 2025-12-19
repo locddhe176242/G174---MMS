@@ -70,12 +70,17 @@ public class SecurityConfig {
 
                         // ============ MANAGER ONLY ============
                         .requestMatchers("/api/auth/register").hasRole("MANAGER")
-                        .requestMatchers("/api/users/**").hasRole("MANAGER")
+                        .requestMatchers("/api/users").hasRole("MANAGER") // GET/POST /api/users (quản lý users)
+                        .requestMatchers("/api/users/*/roles").hasRole("MANAGER") // Quản lý roles của user
+                        .requestMatchers("/api/users/*/permissions").hasRole("MANAGER") // Quản lý permissions của user
                         .requestMatchers("/api/departments/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles/**").hasRole("MANAGER")
                         .requestMatchers("/api/roles").hasRole("MANAGER")
 
-                        // ============ AUTHENTICATED USERS ============
+                        // ============ AUTHENTICATED USERS (Profile endpoints) ============
+                        .requestMatchers("/api/users/profile").authenticated() // GET/PUT /api/users/profile
+                        .requestMatchers("/api/users/profile/**").authenticated() // POST /api/users/profile/avatar
+                        .requestMatchers("/api/users/change-password").authenticated() // PUT /api/users/change-password
                         .requestMatchers("/api/auth/change-password").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/profile/me").authenticated()

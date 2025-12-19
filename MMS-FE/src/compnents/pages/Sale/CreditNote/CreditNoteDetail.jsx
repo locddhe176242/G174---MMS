@@ -50,7 +50,10 @@ export default function CreditNoteDetail() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [refundLoading, setRefundLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundForm, setRefundForm] = useState({ amount: "" });
 
   const fetchCreditNote = async () => {
     setLoading(true);
@@ -88,6 +91,33 @@ export default function CreditNoteDetail() {
     }
   };
 
+  const handleRefundSubmit = async (e) => {
+    e.preventDefault();
+    const amount = Number(refundForm.amount);
+    if (!amount || amount < 0) {
+      toast.error("Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+    if (amount > (data.refundAmount || 0)) {
+      toast.error("Số tiền đã trả không được vượt quá số tiền phải trả");
+      return;
+    }
+
+    setRefundLoading(true);
+    try {
+      await creditNoteService.updateRefundPaidAmount(id, amount);
+      toast.success("Đã cập nhật số tiền đã trả lại khách hàng");
+      setShowRefundForm(false);
+      setRefundForm({ amount: "" });
+      fetchCreditNote();
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Không thể cập nhật số tiền đã trả");
+    } finally {
+      setRefundLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -105,18 +135,31 @@ export default function CreditNoteDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate("/sales/credit-notes")}
-            className="text-blue-600 hover:underline mb-4"
-          >
-            ← Quay lại danh sách
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Credit Note: {data.creditNoteNo}</h1>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Credit Note: {data.creditNoteNo}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(`/sales/credit-notes/${id}/print`)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              In hóa đơn điều chỉnh
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/sales/credit-notes")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="px-6 py-6 space-y-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
@@ -191,7 +234,7 @@ export default function CreditNoteDetail() {
         </div>
 
         {canChangeStatus && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Thay đổi trạng thái</h3>
               <span className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(data.status)}`}>
@@ -229,7 +272,7 @@ export default function CreditNoteDetail() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
           </div>
@@ -315,11 +358,109 @@ export default function CreditNoteDetail() {
               <span>Tổng cộng</span>
               <span>{formatCurrency(data.totalAmount || 0)}</span>
             </div>
+            {(data.appliedToBalance || data.refundAmount) && (
+              <>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-gray-600">Số tiền bù trừ vào balance:</span>
+                  <span className="font-semibold text-green-600">
+                    {formatCurrency(data.appliedToBalance || 0)}
+                  </span>
+                </div>
+                    {data.refundAmount > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Số tiền phải trả lại khách hàng:</span>
+                          <span className="font-semibold text-orange-600">
+                            {formatCurrency(data.refundAmount || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Số tiền đã trả lại khách hàng:</span>
+                          <span className="font-semibold text-green-600">
+                            {formatCurrency(data.refundPaidAmount || 0)}
+                          </span>
+                        </div>
+                        {data.refundPaidAmount >= data.refundAmount ? (
+                          <div className="flex justify-between pt-2 border-t border-green-200">
+                            <span className="text-green-600 font-semibold">✓ Đã hoàn tất trả lại</span>
+                            <span className="text-green-600 font-semibold">0 ₫</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between pt-2 border-t border-red-200">
+                              <span className="text-red-600 font-semibold">Còn phải trả:</span>
+                              <span className="text-red-600 font-semibold">
+                                {formatCurrency((data.refundAmount || 0) - (data.refundPaidAmount || 0))}
+                              </span>
+                            </div>
+                            {!showRefundForm ? (
+                              <div className="pt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowRefundForm(true);
+                                    setRefundForm({ amount: String(data.refundPaidAmount || 0) });
+                                  }}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                                >
+                                  Cập nhật số tiền đã trả
+                                </button>
+                              </div>
+                            ) : (
+                              <form onSubmit={handleRefundSubmit} className="pt-3 border-t border-gray-200">
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Số tiền đã trả lại khách hàng
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={data.refundAmount}
+                                      step="0.01"
+                                      value={refundForm.amount}
+                                      onChange={(e) => setRefundForm({ amount: e.target.value })}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="Nhập số tiền đã trả"
+                                      required
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Tối đa: {formatCurrency(data.refundAmount || 0)}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="submit"
+                                      disabled={refundLoading}
+                                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                                    >
+                                      {refundLoading ? "Đang xử lý..." : "Lưu"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowRefundForm(false);
+                                        setRefundForm({ amount: "" });
+                                      }}
+                                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                                    >
+                                      Hủy
+                                    </button>
+                                  </div>
+                                </div>
+                              </form>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+              </>
+            )}
           </div>
         </div>
 
         {data.notes && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Ghi chú</h3>
             <p className="text-gray-700 whitespace-pre-wrap">{data.notes}</p>
           </div>

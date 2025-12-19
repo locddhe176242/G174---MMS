@@ -57,7 +57,7 @@ export default function CreditNoteList() {
       setCreditNotes(list);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách Credit Note");
+      toast.error("Không thể tải danh sách hoá đơn điều chỉnh");
     } finally {
       setLoading(false);
     }
@@ -141,41 +141,41 @@ export default function CreditNoteList() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa Credit Note này?")) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa hoá đơn điều chỉnh này?")) return;
     try {
       await creditNoteService.deleteCreditNote(id);
-      toast.success("Đã xóa Credit Note");
+      toast.success("Đã xóa hoá đơn điều chỉnh");
       fetchCreditNotes();
     } catch (error) {
       console.error(error);
-      toast.error("Không thể xóa Credit Note");
+      toast.error("Không thể xóa hoá đơn điều chỉnh");
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Danh sách hoá đơn điều chỉnh</h1>
+            <p className="text-gray-500">Quản lý các hoá đơn điều chỉnh hoá đơn bán hàng</p>
+          </div>
+          <button
+            onClick={() => navigate("/sales/credit-notes/new")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + Tạo hoá đơn điều chỉnh
+          </button>
+        </div>
+      </div>
+
+      <div className="px-6 py-6">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Danh sách Credit Note</h1>
-                <p className="mt-1 text-sm text-gray-500">Quản lý các Credit Note điều chỉnh Invoice</p>
-              </div>
-              <button
-                onClick={() => navigate("/sales/credit-notes/new")}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                + Tạo Credit Note
-              </button>
-            </div>
-          </div>
-
-          <div className="p-6">
             <form onSubmit={handleSearch} className="mb-6 flex flex-wrap gap-3">
               <input
                 type="text"
-                placeholder="Tìm theo số Credit Note, số Invoice..."
+                placeholder="Tìm theo số hoá đơn điều chỉnh, số hoá đơn bán hàng..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -185,7 +185,7 @@ export default function CreditNoteList() {
               />
               <input
                 type="number"
-                placeholder="Invoice ID"
+                  placeholder="ID hoá đơn bán hàng"
                 value={invoiceFilter}
                 onChange={(e) => {
                   setInvoiceFilter(e.target.value);
@@ -214,29 +214,30 @@ export default function CreditNoteList() {
                 Tìm kiếm
               </button>
             </form>
+          </div>
 
-            <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
               {loading ? (
                 <div className="py-12 text-center text-gray-500">Đang tải dữ liệu...</div>
               ) : sorted.length === 0 ? (
-                <div className="py-12 text-center text-gray-500">Không có Credit Note nào</div>
+                <div className="py-12 text-center text-gray-500">Không có hoá đơn điều chỉnh nào</div>
               ) : (
                 <table className="min-w-full">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         <button onClick={() => changeSort("creditNoteNo")} className="flex items-center gap-1">
-                          Số Credit Note {getSortIcon("creditNoteNo")}
+                          Số hoá đơn điều chỉnh {getSortIcon("creditNoteNo")}
                         </button>
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Invoice
+                        Hoá đơn bán hàng
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Sales Order
+                        Đơn bán hàng
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Return Order
+                        Đơn trả hàng
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Khách hàng
@@ -284,8 +285,30 @@ export default function CreditNoteList() {
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {formatDate(cn.creditNoteDate)}
                         </td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                          {formatCurrency(cn.totalAmount)}
+                        <td className="px-4 py-3 text-right text-sm">
+                          <div className="font-semibold text-gray-900">{formatCurrency(cn.totalAmount)}</div>
+                          {cn.appliedToBalance > 0 && (
+                            <div className="text-xs text-green-600 mt-1">
+                              Bù trừ: {formatCurrency(cn.appliedToBalance)}
+                            </div>
+                          )}
+                          {cn.refundAmount > 0 && (
+                            <div className="text-xs mt-1">
+                              <div className="text-orange-600">
+                                Phải trả: {formatCurrency(cn.refundAmount)}
+                              </div>
+                              <div className="text-gray-600">
+                                Đã trả: {formatCurrency(cn.refundPaidAmount || 0)}
+                              </div>
+                              {cn.refundPaidAmount >= cn.refundAmount ? (
+                                <div className="text-green-600 font-semibold">✓ Hoàn tất</div>
+                              ) : (
+                                <div className="text-red-600">
+                                  Còn: {formatCurrency((cn.refundAmount || 0) - (cn.refundPaidAmount || 0))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <div>{cn.createdByDisplay || "—"}</div>
@@ -320,20 +343,19 @@ export default function CreditNoteList() {
               )}
             </div>
 
-            {sorted.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                totalElements={sorted.length}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setCurrentPage(0);
-                }}
-              />
-            )}
-          </div>
+          {sorted.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalElements={sorted.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(0);
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

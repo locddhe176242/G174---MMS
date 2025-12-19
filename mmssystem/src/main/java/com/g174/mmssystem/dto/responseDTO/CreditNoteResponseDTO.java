@@ -34,6 +34,22 @@ public class CreditNoteResponseDTO {
     private BigDecimal headerDiscountAmount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
+    
+    /**
+     * Số tiền Credit Note được áp dụng để bù trừ vào balance của Invoice
+     * (phần <= số tiền còn nợ)
+     */
+    private BigDecimal appliedToBalance;
+    
+    /**
+     * Số tiền phải trả lại khách hàng (phần Credit Note vượt quá số tiền còn nợ)
+     */
+    private BigDecimal refundAmount;
+    
+    /**
+     * Số tiền đã trả lại khách hàng (để track việc đã trả hay chưa)
+     */
+    private BigDecimal refundPaidAmount;
 
     private String reason;
     private String notes;

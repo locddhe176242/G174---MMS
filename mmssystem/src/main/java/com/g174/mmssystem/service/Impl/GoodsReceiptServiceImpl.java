@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +42,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
     private final APInvoiceRepository apInvoiceRepository;
     private final SalesReturnInboundOrderRepository salesReturnInboundOrderRepository;
     private final SalesReturnInboundOrderItemRepository salesReturnInboundOrderItemRepository;
+    private final GoodsReceiptItemRepository goodsReceiptItemRepository;
     private final ReturnOrderRepository returnOrderRepository;
     private final ReturnOrderItemRepository returnOrderItemRepository;
 
@@ -169,18 +171,8 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                         "Sales Return Inbound Order must be Draft or SentToWarehouse to create Goods Receipt");
             }
 
-            // Check if Sales Return Inbound Order already has an approved Goods Receipt
-            List<GoodsReceipt> existingReceipts = receiptRepository
-                    .findByReturnOrderId(inboundOrder.getReturnOrder().getRoId());
-            boolean hasApprovedReceipt = existingReceipts.stream()
-                    .anyMatch(r -> r.getStatus() == GoodsReceipt.GoodsReceiptStatus.Approved
-                            && r.getSourceType() == GoodsReceipt.SourceType.SalesReturn
-                            && r.getDeletedAt() == null);
-
-            if (hasApprovedReceipt) {
-                throw new IllegalStateException(
-                        "Đơn nhập hàng lại này đã có phiếu nhập kho được phê duyệt. Không thể tạo phiếu nhập mới.");
-            }
+            // Allow multiple Goods Receipts from same SRI (partial receipt support)
+            // No need to block creation if already has approved receipt
 
             Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                     .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found  " + dto.getWarehouseId()));
@@ -188,6 +180,35 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
             // Validate warehouse matches Sales Return Inbound Order warehouse
             if (!warehouse.getWarehouseId().equals(inboundOrder.getWarehouse().getWarehouseId())) {
                 throw new IllegalArgumentException("Warehouse must match Sales Return Inbound Order warehouse");
+            }
+
+            // Load Sales Return Inbound Order items to validate warehouse consistency
+            List<SalesReturnInboundOrderItem> inboundItems = salesReturnInboundOrderItemRepository
+                    .findByInboundOrder_SriId(sriId);
+            
+            // Validate: Tất cả items của SRI phải cùng warehouse (Option 2A)
+            if (inboundItems != null && !inboundItems.isEmpty()) {
+                Set<Integer> uniqueWarehouseIds = inboundItems.stream()
+                        .filter(item -> item.getWarehouse() != null)
+                        .map(item -> item.getWarehouse().getWarehouseId())
+                        .collect(Collectors.toSet());
+                
+                if (uniqueWarehouseIds.size() > 1) {
+                    String warehouseNames = inboundItems.stream()
+                            .filter(item -> item.getWarehouse() != null)
+                            .map(item -> item.getWarehouse().getName())
+                            .distinct()
+                            .collect(Collectors.joining(", "));
+                    throw new IllegalArgumentException(
+                            String.format("Đơn nhập hàng lại có sản phẩm từ nhiều kho khác nhau (%s). Vui lòng tách thành nhiều phiếu nhập kho riêng.",
+                                    warehouseNames));
+                }
+                
+                // Validate: Warehouse của items phải match với warehouse header
+                if (!uniqueWarehouseIds.isEmpty() && !uniqueWarehouseIds.contains(warehouse.getWarehouseId())) {
+                    throw new IllegalArgumentException(
+                            "Kho nhận phải khớp với kho của các sản phẩm trong Đơn nhập hàng lại");
+                }
             }
 
             User createdBy = userRepository.findById(createdById)
@@ -215,9 +236,7 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                     .updatedAt(LocalDateTime.now())
                     .build();
 
-            // Load Sales Return Inbound Order items
-            List<SalesReturnInboundOrderItem> inboundItems = salesReturnInboundOrderItemRepository
-                    .findByInboundOrder_SriId(sriId);
+            // Inbound items already loaded above for validation
             log.info("Loaded {} inbound items for SRI ID: {}", inboundItems != null ? inboundItems.size() : 0, sriId);
 
             if (inboundItems == null || inboundItems.isEmpty()) {
@@ -279,9 +298,15 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                                     .orElseThrow(() -> new ResourceNotFoundException(
                                             "Product not found  " + itemDto.getProductId()));
 
-                            // Validate receivedQty <= plannedQty
-                            if (itemDto.getReceivedQty().compareTo(sriItem.getPlannedQty()) > 0) {
-                                throw new IllegalArgumentException("Received quantity cannot exceed planned quantity");
+                            // Calculate already received quantity from previous approved Goods Receipts
+                            BigDecimal alreadyReceivedQty = getAlreadyReceivedQtyForSriItem(sriItem.getSriiId());
+                            BigDecimal remainingQty = sriItem.getPlannedQty().subtract(alreadyReceivedQty);
+                            
+                            // Validate receivedQty <= remainingQty (plannedQty - alreadyReceivedQty)
+                            if (itemDto.getReceivedQty().compareTo(remainingQty) > 0) {
+                                throw new IllegalArgumentException(
+                                        String.format("Số lượng nhận (%s) vượt quá số lượng còn lại có thể nhập (%s). Đã nhập: %s, Kế hoạch: %s",
+                                                itemDto.getReceivedQty(), remainingQty, alreadyReceivedQty, sriItem.getPlannedQty()));
                             }
 
                             // For Sales Return, if acceptedQty is null or zero, default to receivedQty
@@ -289,6 +314,13 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                             if (acceptedQty == null || acceptedQty.compareTo(BigDecimal.ZERO) <= 0) {
                                 acceptedQty = itemDto.getReceivedQty();
                                 log.info("Setting acceptedQty = receivedQty ({}) for Sales Return item", acceptedQty);
+                            }
+                            
+                            // Validate acceptedQty <= receivedQty (cannot accept more than received)
+                            if (acceptedQty.compareTo(itemDto.getReceivedQty()) > 0) {
+                                throw new IllegalArgumentException(
+                                        String.format("Accepted quantity (%s) cannot exceed received quantity (%s)",
+                                                acceptedQty, itemDto.getReceivedQty()));
                             }
 
                             return GoodsReceiptItem.builder()
@@ -558,23 +590,42 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 log.info("Updated Return Order {} goods_receipt_status to Completed", returnOrder.getRoId());
             }
 
+            // Check if all items in SRI have been fully received
             List<SalesReturnInboundOrder> inboundOrders = salesReturnInboundOrderRepository
                     .findByReturnOrderId(returnOrder.getRoId());
             for (SalesReturnInboundOrder sri : inboundOrders) {
-                if (sri.getStatus() != SalesReturnInboundOrder.Status.Completed &&
-                        sri.getStatus() != SalesReturnInboundOrder.Status.Cancelled) {
+                if (sri.getStatus() == SalesReturnInboundOrder.Status.Completed ||
+                        sri.getStatus() == SalesReturnInboundOrder.Status.Cancelled) {
+                    continue; // Skip already completed or cancelled
+                }
+                
+                // Check if all items have been fully received
+                boolean allItemsFullyReceived = true;
+                List<SalesReturnInboundOrderItem> sriItems = salesReturnInboundOrderItemRepository
+                        .findByInboundOrder_SriId(sri.getSriId());
+                
+                for (SalesReturnInboundOrderItem sriItem : sriItems) {
+                    BigDecimal alreadyReceived = getAlreadyReceivedQtyForSriItem(sriItem.getSriiId());
+                    if (alreadyReceived.compareTo(sriItem.getPlannedQty()) < 0) {
+                        allItemsFullyReceived = false;
+                        break;
+                    }
+                }
+                
+                // Only mark as Completed if all items are fully received
+                if (allItemsFullyReceived) {
                     sri.setStatus(SalesReturnInboundOrder.Status.Completed);
                     salesReturnInboundOrderRepository.save(sri);
-                    log.info("Updated Sales Return Inbound Order {} status to Completed", sri.getSriId());
+                    log.info("Updated Sales Return Inbound Order {} status to Completed (all items fully received)", sri.getSriId());
+                } else {
+                    log.info("Sales Return Inbound Order {} still has items not fully received, keeping status as {}", 
+                            sri.getSriId(), sri.getStatus());
                 }
             }
         }
 
         // Update Warehouse Stock: Increase inventory quantity (for both Purchase and
         // SalesReturn)
-        Integer warehouseId = saved.getWarehouse().getWarehouseId();
-        log.info("Updating warehouse stock for warehouse ID: {}", warehouseId);
-
         for (GoodsReceiptItem grItem : savedWithItems.getItems()) {
             Integer productId = grItem.getProduct() != null ? grItem.getProduct().getProductId() : null;
             BigDecimal acceptedQty = grItem.getAcceptedQty();
@@ -589,7 +640,23 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
                 continue; // Skip items with zero or negative quantity
             }
 
-            log.info("Processing stock update for product {} with acceptedQty {}", productId, acceptedQty);
+            // Determine warehouse: For SalesReturn, use warehouse from ReturnOrderItem; For Purchase, use header warehouse
+            Integer warehouseId;
+            if (saved.getSourceType() == GoodsReceipt.SourceType.SalesReturn) {
+                // For Sales Return, get warehouse from ReturnOrderItem
+                if (grItem.getReturnOrderItem() == null || grItem.getReturnOrderItem().getWarehouse() == null) {
+                    log.error("Goods Receipt Item {} (SalesReturn) has null ReturnOrderItem or Warehouse", grItem.getGriId());
+                    throw new IllegalStateException("Goods Receipt Item (SalesReturn) must have ReturnOrderItem with Warehouse");
+                }
+                warehouseId = grItem.getReturnOrderItem().getWarehouse().getWarehouseId();
+                log.info("Using warehouse from ReturnOrderItem: {} for SalesReturn item", warehouseId);
+            } else {
+                // For Purchase, use header warehouse
+                warehouseId = saved.getWarehouse().getWarehouseId();
+                log.info("Using header warehouse: {} for Purchase item", warehouseId);
+            }
+
+            log.info("Processing stock update for warehouse {} product {} with acceptedQty {}", warehouseId, productId, acceptedQty);
 
             // Try to update existing stock
             int updated = warehouseStockRepository.updateStockQuantity(warehouseId, productId, acceptedQty);
@@ -771,5 +838,26 @@ public class GoodsReceiptServiceImpl implements IGoodsReceiptService {
         } while (true);
 
         return receiptNo;
+    }
+
+    /**
+     * Calculate already received quantity for a Sales Return Inbound Order Item
+     * by summing receivedQty from all approved Goods Receipts for the same roiId
+     */
+    private BigDecimal getAlreadyReceivedQtyForSriItem(Integer sriiId) {
+        SalesReturnInboundOrderItem sriItem = salesReturnInboundOrderItemRepository.findById(sriiId)
+                .orElse(null);
+        if (sriItem == null || sriItem.getReturnOrderItem() == null) {
+            return BigDecimal.ZERO;
+        }
+        
+        Integer roiId = sriItem.getReturnOrderItem().getRoiId();
+        
+        // Find all GoodsReceiptItems with same roiId from approved Goods Receipts
+        List<GoodsReceiptItem> receiptItems = goodsReceiptItemRepository.findApprovedByRoiId(roiId);
+        
+        return receiptItems.stream()
+                .map(GoodsReceiptItem::getReceivedQty)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

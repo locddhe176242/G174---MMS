@@ -77,35 +77,28 @@ export default function SalesReturnInboundOrderDetail() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm">
         <div className="px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/sales/return-inbound-orders")}
-              className="px-3 py-1.5 rounded border hover:bg-gray-50"
-            >
-              ← Quay lại
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Đơn nhập hàng lại: {data.sriNo || `SRI-${data.sriId}`}
-              </h1>
-              <p className="text-gray-500 text-sm">
-                Từ Đơn trả hàng:{" "}
-                {data.returnNo ? (
-                  <button
-                    onClick={() =>
-                      data.roId && navigate(`/sales/return-orders/${data.roId}`)
-                    }
-                    className="text-blue-600 hover:underline"
-                  >
-                    {data.returnNo}
-                  </button>
-                ) : (
-                  "—"
-                )}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Đơn nhập hàng lại: {data.sriNo || `SRI-${data.sriId}`}
+            </h1>
+            <p className="text-gray-500">
+              Từ Đơn trả hàng:{" "}
+              {data.returnNo ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    data.roId && navigate(`/sales/return-orders/${data.roId}`)
+                  }
+                  className="text-blue-600 hover:underline"
+                >
+                  {data.returnNo}
+                </button>
+              ) : (
+                "—"
+              )}
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span
               className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
                 data.status
@@ -113,25 +106,13 @@ export default function SalesReturnInboundOrderDetail() {
             >
               {getStatusLabel(data.status)}
             </span>
-            {(data.status === "Draft" || data.status === "SentToWarehouse") && (
-              <button
-                onClick={() => {
-                  console.log("=== Creating Goods Receipt from Sales Return Inbound Order ===", {
-                    sriId: data.sriId,
-                    sriNo: data.sriNo,
-                    status: data.status
-                  });
-                  if (!data.sriId) {
-                    toast.error("Không tìm thấy ID của Đơn nhập hàng lại");
-                    return;
-                  }
-                  navigate(`/purchase/goods-receipts/new?sriId=${data.sriId}`);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
-              >
-                Tạo Phiếu nhập kho
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate("/sales/return-inbound-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
+            </button>
           </div>
         </div>
       </div>

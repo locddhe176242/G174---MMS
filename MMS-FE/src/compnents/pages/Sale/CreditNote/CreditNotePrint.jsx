@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { invoiceService } from "../../../../api/invoiceService";
+import { creditNoteService } from "../../../../api/creditNoteService";
 import html2pdf from "html2pdf.js";
 
 const formatDate = (value) => {
@@ -87,42 +87,42 @@ const convertNumberToVietnamese = (num) => {
   return result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn.";
 };
 
-export default function InvoicePrint() {
+export default function CreditNotePrint() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [downloading, setDownloading] = useState(false);
-  const invoiceRef = useRef(null);
+  const creditNoteRef = useRef(null);
 
   useEffect(() => {
-    const fetchInvoice = async () => {
+    const fetchCreditNote = async () => {
       try {
-        const response = await invoiceService.getInvoiceById(id);
+        const response = await creditNoteService.getCreditNote(id);
         setData(response);
       } catch (error) {
         console.error(error);
-        toast.error("Không thể tải hóa đơn");
-        navigate("/sales/invoices");
+        toast.error("Không thể tải hóa đơn điều chỉnh");
+        navigate("/sales/credit-notes");
       } finally {
         setLoading(false);
       }
     };
-    fetchInvoice();
+    fetchCreditNote();
   }, [id, navigate]);
 
   const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) {
+    if (!creditNoteRef.current) {
       toast.error("Không thể tải PDF");
       return;
     }
 
     try {
       setDownloading(true);
-      const element = invoiceRef.current;
+      const element = creditNoteRef.current;
       const opt = {
         margin: [10, 10, 10, 10],
-        filename: `Hoa_don_${data.invoiceNo || id}.pdf`,
+        filename: `Hoa_don_dieu_chinh_${data.creditNoteNo || id}.pdf`,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
@@ -141,15 +141,15 @@ export default function InvoicePrint() {
   if (loading || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Đang tải hóa đơn...</p>
+        <p>Đang tải hóa đơn điều chỉnh...</p>
       </div>
     );
   }
 
-  const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : new Date();
-  const day = String(invoiceDate.getDate()).padStart(2, "0");
-  const month = String(invoiceDate.getMonth() + 1).padStart(2, "0");
-  const year = invoiceDate.getFullYear();
+  const creditNoteDate = data.creditNoteDate ? new Date(data.creditNoteDate) : new Date();
+  const day = String(creditNoteDate.getDate()).padStart(2, "0");
+  const month = String(creditNoteDate.getMonth() + 1).padStart(2, "0");
+  const year = creditNoteDate.getFullYear();
 
   return (
     <>
@@ -187,7 +187,7 @@ export default function InvoicePrint() {
           onClick={() => window.print()}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mr-4"
         >
-          In hóa đơn
+          In hóa đơn điều chỉnh
         </button>
         <button
           onClick={handleDownloadPDF}
@@ -197,14 +197,14 @@ export default function InvoicePrint() {
           {downloading ? "Đang tải..." : "Tải PDF"}
         </button>
         <button
-          onClick={() => navigate(`/sales/invoices/${id}`)}
+          onClick={() => navigate(`/sales/credit-notes/${id}`)}
           className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
         >
           Quay lại
         </button>
       </div>
       <div 
-        ref={invoiceRef}
+        ref={creditNoteRef}
         className="print-container print-page" 
         style={{ border: "2px solid #0066cc", padding: "20px", fontFamily: "Arial, sans-serif" }}
       >
@@ -221,10 +221,10 @@ export default function InvoicePrint() {
             {/* Tiêu đề và thông tin hóa đơn - bên phải */}
             <div style={{ flex: "2", textAlign: "center" }}>
               <h1 style={{ fontSize: "20px", fontWeight: "bold", color: "#0066cc", margin: "0 0 10px 0" }}>
-                HÓA ĐƠN BÁN HÀNG
+                HÓA ĐƠN ĐIỀU CHỈNH
               </h1>
               <p style={{ margin: "5px 0", fontSize: "12px" }}>
-                {formatDate(data.invoiceDate)}
+                {formatDate(data.creditNoteDate)}
               </p>
             </div>
             
@@ -233,7 +233,7 @@ export default function InvoicePrint() {
               <p style={{ margin: "3px 0", fontSize: "11px" }}>Mẫu số - Ký hiệu:</p>
               <p style={{ margin: "3px 0", fontSize: "11px", fontWeight: "bold" }}>01GTKT0/001</p>
               <p style={{ margin: "3px 0", fontSize: "11px" }}>Số:</p>
-              <p style={{ margin: "3px 0", fontSize: "11px", fontWeight: "bold" }}>{data.invoiceNo || "—"}</p>
+              <p style={{ margin: "3px 0", fontSize: "11px", fontWeight: "bold" }}>{data.creditNoteNo || "—"}</p>
             </div>
           </div>
           
@@ -270,12 +270,11 @@ export default function InvoicePrint() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "11px" }}>
             <div>
               <p style={{ margin: "3px 0" }}><strong>Tên đơn vị:</strong> {data.customerName || "—"}</p>
-              <p style={{ margin: "3px 0" }}><strong>MST:</strong> {data.customerTaxCode || "[Mã số thuế]"}</p>
+              <p style={{ margin: "3px 0" }}><strong>MST:</strong> [Mã số thuế]</p>
             </div>
             <div>
-              <p style={{ margin: "3px 0" }}><strong>Địa chỉ:</strong> {data.customerAddress || "—"}</p>
-              <p style={{ margin: "3px 0" }}><strong>HTTT:</strong> {data.paymentMethod || "Chuyển khoản"}</p>
-              <p style={{ margin: "3px 0" }}><strong>STK:</strong> {data.customerAccountNo || "[Số tài khoản]"}</p>
+              <p style={{ margin: "3px 0" }}><strong>Địa chỉ:</strong> —</p>
+              <p style={{ margin: "3px 0" }}><strong>Hóa đơn gốc:</strong> {data.invoiceNo || "—"}</p>
             </div>
           </div>
         </div>
@@ -297,32 +296,18 @@ export default function InvoicePrint() {
           <tbody>
             {data.items?.map((item, index) => {
               const subtotal = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+              const discountAmount = Number(item.discountAmount || 0);
+              const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
               const taxAmount = Number(item.taxAmount || 0);
               const lineTotal = Number(item.lineTotal || 0);
               
-              // Lấy discountPercent từ API response (đã được tính từ SalesOrderItem)
-              let discountPercent = Number(item.discountPercent || item.discount_percent || 0);
-              
-              // Fallback: tính từ lineTotal nếu không có trong response
-              if (discountPercent === 0 && subtotal > 0) {
-                // lineTotal = subtotal - discountAmount + taxAmount
-                // => discountAmount = subtotal + taxAmount - lineTotal
-                const discountAmount = subtotal + taxAmount - lineTotal;
-                if (discountAmount > 0) {
-                  discountPercent = (discountAmount / subtotal) * 100;
-                }
-              }
-              
-              const discountAmount = subtotal * (discountPercent / 100);
-              const afterDiscount = subtotal - discountAmount;
-              
               return (
-                <tr key={item.ariId || index} style={{ border: "1px solid #000" }}>
+                <tr key={item.cniId || index} style={{ border: "1px solid #000" }}>
                   <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>{index + 1}</td>
                   <td style={{ border: "1px solid #000", padding: "8px" }}>
                     {item.productName || item.description || "—"}
-                    {item.productSku && (
-                      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>Mã: {item.productSku}</div>
+                    {item.productCode && (
+                      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>Mã: {item.productCode}</div>
                     )}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>
@@ -335,7 +320,7 @@ export default function InvoicePrint() {
                     {formatNumber(item.unitPrice || 0)}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "8px", textAlign: "right" }}>
-                    {formatNumber(discountPercent)}%
+                    {formatNumber(discountPercent.toFixed(2))}%
                   </td>
                   <td style={{ border: "1px solid #000", padding: "8px", textAlign: "right" }}>
                     {formatNumber(item.taxRate || 0)}%
@@ -372,7 +357,7 @@ export default function InvoicePrint() {
             </div>
             <div style={{ width: "250px", fontSize: "11px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #ddd" }}>
-                <span>Tổng cộng tiền thanh toán:</span>
+                <span>Tổng cộng tiền điều chỉnh:</span>
                 <span style={{ fontWeight: "bold" }}>{formatNumber(Math.round(data.totalAmount || 0))}</span>
               </div>
             </div>
@@ -402,3 +387,4 @@ export default function InvoicePrint() {
     </>
   );
 }
+

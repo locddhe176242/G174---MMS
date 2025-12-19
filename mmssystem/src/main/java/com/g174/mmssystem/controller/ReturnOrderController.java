@@ -21,7 +21,7 @@ public class ReturnOrderController {
     private final IReturnOrderService returnOrderService;
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<List<ReturnOrderListResponseDTO>> getAllReturnOrders(
             @RequestParam(required = false) Integer deliveryId,
             @RequestParam(required = false) Integer invoiceId,
@@ -31,7 +31,7 @@ public class ReturnOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE')")
+    @PreAuthorize("hasAnyRole('MANAGER','SALE','WAREHOUSE','ACCOUNTING')")
     public ResponseEntity<ReturnOrderResponseDTO> getReturnOrder(@PathVariable Integer id) {
         return ResponseEntity.ok(returnOrderService.getReturnOrder(id));
     }

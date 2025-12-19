@@ -163,7 +163,7 @@ export default function SalesOrderDetail() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-              Tổng quan tiền tệ
+              Tổng quan tiền hàng
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
               <li>

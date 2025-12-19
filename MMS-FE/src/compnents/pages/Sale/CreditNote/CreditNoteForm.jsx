@@ -85,7 +85,7 @@ export default function CreditNoteForm() {
       setInvoices(list);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách Invoice");
+      toast.error("Không thể tải danh sách hóa đơn bán hàng");
     } finally {
       setInvoiceLoading(false);
     }
@@ -104,7 +104,7 @@ export default function CreditNoteForm() {
       setReturnOrders(filtered);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách Return Order");
+      toast.error("Không thể tải danh sách đơn trả hàng");
     } finally {
       setReturnOrderLoading(false);
     }
@@ -202,7 +202,7 @@ export default function CreditNoteForm() {
             const response = await apiClient.get(`/ar-invoices/${data.invoiceId}`);
             setSelectedInvoice(response.data);
           } catch (err) {
-            console.error("Could not load invoice:", err);
+            console.error("Không thể tải hóa đơn:", err);
           }
         }
       }
@@ -214,7 +214,7 @@ export default function CreditNoteForm() {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải Credit Note");
+      toast.error("Không thể tải hóa đơn điều chỉnh");
       navigate("/sales/credit-notes");
     } finally {
       setLoading(false);
@@ -238,7 +238,7 @@ export default function CreditNoteForm() {
 
   const loadFromReturnOrder = async () => {
     if (!selectedReturnOrder?.roId) {
-      toast.warn("Vui lòng chọn Return Order");
+      toast.warn("Vui lòng chọn đơn trả hàng");
       return;
     }
     const returnOrderId = selectedReturnOrder.roId;
@@ -253,8 +253,8 @@ export default function CreditNoteForm() {
           setSelectedInvoice(response.data);
           handleInputChange("invoiceId", returnOrder.invoiceId);
         } catch (err) {
-          console.error("Could not load invoice:", err);
-          toast.warn("Không thể tải Invoice từ Return Order. Vui lòng chọn Invoice thủ công.");
+          console.error("Không thể tải hóa đơn:", err);
+          toast.warn("Không thể tải hóa đơn từ đơn trả hàng. Vui lòng chọn hóa đơn thủ công.");
         }
       } else {
         // Tự động tìm Invoice từ Delivery/SalesOrder
@@ -274,17 +274,17 @@ export default function CreditNoteForm() {
               if (matchingInvoice) {
                 setSelectedInvoice(matchingInvoice);
                 handleInputChange("invoiceId", matchingInvoice.arInvoiceId || matchingInvoice.invoiceId);
-                toast.success("Đã tự động chọn Invoice từ Sales Order");
+                toast.success("Đã tự động chọn hóa đơn từ đơn bán hàng");
               } else {
-                toast.info("Không tìm thấy Invoice liên quan. Vui lòng chọn Invoice trong form.");
+                toast.info("Không tìm thấy hóa đơn liên quan. Vui lòng chọn hóa đơn trong form.");
               }
             }
           } catch (err) {
-            console.error("Could not find related invoice:", err);
-            toast.info("Return Order này chưa liên kết với Invoice. Vui lòng chọn Invoice trong form.");
+            console.error("Không thể tìm hóa đơn liên quan:", err);
+            toast.info("Đơn trả hàng này chưa liên kết với hóa đơn. Vui lòng chọn hóa đơn trong form.");
           }
         } else {
-          toast.info("Return Order này chưa liên kết với Invoice. Vui lòng chọn Invoice trong form.");
+          toast.info("Đơn trả hàng này chưa liên kết với hóa đơn. Vui lòng chọn hóa đơn trong form.");
         }
       }
 
@@ -307,13 +307,13 @@ export default function CreditNoteForm() {
           items: items.length > 0 ? items : [defaultItem()],
         }));
 
-        toast.success("Đã tải dữ liệu từ Return Order");
+        toast.success("Đã tải dữ liệu từ đơn trả hàng");
       } else {
-        toast.warn("Return Order không có sản phẩm nào");
+        toast.warn("Đơn trả hàng không có sản phẩm nào");
       }
     } catch (error) {
       console.error(error);
-      toast.error(error?.response?.data?.message || "Không thể tải dữ liệu từ Return Order");
+      toast.error(error?.response?.data?.message || "Không thể tải dữ liệu từ đơn trả hàng");
     } finally {
       setLoading(false);
     }
@@ -419,7 +419,7 @@ export default function CreditNoteForm() {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.invoiceId) {
-      newErrors.invoiceId = "Vui lòng chọn Invoice";
+      newErrors.invoiceId = "Vui lòng chọn hóa đơn bán hàng";
     }
     if (!formData.items || formData.items.length === 0) {
       newErrors.items = "Cần ít nhất một dòng sản phẩm";
@@ -476,15 +476,15 @@ export default function CreditNoteForm() {
       const payload = buildPayload();
       if (isEdit) {
         await creditNoteService.updateCreditNote(id, payload);
-        toast.success("Đã cập nhật Credit Note");
+        toast.success("Đã cập nhật hóa đơn điều chỉnh");
       } else {
         await creditNoteService.createCreditNote(payload);
-        toast.success("Đã tạo Credit Note");
+        toast.success("Đã tạo hóa đơn điều chỉnh");
       }
       navigate("/sales/credit-notes");
     } catch (error) {
       console.error(error);
-      toast.error(error?.response?.data?.message || "Không thể lưu Credit Note");
+      toast.error(error?.response?.data?.message || "Không thể lưu hóa đơn điều chỉnh");
     } finally {
       setSubmitting(false);
     }
@@ -500,32 +500,33 @@ export default function CreditNoteForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isEdit ? "Cập nhật Credit Note" : "Tạo Credit Note mới"}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  {isEdit ? "Cập nhật thông tin Credit Note" : "Nhập thông tin Credit Note"}
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/sales/credit-notes")}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                ← Quay lại
-              </button>
-            </div>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEdit ? "Cập nhật hóa đơn điều chỉnh" : "Tạo hóa đơn điều chỉnh mới"}
+            </h1>
+            <p className="text-gray-500">
+              {isEdit ? "Cập nhật thông tin hóa đơn điều chỉnh" : "Nhập thông tin hóa đơn điều chỉnh"}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/sales/credit-notes")}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
 
+      <div className="px-6 py-6">
+        <div className="bg-white rounded-lg shadow-sm">
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Invoice <span className="text-red-500">*</span>
+                  Hóa đơn bán hàng <span className="text-red-500">*</span>
                 </label>
                 {isEdit ? (
                   <input
@@ -540,7 +541,7 @@ export default function CreditNoteForm() {
                       type="text"
                       value={selectedInvoice?.invoiceNo || ""}
                       readOnly
-                      placeholder="Chọn Invoice"
+                      placeholder="Chọn hóa đơn bán hàng"
                       className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                     />
                     <button
@@ -571,7 +572,7 @@ export default function CreditNoteForm() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Return Order
+                  Đơn trả hàng
                 </label>
                 {!isEdit ? (
                   <div className="flex gap-2">
@@ -579,7 +580,7 @@ export default function CreditNoteForm() {
                       type="text"
                       value={selectedReturnOrder?.returnNo || ""}
                       readOnly
-                      placeholder="Chọn Return Order (tùy chọn)"
+                      placeholder="Chọn đơn trả hàng (tùy chọn)"
                       className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                     />
                     <button
@@ -607,7 +608,7 @@ export default function CreditNoteForm() {
                         onClick={loadFromReturnOrder}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                       >
-                        Tạo từ RO
+                        Tạo từ đơn trả hàng
                       </button>
                     )}
                   </div>
@@ -623,7 +624,7 @@ export default function CreditNoteForm() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ngày Credit Note
+                  Ngày tạo hóa đơn điều chỉnh
                 </label>
                 <DatePicker
                   selected={formData.creditNoteDate}
@@ -660,9 +661,6 @@ export default function CreditNoteForm() {
                   className="w-full border rounded-lg px-3 py-2"
                   placeholder="0"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  💡 Chiết khấu áp dụng sau khi trừ chiết khấu từng sản phẩm
-                </p>
               </div>
             </div>
 
@@ -924,8 +922,8 @@ const InvoicePickerModal = ({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Chọn Invoice</h3>
-            <p className="text-sm text-gray-500">Tìm và chọn Invoice</p>
+            <h3 className="text-lg font-semibold text-gray-900">Chọn hóa đơn bán hàng</h3>
+            <p className="text-sm text-gray-500">Tìm và chọn hóa đơn bán hàng</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             ✕
@@ -942,9 +940,9 @@ const InvoicePickerModal = ({
         </div>
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="py-12 text-center text-gray-500">Đang tải danh sách Invoice...</div>
+            <div className="py-12 text-center text-gray-500">Đang tải danh sách hóa đơn bán hàng...</div>
           ) : invoices.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">Không có Invoice nào</div>
+            <div className="py-12 text-center text-gray-500">Không có hóa đơn nào</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
@@ -1018,8 +1016,8 @@ const ReturnOrderPickerModal = ({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Chọn Return Order</h3>
-            <p className="text-sm text-gray-500">Tìm và chọn Return Order đã hoàn thành</p>
+            <h3 className="text-lg font-semibold text-gray-900">Chọn đơn trả hàng</h3>
+            <p className="text-sm text-gray-500">Tìm và chọn đơn trả hàng đã hoàn thành</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             ✕
@@ -1030,35 +1028,35 @@ const ReturnOrderPickerModal = ({
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm theo số Return Order hoặc khách hàng..."
+            placeholder="Tìm theo số đơn trả hàng hoặc khách hàng..."
             className="w-full border rounded-lg px-3 py-2"
           />
         </div>
         <div className="flex-1 overflow-auto">
           {loading ? (
             <div className="py-12 text-center text-gray-500">
-              Đang tải danh sách Return Order...
+              Đang tải danh sách đơn trả hàng...
             </div>
           ) : returnOrders.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">Không có Return Order nào</div>
+            <div className="py-12 text-center text-gray-500">Không có đơn trả hàng nào</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Số Return Order
+                    Số đơn trả hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Khách hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Delivery
+                    Phiếu giao hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Sales Order
+                    Đơn bán hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Invoice
+                    Hóa đơn bán hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Trạng thái
