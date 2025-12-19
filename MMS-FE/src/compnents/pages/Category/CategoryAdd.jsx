@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faX, faPlus, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import { faInfoCircle, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
 import { createCategory } from '../../../api/categoryService';
 import { validation } from '../../../utils/validation';
 import { toast } from 'react-toastify';
 
-const CategoryAdd = ({ onClose, onSave }) => {
+const CategoryAdd = () => {
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
         description: ''
@@ -58,8 +60,7 @@ const CategoryAdd = ({ onClose, onSave }) => {
         try {
             const response = await createCategory(formData);
             toast.success('Thêm danh mục thành công!');
-            onSave(response);
-            onClose();
+            navigate('/categories');
         } catch (error) {
             console.error('Lỗi khi tạo danh mục:', error);
             const apiMessage =
@@ -74,49 +75,30 @@ const CategoryAdd = ({ onClose, onSave }) => {
     };
 
     return (
-        <div className="w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="relative px-8 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5" />
-                <div className="relative flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/30">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-                                Thêm danh mục
-                            </h2>
-                            <p className="text-sm text-gray-600 mt-0.5">Tạo danh mục mới trong hệ thống</p>
-                        </div>
-                    </div>
+        <div className="p-6">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/80 rounded-xl transition-all duration-200 group"
+                        onClick={() => navigate('/categories')}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
                     >
-                        <FontAwesomeIcon icon={faX} className="w-5 h-5 text-gray-500 group-hover:text-gray-700 group-hover:rotate-90 transition-all duration-200" />
+                        ← Quay lại
                     </button>
+                    <h1 className="text-2xl font-semibold">Thêm danh mục</h1>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                <div className="flex-1 overflow-y-auto px-8 py-6" style={{ 
-                    maxHeight: 'calc(90vh - 180px)',
-                    WebkitOverflowScrolling: 'touch',
-                    transform: 'translateZ(0)',
-                    scrollBehavior: 'smooth',
-                }}>
-                    <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl p-6 border border-gray-200/50">
-                            <div className="flex items-center gap-2 mb-5">
-                                <FontAwesomeIcon icon={faInfoCircle} className="w-5 h-5 text-blue-600" />
-                                <h3 className="text-base font-semibold text-gray-800">Thông tin danh mục</h3>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
+
+            <form onSubmit={handleSubmit}>
+                <div className="space-y-4">
+                        <div className="bg-slate-50 rounded-lg p-4">
+                            <div className="mb-4">
+                                <h3 className="text-base font-semibold text-slate-800">Thông tin danh mục</h3>
                             </div>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Tên danh mục <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -124,8 +106,8 @@ const CategoryAdd = ({ onClose, onSave }) => {
                                         name="name"
                                         value={formData.name}
                                         onChange={handleChange}
-                                        className={`w-full px-4 py-2.5 bg-white border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 text-sm transition-all duration-200 ${
-                                            validationErrors.name ? 'border-red-500' : 'border-gray-300'
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
+                                            validationErrors.name ? 'border-red-500' : 'border-slate-300'
                                         }`}
                                         placeholder="Nhập tên danh mục (tối đa 100 ký tự)"
                                         required
@@ -133,85 +115,65 @@ const CategoryAdd = ({ onClose, onSave }) => {
                                     {validationErrors.name && (
                                         <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
                                     )}
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <p className="mt-1 text-xs text-slate-500">
                                         {formData.name.length}/100 ký tự
                                     </p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Mô tả
                                     </label>
                                     <textarea
                                         name="description"
                                         value={formData.description}
                                         onChange={handleChange}
-                                        rows="4"
-                                        className={`w-full px-4 py-3 bg-white border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 text-sm resize-none transition-all duration-200 ${
-                                            validationErrors.description ? 'border-red-500' : 'border-gray-300'
+                                        rows="3"
+                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none ${
+                                            validationErrors.description ? 'border-red-500' : 'border-slate-300'
                                         }`}
                                         placeholder="Nhập mô tả danh mục (tối đa 500 ký tự)"
                                     />
                                     {validationErrors.description && (
                                         <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
                                     )}
-                                    <p className="mt-1 text-xs text-gray-500">
+                                    <p className="mt-1 text-xs text-slate-500">
                                         {formData.description.length}/500 ký tự
                                     </p>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="bg-gradient-to-br from-amber-50 to-orange-50/30 rounded-xl p-4 border border-amber-200/50">
-                            <h4 className="text-sm font-semibold text-amber-800 mb-2">Quy tắc đặt tên:</h4>
-                            <ul className="text-xs text-amber-700 space-y-1">
-                                <li>• Chỉ được chứa chữ cái, số, khoảng trắng, dấu gạch ngang</li>
-                                <li>• Tên danh mục phải là duy nhất</li>
-                                <li>• Không được để trống</li>
-                            </ul>
-                        </div>
                     </div>
-                </div>
 
-                <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50/30">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
-                    >
-                        Hủy
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200 flex items-center gap-2 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        {isSubmitting ? 'Đang tạo...' : 'Thêm danh mục'}
-                    </button>
-                </div>
+                    <div className="flex items-center gap-3 mt-6 pt-4 border-t">
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="group flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 hover:shadow-lg border border-green-600 hover:border-green-700 disabled:hover:scale-100"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin" />
+                                    <span>Đang tạo...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FontAwesomeIcon icon={faFloppyDisk} className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                                    <span className="group-hover:font-medium transition-all duration-200">Thêm danh mục</span>
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate('/categories')}
+                            disabled={isSubmitting}
+                            className="group px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 hover:shadow-sm disabled:hover:scale-100"
+                        >
+                            <span className="group-hover:font-medium transition-all duration-200">Hủy</span>
+                        </button>
+                    </div>
             </form>
-
-            <style jsx>{`
-                /* Custom Scrollbar */
-                .overflow-y-auto::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-track {
-                    background: #f1f5f9;
-                    border-radius: 10px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb {
-                    background: linear-gradient(to bottom, #3b82f6, #6366f1);
-                    border-radius: 10px;
-                }
-                .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-                    background: linear-gradient(to bottom, #2563eb, #4f46e5);
-                }
-            `}</style>
+            </div>
         </div>
     );
 };
