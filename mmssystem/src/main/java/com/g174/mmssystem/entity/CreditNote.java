@@ -65,6 +65,25 @@ public class CreditNote {
     @Column(name = "total_amount", precision = 18, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    /**
+     * Số tiền Credit Note được áp dụng để bù trừ vào balance của Invoice
+     * (phần <= số tiền còn nợ)
+     */
+    @Column(name = "applied_to_balance", precision = 18, scale = 2)
+    private BigDecimal appliedToBalance = BigDecimal.ZERO;
+
+    /**
+     * Số tiền phải trả lại khách hàng (phần Credit Note vượt quá số tiền còn nợ)
+     */
+    @Column(name = "refund_amount", precision = 18, scale = 2)
+    private BigDecimal refundAmount = BigDecimal.ZERO;
+
+    /**
+     * Số tiền đã trả lại khách hàng (để track việc đã trả hay chưa)
+     */
+    @Column(name = "refund_paid_amount", precision = 18, scale = 2)
+    private BigDecimal refundPaidAmount = BigDecimal.ZERO;
+
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
 

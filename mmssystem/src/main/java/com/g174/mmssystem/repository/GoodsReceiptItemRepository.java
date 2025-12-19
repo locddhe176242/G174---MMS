@@ -20,5 +20,13 @@ public interface GoodsReceiptItemRepository extends JpaRepository<GoodsReceiptIt
     // Query by Purchase Order Item directly (new flow: PO → GR)
     @Query("SELECT gri FROM GoodsReceiptItem gri WHERE gri.purchaseOrderItem.poiId = :poiId")
     List<GoodsReceiptItem> findByPoiId(@Param("poiId") Integer poiId);
+    
+    // Query by Return Order Item for Sales Return flow
+    @Query("SELECT gri FROM GoodsReceiptItem gri " +
+           "WHERE gri.returnOrderItem.roiId = :roiId " +
+           "AND gri.goodsReceipt.status = 'Approved' " +
+           "AND gri.goodsReceipt.sourceType = 'SalesReturn' " +
+           "AND gri.goodsReceipt.deletedAt IS NULL")
+    List<GoodsReceiptItem> findApprovedByRoiId(@Param("roiId") Integer roiId);
 }
 

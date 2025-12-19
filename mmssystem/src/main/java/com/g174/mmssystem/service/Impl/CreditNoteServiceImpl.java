@@ -63,6 +63,9 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
         recalcTotals(creditNote, items);
 
+        // Tính toán appliedToBalance và refundAmount
+        calculateAppliedAndRefund(creditNote, invoice);
+
         CreditNote saved = creditNoteRepository.save(creditNote);
         return creditNoteMapper.toResponse(saved, items);
     }
@@ -86,6 +89,12 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
         creditNote.getItems().addAll(items);
 
         recalcTotals(creditNote, items);
+
+        // Tính toán appliedToBalance và refundAmount
+        ARInvoice invoice = creditNote.getInvoice();
+        if (invoice != null) {
+            calculateAppliedAndRefund(creditNote, invoice);
+        }
 
         CreditNote saved = creditNoteRepository.save(creditNote);
         return creditNoteMapper.toResponse(saved, items);
@@ -147,15 +156,20 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
         creditNote.setStatus(newStatus);
 
-        // Khi chuyển sang Issued hoặc Applied, cập nhật Invoice balance và Customer
-        // balance
+        // Khi chuyển sang Issued hoặc Applied, tính lại appliedToBalance và refundAmount
+        // rồi cập nhật Invoice balance và Customer balance
         if (newStatus == CreditNote.CreditNoteStatus.Issued || newStatus == CreditNote.CreditNoteStatus.Applied) {
+            // Reload invoice để đảm bảo có dữ liệu mới nhất
+            ARInvoice invoice = getInvoice(creditNote.getInvoice().getArInvoiceId());
+            // Tính lại appliedToBalance và refundAmount trước khi update balance
+            calculateAppliedAndRefund(creditNote, invoice);
+            creditNoteRepository.save(creditNote); // Lưu lại giá trị đã tính
             updateInvoiceBalance(creditNote);
-            // Cập nhật customer balance
-            if (creditNote.getInvoice() != null && creditNote.getInvoice().getCustomer() != null) {
+            // Cập nhật customer balance (chỉ tính phần appliedToBalance, không tính refundAmount)
+            if (invoice.getCustomer() != null) {
                 customerBalanceService.updateOnCreditNoteApplied(
-                        creditNote.getInvoice().getCustomer().getCustomerId(),
-                        creditNote.getTotalAmount());
+                        invoice.getCustomer().getCustomerId(),
+                        creditNote.getAppliedToBalance() != null ? creditNote.getAppliedToBalance() : creditNote.getTotalAmount());
             }
         }
 
@@ -170,6 +184,17 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
 
         if (invoice.getStatus() == ARInvoice.InvoiceStatus.Cancelled) {
             throw new IllegalStateException("Không thể tạo Credit Note từ hóa đơn đã hủy");
+        }
+
+        // Không cho phép tạo Credit Note từ Invoice đã Paid nếu không có Return Order
+        // Vì nếu đã trả hết tiền và không có Return Order, thì không có lý do để tạo Credit Note
+        // Credit Note chỉ nên tạo khi:
+        // 1. Có Return Order (khách hàng trả lại hàng)
+        // 2. Hoặc Invoice chưa Paid (để điều chỉnh trước khi thanh toán)
+        if (invoice.getStatus() == ARInvoice.InvoiceStatus.Paid) {
+            throw new IllegalStateException(
+                    "Không thể tạo Credit Note từ hóa đơn đã thanh toán đầy đủ. " +
+                    "Credit Note chỉ được tạo khi có Return Order hoặc hóa đơn chưa thanh toán đầy đủ.");
         }
 
         // Copy toàn bộ thông tin từ Invoice gốc
@@ -284,19 +309,25 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy Invoice ID " + invoice.getArInvoiceId()));
 
-            // Tính lại balance từ đầu: totalAmount - tổng Credit Notes - tổng Payments
-            // Đây là cách đúng trong ERP: không trừ trực tiếp, mà tính lại từ đầu để đảm
-            // bảo chính xác
+            // Tính lại balance từ đầu: totalAmount - tổng appliedToBalance - tổng Payments
+            // Chỉ trừ phần appliedToBalance (bù trừ vào balance), không trừ refundAmount
             BigDecimal balance = freshInvoice.getTotalAmount();
 
-            // Trừ đi tất cả Credit Notes đã áp dụng (Issued hoặc Applied)
+            // Trừ đi tất cả appliedToBalance từ Credit Notes đã áp dụng (Issued hoặc Applied)
             List<CreditNote> allCreditNotes = creditNoteRepository
                     .findByInvoice_ArInvoiceIdAndDeletedAtIsNull(freshInvoice.getArInvoiceId());
+            BigDecimal totalAppliedToBalance = BigDecimal.ZERO;
+            BigDecimal totalRefundAmount = BigDecimal.ZERO;
             for (CreditNote cn : allCreditNotes) {
                 if (cn.getStatus() == CreditNote.CreditNoteStatus.Issued ||
                         cn.getStatus() == CreditNote.CreditNoteStatus.Applied) {
-                    balance = balance.subtract(cn.getTotalAmount());
-                    log.debug("Trừ Credit Note {}: -{}", cn.getCreditNoteNo(), cn.getTotalAmount());
+                    BigDecimal applied = cn.getAppliedToBalance() != null ? cn.getAppliedToBalance() : BigDecimal.ZERO;
+                    BigDecimal refund = cn.getRefundAmount() != null ? cn.getRefundAmount() : BigDecimal.ZERO;
+                    balance = balance.subtract(applied);
+                    totalAppliedToBalance = totalAppliedToBalance.add(applied);
+                    totalRefundAmount = totalRefundAmount.add(refund);
+                    log.debug("Trừ Credit Note {}: Applied={}, Refund={}", 
+                            cn.getCreditNoteNo(), applied, refund);
                 }
             }
 
@@ -327,16 +358,67 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
             }
 
             arInvoiceRepository.save(freshInvoice);
-            log.info("Đã tính lại balance của Invoice {}: {} -> {} (Total: {}, Credit Notes: {}, Payments: {})",
+            log.info("Đã tính lại balance của Invoice {}: {} -> {} (Total: {}, Applied to Balance: {}, Refund: {}, Payments: {})",
                     freshInvoice.getInvoiceNo(), oldBalance, balance,
                     freshInvoice.getTotalAmount(),
-                    allCreditNotes.stream()
-                            .filter(cn -> cn.getStatus() == CreditNote.CreditNoteStatus.Issued ||
-                                    cn.getStatus() == CreditNote.CreditNoteStatus.Applied)
-                            .map(CreditNote::getTotalAmount)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add),
+                    totalAppliedToBalance,
+                    totalRefundAmount,
                     totalPaid != null ? totalPaid : BigDecimal.ZERO);
         }
+    }
+
+    /**
+     * Tính toán appliedToBalance và refundAmount cho Credit Note
+     * Logic:
+     * - Nếu Credit Note <= số tiền còn nợ: appliedToBalance = Credit Note, refundAmount = 0
+     * - Nếu Credit Note > số tiền còn nợ: appliedToBalance = số còn nợ, refundAmount = Credit Note - số còn nợ
+     */
+    private void calculateAppliedAndRefund(CreditNote creditNote, ARInvoice invoice) {
+        if (creditNote.getTotalAmount() == null || creditNote.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            creditNote.setAppliedToBalance(BigDecimal.ZERO);
+            creditNote.setRefundAmount(BigDecimal.ZERO);
+            return;
+        }
+
+        // Tính số tiền còn nợ trước khi áp dụng Credit Note này
+        BigDecimal totalAmount = invoice.getTotalAmount() != null ? invoice.getTotalAmount() : BigDecimal.ZERO;
+        
+        // Tính tổng Payments
+        BigDecimal totalPaid = arPaymentRepository.getTotalPaidByInvoiceId(invoice.getArInvoiceId());
+        if (totalPaid == null) {
+            totalPaid = BigDecimal.ZERO;
+        }
+
+        // Tính tổng appliedToBalance từ các Credit Note khác (đã Issued hoặc Applied)
+        BigDecimal otherAppliedToBalance = creditNoteRepository
+                .findByInvoice_ArInvoiceIdAndDeletedAtIsNull(invoice.getArInvoiceId())
+                .stream()
+                .filter(cn -> !cn.getCnId().equals(creditNote.getCnId()) && // Loại trừ Credit Note hiện tại
+                        (cn.getStatus() == CreditNote.CreditNoteStatus.Issued ||
+                         cn.getStatus() == CreditNote.CreditNoteStatus.Applied))
+                .map(cn -> cn.getAppliedToBalance() != null ? cn.getAppliedToBalance() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Số tiền còn nợ = Total - Payments - appliedToBalance từ các Credit Note khác
+        BigDecimal outstandingBalance = totalAmount.subtract(totalPaid).subtract(otherAppliedToBalance);
+        outstandingBalance = outstandingBalance.max(BigDecimal.ZERO); // Không âm
+
+        BigDecimal creditNoteAmount = creditNote.getTotalAmount();
+
+        // Tính toán appliedToBalance và refundAmount
+        if (creditNoteAmount.compareTo(outstandingBalance) <= 0) {
+            // Credit Note <= số còn nợ: toàn bộ được áp dụng vào balance
+            creditNote.setAppliedToBalance(creditNoteAmount);
+            creditNote.setRefundAmount(BigDecimal.ZERO);
+        } else {
+            // Credit Note > số còn nợ: phần còn nợ được áp dụng, phần vượt quá là refund
+            creditNote.setAppliedToBalance(outstandingBalance);
+            creditNote.setRefundAmount(creditNoteAmount.subtract(outstandingBalance));
+        }
+
+        log.debug("Credit Note {}: Total={}, Outstanding={}, Applied={}, Refund={}",
+                creditNote.getCreditNoteNo(), creditNoteAmount, outstandingBalance,
+                creditNote.getAppliedToBalance(), creditNote.getRefundAmount());
     }
 
     private void validateStatusTransition(CreditNote.CreditNoteStatus currentStatus,
@@ -403,6 +485,34 @@ public class CreditNoteServiceImpl implements ICreditNoteService {
         } catch (IllegalArgumentException ex) {
             return null;
         }
+    }
+
+    @Override
+    public CreditNoteResponseDTO updateRefundPaidAmount(Integer id, BigDecimal refundPaidAmount) {
+        CreditNote creditNote = creditNoteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Credit Note không tồn tại với ID: " + id));
+
+        if (refundPaidAmount == null || refundPaidAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Số tiền đã trả phải >= 0");
+        }
+
+        if (refundPaidAmount.compareTo(creditNote.getRefundAmount()) > 0) {
+            throw new IllegalArgumentException(
+                    String.format("Số tiền đã trả (%s) không được vượt quá số tiền phải trả (%s)",
+                            refundPaidAmount, creditNote.getRefundAmount()));
+        }
+
+        creditNote.setRefundPaidAmount(refundPaidAmount);
+        User currentUser = getCurrentUser();
+        creditNote.setUpdatedBy(currentUser);
+        creditNote.setUpdatedAt(Instant.now());
+
+        creditNoteRepository.save(creditNote);
+
+        log.info("Đã cập nhật số tiền đã trả lại khách hàng cho Credit Note {}: {} / {}",
+                creditNote.getCreditNoteNo(), refundPaidAmount, creditNote.getRefundAmount());
+
+        return creditNoteMapper.toResponse(creditNote, creditNote.getItems());
     }
 
     private String generateCreditNoteNo() {

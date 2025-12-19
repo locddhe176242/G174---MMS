@@ -29,6 +29,21 @@ public class CreditNoteListResponseDTO {
     private Instant creditNoteDate;
 
     private BigDecimal totalAmount;
+    
+    /**
+     * Số tiền Credit Note được áp dụng để bù trừ vào balance của Invoice
+     */
+    private BigDecimal appliedToBalance;
+    
+    /**
+     * Số tiền phải trả lại khách hàng
+     */
+    private BigDecimal refundAmount;
+    
+    /**
+     * Số tiền đã trả lại khách hàng
+     */
+    private BigDecimal refundPaidAmount;
 
     private Instant createdAt;
     private Instant updatedAt;

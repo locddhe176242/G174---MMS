@@ -76,8 +76,8 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
                 .createdBy(createdBy)
                 .build();
 
-        // Lấy tất cả item của ReturnOrder có returnedQty > 0
-        List<ReturnOrderItem> sourceItems = returnOrderItemRepository.findByReturnOrder_RoId(returnOrder.getRoId())
+        // Lấy tất cả item của ReturnOrder có returnedQty > 0 (với JOIN FETCH để load product và warehouse)
+        List<ReturnOrderItem> sourceItems = returnOrderItemRepository.findByReturnOrder_RoIdWithRelations(returnOrder.getRoId())
                 .stream()
                 .filter(roi -> roi.getReturnedQty() != null
                         && roi.getReturnedQty().compareTo(BigDecimal.ZERO) > 0)
@@ -90,11 +90,8 @@ public class SalesReturnInboundOrderServiceImpl implements ISalesReturnInboundOr
         // Tạo items cho Đơn nhập hàng lại (plannedQty = returnedQty)
         List<SalesReturnInboundOrderItem> items = sourceItems.stream()
                 .map(roi -> {
-                    Product product = roi.getProduct() != null
-                            ? roi.getProduct()
-                            : productRepository.findById(roi.getProduct().getProductId())
-                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm ID " + roi.getProduct().getProductId()));
-
+                    // Product và Warehouse đã được JOIN FETCH, không cần kiểm tra null
+                    Product product = roi.getProduct();
                     Warehouse lineWarehouse = roi.getWarehouse() != null ? roi.getWarehouse() : baseWarehouse;
 
                     SalesReturnInboundOrderItem item = new SalesReturnInboundOrderItem();

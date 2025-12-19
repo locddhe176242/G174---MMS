@@ -67,6 +67,7 @@ import ReturnOrderDetail from "./compnents/pages/Sale/ReturnOrder/ReturnOrderDet
 import CreditNoteList from "./compnents/pages/Sale/CreditNote/CreditNoteList.jsx";
 import CreditNoteForm from "./compnents/pages/Sale/CreditNote/CreditNoteForm.jsx";
 import CreditNoteDetail from "./compnents/pages/Sale/CreditNote/CreditNoteDetail.jsx";
+import CreditNotePrint from "./compnents/pages/Sale/CreditNote/CreditNotePrint.jsx";
 import InvoiceList from "./compnents/pages/Sale/Invoice/InvoiceList.jsx";
 import InvoiceForm from "./compnents/pages/Sale/Invoice/InvoiceForm.jsx";
 import InvoiceDetail from "./compnents/pages/Sale/Invoice/InvoiceDetail.jsx";
@@ -105,6 +106,15 @@ function App() {
                 element={
                     <ProtectedRoute>
                         <InvoicePrint />
+                    </ProtectedRoute>
+                }
+            />
+            {/* Route in hóa đơn điều chỉnh - không có layout */}
+            <Route
+                path="/sales/credit-notes/:id/print"
+                element={
+                    <ProtectedRoute>
+                        <CreditNotePrint />
                     </ProtectedRoute>
                 }
             />
