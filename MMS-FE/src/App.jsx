@@ -22,7 +22,13 @@ import VendorDetail from "./compnents/pages/VendorDetail";
 import CustomerDetail from "./compnents/pages/CustomerDetail";
 import CustomerForm from "./compnents/pages/CustomerForm";
 import ProductList from "./compnents/pages/product/ProductList";
+import ProductAdd from "./compnents/pages/product/ProductAdd";
+import ProductEdit from "./compnents/pages/product/ProductEdit";
+import ProductDetail from "./compnents/pages/product/ProductDetail";
 import CategoryList from "./compnents/pages/Category/CategoryList";
+import CategoryAdd from "./compnents/pages/Category/CategoryAdd";
+import CategoryEdit from "./compnents/pages/Category/CategoryEdit";
+import CategoryDetail from "./compnents/pages/Category/CategoryDetail";
 
 //page for purchase module
 import PurchaseRequisitionForm from "./compnents/pages/Purchase/PurchaseRequisitionForm";
@@ -129,6 +135,9 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/categories" element={<CategoryList />} />
+                <Route path="/categories/new" element={<CategoryAdd />} />
+                <Route path="/categories/:id" element={<CategoryDetail />} />
+                <Route path="/categories/:id/edit" element={<CategoryEdit />} />
                 <Route path="/profile" element={<UserProfile />} />
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/new" element={<CustomerForm />} />
@@ -136,6 +145,9 @@ function App() {
                 <Route path="/customers/:id/edit" element={<CustomerForm />} />
 
                 <Route path="/products" element={<ProductList />} />
+                <Route path="/products/new" element={<ProductAdd />} />
+                <Route path="/products/:id" element={<ProductDetail />} />
+                <Route path="/products/:id/edit" element={<ProductEdit />} />
 
                 <Route path="/vendors" element={<VendorList />} />
                 <Route path="/vendors/new" element={<VendorForm />} />

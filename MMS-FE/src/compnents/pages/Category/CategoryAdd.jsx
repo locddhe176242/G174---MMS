@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfoCircle, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
+import { faInfoCircle, faSpinner, faFloppyDisk, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { createCategory } from '../../../api/categoryService';
 import { validation } from '../../../utils/validation';
 import { toast } from 'react-toastify';
@@ -81,8 +81,9 @@ const CategoryAdd = () => {
                     <button
                         onClick={() => navigate('/categories')}
                         className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        ← Quay lại
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                     <h1 className="text-2xl font-semibold">Thêm danh mục</h1>
                 </div>
