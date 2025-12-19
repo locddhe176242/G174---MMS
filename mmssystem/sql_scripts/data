@@ -180,10 +180,12 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- ACCOUNTING (role_id = 4): Quản lý danh mục, Sản phẩm, Kho (tất cả), Kế toán (tất cả)
+-- ACCOUNTING (role_id = 4): Quản lý danh mục, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (tất cả), Kế toán (tất cả)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (4, 1),   -- Dashboard
 (4, 2),   -- Categories (Quản lý danh mục)
+(4, 3),   -- Customers (Khách hàng)
+(4, 4),   -- Vendors (Nhà cung cấp)
 (4, 5),   -- Products (Sản phẩm)
 (4, 6),   -- Warehouse (parent)
 (4, 9),   -- Accounting (parent)

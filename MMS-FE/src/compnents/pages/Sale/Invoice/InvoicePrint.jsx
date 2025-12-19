@@ -243,7 +243,7 @@ export default function InvoicePrint() {
           {/* Mã cơ quan thuế */}
           <div style={{ textAlign: "center", marginTop: "10px" }}>
             <p style={{ margin: "0", fontSize: "11px", color: "#666" }}>
-              Mã của Cơ quan thuế: [Mã cơ quan thuế]
+              Mã của Cơ quan thuế: 10113
             </p>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function InvoicePrint() {
             </div>
             <div>
               <p style={{ margin: "3px 0" }}><strong>Địa chỉ:</strong> Số 2, ngõ 10 đường Nguyễn Văn Huyên, Phường Quan Hoa, Quận Cầu Giấy, Thành phố Hà Nội, Việt Nam</p>
-              <p style={{ margin: "3px 0" }}><strong>STK:</strong> [Số tài khoản]</p>
+              <p style={{ margin: "3px 0" }}><strong>STK:</strong></p>
             </div>
           </div>
         </div>
@@ -273,12 +273,10 @@ export default function InvoicePrint() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "11px" }}>
             <div>
               <p style={{ margin: "3px 0" }}><strong>Tên đơn vị:</strong> {data.customerName || "—"}</p>
-              <p style={{ margin: "3px 0" }}><strong>MST:</strong> {data.customerTaxCode || "[Mã số thuế]"}</p>
+              <p style={{ margin: "3px 0" }}><strong>MST:</strong> {data.customerTaxCode || ""}</p>
             </div>
             <div>
-              <p style={{ margin: "3px 0" }}><strong>Địa chỉ:</strong> {data.customerAddress || "—"}</p>
-              <p style={{ margin: "3px 0" }}><strong>HTTT:</strong> {data.paymentMethod || "Chuyển khoản"}</p>
-              <p style={{ margin: "3px 0" }}><strong>STK:</strong> {data.customerAccountNo || "[Số tài khoản]"}</p>
+              <p style={{ margin: "3px 0" }}><strong>Địa chỉ:</strong> {data.customerAddress || ""}</p>
             </div>
           </div>
         </div>

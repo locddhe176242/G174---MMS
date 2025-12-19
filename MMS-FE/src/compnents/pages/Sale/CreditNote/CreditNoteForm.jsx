@@ -1077,9 +1077,6 @@ const ReturnOrderPickerModal = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Trạng thái
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                    Tổng tiền
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -1133,9 +1130,6 @@ const ReturnOrderPickerModal = ({
                         >
                           {getStatusLabel(ro.status)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {formatCurrency(ro.totalAmount)}
                       </td>
                     </tr>
                   );

@@ -216,12 +216,12 @@ const ProductList = () => {
         </div>
 
         {canEdit && (
-          <button
-            onClick={handleAdd}
-            className="group flex items-center gap-2 px-6 py-3 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
-          >
-            <span className="group-hover:font-medium transition-all duration-200">Thêm sản phẩm</span>
-          </button>
+        <button
+          onClick={handleAdd}
+          className="group flex items-center gap-2 px-6 py-3 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
+        >
+          <span className="group-hover:font-medium transition-all duration-200">Thêm sản phẩm</span>
+        </button>
         )}
       </div>
 
@@ -356,25 +356,25 @@ const ProductList = () => {
                         
                         {canEdit && (
                           <>
-                            <button
-                              onClick={() => handleEdit(product)}
-                              title="Chỉnh sửa"
+                        <button
+                          onClick={() => handleEdit(product)}
+                          title="Chỉnh sửa"
                               className="group p-2.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-green-200 hover:border-green-300"
-                            >
+                        >
                               <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
-                            </button>
-                            
-                            <button
-                              onClick={() => handleDelete(productId)}
-                              title="Xóa"
-                              className="group p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-red-200 hover:border-red-300"
-                            >
+                        </button>
+                        
+                        <button
+                          onClick={() => handleDelete(productId)}
+                          title="Xóa"
+                          className="group p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-red-200 hover:border-red-300"
+                        >
                               <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                            </button>
+                        </button>
                           </>
                         )}
                       </div>

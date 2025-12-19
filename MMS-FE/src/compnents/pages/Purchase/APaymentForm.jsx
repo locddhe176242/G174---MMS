@@ -349,12 +349,11 @@ export default function APaymentForm() {
                     {validationErrors.referenceNo && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.referenceNo}</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formData.method === "Bank Transfer" 
-                        ? "Nhập mã giao dịch ngân hàng để đối soát (không bắt buộc)"
-                        : "Nhập mã tham chiếu hoặc mã giao dịch ngân hàng (không bắt buộc)"
-                      }
-                    </p>
+                    {formData.method !== "Bank Transfer" && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Nhập mã tham chiếu hoặc mã giao dịch ngân hàng (không bắt buộc)
+                      </p>
+                    )}
                   </div>
                 </div>
 
