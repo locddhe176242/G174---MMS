@@ -21,4 +21,6 @@ public interface ICreditNoteService {
     CreditNoteResponseDTO changeStatus(Integer id, String status);
 
     CreditNoteResponseDTO createFromInvoice(Integer invoiceId);
+
+    CreditNoteResponseDTO updateRefundPaidAmount(Integer id, java.math.BigDecimal refundPaidAmount);
 }

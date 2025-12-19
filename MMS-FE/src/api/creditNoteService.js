@@ -36,4 +36,11 @@ export const creditNoteService = {
     const response = await apiClient.post(`/credit-notes/from-invoice/${invoiceId}`);
     return response.data;
   },
+
+  updateRefundPaidAmount: async (id, refundPaidAmount) => {
+    const response = await apiClient.patch(`/credit-notes/${id}/refund-paid-amount`, null, {
+      params: { refundPaidAmount },
+    });
+    return response.data;
+  },
 };

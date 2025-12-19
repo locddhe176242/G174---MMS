@@ -85,7 +85,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, parent_id, display_order) VALUES
 -- Menu chính (parent_id = NULL)
 (1, 'dashboard', 'Trang chủ', '/dashboard', 'home', NULL, 1),
-(2, 'categories', 'Quản lý danh mục', '/categories', 'categories', NULL, 3),
+(2, 'categories', 'Danh mục sản phẩm', '/categories', 'categories', NULL, 3),
 (3, 'customers', 'Khách hàng', '/customers', 'customers', NULL, 10),
 (4, 'vendors', 'Nhà cung cấp', '/vendors', 'vendors', NULL, 11),
 (5, 'products', 'Sản phẩm', '/products', 'products', NULL, 12),
@@ -108,7 +108,6 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (17, 'rfq', 'Yêu cầu báo giá', '/purchase/rfqs', 'quote', 7, 19),
 (18, 'purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 7, 20),
 (19, 'purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 7, 21),
-(31, 'inbound-delivery', 'Kế hoạch nhận hàng', '/purchase/inbound-deliveries', 'delivery', 7, 22),
 
 -- Menu con của Sales (parent_id = 8)
 (20, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 8, 22),
@@ -118,7 +117,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (25, 'sales-return-inbound-orders', 'Đơn nhập hàng lại', '/sales/return-inbound-orders', 'inbound', 8, 26),
 
 -- Menu con của Accounting (parent_id = 9)
-(24, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 9, 27),
+(24, 'credit-notes', 'Hoá đơn điều chỉnh', '/sales/credit-notes', 'credit', 9, 27),
 (26, 'accounting-ap-invoices', 'Hóa đơn mua hàng', '/purchase/ap-invoices', 'accounting', 9, 28),
 (27, 'accounting-ar-invoices', 'Hóa đơn bán hàng', '/sales/invoices', 'invoice', 9, 29),
 (28, 'accounting-ap-payments', 'Thanh toán mua hàng', '/purchase/ap-payments', 'payment', 9, 30),

@@ -418,28 +418,29 @@ export default function InvoiceForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isEdit ? "Cập nhật hóa đơn" : "Tạo hóa đơn mới"}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  {isEdit ? "Cập nhật thông tin hóa đơn" : "Tạo hóa đơn từ Delivery đã giao hàng"}
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/sales/invoices")}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                ← Quay lại
-              </button>
-            </div>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEdit ? "Cập nhật hóa đơn" : "Tạo hóa đơn mới"}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {isEdit ? "Cập nhật thông tin hóa đơn" : "Tạo hóa đơn từ Delivery đã giao hàng"}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/sales/invoices")}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="px-6 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -528,7 +529,22 @@ export default function InvoiceForm() {
                   max="100"
                   step="0.01"
                   value={formData.commonDiscountRate || 0}
-                  onChange={(e) => handleInputChange("commonDiscountRate", Number(e.target.value) || 0)}
+                  onChange={(e) => {
+                    handleInputChange("commonDiscountRate", Number(e.target.value) || 0);
+                    e.target.setCustomValidity("");
+                  }}
+                  onInvalid={(e) => {
+                    if (e.target.validity.rangeUnderflow) {
+                      e.target.setCustomValidity("Giá trị phải lớn hơn hoặc bằng 0");
+                    } else if (e.target.validity.rangeOverflow) {
+                      e.target.setCustomValidity("Giá trị phải từ 0 đến 100");
+                    } else {
+                      e.target.setCustomValidity("Vui lòng nhập giá trị hợp lệ");
+                    }
+                  }}
+                  onInput={(e) => {
+                    e.target.setCustomValidity("");
+                  }}
                   readOnly={!!formData.deliveryId}
                   disabled={!!formData.deliveryId}
                   className={`w-full border rounded-lg px-3 py-2 ${
@@ -617,13 +633,24 @@ export default function InvoiceForm() {
                               min="0"
                               step="0.01"
                               value={item.quantity}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 setFormData((prev) => {
                                   const items = [...prev.items];
                                   items[index] = { ...items[index], quantity: e.target.value };
                                   return { ...prev, items };
-                                })
-                              }
+                                });
+                                e.target.setCustomValidity("");
+                              }}
+                              onInvalid={(e) => {
+                                if (e.target.validity.rangeUnderflow) {
+                                  e.target.setCustomValidity("Số lượng phải lớn hơn hoặc bằng 0");
+                                } else {
+                                  e.target.setCustomValidity("Vui lòng nhập số lượng hợp lệ");
+                                }
+                              }}
+                              onInput={(e) => {
+                                e.target.setCustomValidity("");
+                              }}
                               readOnly={isDeliveryLoaded}
                               disabled={isDeliveryLoaded}
                               className={`w-20 px-2 py-1 text-right border rounded ${
@@ -645,13 +672,24 @@ export default function InvoiceForm() {
                                 min="0"
                                 step="0.01"
                                 value={item.unit_price}
-                                onChange={(e) =>
+                                onChange={(e) => {
                                   setFormData((prev) => {
                                     const items = [...prev.items];
                                     items[index] = { ...items[index], unit_price: e.target.value };
                                     return { ...prev, items };
-                                  })
-                                }
+                                  });
+                                  e.target.setCustomValidity("");
+                                }}
+                                onInvalid={(e) => {
+                                  if (e.target.validity.rangeUnderflow) {
+                                    e.target.setCustomValidity("Đơn giá phải lớn hơn hoặc bằng 0");
+                                  } else {
+                                    e.target.setCustomValidity("Vui lòng nhập đơn giá hợp lệ");
+                                  }
+                                }}
+                                onInput={(e) => {
+                                  e.target.setCustomValidity("");
+                                }}
                                 className={`w-32 px-2 py-1 text-right border rounded ${
                                   itemErr.unit_price ? "border-red-500" : "border-gray-300"
                                 }`}
@@ -668,13 +706,24 @@ export default function InvoiceForm() {
                               min="0"
                               step="0.01"
                               value={item.discount_percent || 0}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 setFormData((prev) => {
                                   const items = [...prev.items];
                                   items[index] = { ...items[index], discount_percent: e.target.value };
                                   return { ...prev, items };
-                                })
-                              }
+                                });
+                                e.target.setCustomValidity("");
+                              }}
+                              onInvalid={(e) => {
+                                if (e.target.validity.rangeUnderflow) {
+                                  e.target.setCustomValidity("Chiết khấu phải lớn hơn hoặc bằng 0");
+                                } else {
+                                  e.target.setCustomValidity("Vui lòng nhập chiết khấu hợp lệ");
+                                }
+                              }}
+                              onInput={(e) => {
+                                e.target.setCustomValidity("");
+                              }}
                               readOnly={isDeliveryLoaded}
                               disabled={isDeliveryLoaded}
                               className={`w-20 px-2 py-1 text-right border rounded ${
@@ -691,13 +740,24 @@ export default function InvoiceForm() {
                                 min="0"
                                 step="0.01"
                                 value={item.tax_rate || 0}
-                                onChange={(e) =>
+                                onChange={(e) => {
                                   setFormData((prev) => {
                                     const items = [...prev.items];
                                     items[index] = { ...items[index], tax_rate: e.target.value };
                                     return { ...prev, items };
-                                  })
-                                }
+                                  });
+                                  e.target.setCustomValidity("");
+                                }}
+                                onInvalid={(e) => {
+                                  if (e.target.validity.rangeUnderflow) {
+                                    e.target.setCustomValidity("Thuế phải lớn hơn hoặc bằng 0");
+                                  } else {
+                                    e.target.setCustomValidity("Vui lòng nhập thuế hợp lệ");
+                                  }
+                                }}
+                                onInput={(e) => {
+                                  e.target.setCustomValidity("");
+                                }}
                                 readOnly={isDeliveryLoaded}
                                 disabled={isDeliveryLoaded}
                                 className={`w-20 px-2 py-1 text-right border rounded border-gray-300 ${
