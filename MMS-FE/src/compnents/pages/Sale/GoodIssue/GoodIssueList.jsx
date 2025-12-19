@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { goodIssueService } from "../../../../api/goodIssueService";
 import Pagination from "../../../common/Pagination";
 import { hasRole } from "../../../../api/authService";
+import useAuthStore from "../../../../store/authStore";
 
 const getStatusBadge = (status) => {
     const map = {
@@ -20,6 +21,14 @@ const getStatusBadge = (status) => {
 
 export default function GoodIssueList() {
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or WAREHOUSE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+    }) || false;
 
     const [issues, setIssues] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -164,12 +173,14 @@ export default function GoodIssueList() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý Phiếu xuất kho</h1>
                         </div>
-                        <button
-                            onClick={() => navigate("/sales/good-issues/new")}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            + Tạo Phiếu xuất kho
-                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={() => navigate("/sales/good-issues/new")}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                                + Tạo Phiếu xuất kho
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -325,8 +336,8 @@ export default function GoodIssueList() {
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                             </svg>
                                                         </button>
-                                                        {/* Chỉ cho sửa/xóa khi phiếu còn trạng thái Nháp. Đã duyệt thì chỉ được xem. */}
-                                                        {issue.status === "Draft" && (
+                                                        {/* Chỉ cho sửa/xóa khi phiếu còn trạng thái Nháp và user có quyền. Đã duyệt thì chỉ được xem. */}
+                                                        {canEdit && issue.status === "Draft" && (
                                                             <>
                                                                 <button
                                                                     onClick={() => navigate(`/sales/good-issues/${issue.issueId || issue.issue_id}/edit`)}

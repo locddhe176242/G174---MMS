@@ -4,11 +4,28 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { vendorService } from "../../api/vendorService";
 import { toast } from "react-toastify";
+import useAuthStore from "../../store/authStore";
 
 export default function VendorForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or PURCHASE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+  }) || false;
+  
+  // Redirect users without permission
+  useEffect(() => {
+    if (!canEdit) {
+      toast.error('Bạn không có quyền truy cập trang này!');
+      navigate('/vendors');
+    }
+  }, [canEdit, navigate]);
 
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

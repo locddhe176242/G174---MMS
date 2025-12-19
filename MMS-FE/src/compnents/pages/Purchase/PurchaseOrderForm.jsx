@@ -11,6 +11,7 @@ import { purchaseRequisitionService } from "../../../api/purchaseRequisitionServ
 import apiClient from "../../../api/apiClient";
 import { getCurrentUser } from "../../../api/authService";
 import { formatCurrency, formatNumberInput, parseNumberInput } from "../../../utils/formatters";
+import useAuthStore from "../../../store/authStore";
 
 export default function PurchaseOrderForm() {
     const { id } = useParams();
@@ -18,6 +19,22 @@ export default function PurchaseOrderForm() {
     const navigate = useNavigate();
     const isEdit = Boolean(id);
     const prIdFromQuery = searchParams.get("pr_id");
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or PURCHASE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+    }) || false;
+    
+    // Redirect users without permission
+    useEffect(() => {
+        if (!canEdit) {
+            toast.error('Bạn không có quyền truy cập trang này!');
+            navigate('/purchase/purchase-orders');
+        }
+    }, [canEdit, navigate]);
 
     const [formData, setFormData] = useState({
         po_no: "",

@@ -14,6 +14,7 @@ import { warehouseStockService } from "../../../../api/warehouseStockService";
 import { goodIssueService } from "../../../../api/goodIssueService";
 import { getProducts } from "../../../../api/productService";
 import { hasRole } from "../../../../api/authService";
+import useAuthStore from "../../../../store/authStore";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
@@ -51,6 +52,22 @@ export default function DeliveryForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { roles } = useAuthStore();
+  
+  // Check if user is MANAGER or SALE
+  const canEdit = roles?.some(role => {
+    const roleName = typeof role === 'string' ? role : role?.name;
+    return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+           roleName === 'SALE' || roleName === 'ROLE_SALE';
+  }) || false;
+  
+  // Redirect users without permission
+  useEffect(() => {
+    if (!canEdit) {
+      toast.error('Bạn không có quyền truy cập trang này!');
+      navigate('/sales/deliveries');
+    }
+  }, [canEdit, navigate]);
 
   const [loading, setLoading] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);

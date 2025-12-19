@@ -5,6 +5,7 @@ import { faImage, faSpinner, faFloppyDisk, faArrowLeft } from '@fortawesome/free
 import { getCategories } from '../../../api/categoryService';
 import { createProduct, uploadProductImage } from '../../../api/productService';
 import { toast } from 'react-toastify';
+import useAuthStore from '../../../store/authStore';
 
 /**
  * Helper function để xử lý image URL (giống UserProfile)
@@ -32,6 +33,22 @@ const getImageUrl = (imageUrl) => {
 
 const ProductAdd = () => {
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or PURCHASE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+    }) || false;
+    
+    // Redirect users without permission
+    useEffect(() => {
+        if (!canEdit) {
+            toast.error('Bạn không có quyền truy cập trang này!');
+            navigate('/products');
+        }
+    }, [canEdit, navigate]);
     const [formData, setFormData] = useState({
         name: '',
         description: '',

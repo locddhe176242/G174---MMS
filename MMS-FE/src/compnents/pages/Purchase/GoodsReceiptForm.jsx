@@ -10,6 +10,7 @@ import { goodsReceiptService } from "../../../api/goodsReceiptService";
 import { getCurrentUser } from "../../../api/authService";
 import { salesReturnInboundOrderService } from "../../../api/salesReturnInboundOrderService";
 import apiClient from "../../../api/apiClient";
+import useAuthStore from "../../../store/authStore";
 
 export default function GoodsReceiptForm() {
     const { id } = useParams();
@@ -18,6 +19,22 @@ export default function GoodsReceiptForm() {
     const isEdit = Boolean(id);
     const poIdFromQuery = searchParams.get("po_id");
     const sriIdFromQuery = searchParams.get("sriId");
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or WAREHOUSE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+    }) || false;
+    
+    // Redirect users without permission
+    useEffect(() => {
+        if (!canEdit) {
+            toast.error('Bạn không có quyền truy cập trang này!');
+            navigate('/purchase/goods-receipts');
+        }
+    }, [canEdit, navigate]);
     
     // Source type selection: 'purchase' or 'salesReturn'
     const [sourceType, setSourceType] = useState(sriIdFromQuery ? 'salesReturn' : 'purchase');

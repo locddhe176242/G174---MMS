@@ -5,10 +5,19 @@ import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { goodIssueService } from "../../../../api/goodIssueService";
 import { getCurrentUser } from "../../../../api/authService";
+import useAuthStore from "../../../../store/authStore";
 
 export default function GoodIssueDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or WAREHOUSE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'WAREHOUSE' || roleName === 'ROLE_WAREHOUSE';
+    }) || false;
 
     const [data, setData] = useState(null);
     const [items, setItems] = useState([]);
@@ -158,7 +167,7 @@ export default function GoodIssueDetail() {
                             <p className="text-gray-500">Chi tiết phiếu xuất kho</p>
                         </div>
                         <div className="flex-1"></div>
-                        {data.status === "Draft" && (
+                        {canEdit && data.status === "Draft" && (
                             <div className="flex items-center gap-3">
                                 <button
                                     type="button"

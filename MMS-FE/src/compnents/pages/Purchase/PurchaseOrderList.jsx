@@ -3,9 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { purchaseOrderService } from "../../../api/purchaseOrderService";
 import Pagination from "../../common/Pagination";
+import useAuthStore from "../../../store/authStore";
 
 export default function PurchaseOrderList() {
     const navigate = useNavigate();
+    const { roles } = useAuthStore();
+    
+    // Check if user is MANAGER or PURCHASE
+    const canEdit = roles?.some(role => {
+        const roleName = typeof role === 'string' ? role : role?.name;
+        return roleName === 'MANAGER' || roleName === 'ROLE_MANAGER' || 
+               roleName === 'PURCHASE' || roleName === 'ROLE_PURCHASE';
+    }) || false;
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -219,12 +228,14 @@ export default function PurchaseOrderList() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Quản lý Đơn mua hàng</h1>
                         </div>
-                        <button
-                            onClick={() => navigate("/purchase/purchase-orders/new")}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            + Tạo Đơn mua hàng
-                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={() => navigate("/purchase/purchase-orders/new")}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                                + Tạo Đơn mua hàng
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -304,8 +315,8 @@ export default function PurchaseOrderList() {
                                     const approvalStatusStr = getStatusString(order.approval_status || order.approvalStatus, "Pending");
                                     
                                     // ERP standard logic: Only allow Edit/Delete when approval_status = Pending
-                                    const canEdit = approvalStatusStr === "Pending" && statusStr === "Pending";
-                                    const canDelete = approvalStatusStr === "Pending" && statusStr === "Pending";
+                                    const canEditOrder = canEdit && approvalStatusStr === "Pending" && statusStr === "Pending";
+                                    const canDeleteOrder = canEdit && approvalStatusStr === "Pending" && statusStr === "Pending";
                                     
                                     return (
                                     <tr key={orderId} className="hover:bg-gray-50">
@@ -345,7 +356,7 @@ export default function PurchaseOrderList() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
-                                                {canEdit && (
+                                                {canEditOrder && (
                                                     <button
                                                         onClick={() => navigate(`/purchase/purchase-orders/${orderId}/edit`)}
                                                         className="group p-2.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-green-200 hover:border-green-300"
@@ -356,7 +367,7 @@ export default function PurchaseOrderList() {
                                                         </svg>
                                                     </button>
                                                 )}
-                                                {canDelete && (
+                                                {canDeleteOrder && (
                                                     <button
                                                         onClick={() => handleDeleteClick(order)}
                                                         className="group p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-105 hover:shadow-md border border-red-200 hover:border-red-300"
