@@ -104,6 +104,7 @@ public class ReturnOrderMapper {
                 .roId(returnOrder.getRoId())
                 .returnNo(returnOrder.getReturnNo())
                 .status(returnOrder.getStatus())
+                .goodsReceiptStatus(returnOrder.getGoodsReceiptStatus())
                 .deliveryId(delivery != null ? delivery.getDeliveryId() : null)
                 .deliveryNo(delivery != null ? delivery.getDeliveryNo() : null)
                 .salesOrderId(salesOrder != null ? salesOrder.getSoId() : null)

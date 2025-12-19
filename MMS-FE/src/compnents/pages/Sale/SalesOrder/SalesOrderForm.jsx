@@ -1062,19 +1062,18 @@ export default function SalesOrderForm() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm bg-white">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left">Sản phẩm</th>
-                    <th className="px-4 py-3 text-left">ĐVT</th>
-                    <th className="px-4 py-3 text-left">Kho</th>
-                    <th className="px-4 py-3 text-right">Số lượng</th>
-                    <th className="px-4 py-3 text-right">Đơn giá (VND)</th>
-                    <th className="px-4 py-3 text-right">Chiết khấu (%)</th>
-                    <th className="px-4 py-3 text-right">Thuế (%)</th>
-                    <th className="px-4 py-3 text-right">Tạm tính (VND)</th>
-                    <th className="px-4 py-3 text-center">#</th>
+                    <th className="px-4 py-3 text-left w-[32%]">Sản phẩm</th>
+                    <th className="px-4 py-3 text-left w-[10%]">ĐVT</th>
+                    <th className="px-4 py-3 text-right w-[10%]">Số lượng</th>
+                    <th className="px-4 py-3 text-right w-[16%]">Đơn giá (VND)</th>
+                    <th className="px-4 py-3 text-right w-[10%]">Chiết khấu (%)</th>
+                    <th className="px-4 py-3 text-right w-[10%]">Thuế (%)</th>
+                    <th className="px-4 py-3 text-right w-[16%]">Tạm tính (VND)</th>
+                    <th className="px-4 py-3 text-center w-[6%]">#</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -1104,8 +1103,8 @@ export default function SalesOrderForm() {
                     const lineTotal = base + tax;
 
                     return (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 w-64 align-top">
+                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 align-top">
                           <Select
                             placeholder="Chọn sản phẩm"
                             value={products.find((p) => p.value === item.productId) || null}
@@ -1133,33 +1132,6 @@ export default function SalesOrderForm() {
                             className="w-24 border rounded px-2 py-1"
                             disabled={!canEdit}
                           />
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <Select
-                            placeholder="Chọn kho"
-                            value={warehouses.find((w) => w.value === item.warehouseId) || null}
-                            onChange={(opt) => handleItemChange(index, "warehouseId", opt ? opt.value : null)}
-                            options={warehouses}
-                            isClearable
-                            isDisabled={!canEdit}
-                            styles={productSelectStyles}
-                            menuPortalTarget={
-                              typeof window !== "undefined" ? document.body : null
-                            }
-                            menuPosition="fixed"
-                          />
-                          {item.productId && item.warehouseId && itemStocks[index] !== undefined && (
-                            <div className="mt-1 text-xs">
-                              <span className={itemStocks[index] !== null ? "text-gray-600" : "text-gray-400"}>
-                                Tồn kho: {itemStocks[index] !== null ? Number(itemStocks[index]).toLocaleString("vi-VN") : "—"}
-                              </span>
-                              {itemStocks[index] !== null && qty > itemStocks[index] && (
-                                <p className="text-red-600 font-semibold mt-1">
-                                  Không đủ hàng! (Cần: {qty.toLocaleString("vi-VN")})
-                                </p>
-                              )}
-                            </div>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-right align-top">
                           <input

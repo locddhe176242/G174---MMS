@@ -115,12 +115,15 @@ export default function SalesOrderDetail() {
                   {actionLoading ? "Đang gửi..." : "Gửi cho khách"}
                 </button>
               )}
-              <button
-                onClick={() => navigate(`/sales/orders/${id}/edit`)}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
-              >
-                Chỉnh sửa
-              </button>
+              {/* Chỉ cho chỉnh sửa khi còn Draft, chưa có Delivery và chưa có Invoice */}
+              {data.approvalStatus === "Draft" && !data.hasDelivery && !data.hasInvoice && (
+                <button
+                  onClick={() => navigate(`/sales/orders/${id}/edit`)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                >
+                  Chỉnh sửa
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -209,9 +212,6 @@ export default function SalesOrderDetail() {
                     Sản phẩm
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Kho
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Số lượng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -235,9 +235,6 @@ export default function SalesOrderDetail() {
                     <td className="px-4 py-3 text-sm text-gray-900">
                       <div className="font-semibold">{item.productName || "—"}</div>
                       <div className="text-xs text-gray-500">{item.productCode || ""}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {item.warehouseName || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {Number(item.quantity || 0).toLocaleString("vi-VN")} {item.uom || ""}

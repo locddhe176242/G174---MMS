@@ -267,26 +267,31 @@ export default function GoodsReceiptForm() {
             let alreadyReceivedMap = {}; // Map<roiId, alreadyReceivedQty>
             try {
                 if (sri.roId) {
-                    // Load tất cả Goods Receipts đã approve cho Return Order này
+                    // Load tất cả Goods Receipts cho Return Order này
                     const allReceipts = await goodsReceiptService.getGoodsReceiptsWithPagination(0, 1000);
-                    const receipts = Array.isArray(allReceipts?.content) ? allReceipts.content : 
-                                   (Array.isArray(allReceipts) ? allReceipts : []);
+                    const receipts = Array.isArray(allReceipts?.content)
+                        ? allReceipts.content
+                        : Array.isArray(allReceipts)
+                        ? allReceipts
+                        : [];
                     
-                    // Filter các Goods Receipts đã approve, sourceType = SalesReturn, và có returnOrderId trùng
-                    const approvedReceipts = receipts.filter(gr => 
-                        gr.status === "Approved" && 
+                    // Filter các Goods Receipts liên quan đến Return Order này và không bị từ chối
+                    // (tính cả Pending và Approved để lần nhập sau thấy đúng phần còn lại)
+                    const relevantReceipts = receipts.filter((gr) =>
+                        (gr.status === "Approved" || gr.status === "Pending") &&
                         gr.sourceType === "SalesReturn" &&
-                        (gr.returnOrderId === sri.roId || gr.returnOrder?.roId === sri.roId)
+                        // Với GoodsReceiptResponseDTO, roId nằm trực tiếp trên DTO
+                        (gr.roId === sri.roId || gr.returnOrder?.roId === sri.roId)
                     );
                     
-                    console.log("=== Loading alreadyReceivedQty ===", {
+                    console.log("=== Loading alreadyReceivedQty (including Pending & Approved) ===", {
                         sriId: sriIdParsed,
                         roId: sri.roId,
-                        approvedReceiptsCount: approvedReceipts.length
+                        relevantReceiptsCount: relevantReceipts.length,
                     });
                     
                     // Tính alreadyReceivedQty cho mỗi roiId
-                    approvedReceipts.forEach(gr => {
+                    relevantReceipts.forEach((gr) => {
                         (gr.items || []).forEach(grItem => {
                             const roiId = grItem.roiId || grItem.returnOrderItem?.roiId;
                             if (roiId) {

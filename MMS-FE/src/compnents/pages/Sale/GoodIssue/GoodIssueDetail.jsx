@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from "react-toastify";
 import { goodIssueService } from "../../../../api/goodIssueService";
+import { getCurrentUser } from "../../../../api/authService";
 
 export default function GoodIssueDetail() {
     const { id } = useParams();
@@ -13,12 +14,24 @@ export default function GoodIssueDetail() {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     useEffect(() => {
         if (id) {
             loadIssue();
         }
+        loadUser();
     }, [id]);
+
+    const loadUser = () => {
+        try {
+            const user = getCurrentUser();
+            setCurrentUser(user);
+        } catch (error) {
+            // ignore
+        }
+    };
 
     const loadIssue = async () => {
         try {
@@ -34,6 +47,26 @@ export default function GoodIssueDetail() {
             setErr(error?.response?.data?.message || "Không thể tải Phiếu xuất kho");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCompleteIssue = async () => {
+        if (actionLoading) return;
+        if (!window.confirm("Xác nhận hoàn tất phiếu xuất kho? Sau khi hoàn tất, hệ thống sẽ trừ tồn kho và bạn sẽ không thể sửa phiếu này")) {
+            return;
+        }
+
+        try {
+            setActionLoading(true);
+            const userId = currentUser?.userId || currentUser?.id || 1;
+            await goodIssueService.submitForApproval(id, userId);
+            toast.success("Đã hoàn tất phiếu xuất kho và cập nhật tồn kho");
+            await loadIssue();
+        } catch (error) {
+            console.error(error);
+            toast.error(error?.response?.data?.message || "Không thể hoàn tất phiếu xuất kho");
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -126,13 +159,23 @@ export default function GoodIssueDetail() {
                         </div>
                         <div className="flex-1"></div>
                         {data.status === "Draft" && (
-                            <button
-                                type="button"
-                                onClick={() => navigate(`/sales/good-issues/${id}/edit`)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                Sửa
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(`/sales/good-issues/${id}/edit`)}
+                                    className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+                                >
+                                    Sửa
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleCompleteIssue}
+                                    disabled={actionLoading}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {actionLoading ? "Đang hoàn tất..." : "Hoàn tất phiếu xuất kho"}
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>

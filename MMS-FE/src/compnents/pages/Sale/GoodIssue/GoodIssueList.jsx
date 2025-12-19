@@ -325,12 +325,8 @@ export default function GoodIssueList() {
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                             </svg>
                                                         </button>
-                                                        {/* Chỉ hiển thị nút Sửa/Xóa nếu:
-                                                            - status = Draft: tất cả user
-                                                            - status = Approved: chỉ Manager
-                                                        */}
-                                                        {(issue.status === "Draft" || 
-                                                          (issue.status === "Approved" && (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                                                        {/* Chỉ cho sửa/xóa khi phiếu còn trạng thái Nháp. Đã duyệt thì chỉ được xem. */}
+                                                        {issue.status === "Draft" && (
                                                             <>
                                                                 <button
                                                                     onClick={() => navigate(`/sales/good-issues/${issue.issueId || issue.issue_id}/edit`)}

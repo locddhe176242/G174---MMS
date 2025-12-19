@@ -462,8 +462,10 @@ export default function GoodIssueForm() {
         if (!item.warehouseId) {
           e.warehouseId = "Chọn kho cho sản phẩm này";
         }
-        if (!item.issuedQty || item.issuedQty <= 0) {
-          e.issuedQty = "Số lượng xuất phải lớn hơn 0";
+        // Cho phép nhập 0 để thể hiện không xuất sản phẩm này trong phiếu hiện tại
+        // Chỉ chặn khi số lượng âm
+        if (item.issuedQty != null && item.issuedQty < 0) {
+          e.issuedQty = "Số lượng xuất không được nhỏ hơn 0";
         }
         if (item.issuedQty > item.plannedQty) {
           e.issuedQty = `Số lượng xuất không được vượt quá số lượng dự kiến (${item.plannedQty})`;
@@ -477,6 +479,14 @@ export default function GoodIssueForm() {
       });
       if (itemErrors.some((e) => Object.keys(e).length > 0)) {
         newErrors.itemDetails = itemErrors;
+      }
+
+      // Ít nhất phải có một dòng có số lượng xuất > 0
+      const hasPositiveQty = formData.items.some(
+        (item) => Number(item.issuedQty || 0) > 0
+      );
+      if (!hasPositiveQty) {
+        newErrors.items = "Cần ít nhất một sản phẩm có số lượng xuất > 0";
       }
     }
     setErrors(newErrors);
@@ -856,7 +866,7 @@ export default function GoodIssueForm() {
                               min="0"
                               step="0.01"
                               max={item.plannedQty || 0}
-                              value={item.issuedQty || ""}
+                              value={item.issuedQty ?? ""}
                               onChange={(e) =>
                                 handleItemChange(index, "issuedQty", Number(e.target.value))
                               }
@@ -909,16 +919,6 @@ export default function GoodIssueForm() {
             >
               Hủy
             </button>
-            {isEdit && issueStatus === "Draft" && (
-              <button
-                type="button"
-                onClick={handleSubmitForApproval}
-                disabled={loading}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {loading ? "Đang xử lý..." : "Hoàn tất phiếu xuất kho"}
-              </button>
-            )}
             <button
               type="submit"
               disabled={loading || !canEditAll}

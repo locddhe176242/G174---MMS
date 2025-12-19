@@ -25,7 +25,8 @@ public class GoodIssueItemRequestDTO {
     private Integer warehouseId;
 
     @NotNull(message = "Số lượng xuất là bắt buộc")
-    @DecimalMin(value = "0.0001", message = "Số lượng xuất phải lớn hơn 0")
+    // Cho phép = 0 để thể hiện không xuất sản phẩm ở phiếu hiện tại, chỉ chặn khi < 0
+    @DecimalMin(value = "0", message = "Số lượng xuất không được nhỏ hơn 0")
     @DecimalMax(value = "999999999999999.99", message = "Số lượng xuất quá lớn")
     private BigDecimal issuedQty;
 
