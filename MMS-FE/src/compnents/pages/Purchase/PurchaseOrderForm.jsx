@@ -1141,6 +1141,7 @@ export default function PurchaseOrderForm() {
                                             selected={formData.delivery_date instanceof Date ? formData.delivery_date : (formData.delivery_date ? new Date(formData.delivery_date) : null)}
                                             onChange={(date) => handleInputChange("delivery_date", date)}
                                             dateFormat="dd/MM/yyyy"
+                                            minDate={formData.order_date instanceof Date ? formData.order_date : (formData.order_date ? new Date(formData.order_date) : new Date())}
                                             isClearable
                                             placeholderText="Chọn ngày giao hàng"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

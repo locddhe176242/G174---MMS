@@ -149,16 +149,16 @@ export default function RFQForm() {
         try {
             const rfqNo = await rfqService.generateRFQNo();
             if (rfqNo) {
-                setFormData((prev) => ({ ...prev, rfqNo }));
+                setFormData((prev) => ({ ...prev, rfqNo, issueDate: new Date() }));
                 return;
             }
             // Fallback
             const ts = Date.now().toString().slice(-6);
-            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}` }));
+            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}`, issueDate: new Date() }));
         } catch (err) {
             console.error("Error generating RFQ number:", err);
             const ts = Date.now().toString().slice(-6);
-            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}` }));
+            setFormData((prev) => ({ ...prev, rfqNo: `RFQ-${ts}`, issueDate: new Date() }));
         }
     };
 
@@ -212,7 +212,7 @@ export default function RFQForm() {
             
             setFormData({
                 rfqNo: rfq.rfqNo || "",
-                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? rfq.issueDate.slice(0, 10) : rfq.issueDate) : "",
+                issueDate: rfq.issueDate ? (typeof rfq.issueDate === 'string' ? new Date(rfq.issueDate) : (rfq.issueDate instanceof Date ? rfq.issueDate : new Date(rfq.issueDate))) : new Date(),
                 dueDate: rfq.dueDate ? (typeof rfq.dueDate === 'string' ? rfq.dueDate.slice(0, 10) : rfq.dueDate) : "",
                 status: statusValue,
                 selectedVendorIds: rfq.selectedVendorIds || 
@@ -825,11 +825,17 @@ export default function RFQForm() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Ngày phát hành đơn <span className="text-red-500">*</span>
                                         </label>
-                                        <DatePicker
-                                            selected={formData.issueDate instanceof Date ? formData.issueDate : (formData.issueDate ? new Date(formData.issueDate) : new Date())}
-                                            onChange={(date) => handleInputChange("issueDate", date)}
-                                            dateFormat="dd/MM/yyyy"
-                                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
+                                        <input
+                                            type="text"
+                                            value={(() => {
+                                                if (!formData.issueDate) return new Date().toLocaleDateString('vi-VN');
+                                                const date = formData.issueDate instanceof Date 
+                                                    ? formData.issueDate 
+                                                    : new Date(formData.issueDate);
+                                                return date.toLocaleDateString('vi-VN');
+                                            })()}
+                                            readOnly
+                                            className={`w-full px-3 py-2 border rounded-lg bg-gray-50 ${validationErrors.issueDate ? "border-red-500" : "border-gray-300"}`}
                                         />
                                         {validationErrors.issueDate && (
                                             <p className="mt-1 text-sm text-red-600">{validationErrors.issueDate}</p>
