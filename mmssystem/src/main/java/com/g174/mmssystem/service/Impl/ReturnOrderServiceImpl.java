@@ -112,8 +112,10 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     @Override
     @Transactional(readOnly = true)
     public ReturnOrderResponseDTO getReturnOrder(Integer id) {
-        ReturnOrder returnOrder = getReturnOrderEntity(id);
-        List<ReturnOrderItem> items = returnOrderItemRepository.findByReturnOrder_RoId(id);
+        // Sử dụng query với JOIN FETCH để eager load các relationship và tránh LazyInitializationException
+        ReturnOrder returnOrder = returnOrderRepository.findByIdWithRelations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn trả hàng ID " + id));
+        List<ReturnOrderItem> items = returnOrderItemRepository.findByReturnOrder_RoIdWithRelations(id);
         return returnOrderMapper.toResponse(returnOrder, items);
     }
 
@@ -121,8 +123,8 @@ public class ReturnOrderServiceImpl implements IReturnOrderService {
     @Transactional(readOnly = true)
     public List<ReturnOrderListResponseDTO> getAllReturnOrders(Integer deliveryId, Integer invoiceId, String status,
             String keyword) {
-        List<ReturnOrder> returnOrders = returnOrderRepository.findAll().stream()
-                .filter(ro -> ro.getDeletedAt() == null)
+        // Sử dụng query với JOIN FETCH để eager load các relationship và tránh LazyInitializationException
+        List<ReturnOrder> returnOrders = returnOrderRepository.findAllWithRelations().stream()
                 .filter(ro -> deliveryId == null
                         || (ro.getDelivery() != null && ro.getDelivery().getDeliveryId().equals(deliveryId)))
                 .filter(ro -> invoiceId == null

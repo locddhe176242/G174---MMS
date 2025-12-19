@@ -103,19 +103,39 @@ export default function ReturnOrderDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="px-6 py-6">
-        <div className="mb-4">
-          <button
-            onClick={() => navigate("/sales/return-orders")}
-            className="text-blue-600 hover:underline mb-4"
-          >
-            Quay lại
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Đơn trả hàng: {data.returnNo}</h1>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Đơn trả hàng: {data.returnNo}
+            </h1>
+            <p className="text-gray-500">
+              Phiếu giao hàng: {data.deliveryNo || "—"} | Khách hàng: {data.customerName || "—"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {data.status === "Draft" && (
+              <button
+                onClick={() => navigate(`/sales/return-orders/${id}/edit`)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Sửa
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/sales/return-orders")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="px-6 py-6 space-y-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
                 Thông tin đơn trả hàng
@@ -132,13 +152,13 @@ export default function ReturnOrderDetail() {
                   </span>
                 </li>
                 <li>
-                  <span className="text-gray-500">Delivery:</span> {data.deliveryNo || "—"}
+                  <span className="text-gray-500">Phiếu giao hàng:</span> {data.deliveryNo || "—"}
                 </li>
                 <li>
-                  <span className="text-gray-500">Sales Order:</span> {data.salesOrderNo || "—"}
+                  <span className="text-gray-500">Đơn bán hàng:</span> {data.salesOrderNo || "—"}
                 </li>
                 <li>
-                  <span className="text-gray-500">Invoice:</span> {data.invoiceNo || "—"}
+                  <span className="text-gray-500">Hóa đơn:</span> {data.invoiceNo || "—"}
                 </li>
                 <li>
                   <span className="text-gray-500">Khách hàng:</span> {data.customerName || "—"}
@@ -161,7 +181,7 @@ export default function ReturnOrderDetail() {
         </div>
 
         {canChangeStatus && (
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Thay đổi trạng thái</h3>
@@ -258,7 +278,7 @@ export default function ReturnOrderDetail() {
         </div>
 
         {data.notes && (
-          <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Ghi chú</h3>
             <p className="text-gray-700 whitespace-pre-wrap">{data.notes}</p>
           </div>

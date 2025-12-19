@@ -314,7 +314,7 @@ const ProductAdd = () => {
                                 name="sku"
                                 value={formData.sku}
                                 onChange={handleChange}
-                                placeholder="Phải Unique"
+                                placeholder=""
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                             />
                         </div>
@@ -350,7 +350,7 @@ const ProductAdd = () => {
                                 name="uom"
                                 value={formData.uom}
                                 onChange={handleChange}
-                                placeholder="VD: cái, thùng, mét, kg, gói"
+                                placeholder=""
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                             />
                         </div>
@@ -361,7 +361,7 @@ const ProductAdd = () => {
                                 name="size"
                                 value={formData.size}
                                 onChange={handleChange}
-                                placeholder="Theo đơn vị đo lường"
+                                placeholder=""
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
                             />
                         </div>

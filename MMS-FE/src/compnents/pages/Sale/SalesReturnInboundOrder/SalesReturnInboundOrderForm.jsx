@@ -182,14 +182,14 @@ export default function SalesReturnInboundOrderForm() {
         payload
       );
       toast.success(
-        `Đã tạo Đơn nhập hàng lại ${res.sriNo || ""} từ Đơn trả hàng`
+        `Đã tạo Đơn nhập hàng trả lại ${res.sriNo || ""} từ Đơn trả hàng`
       );
       navigate(`/sales/return-inbound-orders/${res.sriId}`);
     } catch (error) {
       console.error(error);
       toast.error(
         error?.response?.data?.message ||
-          "Không thể tạo Đơn nhập hàng lại từ Đơn trả hàng"
+          "Không thể tạo Đơn nhập hàng trả lại từ Đơn trả hàng"
       );
     } finally {
       setSubmitting(false);
@@ -203,23 +203,27 @@ export default function SalesReturnInboundOrderForm() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 flex items-center justify-between">
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Tạo Đơn nhập hàng lại
+              {isEdit ? "Cập nhật Đơn nhập hàng trả lại" : "Tạo Đơn nhập hàng trả lại"}
             </h1>
+          </div>
+          <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => navigate("/sales/return-inbound-orders")}
               className="px-4 py-2 border rounded-lg hover:bg-gray-100"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
-          <div className="border-t border-gray-200" />
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+      <div className="px-6 py-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           {/* Thông tin đơn nhập hàng lại */}
           <div className="grid grid-cols-1 gap-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -399,10 +403,6 @@ export default function SalesReturnInboundOrderForm() {
                 <h2 className="text-lg font-semibold text-gray-900">
                   Danh sách sản phẩm trong Đơn trả hàng
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Tham khảo để kiểm tra lại trước khi tạo Đơn nhập hàng lại. Số
-                  lượng nhập thực tế sẽ được xác nhận ở bước Phiếu nhập kho.
-                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
@@ -459,7 +459,7 @@ export default function SalesReturnInboundOrderForm() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow-sm p-6 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => navigate("/sales/return-inbound-orders")}
@@ -472,7 +472,7 @@ export default function SalesReturnInboundOrderForm() {
               disabled={submitting}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {submitting ? "Đang tạo..." : "Tạo Đơn nhập hàng lại"}
+              {submitting ? "Đang tạo..." : isEdit ? "Cập nhật" : "Tạo Đơn nhập hàng trả lại"}
             </button>
           </div>
         </form>

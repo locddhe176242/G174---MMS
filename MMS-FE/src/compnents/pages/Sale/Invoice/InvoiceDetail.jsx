@@ -64,8 +64,8 @@ export default function InvoiceDetail() {
           const creditNotesList = await creditNoteService.getAllCreditNotes({ invoiceId: response.arInvoiceId });
           setCreditNotes(creditNotesList || []);
         } catch (err) {
-          console.error("Error loading credit notes:", err);
-          // Don't show error, just set empty array
+          console.error("Lỗi khi tải hoá đơn điều chỉnh:", err);
+          // Không hiển thị lỗi, chỉ set mảng rỗng
           setCreditNotes([]);
         }
       }
@@ -136,43 +136,35 @@ export default function InvoiceDetail() {
   }
 
   const canAddPayment = data.status !== "Paid" && data.status !== "Cancelled" && Number(data.balanceAmount || 0) > 0;
-  const canCreateCreditNote = data.status !== "Cancelled";
-
-  const handleCreateCreditNote = async () => {
-    if (!window.confirm("Xác nhận tạo Credit Note (hóa đơn điều chỉnh) từ hóa đơn này?\n\nHệ thống sẽ copy toàn bộ thông tin và sản phẩm. Bạn có thể điều chỉnh số lượng sau.")) return;
-
-    try {
-      const creditNote = await creditNoteService.createFromInvoice(id);
-      toast.success("Đã tạo Credit Note thành công. Vui lòng điều chỉnh số lượng theo nhu cầu.");
-      navigate(`/sales/credit-notes/${creditNote.cnId}/edit`);
-    } catch (error) {
-      console.error(error);
-      toast.error(error?.response?.data?.message || "Không thể tạo Credit Note");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate("/sales/invoices")}
-            className="text-blue-600 hover:underline mb-4"
-          >
-            ← Quay lại danh sách
-          </button>
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-gray-900">Hóa đơn: {data.invoiceNo}</h1>
+      <div className="bg-white shadow-sm">
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Hóa đơn: {data.invoiceNo}</h1>
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(`/sales/invoices/${id}/print`)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
             >
-              🖨️ In hóa đơn
+              In hóa đơn
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/sales/invoices")}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+            >
+              Quay lại
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="px-6 py-6 space-y-6">
+
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
@@ -262,27 +254,8 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {canCreateCreditNote && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Tạo hóa đơn điều chỉnh (Credit Note)</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Tạo Credit Note mới từ hóa đơn này. Hệ thống sẽ copy toàn bộ thông tin và sản phẩm. Bạn có thể điều chỉnh số lượng sau.
-                </p>
-              </div>
-              <button
-                onClick={handleCreateCreditNote}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                + Tạo Credit Note
-              </button>
-            </div>
-          </div>
-        )}
-
         {canAddPayment && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Thêm thanh toán</h3>
               {!showPaymentForm && (
@@ -302,14 +275,34 @@ export default function InvoiceDetail() {
                       Số tiền <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max={data.balanceAmount}
-                      value={paymentForm.amount}
-                      onChange={(e) =>
-                        setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))
-                      }
+                      type="text"
+                      value={paymentForm.amount ? formatNumber(paymentForm.amount) : ""}
+                      onChange={(e) => {
+                        // Loại bỏ tất cả ký tự không phải số
+                        const rawValue = e.target.value.replace(/[^\d]/g, "");
+                        if (rawValue === "" || rawValue === "0") {
+                          setPaymentForm((prev) => ({ ...prev, amount: "" }));
+                        } else {
+                          // Lưu số nguyên (không có dấu chấm)
+                          setPaymentForm((prev) => ({ ...prev, amount: rawValue }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Validate khi blur
+                        const numValue = Number(paymentForm.amount || 0);
+                        if (!paymentForm.amount || paymentForm.amount === "") {
+                          e.target.setCustomValidity("Vui lòng nhập số tiền");
+                        } else if (numValue <= 0) {
+                          e.target.setCustomValidity("Số tiền phải lớn hơn 0");
+                        } else if (numValue > Number(data.balanceAmount || 0)) {
+                          e.target.setCustomValidity(`Số tiền không được vượt quá ${formatCurrency(data.balanceAmount)}`);
+                        } else {
+                          e.target.setCustomValidity("");
+                        }
+                      }}
+                      onInput={(e) => {
+                        e.target.setCustomValidity("");
+                      }}
                       className="w-full border rounded-lg px-3 py-2"
                       placeholder="Nhập số tiền"
                       required
@@ -406,7 +399,7 @@ export default function InvoiceDetail() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h3>
           </div>
@@ -468,7 +461,7 @@ export default function InvoiceDetail() {
         </div>
 
         {creditNotes && creditNotes.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="bg-white rounded-lg shadow-sm">
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Credit Notes liên quan</h3>
               <p className="text-sm text-gray-500 mt-1">
@@ -529,8 +522,32 @@ export default function InvoiceDetail() {
                             : "Nháp"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-red-600">
-                        -{formatCurrency(cn.totalAmount || 0)}
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                        {formatCurrency(cn.totalAmount || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">
+                        -{formatCurrency(cn.appliedToBalance || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm">
+                        {cn.refundAmount > 0 ? (
+                          <div>
+                            <div className="font-semibold text-orange-600">
+                              Phải trả: {formatCurrency(cn.refundAmount || 0)}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">
+                              Đã trả: {formatCurrency(cn.refundPaidAmount || 0)}
+                            </div>
+                            {cn.refundPaidAmount >= cn.refundAmount ? (
+                              <div className="text-xs text-green-600 mt-1 font-semibold">✓ Đã hoàn tất</div>
+                            ) : (
+                              <div className="text-xs text-red-600 mt-1">
+                                Còn lại: {formatCurrency((cn.refundAmount || 0) - (cn.refundPaidAmount || 0))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {cn.returnOrderNo ? (
@@ -560,10 +577,44 @@ export default function InvoiceDetail() {
                     <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-gray-900">
                       Tổng Credit Notes:
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-red-600">
-                      -{formatCurrency(
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                      {formatCurrency(
                         creditNotes.reduce((sum, cn) => sum + Number(cn.totalAmount || 0), 0)
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                      -{formatCurrency(
+                        creditNotes.reduce((sum, cn) => sum + Number(cn.appliedToBalance || 0), 0)
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm">
+                      <div className="font-bold text-orange-600">
+                        Phải trả: {formatCurrency(
+                          creditNotes.reduce((sum, cn) => sum + Number(cn.refundAmount || 0), 0)
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Đã trả: {formatCurrency(
+                          creditNotes.reduce((sum, cn) => sum + Number(cn.refundPaidAmount || 0), 0)
+                        )}
+                      </div>
+                      {(() => {
+                        const totalRefund = creditNotes.reduce((sum, cn) => sum + Number(cn.refundAmount || 0), 0);
+                        const totalPaid = creditNotes.reduce((sum, cn) => sum + Number(cn.refundPaidAmount || 0), 0);
+                        const remaining = totalRefund - totalPaid;
+                        if (remaining > 0) {
+                          return (
+                            <div className="text-xs text-red-600 mt-1">
+                              Còn lại: {formatCurrency(remaining)}
+                            </div>
+                          );
+                        } else if (totalRefund > 0) {
+                          return (
+                            <div className="text-xs text-green-600 mt-1 font-semibold">✓ Đã hoàn tất</div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </td>
                     <td colSpan={2}></td>
                   </tr>
@@ -641,7 +692,7 @@ export default function InvoiceDetail() {
         )}
 
         {data.notes && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Ghi chú</h3>
             <p className="text-gray-700 whitespace-pre-wrap">{data.notes}</p>
           </div>

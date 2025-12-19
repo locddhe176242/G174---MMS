@@ -183,7 +183,7 @@ export default function ReturnOrderList() {
               />
               <input
                 type="number"
-                placeholder="Delivery ID"
+                placeholder="Mã phiếu giao hàng"
                 value={deliveryFilter}
                 onChange={(e) => {
                   setDeliveryFilter(e.target.value);
@@ -228,10 +228,10 @@ export default function ReturnOrderList() {
                         </button>
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Delivery
+                        Phiếu giao hàng
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Sales Order
+                        Đơn bán hàng
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Khách hàng

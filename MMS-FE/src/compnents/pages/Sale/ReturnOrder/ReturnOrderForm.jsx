@@ -48,6 +48,7 @@ export default function ReturnOrderForm() {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [deliverySearch, setDeliverySearch] = useState("");
   const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [alreadyReturnedMap, setAlreadyReturnedMap] = useState({}); // Map<deliveryItemId, alreadyReturnedQty>
   const [formData, setFormData] = useState({
     deliveryId: "",
     invoiceId: null,
@@ -81,7 +82,7 @@ export default function ReturnOrderForm() {
       setDeliveries(list);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải danh sách Delivery");
+      toast.error("Không thể tải danh sách phiếu giao hàng");
     } finally {
       setDeliveryLoading(false);
     }
@@ -177,13 +178,106 @@ export default function ReturnOrderForm() {
   const loadFromDelivery = async (deliveryIdArg = null) => {
     const targetDeliveryId = deliveryIdArg || formData.deliveryId;
     if (!targetDeliveryId) {
-      toast.warn("Vui lòng chọn Delivery");
+      toast.warn("Vui lòng chọn phiếu giao hàng");
       return;
     }
     try {
       setLoading(true);
       const delivery = await deliveryService.getDeliveryById(targetDeliveryId);
       setSelectedDelivery(delivery);
+
+      // Load các Return Order đã Approved cho delivery này để tính alreadyReturned
+      try {
+        const allReturnOrders = await returnOrderService.getAllReturnOrders();
+        const returnOrders = Array.isArray(allReturnOrders) ? allReturnOrders : allReturnOrders?.content || [];
+        
+        // Get deliveryId from delivery object (ensure correct format)
+        const deliveryIdFromDelivery = delivery.deliveryId || delivery.delivery_id || targetDeliveryId;
+        const targetDeliveryIdNum = typeof deliveryIdFromDelivery === 'string' 
+          ? parseInt(deliveryIdFromDelivery) 
+          : (deliveryIdFromDelivery || (typeof targetDeliveryId === 'string' ? parseInt(targetDeliveryId) : targetDeliveryId));
+        
+        console.log("=== Loading alreadyReturned ===", {
+          targetDeliveryId,
+          deliveryIdFromDelivery,
+          targetDeliveryIdNum,
+          allReturnOrdersCount: returnOrders.length
+        });
+        
+        // Lọc các Return Order có deliveryId trùng và status = Approved
+        // (Loại trừ Return Order đang được edit nếu có)
+        const approvedReturnOrders = returnOrders.filter(ro => {
+          const roDeliveryId = ro.deliveryId || ro.delivery?.deliveryId || ro.delivery?.delivery_id;
+          const roDeliveryIdNum = typeof roDeliveryId === 'string' ? parseInt(roDeliveryId) : roDeliveryId;
+          const isSameDelivery = roDeliveryIdNum === targetDeliveryIdNum;
+          // Check status: "Approved" (string) or ReturnStatus.Approved (enum)
+          const statusStr = ro.status?.toString() || ro.status;
+          const isApproved = statusStr === "Approved" || statusStr === "APPROVED";
+          const isNotCurrentEdit = !isEdit || (ro.roId && ro.roId !== parseInt(id));
+          
+          const match = isSameDelivery && isApproved && isNotCurrentEdit;
+          if (isSameDelivery) {
+            console.log(`  RO ${ro.roId || ro.returnNo}: deliveryId=${roDeliveryId} (${roDeliveryIdNum}), target=${targetDeliveryIdNum}, status=${statusStr}, approved=${isApproved}, notEdit=${isNotCurrentEdit}, match=${match}`);
+          }
+          
+          return match;
+        });
+        
+        console.log("=== Calculating alreadyReturned ===", {
+          targetDeliveryId,
+          targetDeliveryIdNum,
+          approvedReturnOrders: approvedReturnOrders.map(ro => ({
+            roId: ro.roId,
+            deliveryId: ro.deliveryId || ro.delivery?.deliveryId,
+            status: ro.status,
+            itemsCount: ro.items?.length || 0
+          }))
+        });
+        
+        // Tính alreadyReturned cho mỗi deliveryItemId
+        // Sử dụng cả number và string key để đảm bảo match
+        const alreadyReturned = {};
+        approvedReturnOrders.forEach(ro => {
+          console.log(`  Processing RO ${ro.roId || ro.returnNo}:`, {
+            itemsCount: ro.items?.length || 0,
+            items: ro.items?.map(item => ({
+              roiId: item.roiId,
+              deliveryItemId: item.deliveryItemId,
+              productId: item.productId,
+              productName: item.productName,
+              returnedQty: item.returnedQty
+            }))
+          });
+          
+          (ro.items || []).forEach(roItem => {
+            const diId = roItem.deliveryItemId || roItem.deliveryItem?.deliveryItemId || roItem.diId;
+            if (diId) {
+              const returnedQty = Number(roItem.returnedQty || 0);
+              // Store with both number and string key to ensure match
+              const diIdNum = typeof diId === 'string' ? parseInt(diId) : diId;
+              const diIdStr = String(diIdNum);
+              
+              alreadyReturned[diIdNum] = (alreadyReturned[diIdNum] || 0) + returnedQty;
+              alreadyReturned[diIdStr] = alreadyReturned[diIdNum]; // Also store as string key
+              console.log(`    Item diId=${diId} (num=${diIdNum}, str=${diIdStr}): +${returnedQty} (total: ${alreadyReturned[diIdNum]})`);
+            } else {
+              console.warn(`    Item missing deliveryItemId:`, roItem);
+            }
+          });
+        });
+        
+        console.log("=== Final alreadyReturnedMap ===", alreadyReturned);
+        console.log("=== Delivery items for comparison ===", (delivery.items || []).map(item => ({
+          diId: item.deliveryItemId || item.diId,
+          productId: item.productId,
+          productName: item.productName,
+          deliveredQty: item.deliveredQty
+        })));
+        setAlreadyReturnedMap(alreadyReturned);
+      } catch (error) {
+        console.warn("Không thể load Return Orders để tính alreadyReturned:", error);
+        setAlreadyReturnedMap({});
+      }
 
       const items = (delivery.items || [])
         .filter((item) => Number(item.deliveredQty || 0) > 0)
@@ -197,7 +291,7 @@ export default function ReturnOrderForm() {
         }));
 
       if (items.length === 0) {
-        toast.warn("Delivery này không có sản phẩm đã giao");
+        toast.warn("Phiếu giao hàng này không có sản phẩm đã giao");
         return;
       }
 
@@ -210,7 +304,7 @@ export default function ReturnOrderForm() {
       }));
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải dữ liệu từ Delivery");
+      toast.error("Không thể tải dữ liệu từ phiếu giao hàng");
     } finally {
       setLoading(false);
     }
@@ -260,7 +354,7 @@ export default function ReturnOrderForm() {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.deliveryId) {
-      newErrors.deliveryId = "Vui lòng chọn Delivery";
+      newErrors.deliveryId = "Vui lòng chọn phiếu giao hàng";
     }
     // Không validate warehouseId ở header nữa, vì mỗi item có kho riêng
     
@@ -280,7 +374,7 @@ export default function ReturnOrderForm() {
         // Chỉ validate nếu returnedQty > 0
         if (returnedQty > 0) {
           if (!item.deliveryItemId) {
-            err.deliveryItemId = "Thiếu Delivery Item";
+            err.deliveryItemId = "Thiếu dòng phiếu giao hàng";
           }
           if (!item.productId) {
             err.productId = "Chọn sản phẩm";
@@ -398,7 +492,7 @@ export default function ReturnOrderForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Delivery * <span className="text-red-500">*</span>
+                  Phiếu giao hàng * <span className="text-red-500">*</span>
                 </label>
                 {isEdit ? (
                   <input
@@ -413,7 +507,7 @@ export default function ReturnOrderForm() {
                       type="text"
                       value={selectedDelivery?.deliveryNo || ""}
                       readOnly
-                      placeholder="Chọn Delivery"
+                      placeholder="Chọn phiếu giao hàng"
                       className="flex-1 px-3 py-2 border rounded-lg bg-gray-50"
                     />
                     <button
@@ -509,10 +603,25 @@ export default function ReturnOrderForm() {
                   <tbody className="divide-y">
                     {formData.items.map((item, index) => {
                       const deliveryItem = getDeliveryItemInfo(item.deliveryItemId);
-                      const maxReturnable = deliveryItem
-                        ? Number(deliveryItem.deliveredQty || 0)
-                        : 0;
+                      const deliveredQty = deliveryItem ? Number(deliveryItem.deliveredQty || 0) : 0;
+                      // Ensure deliveryItemId is compared correctly (handle both string and number)
+                      const diIdKey = item.deliveryItemId;
+                      const alreadyReturned = alreadyReturnedMap[diIdKey] || alreadyReturnedMap[String(diIdKey)] || alreadyReturnedMap[Number(diIdKey)] || 0;
+                      const maxReturnable = Math.max(0, deliveredQty - alreadyReturned);
                       const itemError = errors.itemDetails?.[index] || {};
+                      
+                      // Debug log for first item
+                      if (index === 0) {
+                        console.log(`=== Item ${index} calculation ===`, {
+                          deliveryItemId: item.deliveryItemId,
+                          diIdKey,
+                          deliveredQty,
+                          alreadyReturned,
+                          maxReturnable,
+                          alreadyReturnedMapKeys: Object.keys(alreadyReturnedMap),
+                          alreadyReturnedMap
+                        });
+                      }
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -556,7 +665,15 @@ export default function ReturnOrderForm() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600">
-                            {formatNumberDisplay(maxReturnable)}
+                            <div>{formatNumberDisplay(deliveredQty)}</div>
+                            {alreadyReturned > 0 && (
+                              <div className="text-xs text-gray-400">
+                                Đã trả: {formatNumberDisplay(alreadyReturned)}
+                              </div>
+                            )}
+                            <div className="text-xs text-blue-600 font-medium">
+                              Có thể trả: {formatNumberDisplay(maxReturnable)}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <input
@@ -578,7 +695,7 @@ export default function ReturnOrderForm() {
                             )}
                             {item.returnedQty > maxReturnable && (
                               <p className="text-red-500 text-xs mt-1">
-                                Vượt quá số lượng đã giao ({maxReturnable})
+                                Vượt quá số lượng có thể trả ({formatNumberDisplay(maxReturnable)})
                               </p>
                             )}
                           </td>
@@ -669,8 +786,8 @@ const DeliveryPickerModal = ({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Chọn Delivery</h3>
-            <p className="text-sm text-gray-500">Tìm và chọn Delivery đã giao hàng</p>
+            <h3 className="text-lg font-semibold text-gray-900">Chọn phiếu giao hàng</h3>
+            <p className="text-sm text-gray-500">Tìm và chọn phiếu giao hàng đã giao</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             ✕
@@ -681,27 +798,27 @@ const DeliveryPickerModal = ({
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm theo số Delivery, khách hàng hoặc Sales Order..."
+            placeholder="Tìm theo số phiếu giao hàng, khách hàng hoặc đơn bán hàng..."
             className="w-full border rounded-lg px-3 py-2"
           />
         </div>
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="py-12 text-center text-gray-500">Đang tải danh sách Delivery...</div>
+            <div className="py-12 text-center text-gray-500">Đang tải danh sách phiếu giao hàng...</div>
           ) : deliveries.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">Không có Delivery nào</div>
+            <div className="py-12 text-center text-gray-500">Không có phiếu giao hàng nào</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Số Delivery
+                    Số phiếu giao hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Khách hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Sales Order
+                    Đơn bán hàng
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Ngày giao

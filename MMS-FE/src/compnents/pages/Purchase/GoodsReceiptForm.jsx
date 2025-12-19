@@ -22,7 +22,7 @@ export default function GoodsReceiptForm() {
     
     // Determine if in Sales Return mode (from URL or user selection)
     const isSalesReturnMode = sourceType === 'salesReturn' || Boolean(sriIdFromQuery);
-    
+
     const [formData, setFormData] = useState({
         receipt_no: "",
         order_id: null,
@@ -88,24 +88,24 @@ export default function GoodsReceiptForm() {
                 const user = await getCurrentUser();
                 setCurrentUser(user);
             } catch (error) {
-                console.warn("Could not load current user:", error);
+                console.warn("Không thể tải thông tin người dùng:", error);
             }
         };
         
         loadUser();
         loadWarehouses();
         if (!isSalesReturnMode) {
-            loadPurchaseOrders();
+        loadPurchaseOrders();
         }
         if (isEdit) {
             loadReceipt();
         } else {
             generateReceiptNumber();
             if (isSalesReturnMode && sriIdFromQuery) {
-                console.log("=== Sales Return Mode detected ===", { sriIdFromQuery, isSalesReturnMode });
+                console.log("=== Đã phát hiện chế độ Đơn nhập hàng lại ===", { sriIdFromQuery, isSalesReturnMode });
                 loadSalesReturnInboundOrder(sriIdFromQuery);
             } else if (poIdFromQuery) {
-                console.log("Auto-loading PO from query:", poIdFromQuery);
+                console.log("Tự động tải PO từ query:", poIdFromQuery);
                 loadPOItems(poIdFromQuery);
             }
         }
@@ -121,7 +121,7 @@ export default function GoodsReceiptForm() {
                 }));
             }
         } catch (err) {
-            console.warn("Could not generate receipt number:", err);
+            console.warn("Không thể tạo số phiếu:", err);
         }
     };
 
@@ -131,7 +131,7 @@ export default function GoodsReceiptForm() {
                 params: { page: 0, size: 100 },
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
-            console.log("Warehouses loaded:", data);
+            console.log("Đã tải danh sách kho:", data);
             setWarehouses(
                 data.map((warehouse) => ({
                     value: warehouse.warehouseId || warehouse.warehouse_id || warehouse.id,
@@ -140,7 +140,7 @@ export default function GoodsReceiptForm() {
                 }))
             );
         } catch (err) {
-            console.error("Error loading warehouses:", err);
+            console.error("Lỗi khi tải danh sách kho:", err);
             toast.error("Không thể tải danh sách kho");
         }
     };
@@ -165,7 +165,7 @@ export default function GoodsReceiptForm() {
                     const poId = po.orderId || po.order_id || po.id;
                     const vendorName = po.vendorName || po.vendor?.name || "N/A";
                     
-                    return {
+                        return {
                         value: poId,
                         label: `${poNo} - ${vendorName}`,
                         po,
@@ -173,8 +173,8 @@ export default function GoodsReceiptForm() {
                     };
                 })
             );
-        } catch (err) {
-            console.error("Error loading purchase orders:", err);
+                    } catch (err) {
+            console.error("Lỗi khi tải danh sách đơn hàng:", err);
             toast.error("Đông thể tải danh sách đơn hàng");
         }
     };
@@ -183,7 +183,7 @@ export default function GoodsReceiptForm() {
         try {
             setLoadingSriList(true);
             const response = await salesReturnInboundOrderService.getAll();
-            console.log("=== Sales Return Inbound Order List Response ===", response);
+            console.log("=== Phản hồi danh sách Đơn nhập hàng lại ===", response);
             
             // Handle different response formats (same as SalesReturnInboundOrderList)
             let list = [];
@@ -195,19 +195,21 @@ export default function GoodsReceiptForm() {
                 list = response.data;
             }
             
-            console.log("=== Parsed List ===", list);
-            console.log("=== List length ===", list.length);
+            console.log("=== Danh sách đã parse ===", list);
+            console.log("=== Độ dài danh sách ===", list.length);
             
-            // Filter: Cho phép Draft hoặc SentToWarehouse (không cần Approved)
+            // Filter: Cho phép Draft, SentToWarehouse, hoặc Completed nhưng vẫn còn items chưa nhập đủ
+            // (hỗ trợ partial receipt - nhập kho nhiều lần)
             const filtered = list.filter(sri => {
                 const status = sri.status || sri.Status;
-                const isMatch = status === 'Draft' || status === 'SentToWarehouse';
+                // Cho phép Draft, SentToWarehouse, hoặc Completed (vì có thể vẫn còn items chưa nhập đủ)
+                const isMatch = status === 'Draft' || status === 'SentToWarehouse' || status === 'Completed';
                 console.log(`SRI ${sri.sriId || sri.sri_id}: status=${status}, match=${isMatch}`);
                 return isMatch;
             });
             
-            console.log("=== Filtered List ===", filtered);
-            console.log("=== Filtered length ===", filtered.length);
+            console.log("=== Danh sách đã lọc ===", filtered);
+            console.log("=== Độ dài danh sách đã lọc ===", filtered.length);
             
             setSriList(filtered);
             
@@ -215,8 +217,8 @@ export default function GoodsReceiptForm() {
                 toast.warning(`Có ${list.length} đơn nhập hàng lại nhưng không có đơn nào ở trạng thái "Approved" hoặc "SentToWarehouse"`);
             }
         } catch (err) {
-            console.error("Error loading Sales Return Inbound Order list:", err);
-            console.error("Error details:", err.response?.data);
+            console.error("Lỗi khi tải danh sách Đơn nhập hàng lại:", err);
+            console.error("Chi tiết lỗi:", err.response?.data);
             toast.error("Không thể tải danh sách Đơn nhập hàng lại: " + (err.message || "Lỗi không xác định"));
         } finally {
             setLoadingSriList(false);
@@ -243,52 +245,131 @@ export default function GoodsReceiptForm() {
     const loadSalesReturnInboundOrder = async (sriId) => {
         try {
             setLoading(true);
-            console.log("=== Loading Sales Return Inbound Order ===", sriId);
+            console.log("=== Đang tải Đơn nhập hàng lại ===", sriId);
             const sriIdParsed = parseInt(sriId);
             if (isNaN(sriIdParsed)) {
-                throw new Error("Invalid sriId: " + sriId);
+                throw new Error("ID Đơn nhập hàng lại không hợp lệ: " + sriId);
             }
             
             const sri = await salesReturnInboundOrderService.getById(sriIdParsed);
-            console.log("=== Sales Return Inbound Order loaded ===", sri);
+            console.log("=== Đã tải Đơn nhập hàng lại ===", sri);
             setSalesReturnInboundOrder(sri);
             
             // Set warehouse from Sales Return Inbound Order
             if (sri.warehouseId) {
-                console.log("Setting warehouse:", sri.warehouseId);
+                console.log("Đang đặt kho:", sri.warehouseId);
                 setFormData((prev) => ({ ...prev, warehouse_id: sri.warehouseId }));
             }
             
+            // Load alreadyReceivedQty từ các Goods Receipt đã approve cho SRI này
+            let alreadyReceivedMap = {}; // Map<roiId, alreadyReceivedQty>
+            try {
+                if (sri.roId) {
+                    // Load tất cả Goods Receipts đã approve cho Return Order này
+                    const allReceipts = await goodsReceiptService.getGoodsReceiptsWithPagination(0, 1000);
+                    const receipts = Array.isArray(allReceipts?.content) ? allReceipts.content : 
+                                   (Array.isArray(allReceipts) ? allReceipts : []);
+                    
+                    // Filter các Goods Receipts đã approve, sourceType = SalesReturn, và có returnOrderId trùng
+                    const approvedReceipts = receipts.filter(gr => 
+                        gr.status === "Approved" && 
+                        gr.sourceType === "SalesReturn" &&
+                        (gr.returnOrderId === sri.roId || gr.returnOrder?.roId === sri.roId)
+                    );
+                    
+                    console.log("=== Loading alreadyReceivedQty ===", {
+                        sriId: sriIdParsed,
+                        roId: sri.roId,
+                        approvedReceiptsCount: approvedReceipts.length
+                    });
+                    
+                    // Tính alreadyReceivedQty cho mỗi roiId
+                    approvedReceipts.forEach(gr => {
+                        (gr.items || []).forEach(grItem => {
+                            const roiId = grItem.roiId || grItem.returnOrderItem?.roiId;
+                            if (roiId) {
+                                const receivedQty = Number(grItem.receivedQty || grItem.received_qty || 0);
+                                alreadyReceivedMap[roiId] = (alreadyReceivedMap[roiId] || 0) + receivedQty;
+                            }
+                        });
+                    });
+                    
+                    console.log("=== Bản đồ đã nhận ===", alreadyReceivedMap);
+                }
+            } catch (error) {
+                console.warn("Không thể load Goods Receipts để tính alreadyReceivedQty:", error);
+            }
+            
             // Map items from Sales Return Inbound Order
-            console.log("=== Mapping items ===", sri.items);
+            console.log("=== Đang map sản phẩm ===", sri.items);
             if (sri.items && sri.items.length > 0) {
+                // Validate: Tất cả items phải cùng warehouse
+                const itemWarehouseIds = sri.items
+                    .map(item => item.warehouseId || item.warehouse_id)
+                    .filter(id => id != null);
+                
+                const uniqueWarehouseIds = [...new Set(itemWarehouseIds)];
+                
+                if (uniqueWarehouseIds.length > 1) {
+                    const warehouseNames = sri.items
+                        .map(item => item.warehouseName || item.warehouse_name || `Kho ID ${item.warehouseId || item.warehouse_id}`)
+                        .filter(name => name);
+                    const uniqueWarehouseNames = [...new Set(warehouseNames)];
+                    
+                    const errorMsg = `Đơn nhập hàng lại có sản phẩm từ nhiều kho khác nhau (${uniqueWarehouseNames.join(", ")}). Vui lòng tách thành nhiều phiếu nhập kho riêng hoặc chỉ chọn các sản phẩm từ cùng một kho.`;
+                    console.error("=== VALIDATION ERROR: Multiple warehouses ===", {
+                        uniqueWarehouseIds,
+                        uniqueWarehouseNames,
+                        items: sri.items.map(item => ({
+                            product: item.productName,
+                            warehouseId: item.warehouseId || item.warehouse_id,
+                            warehouseName: item.warehouseName || item.warehouse_name
+                        }))
+                    });
+                    toast.error(errorMsg);
+                    setError(errorMsg);
+                    setFormData((prev) => ({ ...prev, items: [] }));
+                    return;
+                }
+                
+                // Tất cả items cùng warehouse, tiếp tục map
                 const mapped = sri.items.map((item, index) => {
                     const planned = Number(item.plannedQty || item.planned_qty || 0);
+                    const roiId = item.roiId || item.roi_id;
+                    const alreadyReceived = alreadyReceivedMap[roiId] || 0;
+                    const remainingQty = Math.max(0, planned - alreadyReceived);
+                    
                     const mappedItem = {
-                        roi_id: item.roiId || item.roi_id,
+                        roi_id: roiId,
                         product_id: item.productId || item.product_id,
                         productName: item.productName || item.product_name || "-",
                         productCode: item.productCode || item.product_code || "",
+                        warehouse_id: item.warehouseId || item.warehouse_id, // Lưu warehouseId của item
                         planned_qty: planned,
-                        // Đặt ordered_qty = planned_qty để validation “vượt quá SL còn lại” dùng đúng số
+                        // Đặt ordered_qty = planned_qty để validation "vượt quá SL còn lại" dùng đúng số
                         ordered_qty: planned,
-                        previously_received_qty: 0,
-                        received_qty: planned,
-                        accepted_qty: planned, // Mặc định accepted = received
+                        previously_received_qty: alreadyReceived, // Đã nhập từ các Goods Receipt đã approve
+                        received_qty: 0, // User nhập số lượng còn lại
+                        accepted_qty: 0, // User nhập số lượng còn lại
                         remark: item.note || "",
                     };
-                    console.log(`Mapped item ${index}:`, mappedItem);
+                    console.log(`Mapped item ${index}:`, {
+                        ...mappedItem,
+                        alreadyReceived,
+                        remainingQty
+                    });
                     return mappedItem;
                 });
-                console.log("=== Final mapped items ===", mapped);
+                console.log("=== Sản phẩm đã map cuối cùng ===", mapped);
                 setFormData((prev) => ({ ...prev, items: mapped }));
+                setError(null); // Clear error nếu validation pass
             } else {
-                console.warn("No items found in Sales Return Inbound Order");
+                console.warn("Không tìm thấy sản phẩm trong Đơn nhập hàng lại");
                 toast.warning("Đơn nhập hàng lại không có sản phẩm nào");
             }
-        } catch (err) {
-            console.error("Error loading Sales Return Inbound Order:", err);
-            console.error("Error details:", err.response?.data);
+                    } catch (err) {
+            console.error("Lỗi khi tải Đơn nhập hàng lại:", err);
+            console.error("Chi tiết lỗi:", err.response?.data);
             toast.error("Không thể tải Đơn nhập hàng lại: " + (err.message || "Lỗi không xác định"));
         } finally {
             setLoading(false);
@@ -307,15 +388,15 @@ export default function GoodsReceiptForm() {
             const warehouseId = po.warehouseId || po.warehouse_id;
             const orderId = po.orderId || po.order_id || po.id;
             
-            console.log("Setting warehouse_id:", warehouseId);
-            console.log("Setting order_id:", orderId);
+            console.log("Đang đặt warehouse_id:", warehouseId);
+            console.log("Đang đặt order_id:", orderId);
             
             // Map items from PO
             const mapped = items.map((item, index) => {
-                console.log(`Mapping PO item ${index}:`, item);
+                console.log(`Đang map sản phẩm PO ${index}:`, item);
                 const orderedQty = Number(item.quantity || item.qty || 0);
-                
-                return {
+                    
+                    return {
                     poi_id: item.poiId || item.poi_id || item.id,
                     product_id: item.productId || item.product_id,
                     productName: item.productName || item.product_name || "-",
@@ -326,7 +407,7 @@ export default function GoodsReceiptForm() {
                     remark: "",
                 };
             });
-            console.log("=== FINAL MAPPED PO ITEMS ===", mapped);
+            console.log("=== Sản phẩm PO đã map cuối cùng ===", mapped);
             
             // Update form data with warehouse, order, and items
             setFormData((prev) => ({
@@ -339,7 +420,7 @@ export default function GoodsReceiptForm() {
             setPoReferenceItems(mapped);
             toast.success("Đã tải thông tin đơn hàng");
         } catch (err) {
-            console.error("Error loading PO items:", err);
+            console.error("Lỗi khi tải sản phẩm đơn hàng:", err);
             toast.error("Không thể tải thông tin đơn hàng");
         } finally {
             setLoading(false);
@@ -350,7 +431,7 @@ export default function GoodsReceiptForm() {
         if (!orderId) return;
         try {
             const response = await apiClient.get(`/purchase-orders/${orderId}/items`);
-            console.log("=== PO ITEMS RAW RESPONSE ===", response.data);
+            console.log("=== Phản hồi thô sản phẩm PO ===", response.data);
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
             setPoReferenceItems(data);
 
@@ -374,7 +455,7 @@ export default function GoodsReceiptForm() {
                 setFormData((prev) => ({ ...prev, items: merged }));
             } else {
                 const mapped = data.map((poItem, index) => {
-                    console.log(`Mapping item ${index}:`, poItem);
+                    console.log(`Đang map sản phẩm ${index}:`, poItem);
                     const orderedQty = Number(poItem.quantity || poItem.order_qty || 0);
                     const previouslyReceived = Number(poItem.receivedQty || poItem.received_qty || 0);
                     const remainingQty = Math.max(0, orderedQty - previouslyReceived);
@@ -390,15 +471,15 @@ export default function GoodsReceiptForm() {
                         accepted_qty: remainingQty, // Will be auto-set to received_qty
                         remark: "",
                     };
-                    console.log(`Mapped result ${index}:`, mapped);
-                    console.log(`  -> poi_id: ${mapped.poi_id}, product_id: ${mapped.product_id}, ordered: ${orderedQty}, prev received: ${previouslyReceived}, remaining: ${remainingQty}`);
+                    console.log(`Kết quả map ${index}:`, mapped);
+                    console.log(`  -> poi_id: ${mapped.poi_id}, product_id: ${mapped.product_id}, đã đặt: ${orderedQty}, đã nhận trước: ${previouslyReceived}, còn lại: ${remainingQty}`);
                     return mapped;
                 });
-                console.log("=== FINAL MAPPED ITEMS ===", mapped);
+                console.log("=== Sản phẩm đã map cuối cùng ===", mapped);
                 setFormData((prev) => ({ ...prev, items: mapped }));
             }
         } catch (err) {
-            console.error("Error loading purchase order items:", err);
+            console.error("Lỗi khi tải sản phẩm đơn hàng:", err);
             toast.error("Không thể tải danh sách sản phẩm của đơn hàng");
         }
     };
@@ -407,11 +488,11 @@ export default function GoodsReceiptForm() {
         try {
             setLoading(true);
             const receipt = await goodsReceiptService.getGoodsReceiptById(id);
-            console.log("Loading receipt for edit:", receipt);
+            console.log("Đang tải phiếu nhập kho để chỉnh sửa:", receipt);
             
             // Get items from receipt detail response
             const receiptItems = Array.isArray(receipt.items) ? receipt.items : receipt.items?.content || [];
-            console.log("Receipt items for edit:", receiptItems);
+            console.log("Sản phẩm phiếu nhập kho để chỉnh sửa:", receiptItems);
 
             setFormData({
                 receipt_no: receipt.receipt_no || receipt.receiptNo || "",
@@ -474,15 +555,15 @@ export default function GoodsReceiptForm() {
                         items: enrichedItems
                     }));
                 } catch (err) {
-                    console.error("Error loading inbound delivery for enrichment:", err);
+                    console.error("Lỗi khi tải inbound delivery để làm giàu dữ liệu:", err);
                 }
             } else if (receipt.order_id || receipt.orderId) {
                 // Legacy: Load from PO directly
                 await loadPurchaseOrderItems(receipt.order_id || receipt.orderId, receiptItems);
             }
         } catch (err) {
-            console.error("Error loading Goods Receipt:", err);
-            console.error("Error details:", err.response?.data);
+            console.error("Lỗi khi tải Phiếu nhập kho:", err);
+            console.error("Chi tiết lỗi:", err.response?.data);
             setError("Không thể tải Phiếu nhập kho");
         } finally {
             setLoading(false);
@@ -518,6 +599,14 @@ export default function GoodsReceiptForm() {
                 ...next[index],
                 [field]: value,
             };
+            
+            // For Sales Return mode: Auto-sync accepted_qty with received_qty when received_qty changes
+            if (isSalesReturnMode && field === "received_qty") {
+                const receivedQty = parseFloat(value) || 0;
+                // Auto-sync accepted_qty with received_qty for Sales Return to ensure consistency
+                next[index] = { ...next[index], accepted_qty: receivedQty };
+            }
+            
             return { ...prev, items: next };
         });
     };
@@ -539,6 +628,22 @@ export default function GoodsReceiptForm() {
         if (!formData.items || formData.items.length === 0) {
             errors.items = "Cần ít nhất 1 dòng sản phẩm";
         } else {
+            // Validate: Tất cả items phải cùng warehouse (cho Sales Return mode)
+            if (isSalesReturnMode) {
+                const itemWarehouseIds = formData.items
+                    .map(item => item.warehouse_id)
+                    .filter(id => id != null);
+                const uniqueWarehouseIds = [...new Set(itemWarehouseIds)];
+                
+                if (uniqueWarehouseIds.length > 1) {
+                    errors.items = "Tất cả sản phẩm phải từ cùng một kho. Vui lòng tách thành nhiều phiếu nhập kho riêng.";
+                } else if (uniqueWarehouseIds.length === 1 && formData.warehouse_id) {
+                    // Validate warehouse header phải match với warehouse của items
+                    if (uniqueWarehouseIds[0] !== formData.warehouse_id) {
+                        errors.warehouse_id = "Kho nhận phải khớp với kho của các sản phẩm";
+                    }
+                }
+            }
             const itemErrors = formData.items.map((item) => {
                 const err = {};
                 const receivedQty = Number(item.received_qty || 0);
@@ -566,18 +671,18 @@ export default function GoodsReceiptForm() {
     };
 
     const handleSubmit = async (e) => {
-        console.log("=== HANDLE SUBMIT CALLED ===");
+        console.log("=== ĐÃ GỌI HANDLE SUBMIT ===");
         e.preventDefault();
         setIsSubmitting(true);
         setError(null);
         setValidationErrors({});
 
-        console.log("=== VALIDATING FORM ===");
-        console.log("FormData:", formData);
-        console.log("FormData.items:", formData.items);
+        console.log("=== ĐANG VALIDATE FORM ===");
+        console.log("Dữ liệu form:", formData);
+        console.log("Sản phẩm form:", formData.items);
         
         const errors = validate();
-        console.log("Validation errors:", errors);
+        console.log("Lỗi validate:", errors);
     
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
@@ -587,12 +692,12 @@ export default function GoodsReceiptForm() {
             return;
         }
 
-        console.log("=== VALIDATION PASSED, BUILDING PAYLOAD ===");
+        console.log("=== VALIDATE THÀNH CÔNG, ĐANG TẠO PAYLOAD ===");
 
         try {
             const userId = currentUser?.userId || currentUser?.user_id || currentUser?.id || 1; // Fallback to 1 for testing
-            console.log("Current user:", currentUser);
-            console.log("User ID:", userId);
+            console.log("Người dùng hiện tại:", currentUser);
+            console.log("ID người dùng:", userId);
             console.log("sourceType:", sourceType);
             console.log("isSalesReturnMode:", isSalesReturnMode);
             console.log("sriIdFromQuery:", sriIdFromQuery);
@@ -634,14 +739,35 @@ export default function GoodsReceiptForm() {
                     setIsSubmitting(false);
                     return;
                 }
+                
+                // Validate: Tất cả items phải cùng warehouse
+                const itemWarehouseIds = formData.items
+                    .map(item => item.warehouse_id)
+                    .filter(id => id != null);
+                const uniqueWarehouseIds = [...new Set(itemWarehouseIds)];
+                
+                if (uniqueWarehouseIds.length > 1) {
+                    toast.error("Tất cả sản phẩm phải từ cùng một kho. Vui lòng tách thành nhiều phiếu nhập kho riêng.");
+                    setIsSubmitting(false);
+                    return;
+                }
+                
+                // Validate warehouse header phải match với warehouse của items
+                if (uniqueWarehouseIds.length === 1 && formData.warehouse_id) {
+                    if (uniqueWarehouseIds[0] !== formData.warehouse_id) {
+                        toast.error("Kho nhận phải khớp với kho của các sản phẩm");
+                        setIsSubmitting(false);
+                        return;
+                    }
+                }
 
-                const payload = {
-                    receiptNo: formData.receipt_no,
-                    warehouseId: formData.warehouse_id,
+            const payload = {
+                receiptNo: formData.receipt_no,
+                warehouseId: formData.warehouse_id,
                     receivedDate: formattedDate,
                     sourceType: "SalesReturn",
                     items: formData.items.map((item, index) => {
-                        console.log(`Item ${index}:`, item);
+                        console.log(`Sản phẩm ${index}:`, item);
                         
                         // Validate required fields
                         if (!item.roi_id) {
@@ -672,32 +798,32 @@ export default function GoodsReceiptForm() {
                             acceptedQty: acceptedQty, // Use receivedQty as default if not set
                             remark: item.remark || null,
                         };
-                        console.log(`Mapped item ${index}:`, mappedItem);
+                        console.log(`Sản phẩm đã map ${index}:`, mappedItem);
                         return mappedItem;
                     }),
                 };
 
-                console.log("=== SUBMITTING PAYLOAD (SalesReturn) ===", JSON.stringify(payload, null, 2));
-                console.log("Items detail:", payload.items);
-                console.log("sriId:", sriId, "parsed:", parseInt(sriId));
+                console.log("=== GỬI DỮ LIỆU (Đơn nhập hàng lại) ===", JSON.stringify(payload, null, 2));
+                console.log("Chi tiết sản phẩm:", payload.items);
+                console.log("sriId:", sriId, "đã parse:", parseInt(sriId));
                 console.log("userId:", userId);
                 
                 // Validate payload before sending
                 if (!payload.warehouseId) {
-                    throw new Error("Warehouse ID is required");
+                    throw new Error("ID kho là bắt buộc");
                 }
                 if (!payload.items || payload.items.length === 0) {
-                    throw new Error("Items list is required");
+                    throw new Error("Danh sách sản phẩm là bắt buộc");
                 }
                 payload.items.forEach((item, idx) => {
                     if (!item.roiId) {
-                        throw new Error(`Item ${idx + 1}: roiId is required`);
+                        throw new Error(`Sản phẩm ${idx + 1}: ID đơn trả hàng là bắt buộc`);
                     }
                     if (!item.productId) {
-                        throw new Error(`Item ${idx + 1}: productId is required`);
+                        throw new Error(`Sản phẩm ${idx + 1}: ID sản phẩm là bắt buộc`);
                     }
                     if (!item.receivedQty || item.receivedQty <= 0) {
-                        throw new Error(`Item ${idx + 1}: receivedQty must be > 0`);
+                        throw new Error(`Sản phẩm ${idx + 1}: Số lượng nhận phải > 0`);
                     }
                 });
                 
@@ -709,11 +835,11 @@ export default function GoodsReceiptForm() {
                     );
                     toast.success("Tạo Phiếu nhập kho từ Đơn nhập hàng lại thành công!");
                 } catch (apiError) {
-                    console.error("=== API ERROR DETAILS ===", apiError);
-                    console.error("Response data:", apiError.response?.data);
-                    console.error("Response status:", apiError.response?.status);
-                    console.error("Response headers:", apiError.response?.headers);
-                    console.error("Full error:", JSON.stringify(apiError.response?.data, null, 2));
+            console.error("=== CHI TIẾT LỖI API ===", apiError);
+            console.error("Dữ liệu phản hồi:", apiError.response?.data);
+            console.error("Trạng thái phản hồi:", apiError.response?.status);
+            console.error("Headers phản hồi:", apiError.response?.headers);
+            console.error("Lỗi đầy đủ:", JSON.stringify(apiError.response?.data, null, 2));
                     throw apiError; // Re-throw để xử lý ở catch block bên ngoài
                 }
             } else {
@@ -751,50 +877,50 @@ export default function GoodsReceiptForm() {
                     orderId: formData.order_id, // PO ID
                     warehouseId: formData.warehouse_id,
                     receivedDate: formattedDate,
-                    status: formData.status,
-                    items: formData.items.map((item, index) => {
-                        console.log(`Item ${index}:`, item);
+                status: formData.status,
+                items: formData.items.map((item, index) => {
+                    console.log(`Sản phẩm ${index}:`, item);
                         
                         // Skip items that are already completed
                         if (item.is_completed) {
                             return null;
                         }
                         
-                        return {
+                    return {
                             poiId: item.poi_id || item.poiId,
-                            productId: item.product_id,
-                            receivedQty: Number(item.received_qty || 0),
-                            acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
-                            remark: item.remark || "",
-                        };
+                        productId: item.product_id,
+                        receivedQty: Number(item.received_qty || 0),
+                        acceptedQty: Number(item.received_qty || 0), // Auto-accept all received qty
+                        remark: item.remark || "",
+                    };
                     }).filter(item => item !== null), // Remove null items (completed ones)
-                };
+            };
 
-                console.log("=== SUBMITTING PAYLOAD (Purchase) ===", payload);
-                console.log("Items detail:", payload.items);
+                console.log("=== GỬI DỮ LIỆU (Mua hàng) ===", payload);
+            console.log("Chi tiết sản phẩm:", payload.items);
             
-                if (isEdit) {
-                    console.log("Updating with userId:", userId);
-                    await goodsReceiptService.updateGoodsReceipt(id, payload, userId);
-                    toast.success("Cập nhật Phiếu nhập kho thành công!");
-                } else {
-                    console.log("Creating with userId:", userId);
-                    await goodsReceiptService.createGoodsReceipt(payload, userId);
-                    toast.success("Tạo Phiếu nhập kho thành công!");
+            if (isEdit) {
+                console.log("Cập nhật với userId:", userId);
+                await goodsReceiptService.updateGoodsReceipt(id, payload, userId);
+                toast.success("Cập nhật Phiếu nhập kho thành công!");
+            } else {
+                console.log("Tạo mới với userId:", userId);
+                await goodsReceiptService.createGoodsReceipt(payload, userId);
+                toast.success("Tạo Phiếu nhập kho thành công!");
                 }
             }
             navigate("/purchase/goods-receipts");
         } catch (err) {
-            console.error("Error saving Goods Receipt:", err);
-            console.error("Error response:", err.response?.data);
-            console.error("Error response stringified:", JSON.stringify(err.response?.data, null, 2));
-            console.error("Validation errors from backend:", err.response?.data?.errors);
-            console.error("Error message:", err.response?.data?.message);
+            console.error("Lỗi khi lưu Phiếu nhập kho:", err);
+            console.error("Phản hồi lỗi:", err.response?.data);
+            console.error("Phản hồi lỗi (JSON):", JSON.stringify(err.response?.data, null, 2));
+            console.error("Lỗi validate từ backend:", err.response?.data?.errors);
+            console.error("Thông báo lỗi:", err.response?.data?.message);
             
             const backendErrors = err.response?.data?.errors;
             const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message;
             
-            console.error("=== FINAL ERROR MESSAGE ===", errorMessage);
+            console.error("=== THÔNG BÁO LỖI CUỐI CÙNG ===", errorMessage);
             
             if (backendErrors && typeof backendErrors === 'object') {
                 const errorMessages = Object.entries(backendErrors)
@@ -1003,36 +1129,36 @@ export default function GoodsReceiptForm() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Đơn hàng <span className="text-red-500">*</span>
-                                                    </label>
-                                                    <Select
-                                                        value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
-                                                        onChange={handleOrderChange}
-                                                        options={purchaseOrders}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Đơn hàng <span className="text-red-500">*</span>
+                                        </label>
+                                        <Select
+                                            value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
+                                            onChange={handleOrderChange}
+                                            options={purchaseOrders}
                                                         placeholder="Chọn đơn hàng"
-                                                        isClearable
-                                                        classNamePrefix="react-select"
-                                                        isOptionDisabled={(option) => option.isDisabled}
-                                                        styles={{
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                color: state.isDisabled ? '#9ca3af' : provided.color,
-                                                                cursor: state.isDisabled ? 'not-allowed' : 'pointer',
-                                                                fontStyle: state.isDisabled ? 'italic' : 'normal',
-                                                                backgroundColor: state.isDisabled 
-                                                                    ? '#f3f4f6' 
-                                                                    : state.isFocused 
-                                                                    ? '#e5e7eb' 
-                                                                    : provided.backgroundColor
-                                                            })
-                                                        }}
-                                                    />
-                                                    {validationErrors.order_id && (
-                                                        <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
-                                                    )}
-                                                </div>
+                                            isClearable
+                                            classNamePrefix="react-select"
+                                            isOptionDisabled={(option) => option.isDisabled}
+                                            styles={{
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    color: state.isDisabled ? '#9ca3af' : provided.color,
+                                                    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                                    fontStyle: state.isDisabled ? 'italic' : 'normal',
+                                                    backgroundColor: state.isDisabled 
+                                                        ? '#f3f4f6' 
+                                                        : state.isFocused 
+                                                        ? '#e5e7eb' 
+                                                        : provided.backgroundColor
+                                                })
+                                            }}
+                                        />
+                                        {validationErrors.order_id && (
+                                            <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
+                                        )}
+                                    </div>
                                             )}
                                         </>
                                     )}
@@ -1126,6 +1252,9 @@ export default function GoodsReceiptForm() {
                                                 <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-24">
                                                     {isSalesReturnMode ? "SL kế hoạch" : "SL dự kiến"}
                                                 </th>
+                                                {isSalesReturnMode && (
+                                                    <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-24">Đã nhận</th>
+                                                )}
                                                 {!isSalesReturnMode && (
                                                     <th className="border border-gray-200 px-2 py-1 text-right text-xs font-medium text-gray-700 w-24">Đã nhận</th>
                                                 )}
@@ -1150,9 +1279,9 @@ export default function GoodsReceiptForm() {
                                                         <td className="border border-gray-200 px-2 py-1">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="flex-1">
-                                                                    <div className="text-sm font-medium">{item.productName || "-"}</div>
-                                                                    <div className="text-xs text-gray-500">
-                                                                        SKU: {item.productCode || "-"}
+                                                            <div className="text-sm font-medium">{item.productName || "-"}</div>
+                                                            <div className="text-xs text-gray-500">
+                                                                SKU: {item.productCode || "-"}
                                                                     </div>
                                                                 </div>
                                                                 {isCompleted && (
@@ -1165,7 +1294,18 @@ export default function GoodsReceiptForm() {
                                                         <td className="border border-gray-200 px-2 py-1 text-right text-sm text-gray-700">
                                                             {Number(item.expected_qty || item.ordered_qty || item.planned_qty || 0).toLocaleString()}
                                                         </td>
-                                                        {!isSalesReturnMode && (
+                                                        {isSalesReturnMode ? (
+                                                            <td className="border border-gray-200 px-2 py-1 text-right text-sm">
+                                                                <span className={Number(item.previously_received_qty || 0) > 0 ? "text-blue-600 font-medium" : "text-gray-400"}>
+                                                                    {Number(item.previously_received_qty || 0).toLocaleString()}
+                                                                </span>
+                                                                {item.planned_qty && Number(item.previously_received_qty || 0) < Number(item.planned_qty) && (
+                                                                    <div className="text-xs text-blue-600 mt-0.5">
+                                                                        Còn lại: {(Number(item.planned_qty) - Number(item.previously_received_qty || 0)).toLocaleString()}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        ) : (
                                                             <td className="border border-gray-200 px-2 py-1 text-right text-sm">
                                                                 <span className={previouslyReceived > 0 ? "text-blue-600 font-medium" : "text-gray-400"}>
                                                                     {previouslyReceived.toLocaleString()}

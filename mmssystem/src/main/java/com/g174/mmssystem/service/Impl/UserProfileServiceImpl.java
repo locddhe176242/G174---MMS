@@ -34,7 +34,7 @@ public class UserProfileServiceImpl implements IUserProfileService {
     @Override
     @Transactional(readOnly = true)
     public UserProfileResponseDTO getCurrentUserProfile(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailWithRelations(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
 
         return mapToResponseDTO(user);
@@ -43,7 +43,7 @@ public class UserProfileServiceImpl implements IUserProfileService {
     @Override
     @Transactional
     public UserProfileResponseDTO updateCurrentUserProfile(String email, UpdateProfileRequestDTO requestDTO) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailWithRelations(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
 
         UserProfile profile = user.getProfile();
@@ -72,7 +72,7 @@ public class UserProfileServiceImpl implements IUserProfileService {
             throw new InvalidCredentialsException("Mật khẩu mới và xác nhận mật khẩu không khớp");
         }
 
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailWithRelations(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
 
         if (!passwordEncoder.matches(requestDTO.getCurrentPassword(), user.getPassword())) {
@@ -123,7 +123,7 @@ public class UserProfileServiceImpl implements IUserProfileService {
             Files.copy(file.getInputStream(), filePath);
 
             // Update user profile
-            User user = userRepository.findByEmail(email)
+            User user = userRepository.findByEmailWithRelations(email)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
 
             UserProfile profile = user.getProfile();
@@ -169,12 +169,13 @@ public class UserProfileServiceImpl implements IUserProfileService {
                 .phoneNumber(profile != null ? profile.getPhoneNumber() : null)
                 .address(profile != null ? profile.getAddress() : null)
                 .avatarUrl(profile != null ? profile.getAvatarUrl() : null)
-                .departmentId(Long.valueOf(user.getDepartment().getId()))
-                .departmentName(user.getDepartment().getDepartmentName())
-                .departmentCode(user.getDepartment().getDepartmentCode())
-                .roles(user.getUserRoles().stream()
-                        .map(userRole -> userRole.getRole().getRoleName())
-                        .collect(Collectors.toList()))
+                .departmentId(user.getDepartment() != null ? Long.valueOf(user.getDepartment().getId()) : null)
+                .departmentName(user.getDepartment() != null ? user.getDepartment().getDepartmentName() : null)
+                .departmentCode(user.getDepartment() != null ? user.getDepartment().getDepartmentCode() : null)
+                .roles(user.getUserRoles() != null ? user.getUserRoles().stream()
+                        .map(userRole -> userRole.getRole() != null ? userRole.getRole().getRoleName() : null)
+                        .filter(roleName -> roleName != null)
+                        .collect(Collectors.toList()) : java.util.Collections.emptyList())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() : null)
                 .updatedAt(user.getUpdatedAt() != null ? user.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() : null)
                 .build();

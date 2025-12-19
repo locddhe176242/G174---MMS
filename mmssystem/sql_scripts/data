@@ -85,7 +85,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, parent_id, display_order) VALUES
 -- Menu chính (parent_id = NULL)
 (1, 'dashboard', 'Trang chủ', '/dashboard', 'home', NULL, 1),
-(2, 'categories', 'Quản lý danh mục', '/categories', 'categories', NULL, 3),
+(2, 'categories', 'Danh mục sản phẩm', '/categories', 'categories', NULL, 3),
 (3, 'customers', 'Khách hàng', '/customers', 'customers', NULL, 10),
 (4, 'vendors', 'Nhà cung cấp', '/vendors', 'vendors', NULL, 11),
 (5, 'products', 'Sản phẩm', '/products', 'products', NULL, 12),
@@ -108,7 +108,6 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (17, 'rfq', 'Yêu cầu báo giá', '/purchase/rfqs', 'quote', 7, 19),
 (18, 'purchase-quotation', 'Báo giá mua hàng', '/purchase/purchase-quotations', 'quotation', 7, 20),
 (19, 'purchase-order', 'Đơn đặt hàng', '/purchase/purchase-orders', 'order', 7, 21),
-(31, 'inbound-delivery', 'Kế hoạch nhận hàng', '/purchase/inbound-deliveries', 'delivery', 7, 22),
 
 -- Menu con của Sales (parent_id = 8)
 (20, 'sales-quotations', 'Báo giá bán hàng', '/sales/quotations', 'sales-quotations', 8, 22),
@@ -118,7 +117,7 @@ INSERT INTO menu_items (menu_id, menu_key, menu_label, menu_path, menu_icon, par
 (25, 'sales-return-inbound-orders', 'Đơn nhập hàng lại', '/sales/return-inbound-orders', 'inbound', 8, 26),
 
 -- Menu con của Accounting (parent_id = 9)
-(24, 'credit-notes', 'Credit Note', '/sales/credit-notes', 'credit', 9, 27),
+(24, 'credit-notes', 'Hoá đơn điều chỉnh', '/sales/credit-notes', 'credit', 9, 27),
 (26, 'accounting-ap-invoices', 'Hóa đơn mua hàng', '/purchase/ap-invoices', 'accounting', 9, 28),
 (27, 'accounting-ar-invoices', 'Hóa đơn bán hàng', '/sales/invoices', 'invoice', 9, 29),
 (28, 'accounting-ap-payments', 'Thanh toán mua hàng', '/purchase/ap-payments', 'payment', 9, 30),
@@ -142,80 +141,81 @@ AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- SALE (role_id = 2): Dashboard, Khách hàng, Sản phẩm, Kho (view Good Issues), Xuất hàng (+ menu con), Phiếu yêu cầu mua hàng, Báo cáo
+-- SALE (role_id = 2): Quản lý danh mục, Khách hàng, Sản phẩm, Kho (Danh sách kho), Nhập hàng (Phiếu yêu cầu mua hàng), Xuất hàng (tất cả)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (2, 1),   -- Dashboard
-(2, 3),   -- Customers
-(2, 5),   -- Products
-(2, 6),   -- Warehouse (parent) - để hiển thị menu con Good Issues
-(2, 7),   -- Purchase (parent) - để hiển thị menu con Purchase Requisition
-(2, 8),   -- Sales
+(2, 2),   -- Categories (Quản lý danh mục)
+(2, 3),   -- Customers (Khách hàng)
+(2, 5),   -- Products (Sản phẩm)
+(2, 6),   -- Warehouse (parent)
+(2, 7),   -- Purchase (parent)
+(2, 8),   -- Sales (parent)
 (2, 11),  -- Reports
-(2, 16),  -- Purchase Requisition (tạo PR khi hàng sắp hết)
-(2, 20),  -- Sales Quotations
-(2, 21),  -- Sales Orders
-(2, 22),  -- Deliveries
-(2, 23),  -- Return Orders
-(2, 25),  -- Sales Return Inbound Orders
-(2, 30)   -- Good Issues (Phiếu xuất kho) - để xem trạng thái xuất kho
+(2, 14),  -- Warehouse List (Danh sách kho)
+(2, 16),  -- Purchase Requisition (Phiếu yêu cầu mua hàng)
+(2, 20),  -- Sales Quotations (Báo giá bán hàng)
+(2, 21),  -- Sales Orders (Đơn bán hàng)
+(2, 22),  -- Deliveries (Phiếu giao hàng)
+(2, 23),  -- Return Orders (Đơn trả hàng)
+(2, 25)   -- Sales Return Inbound Orders (Đơn nhập hàng lại)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- PURCHASE (role_id = 3): Dashboard, Danh mục, Nhà cung cấp, Sản phẩm, Nhập hàng (PR, RFQ, PQ, PO), Báo cáo
+-- PURCHASE (role_id = 3): Quản lý danh mục, Nhà cung cấp, Sản phẩm, Kho (Danh sách kho), Nhập hàng (tất cả)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (3, 1),   -- Dashboard
-(3, 2),   -- Categories
-(3, 4),   -- Vendors
-(3, 5),   -- Products
-(3, 7),   -- Purchase
+(3, 2),   -- Categories (Quản lý danh mục)
+(3, 4),   -- Vendors (Nhà cung cấp)
+(3, 5),   -- Products (Sản phẩm)
+(3, 6),   -- Warehouse (parent)
+(3, 7),   -- Purchase (parent)
 (3, 11),  -- Reports
-(3, 16),  -- Purchase Requisition
-(3, 17),  -- RFQ
-(3, 18),  -- Purchase Quotation
-(3, 19)   -- Purchase Order
+(3, 14),  -- Warehouse List (Danh sách kho)
+(3, 16),  -- Purchase Requisition (Phiếu yêu cầu mua hàng)
+(3, 17),  -- RFQ (Yêu cầu báo giá)
+(3, 18),  -- Purchase Quotation (Báo giá mua hàng)
+(3, 19)   -- Purchase Order (Đơn đặt hàng)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- ACCOUNTING (role_id = 4): Dashboard, Danh mục, Khách hàng, Nhà cung cấp, Sản phẩm, Kho (Phiếu nhập kho), Kế toán (AP/AR Invoices + AP Payments + Credit Notes + Báo cáo công nợ), Phê duyệt, Báo cáo
+-- ACCOUNTING (role_id = 4): Quản lý danh mục, Sản phẩm, Kho (tất cả), Kế toán (tất cả)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (4, 1),   -- Dashboard
-(4, 2),   -- Categories
-(4, 3),   -- Customers
-(4, 4),   -- Vendors
-(4, 5),   -- Products
-(4, 6),   -- Warehouse (parent) - để hiển thị menu con Goods Receipt
-(4, 9),   -- Accounting
-(4, 10),  -- Approval
+(4, 2),   -- Categories (Quản lý danh mục)
+(4, 5),   -- Products (Sản phẩm)
+(4, 6),   -- Warehouse (parent)
+(4, 9),   -- Accounting (parent)
 (4, 11),  -- Reports
-(4, 15),  -- Goods Receipt (Phiếu nhập kho) - để xem và tạo hóa đơn
-(4, 24),  -- Credit Notes (đã chuyển vào Accounting)
-(4, 26),  -- Accounting - AP Invoices
-(4, 27),  -- Accounting - AR Invoices
-(4, 28),  -- Accounting - AP Payments
+(4, 14),  -- Warehouse List (Danh sách kho)
+(4, 15),  -- Goods Receipt (Phiếu nhập kho)
+(4, 30),  -- Good Issues (Phiếu xuất kho)
+(4, 24),  -- Credit Notes
+(4, 26),  -- Accounting - AP Invoices (Hóa đơn mua hàng)
+(4, 27),  -- Accounting - AR Invoices (Hóa đơn bán hàng)
+(4, 28),  -- Accounting - AP Payments (Thanh toán mua hàng)
 (4, 32)   -- Báo cáo công nợ
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;
 
--- WAREHOUSE (role_id = 5): Dashboard, Danh mục, Sản phẩm, Kho (Danh sách kho + Phiếu nhập kho + Phiếu xuất kho), Nhập hàng (PR), Xuất hàng (view), Báo cáo
+-- WAREHOUSE (role_id = 5): Quản lý danh mục, Sản phẩm, Kho (tất cả), Nhập hàng (Phiếu yêu cầu mua hàng + Đơn đặt hàng), Xuất hàng (Phiếu giao hàng + Đơn nhập hàng lại)
 INSERT INTO role_menus (role_id, menu_id) VALUES
 (5, 1),   -- Dashboard
-(5, 2),   -- Categories
-(5, 5),   -- Products
-(5, 6),   -- Warehouse
-(5, 7),   -- Purchase (parent) - để hiển thị menu con Purchase Requisition
-(5, 8),   -- Sales (view)
+(5, 2),   -- Categories (Quản lý danh mục)
+(5, 5),   -- Products (Sản phẩm)
+(5, 6),   -- Warehouse (parent)
+(5, 7),   -- Purchase (parent)
+(5, 8),   -- Sales (parent)
 (5, 11),  -- Reports
-(5, 14),  -- Warehouse List
-(5, 15),  -- Goods Receipt
-(5, 16),  -- Purchase Requisition (tạo yêu cầu mua hàng khi hàng sắp hết)
-(5, 30),  -- Good Issues
-(5, 21),  -- Sales Orders (view)
-(5, 22),  -- Deliveries
-(5, 23),  -- Return Orders
-(5, 25)   -- Sales Return Inbound Orders
+(5, 14),  -- Warehouse List (Danh sách kho)
+(5, 15),  -- Goods Receipt (Phiếu nhập kho)
+(5, 30),  -- Good Issues (Phiếu xuất kho)
+(5, 16),  -- Purchase Requisition (Phiếu yêu cầu mua hàng)
+(5, 19),  -- Purchase Order (Đơn đặt hàng)
+(5, 22),  -- Deliveries (Phiếu giao hàng)
+(5, 25)   -- Sales Return Inbound Orders (Đơn nhập hàng lại)
 AS new_rm
 ON DUPLICATE KEY UPDATE
   role_id = new_rm.role_id;

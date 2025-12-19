@@ -69,6 +69,15 @@ public class CreditNoteController {
         return ResponseEntity.ok(creditNoteService.changeStatus(id, status));
     }
 
+    @PatchMapping("/{id}/refund-paid-amount")
+    @PreAuthorize("hasAnyRole('MANAGER','ACCOUNTING')")
+    @LogActivity(action = "UPDATE_REFUND_PAID_AMOUNT", activityType = "SALES_MANAGEMENT", description = "Cập nhật số tiền đã trả lại khách hàng")
+    public ResponseEntity<CreditNoteResponseDTO> updateRefundPaidAmount(
+            @PathVariable Integer id,
+            @RequestParam java.math.BigDecimal refundPaidAmount) {
+        return ResponseEntity.ok(creditNoteService.updateRefundPaidAmount(id, refundPaidAmount));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER')")
     @LogActivity(action = "DELETE_CREDIT_NOTE", activityType = "SALES_MANAGEMENT", description = "Xóa Credit Note")
