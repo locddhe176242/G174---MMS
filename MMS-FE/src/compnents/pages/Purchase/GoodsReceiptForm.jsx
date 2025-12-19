@@ -152,11 +152,27 @@ export default function GoodsReceiptForm() {
             });
             const data = Array.isArray(response.data) ? response.data : response.data?.content || [];
             
-            // Filter: Chỉ lấy PO đã Approved và chưa nhập kho hoàn tất
+            // Filter: Chỉ lấy PO đã Approved và chưa nhập kho hoàn tất (cho phép partial delivery)
             const eligiblePOs = data.filter((po) => {
                 const approvalStatus = po.approvalStatus || po.approval_status || "";
-                const hasGoodsReceipt = po.hasGoodsReceipt || false;
-                return approvalStatus.toUpperCase() === "APPROVED" && !hasGoodsReceipt;
+                
+                // Phải là APPROVED
+                if (approvalStatus.toUpperCase() !== "APPROVED") return false;
+                
+                // Kiểm tra còn hàng để nhập không
+                if (po.items && Array.isArray(po.items)) {
+                    // Tính tổng số lượng còn lại
+                    const hasRemainingQty = po.items.some(item => {
+                        const orderedQty = Number(item.quantity || 0);
+                        const receivedQty = Number(item.receivedQty || item.received_qty || 0);
+                        return receivedQty < orderedQty;
+                    });
+                    
+                    return hasRemainingQty;
+                }
+                
+                // Nếu không có items, vẫn cho phép (có thể chưa load items)
+                return true;
             });
 
             setPurchaseOrders(
@@ -310,10 +326,12 @@ export default function GoodsReceiptForm() {
             console.log("Setting warehouse_id:", warehouseId);
             console.log("Setting order_id:", orderId);
             
-            // Map items from PO
+            // Map items from PO with remaining quantity calculation for partial delivery
             const mapped = items.map((item, index) => {
                 console.log(`Mapping PO item ${index}:`, item);
                 const orderedQty = Number(item.quantity || item.qty || 0);
+                const previouslyReceived = Number(item.receivedQty || item.received_qty || 0);
+                const remainingQty = Math.max(0, orderedQty - previouslyReceived);
                 
                 return {
                     poi_id: item.poiId || item.poi_id || item.id,
@@ -321,8 +339,9 @@ export default function GoodsReceiptForm() {
                     productName: item.productName || item.product_name || "-",
                     productCode: item.productCode || item.productSku || "",
                     ordered_qty: orderedQty,
-                    received_qty: orderedQty,
-                    accepted_qty: orderedQty,
+                    previously_received_qty: previouslyReceived,
+                    received_qty: remainingQty,
+                    accepted_qty: remainingQty,
                     remark: "",
                 };
             });
@@ -987,89 +1006,56 @@ export default function GoodsReceiptForm() {
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Nếu có order_id từ URL (tạo mới), hiển thị info box thay vì dropdown */}
-                                            {!isEdit && formData.order_id && poIdFromQuery ? (
-                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                    <div className="flex items-start gap-3">
-                                                        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-blue-800">Đơn nhập kho từ Đơn hàng</p>
-                                                            <p className="text-sm text-blue-700 mt-1">
-                                                                Danh sách sản phẩm được lấy tự động từ Đơn hàng ID: {formData.order_id}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Đơn hàng <span className="text-red-500">*</span>
-                                                    </label>
-                                                    <Select
-                                                        value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
-                                                        onChange={handleOrderChange}
-                                                        options={purchaseOrders}
-                                                        placeholder="Chọn đơn hàng"
-                                                        isClearable
-                                                        classNamePrefix="react-select"
-                                                        isOptionDisabled={(option) => option.isDisabled}
-                                                        styles={{
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                color: state.isDisabled ? '#9ca3af' : provided.color,
-                                                                cursor: state.isDisabled ? 'not-allowed' : 'pointer',
-                                                                fontStyle: state.isDisabled ? 'italic' : 'normal',
-                                                                backgroundColor: state.isDisabled 
-                                                                    ? '#f3f4f6' 
-                                                                    : state.isFocused 
-                                                                    ? '#e5e7eb' 
-                                                                    : provided.backgroundColor
-                                                            })
-                                                        }}
-                                                    />
-                                                    {validationErrors.order_id && (
-                                                        <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Đơn hàng <span className="text-red-500">*</span>
+                                                </label>
+                                                <Select
+                                                    value={purchaseOrders.find((opt) => opt.value === formData.order_id) || null}
+                                                    onChange={handleOrderChange}
+                                                    options={purchaseOrders}
+                                                    placeholder="Chọn đơn hàng"
+                                                    isClearable
+                                                    classNamePrefix="react-select"
+                                                    isOptionDisabled={(option) => option.isDisabled}
+                                                    styles={{
+                                                        option: (provided, state) => ({
+                                                            ...provided,
+                                                            color: state.isDisabled ? '#9ca3af' : provided.color,
+                                                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                                            fontStyle: state.isDisabled ? 'italic' : 'normal',
+                                                            backgroundColor: state.isDisabled 
+                                                                ? '#f3f4f6' 
+                                                                : state.isFocused 
+                                                                ? '#e5e7eb' 
+                                                                : provided.backgroundColor
+                                                        })
+                                                    }}
+                                                />
+                                                {validationErrors.order_id && (
+                                                    <p className="mt-1 text-sm text-red-600">{validationErrors.order_id}</p>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Kho nhận <span className="text-red-500">*</span>
+                                                </label>
+                                                <Select
+                                                    value={warehouses.find((opt) => opt.value === formData.warehouse_id) || null}
+                                                    onChange={handleWarehouseChange}
+                                                    options={warehouses}
+                                                    placeholder="Chọn kho"
+                                                    isClearable
+                                                    classNamePrefix="react-select"
+                                                />
+                                                {validationErrors.warehouse_id && (
+                                                    <p className="mt-1 text-sm text-red-600">{validationErrors.warehouse_id}</p>
+                                                )}
+                                            </div>
                                         </>
                                     )}
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Kho nhận <span className="text-red-500">*</span>
-                                        </label>
-                                        <Select
-                                            value={warehouses.find((opt) => opt.value === formData.warehouse_id) || null}
-                                            onChange={handleWarehouseChange}
-                                            options={warehouses}
-                                            placeholder="Chọn kho"
-                                            isClearable
-                                            classNamePrefix="react-select"
-                                        />
-                                        {validationErrors.warehouse_id && (
-                                            <p className="mt-1 text-sm text-red-600">{validationErrors.warehouse_id}</p>
-                                        )}
-                                    </div>
                                 </div>
-
-                                {formData.items.some(item => Number(item.previously_received_qty || 0) > 0) && (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                        <div className="flex items-start gap-3">
-                                            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <div>
-                                                <p className="text-sm font-medium text-blue-800">Nhập hàng bổ sung (Partial Delivery)</p>
-                                                <p className="text-sm text-blue-700 mt-1">
-                                                    Đơn hàng này đã có lần nhập kho trước đó. Vui lòng kiểm tra cột "Đã nhận" và nhập số lượng nhận thêm vào cột "SL nhận lần này".
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
@@ -1139,8 +1125,9 @@ export default function GoodsReceiptForm() {
                                             {formData.items.map((item, index) => {
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 const isCompleted = item.is_completed || false;
+                                                const orderedQty = Number(item.expected_qty || item.ordered_qty || item.planned_qty || 0);
                                                 const previouslyReceived = Number(item.previously_received_qty || 0);
-                                                const remainingQty = Number(item.remaining_qty || 0);
+                                                const remainingQty = Math.max(0, orderedQty - previouslyReceived);
                                                 
                                                 return (
                                                     <tr key={item.poi_id || item.roi_id || index} className={`hover:bg-gray-50 ${isCompleted ? 'bg-gray-100' : ''}`}>
@@ -1163,7 +1150,7 @@ export default function GoodsReceiptForm() {
                                                             </div>
                                                         </td>
                                                         <td className="border border-gray-200 px-2 py-1 text-right text-sm text-gray-700">
-                                                            {Number(item.expected_qty || item.ordered_qty || item.planned_qty || 0).toLocaleString()}
+                                                            {orderedQty.toLocaleString()}
                                                         </td>
                                                         {!isSalesReturnMode && (
                                                             <td className="border border-gray-200 px-2 py-1 text-right text-sm">

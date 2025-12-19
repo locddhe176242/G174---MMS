@@ -163,7 +163,7 @@ export default function ReportList() {
     };
 
     const formatNumber = (num) => {
-        return new Intl.NumberFormat('vi-VN').format(num || 0);
+        return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0));
     };
 
     const calculateTotals = () => {

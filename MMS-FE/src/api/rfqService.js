@@ -39,14 +39,18 @@ export const rfqService = {
   },
 
   // ===================== CREATE RFQ =====================
-  createRFQ: async (rfqData) => {
-    const response = await apiClient.post(BASE_PATH, rfqData);
+  createRFQ: async (rfqData, sendEmail = true) => {
+    const response = await apiClient.post(BASE_PATH, rfqData, {
+      params: { sendEmail }
+    });
     return extractData(response);
   },
 
   // ===================== UPDATE RFQ =====================
-  updateRFQ: async (id, rfqData) => {
-    const response = await apiClient.put(`${BASE_PATH}/${id}`, rfqData);
+  updateRFQ: async (id, rfqData, sendEmail = true) => {
+    const response = await apiClient.put(`${BASE_PATH}/${id}`, rfqData, {
+      params: { sendEmail }
+    });
     return extractData(response);
   },
 

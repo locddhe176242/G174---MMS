@@ -177,22 +177,7 @@ export default function APInvoiceDetail() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              {(data.status === "Unpaid" || data.status === "Chưa thanh toán") && balanceAmount === totalAmount && id ? (
-                <button
-                  onClick={() => navigate(`/purchase/ap-invoices/${id}/edit`)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Chỉnh sửa
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
-                  title={!id ? "ID không hợp lệ" : "Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã có payment"}
-                >
-                  Chỉnh sửa
-                </button>
-              )}
+              {/* Nút chỉnh sửa đã bị ẩn - không cho sửa hóa đơn sau khi tạo */}
             </div>
           </div>
         </div>

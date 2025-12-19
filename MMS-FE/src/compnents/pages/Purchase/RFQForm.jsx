@@ -736,10 +736,10 @@ export default function RFQForm() {
             };
 
             if (isEdit) {
-                await rfqService.updateRFQ(id, saveData);
+                await rfqService.updateRFQ(id, saveData, false); // Don't send email for draft
                 toast.success('Đã lưu nháp RFQ thành công!');
             } else {
-                await rfqService.createRFQ(saveData);
+                await rfqService.createRFQ(saveData, false); // Don't send email for draft
                 toast.success('Đã lưu nháp RFQ thành công!');
                 
                 if (importedPrId) {
@@ -749,8 +749,8 @@ export default function RFQForm() {
                         console.error(`Failed to convert PR ${importedPrId}:`, convertErr);
                     }
                 }
-                navigate('/purchase/rfqs');
             }
+            navigate('/purchase/rfqs');
         } catch (err) {
             console.error('Save draft error:', err);
             setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi lưu nháp');
@@ -973,6 +973,14 @@ export default function RFQForm() {
                                                                     })()}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
                                                                     options={products}
+                                                                    isOptionDisabled={(option) => {
+                                                                        // Disable if product is already selected in another row
+                                                                        return formData.items.some((it, idx) => 
+                                                                            idx !== index && 
+                                                                            it.productId && 
+                                                                            (String(it.productId) === String(option.value) || Number(it.productId) === Number(option.value))
+                                                                        );
+                                                                    }}
                                                                     isDisabled={['Completed', 'Rejected', 'Cancelled'].includes(formData.status) || importedPrId}
                                                                     placeholder={importedPrId ? "Sản phẩm từ PR" : "Chọn sản phẩm"}
                                                                     menuPortalTarget={document.body}

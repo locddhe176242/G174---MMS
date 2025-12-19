@@ -51,16 +51,6 @@ export default function CustomerDetail() {
   const avgSpend = totalOrders ? (Number(totalSpend) / Number(totalOrders)) : 0;
 
   return (
-    <PermissionGuard 
-      anyOf={['customer.view']} 
-      fallback={
-        <div className="p-6">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800">Bạn không có quyền xem chi tiết khách hàng.</p>
-          </div>
-        </div>
-      }
-    >
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -194,6 +184,5 @@ export default function CustomerDetail() {
         </aside>
       </div>
     </div>
-    </PermissionGuard>
   );
 }

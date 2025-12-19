@@ -895,7 +895,6 @@ export default function PurchaseOrderForm() {
                 pq_id: selectedQuotation.value,
                 payment_terms: paymentTerms || "",
                 delivery_date: deliveryDate || "",
-                shipping_address: deliveryTerms || "",
                 header_discount: headerDiscount,
                 items: mapped 
             };
@@ -904,7 +903,6 @@ export default function PurchaseOrderForm() {
                 vendor_id: vendorId,
                 payment_terms: paymentTerms,
                 delivery_date: deliveryDate,
-                shipping_address: deliveryTerms,
                 header_discount: headerDiscount,
                 items_count: mapped.length,
                 items: mapped
@@ -1258,16 +1256,6 @@ export default function PurchaseOrderForm() {
                                             Thêm sản phẩm
                                         </button>
                                     )}
-                                    {isImportedFromPQ && (
-                                        <button
-                                            type="button"
-                                            onClick={handleResetImport}
-                                            className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition"
-                                            title="Tạo PO mới không sử dụng báo giá"
-                                        >
-                                            Tạo PO mới
-                                        </button>
-                                    )}
                                 </div>
 
                                 {validationErrors.items && (
@@ -1288,7 +1276,7 @@ export default function PurchaseOrderForm() {
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">ĐVT</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Số lượng</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Đơn giá</th>
-                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">CK (%)</th>
+                                                <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Chiết khấu (%)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thành tiền (VND)</th>
                                                 <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-700">Thao tác</th>
                                             </tr>
@@ -1297,6 +1285,29 @@ export default function PurchaseOrderForm() {
                                             {formData.items.map((item, index) => {
                                                 const itemErr = validationErrors.itemDetails?.[index] || {};
                                                 const selectedProduct = products.find((o) => o.value === item.product_id);
+                                                
+                                                // Filter out products already selected in other rows
+                                                const availableProducts = products.filter((option) => {
+                                                    return !formData.items.some((it, idx) => {
+                                                        if (idx === index) return false;
+                                                        
+                                                        // Check by product_id
+                                                        const productId = it.product_id || it.productId;
+                                                        if (productId && (String(productId) === String(option.value) || Number(productId) === Number(option.value))) {
+                                                            return true;
+                                                        }
+                                                        
+                                                        // Check by productCode (for imported items)
+                                                        if (it.productCode && option.product) {
+                                                            const optionSku = option.product.sku || option.product.productCode;
+                                                            if (optionSku && String(it.productCode) === String(optionSku)) {
+                                                                return true;
+                                                            }
+                                                        }
+                                                        
+                                                        return false;
+                                                    });
+                                                });
                                                 
                                                 return (
                                                     <tr key={index} className="hover:bg-gray-50">
@@ -1313,7 +1324,7 @@ export default function PurchaseOrderForm() {
                                                                 <Select
                                                                     value={selectedProduct || null}
                                                                     onChange={(opt) => handleProductSelect(index, opt)}
-                                                                    options={products}
+                                                                    options={availableProducts}
                                                                     placeholder="Chọn sản phẩm"
                                                                     menuPortalTarget={document.body}
                                                                     menuPosition="fixed"

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { purchaseQuotationService } from "../../../api/purchaseQuotationService";
+import apiClient from "../../../api/apiClient";
 import Pagination from "../../common/Pagination";
 
 const STATUS_OPTIONS = [
@@ -81,6 +82,7 @@ const VendorQuotationList = () => {
 
     const [selectedQuotation, setSelectedQuotation] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [rfqsWithPO, setRfqsWithPO] = useState(new Set()); // Track RFQs that have POs
 
     const sortIcon = useMemo(() => {
         return (field) => {
@@ -146,6 +148,24 @@ const VendorQuotationList = () => {
             setTotalPages(response?.totalPages ?? 0);
             setTotalElements(response?.totalElements ?? filteredContent.length);
             setCurrentPage(page);
+
+            // Check which RFQs have purchase orders
+            const uniqueRfqIds = [...new Set(filteredContent.map(q => q?.rfqId || q?.rfq_id || q?.rfq?.id).filter(Boolean))];
+            const rfqsWithPurchaseOrders = new Set();
+            
+            await Promise.all(uniqueRfqIds.map(async (rfqId) => {
+                try {
+                    const poResponse = await apiClient.get(`/purchase-orders/rfq/${rfqId}`);
+                    if (poResponse.data && poResponse.data.length > 0) {
+                        rfqsWithPurchaseOrders.add(rfqId);
+                    }
+                } catch (err) {
+                    // Ignore errors - RFQ might not have a PO yet
+                    console.log(`No PO found for RFQ ${rfqId}`);
+                }
+            }));
+            
+            setRfqsWithPO(rfqsWithPurchaseOrders);
         } catch (err) {
             console.error("Error loading vendor quotations:", err);
             setError("Không thể tải danh sách báo giá nhà cung cấp");
@@ -283,10 +303,9 @@ const VendorQuotationList = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                         {formatCurrency(totalAmount)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(createdAt)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center gap-1">
-                            {hasMultiple && rfqId && (
+                            {hasMultiple && rfqId && !rfqsWithPO.has(rfqId) && (
                                 <button
                                     onClick={() => navigate(`/purchase/rfqs/${rfqId}/compare-quotations`)}
                                     className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 rounded-md border border-green-200 hover:border-green-300 transition-all duration-200 flex items-center gap-1.5 text-xs font-medium"
@@ -398,12 +417,6 @@ const VendorQuotationList = () => {
                                     <button onClick={() => handleSort("totalAmount")} className="flex items-center gap-2">
                                         Tổng tiền
                                         {sortIcon("totalAmount")}
-                                    </button>
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    <button onClick={() => handleSort("createdAt")} className="flex items-center gap-2">
-                                        Ngày tạo
-                                        {sortIcon("createdAt")}
                                     </button>
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Hành động</th>

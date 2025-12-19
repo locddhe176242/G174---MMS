@@ -22,6 +22,7 @@ export default function ApprovalList() {
   const [sortField, setSortField] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState("desc");
   const [filterType, setFilterType] = useState("all"); // all, purchase, sales
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState("Pending"); // Pending, Approved, Rejected, All
   
   // State cho modal approve/reject
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -73,8 +74,8 @@ export default function ApprovalList() {
     }
   };
 
-  // Fetch all pending documents from both Purchase and Sales
-  const fetchDocuments = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc", type = "all") => {
+  // Fetch documents from both Purchase and Sales based on approval status filter
+  const fetchDocuments = async (page = 0, keyword = "", sortField = "createdAt", sortDirection = "desc", type = "all", approvalStatus = "Pending") => {
     try {
       setLoading(true);
       setError(null);
@@ -87,20 +88,22 @@ export default function ApprovalList() {
 
       // Purchase Requisitions không cần duyệt nữa - đã bỏ bước manager approve
 
-      // Fetch Purchase Quotations (Pending)
-      if (type === "all" || type === "purchase") {
+      // Fetch Purchase Quotations (Only for Pending status - không hiển thị PQ trong lịch sử)
+      if ((type === "all" || type === "purchase") && approvalStatus === "Pending") {
         try {
           console.log('Fetching Purchase Quotations...');
           const pqData = await purchaseQuotationService.getQuotationsWithPagination(0, 100, sort);
           console.log('PQ Data:', pqData);
           if (pqData && pqData.content && Array.isArray(pqData.content)) {
             console.log('PQ Total Count:', pqData.content.length);
-            const pendingPQs = pqData.content.filter(item => item.status === "Pending");
-            console.log('PQ Pending Count:', pendingPQs.length);
-            console.log('Pending PQs:', pendingPQs);
+            const filteredPQs = approvalStatus === "All" 
+              ? pqData.content 
+              : pqData.content.filter(item => item.status === approvalStatus);
+            console.log(`PQ ${approvalStatus} Count:`, filteredPQs.length);
+            console.log(`${approvalStatus} PQs:`, filteredPQs);
             
             // Fetch details for each PQ to get complete information
-            for (const item of pendingPQs) {
+            for (const item of filteredPQs) {
               console.log('PQ item:', item);
               console.log('PQ item keys:', Object.keys(item));
               const docId = item.pqId || item.quotationId || item.quotation_id || item.id;
@@ -213,11 +216,13 @@ export default function ApprovalList() {
           console.log('PO Data:', poData);
           if (poData && poData.content && Array.isArray(poData.content)) {
             console.log('PO Total Count:', poData.content.length);
-            const pendingPOs = poData.content.filter(item => item.approvalStatus === "Pending" || item.approval_status === "Pending");
-            console.log('PO Pending Count:', pendingPOs.length);
+            const filteredPOs = approvalStatus === "All"
+              ? poData.content
+              : poData.content.filter(item => item.approvalStatus === approvalStatus || item.approval_status === approvalStatus);
+            console.log(`PO ${approvalStatus} Count:`, filteredPOs.length);
             
             // Fetch details for each PO to get totalAmount
-            for (const item of pendingPOs) {
+            for (const item of filteredPOs) {
               const docId = item.orderId || item.order_id || item.id;
               if (docId) {
                 try {
@@ -265,7 +270,7 @@ export default function ApprovalList() {
                   
                   allDocuments.push({
                     ...item,
-                    documentType: "Purchase Order",
+                    documentType: "Đơn mua",
                     documentTypeCode: "PO",
                     id: docId,
                     number: item.orderNo || item.order_no || item.number,
@@ -278,7 +283,7 @@ export default function ApprovalList() {
                   // Fallback to list data
                   allDocuments.push({
                     ...item,
-                    documentType: "Purchase Order",
+                    documentType: "Đơn mua",
                     documentTypeCode: "PO",
                     id: docId,
                     number: item.orderNo || item.order_no || item.number,
@@ -299,14 +304,16 @@ export default function ApprovalList() {
       // Fetch Sales Orders (Pending approval)
       if (type === "all" || type === "sales") {
         try {
-          const soData = await salesOrderService.getAllOrders({ approvalStatus: "Pending" });
+          const soData = approvalStatus === "All" 
+            ? await salesOrderService.getAllOrders() 
+            : await salesOrderService.getAllOrders({ approvalStatus });
           if (Array.isArray(soData)) {
             soData.forEach(item => {
               const docId = item.orderId || item.order_id || item.id;
               if (docId) {
                 allDocuments.push({
                   ...item,
-                  documentType: "Sales Order",
+                  documentType: "Đơn bán",
                   documentTypeCode: "SO",
                   id: docId,
                   number: item.orderNo || item.order_no || item.number,
@@ -379,14 +386,14 @@ export default function ApprovalList() {
   };
 
   useEffect(() => {
-    fetchDocuments(currentPage, searchKeyword, sortField, sortDirection, filterType);
-  }, [currentPage, sortField, sortDirection, filterType]);
+    fetchDocuments(currentPage, searchKeyword, sortField, sortDirection, filterType, approvalStatusFilter);
+  }, [currentPage, sortField, sortDirection, filterType, approvalStatusFilter]);
 
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
     setCurrentPage(0);
-    fetchDocuments(0, searchKeyword, sortField, sortDirection, filterType);
+    fetchDocuments(0, searchKeyword, sortField, sortDirection, filterType, approvalStatusFilter);
   };
 
   // Handle approve
@@ -576,7 +583,7 @@ export default function ApprovalList() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Duyệt đơn yêu cầu</h1>
             <button
-              onClick={() => navigate("/purchase-requisitions")}
+              onClick={() => navigate("/dashboard")}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Quay lại danh sách
@@ -620,6 +627,51 @@ export default function ApprovalList() {
               Bán hàng
             </button>
           </div>
+
+          {/* Approval Status Filter */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setApprovalStatusFilter("Pending")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                approvalStatusFilter === "Pending"
+                  ? "bg-yellow-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Chờ duyệt
+            </button>
+            <button
+              onClick={() => setApprovalStatusFilter("Approved")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                approvalStatusFilter === "Approved"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Đã duyệt
+            </button>
+            <button
+              onClick={() => setApprovalStatusFilter("Rejected")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                approvalStatusFilter === "Rejected"
+                  ? "bg-red-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Từ chối
+            </button>
+            <button
+              onClick={() => setApprovalStatusFilter("All")}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                approvalStatusFilter === "All"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Tất cả
+            </button>
+          </div>
+
           <form onSubmit={handleSearch} className="flex gap-4">
             <input
               type="text"
@@ -639,7 +691,7 @@ export default function ApprovalList() {
               onClick={() => {
                 setSearchKeyword("");
                 setCurrentPage(0);
-                fetchDocuments(0, "", sortField, sortDirection, filterType);
+                fetchDocuments(0, "", sortField, sortDirection, filterType, approvalStatusFilter);
               }}
               className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -735,31 +787,36 @@ export default function ApprovalList() {
                               >
                                 Xem
                               </button>
-                              {/* For PQ with RFQ, show Compare button to select best vendor */}
-                              {doc.documentTypeCode === "PQ" && doc.rfqId ? (
-                                <button
-                                  onClick={() => navigate(`/purchase/rfqs/${doc.rfqId}/compare-quotations`)}
-                                  className="px-3 py-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded border border-purple-200"
-                                  title="So sánh và chọn báo giá tốt nhất"
-                                >
-                                  So sánh báo giá
-                                </button>
-                              ) : (
+                              {/* Only show approval actions for Pending status */}
+                              {approvalStatusFilter === "Pending" && (
                                 <>
-                                  <button
-                                    onClick={() => openApproveModal(doc)}
-                                    className="text-green-600 hover:text-green-800"
-                                    title="Duyệt đơn"
-                                  >
-                                    Duyệt
-                                  </button>
-                                  <button
-                                    onClick={() => openRejectModal(doc)}
-                                    className="text-red-600 hover:text-red-800"
-                                    title="Từ chối đơn"
-                                  >
-                                    Từ chối
-                                  </button>
+                                  {/* For PQ with RFQ, show Compare button to select best vendor */}
+                                  {doc.documentTypeCode === "PQ" && doc.rfqId ? (
+                                    <button
+                                      onClick={() => navigate(`/purchase/rfqs/${doc.rfqId}/compare-quotations`)}
+                                      className="px-3 py-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded border border-purple-200"
+                                      title="So sánh và chọn báo giá tốt nhất"
+                                    >
+                                      So sánh báo giá
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => openApproveModal(doc)}
+                                        className="text-green-600 hover:text-green-800"
+                                        title="Duyệt đơn"
+                                      >
+                                        Duyệt
+                                      </button>
+                                      <button
+                                        onClick={() => openRejectModal(doc)}
+                                        className="text-red-600 hover:text-red-800"
+                                        title="Từ chối đơn"
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>

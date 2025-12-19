@@ -257,9 +257,10 @@ export default function PurchaseOrderDetail() {
     const normalizedStatus = getStatusString(data.status, "Pending");
     const normalizedApprovalStatus = getStatusString(data.approval_status || data.approvalStatus, "Pending");
     const canApprove = hasRole("MANAGER") && normalizedApprovalStatus === "Pending";
-    const canCreateGR = (hasRole("WAREHOUSE") || hasRole("MANAGER")) && normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent" && !data?.hasGoodsReceipt;
-    // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved)
-    const canEdit = normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected";
+    // Cho phép tạo phiếu nhập kho khi đã được phê duyệt và đã gửi (không cần kiểm tra hasGoodsReceipt để hỗ trợ partial delivery)
+    const canCreateGR = (hasRole("WAREHOUSE") || hasRole("MANAGER")) && normalizedApprovalStatus === "Approved" && normalizedStatus === "Sent";
+    // Chỉ cho phép Edit khi: Pending hoặc Rejected (chưa được Approved) và KHÔNG phải MANAGER
+    const canEdit = !hasRole("MANAGER") && (normalizedApprovalStatus === "Pending" || normalizedApprovalStatus === "Rejected");
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -307,11 +308,6 @@ export default function PurchaseOrderDetail() {
                                     Tạo phiếu nhập kho
                                 </button>
                             )}
-                            {normalizedApprovalStatus === "Approved" && data?.hasGoodsReceipt && (
-                                <div className="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg">
-                                    ✓ Đã tạo phiếu nhập kho
-                                </div>
-                            )}
                             {canEdit && (
                                 <button
                                     onClick={() => navigate(`/purchase/purchase-orders/${id}/edit`)}
@@ -339,6 +335,33 @@ export default function PurchaseOrderDetail() {
                                 />
                                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                                 <Stat label="Số sản phẩm" value={totalItems} />
+                                <div className="hidden md:block w-px bg-gray-200 self-stretch" />
+                                <div className="flex-1 text-center">
+                                    <div className="text-sm text-gray-500">Tiến độ nhập</div>
+                                    <div className="mt-2">
+                                        {(() => {
+                                            const totalOrdered = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                                            const totalReceived = items.reduce((sum, item) => sum + Number(item.receivedQty || item.received_qty || 0), 0);
+                                            const progress = totalOrdered > 0 ? Math.round((totalReceived / totalOrdered) * 100) : 0;
+                                            const isComplete = progress >= 100;
+                                            
+                                            return (
+                                                <div className="w-full">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="text-xs text-gray-600">{totalReceived.toLocaleString()} / {totalOrdered.toLocaleString()}</span>
+                                                        <span className={`text-sm font-semibold ${isComplete ? 'text-green-600' : 'text-blue-600'}`}>{progress}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                                        <div 
+                                                            className={`h-2.5 rounded-full transition-all ${isComplete ? 'bg-green-600' : 'bg-blue-600'}`}
+                                                            style={{ width: `${Math.min(progress, 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
                                 <div className="hidden md:block w-px bg-gray-200 self-stretch" />
                                 <div className="flex-1 text-center">
                                     <div className="text-sm text-gray-500">Trạng thái</div>
@@ -373,7 +396,9 @@ export default function PurchaseOrderDetail() {
                                                 <th className="py-3 pr-4">Mã SP</th>
                                                 <th className="py-3 pr-4">Tên sản phẩm</th>
                                                 <th className="py-3 pr-4">ĐVT</th>
-                                                <th className="py-3 pr-4">Số lượng</th>
+                                                <th className="py-3 pr-4">SL đặt</th>
+                                                <th className="py-3 pr-4">Đã nhận</th>
+                                                <th className="py-3 pr-4">Còn lại</th>
                                                 <th className="py-3 pr-4">Đơn giá</th>
                                                 <th className="py-3 pr-4">CK (%)</th>
                                                 <th className="py-3 pr-4">Thuế (%)</th>
@@ -384,6 +409,11 @@ export default function PurchaseOrderDetail() {
                                             <tbody>
                                             {items.map((item, index) => {
                                                 const itemTotal = lineValue(item);
+                                                const orderedQty = Number(item.quantity || 0);
+                                                const receivedQty = Number(item.receivedQty || item.received_qty || 0);
+                                                const remainingQty = orderedQty - receivedQty;
+                                                const isFullyReceived = remainingQty <= 0;
+                                                
                                                 return (
                                                     <tr key={item.poi_id || item.id || index} className="border-t hover:bg-gray-50">
                                                         <td className="py-3 pr-4">{index + 1}</td>
@@ -397,7 +427,17 @@ export default function PurchaseOrderDetail() {
                                                             {item.uom || "-"}
                                                         </td>
                                                         <td className="py-3 pr-4">
-                                                            {Number(item.quantity || 0).toLocaleString()}
+                                                            {orderedQty.toLocaleString()}
+                                                        </td>
+                                                        <td className="py-3 pr-4">
+                                                            <span className={receivedQty > 0 ? "text-green-600 font-medium" : ""}>
+                                                                {receivedQty.toLocaleString()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 pr-4">
+                                                            <span className={isFullyReceived ? "text-green-600 font-medium" : remainingQty > 0 ? "text-orange-600 font-medium" : ""}>
+                                                                {remainingQty.toLocaleString()}
+                                                            </span>
                                                         </td>
                                                         <td className="py-3 pr-4">
                                                             {formatCurrency(item.unit_price || item.unitPrice || 0)}
@@ -445,7 +485,7 @@ export default function PurchaseOrderDetail() {
                                                 return (
                                                     <>
                                                         <tr className="border-t bg-gray-50">
-                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                            <td colSpan={11} className="py-3 pr-4 text-right">
                                                                 Tạm tính:
                                                             </td>
                                                             <td className="py-3 pr-0 text-right">
@@ -455,7 +495,7 @@ export default function PurchaseOrderDetail() {
                                                         {itemDiscounts > 0 && (
                                                             <>
                                                                 <tr className="bg-gray-50">
-                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                    <td colSpan={11} className="py-3 pr-4 text-right">
                                                                         Chiết khấu sản phẩm:
                                                                     </td>
                                                                     <td className="py-3 pr-0 text-right text-red-600">
@@ -463,7 +503,7 @@ export default function PurchaseOrderDetail() {
                                                                     </td>
                                                                 </tr>
                                                                 <tr className="bg-gray-50">
-                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                    <td colSpan={11} className="py-3 pr-4 text-right">
                                                                         Tổng sau chiết khấu sản phẩm:
                                                                     </td>
                                                                     <td className="py-3 pr-0 text-right">
@@ -475,7 +515,7 @@ export default function PurchaseOrderDetail() {
                                                         {data.headerDiscount > 0 && (
                                                             <>
                                                                 <tr className="bg-gray-50">
-                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                    <td colSpan={11} className="py-3 pr-4 text-right">
                                                                         Chiết khấu tổng đơn ({data.headerDiscount}%):
                                                                     </td>
                                                                     <td className="py-3 pr-0 text-right text-red-600">
@@ -483,7 +523,7 @@ export default function PurchaseOrderDetail() {
                                                                     </td>
                                                                 </tr>
                                                                 <tr className="bg-gray-50">
-                                                                    <td colSpan={9} className="py-3 pr-4 text-right">
+                                                                    <td colSpan={11} className="py-3 pr-4 text-right">
                                                                         Tiền sau khi chiết khấu tổng đơn:
                                                                     </td>
                                                                     <td className="py-3 pr-0 text-right">
@@ -493,7 +533,7 @@ export default function PurchaseOrderDetail() {
                                                             </>
                                                         )}
                                                         <tr className="bg-gray-50">
-                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                            <td colSpan={11} className="py-3 pr-4 text-right">
                                                                 Thuế:
                                                             </td>
                                                             <td className="py-3 pr-0 text-right">
@@ -501,7 +541,7 @@ export default function PurchaseOrderDetail() {
                                                             </td>
                                                         </tr>
                                                         <tr className="border-t-2 font-semibold bg-gray-100">
-                                                            <td colSpan={9} className="py-3 pr-4 text-right">
+                                                            <td colSpan={11} className="py-3 pr-4 text-right">
                                                                 Tổng cộng:
                                                             </td>
                                                             <td className="py-3 pr-0 text-right">

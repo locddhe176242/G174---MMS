@@ -41,6 +41,7 @@ export default function APInvoiceForm() {
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [isFromGR, setIsFromGR] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   const calculateItemTotal = (item) => {
     const qty = Number(item.quantity || 0);
@@ -145,6 +146,7 @@ export default function APInvoiceForm() {
   const loadFromGoodsReceipt = async (receiptId) => {
     try {
       setLoading(true);
+      setShowReceiptModal(false); // Đóng modal sau khi chọn
       console.log("loadFromGoodsReceipt called with receiptId:", receiptId);
       
       // Ensure vendors are loaded first and get the list directly
@@ -168,9 +170,10 @@ export default function APInvoiceForm() {
       const extractedReceiptId = gr.receiptId || gr.receipt_id;
       console.log("Extracted receipt_id:", extractedReceiptId);
 
-      // Get PO info (vendor + header discount) if available
+      // Get PO info (vendor + header discount + payment terms) if available
       let headerDiscount = 0;
       let vendorId = null;
+      let paymentTerms = null;
       const extractedOrderId = gr.orderId || gr.order_id || gr.purchaseOrder?.orderId || gr.purchaseOrder?.order_id || gr.order?.orderId || gr.order?.order_id;
       
       if (extractedOrderId) {
@@ -179,8 +182,10 @@ export default function APInvoiceForm() {
           const poData = poResponse.data;
           headerDiscount = poData?.headerDiscount || poData?.header_discount || 0;
           vendorId = poData?.vendorId || poData?.vendor_id || poData?.vendor?.vendorId || poData?.vendor?.vendor_id;
+          paymentTerms = poData?.paymentTerms || poData?.payment_terms;
           console.log("PO header discount:", headerDiscount);
           console.log("PO vendor_id:", vendorId);
+          console.log("PO payment terms:", paymentTerms);
         } catch (err) {
           console.warn("Could not fetch PO info:", err);
         }
@@ -195,6 +200,21 @@ export default function APInvoiceForm() {
       console.log("Final order_id:", extractedOrderId);
       console.log("Header discount:", headerDiscount);
 
+      // Calculate due_date based on payment terms
+      let dueDate = new Date();
+      if (paymentTerms) {
+        if (paymentTerms.toUpperCase() === 'COD') {
+          // COD = Cash on Delivery = today
+          dueDate = new Date();
+        } else if (paymentTerms.toUpperCase().includes('NET')) {
+          // Extract days from "NET 30", "NET 60", etc.
+          const match = paymentTerms.match(/\d+/);
+          const days = match ? parseInt(match[0]) : 30;
+          dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + days);
+        }
+      }
+
       // Pre-fill form with GR data
       setFormData(prev => ({
         ...prev,
@@ -202,6 +222,7 @@ export default function APInvoiceForm() {
         order_id: extractedOrderId,
         receipt_id: extractedReceiptId,
         invoice_date: new Date(),
+        due_date: dueDate,
         header_discount: headerDiscount,
         notes: `Tạo từ phiếu nhập kho ${gr.receiptNo || gr.receipt_no || ''}`,
         items: (gr.items || []).map((item, idx) => {
@@ -228,8 +249,7 @@ export default function APInvoiceForm() {
         console.log("First vendor:", vendorsList[0]);
       }
       console.log("Vendor match test:", vendorsList.find((v) => v.value === vendorId));
-      setIsFromGR(true); // Mark as imported from GR
-      toast.success("Đã import dữ liệu từ phiếu nhập kho");
+      setIsFromGR(true);
       setLoading(false);
     } catch (err) {
       console.error("Error loading GR data:", err);
@@ -523,12 +543,35 @@ export default function APInvoiceForm() {
             <h1 className="text-2xl font-bold text-gray-900">
               {isEdit ? "Cập nhật Hóa đơn phải trả" : "Tạo Hóa đơn phải trả mới"}
             </h1>
-            <button
-              onClick={() => navigate("/purchase/ap-invoices")}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Quay lại
-            </button>
+            <div className="flex items-center gap-2">
+              {!isFromGR ? (
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                >
+                  Import từ phiếu nhập
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFromGR(false);
+                    setFormData(prev => ({ ...prev, receipt_id: null, items: [] }));
+                  }}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
+                  title="Xóa dữ liệu import và chọn lại"
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                onClick={() => navigate("/purchase/ap-invoices")}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Quay lại
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -604,47 +647,15 @@ export default function APInvoiceForm() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phiếu nhập (tùy chọn)
                     </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Select
-                          value={receipts.find((r) => r.value === formData.receipt_id) || null}
-                          onChange={(option) => handleInputChange("receipt_id", option ? option.value : null)}
-                          options={receipts}
-                          isClearable
-                          isOptionDisabled={(option) => option.isDisabled}
-                          placeholder="Chọn phiếu nhập"
-                          classNamePrefix="react-select"
-                        />
-                      </div>
-                      {formData.receipt_id && !isFromGR && (
-                        <button
-                          type="button"
-                          onClick={() => loadFromGoodsReceipt(formData.receipt_id)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
-                        >
-                          Import
-                        </button>
-                      )}
-                      {isFromGR && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsFromGR(false);
-                            setFormData(prev => ({ ...prev, receipt_id: null, items: [] }));
-                          }}
-                          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
-                          title="Xóa dữ liệu import và chọn lại"
-                        >
-                          Reset
-                        </button>
-                      )}
-                    </div>
-                    {isFromGR && (
-                      <p className="mt-1 text-sm text-blue-600">✓ Đã import từ phiếu nhập kho - Nhấn "Reset" để import lại</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Phiếu nhập đã có hóa đơn sẽ hiển thị "(Đã có hóa đơn)" và không thể chọn
-                    </p>
+                    <Select
+                      value={receipts.find((r) => r.value === formData.receipt_id) || null}
+                      onChange={(option) => handleInputChange("receipt_id", option ? option.value : null)}
+                      options={receipts}
+                      isClearable
+                      isOptionDisabled={(option) => option.isDisabled}
+                      placeholder="Chọn phiếu nhập"
+                      classNamePrefix="react-select"
+                    />
                   </div>
                 </div>
 
@@ -657,29 +668,25 @@ export default function APInvoiceForm() {
                       selected={formData.invoice_date instanceof Date ? formData.invoice_date : (formData.invoice_date ? new Date(formData.invoice_date) : new Date())}
                       onChange={(date) => handleInputChange("invoice_date", date)}
                       dateFormat="dd/MM/yyyy"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.invoice_date ? "border-red-500" : "border-gray-300"}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 cursor-not-allowed"
+                      disabled={true}
                     />
-                    {validationErrors.invoice_date && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.invoice_date}</p>
-                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ngày đến hạn thanh toán <span className="text-red-500">*</span>
+                      Ngày thanh toán <span className="text-red-500">*</span>
                     </label>
                     <DatePicker
                       selected={formData.due_date instanceof Date ? formData.due_date : (formData.due_date ? new Date(formData.due_date) : null)}
                       onChange={(date) => handleInputChange("due_date", date)}
                       dateFormat="dd/MM/yyyy"
-                      isClearable
+                      isClearable={!isFromGR}
                       placeholderText="Chọn hạn thanh toán cho vendor"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isFromGR ? "bg-gray-100 cursor-not-allowed" : "border-gray-300"}`}
                       minDate={new Date()}
+                      disabled={isFromGR}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      💡 Ngày phải trả tiền cho nhà cung cấp. Hệ thống sẽ nhắc khi đến hạn.
-                    </p>
                   </div>
                 </div>
 
@@ -716,10 +723,11 @@ export default function APInvoiceForm() {
                           items: prev.items.map(item => ({ ...item, tax_rate: newTaxRate }))
                         }));
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isFromGR ? "bg-gray-100" : "border-gray-300"}`}
                       min="0"
                       max="100"
                       step="0.01"
+                      readOnly={isFromGR}
                       placeholder="10.00"
                     />
                     <p className="mt-1 text-xs text-gray-500">Thuế tính trên tổng sau tất cả chiết khấu</p>
@@ -762,8 +770,8 @@ export default function APInvoiceForm() {
                           <th className="py-3 pr-4">#</th>
                           <th className="py-3 pr-4">Sản phẩm</th>
                           <th className="py-3 pr-4 text-right">SL yêu cầu</th>
-                          <th className="py-3 pr-4 text-right">Đơn giá/Sản phẩm(VND)</th>
-                          <th className="py-3 pr-4 text-center">Chiết Khấu (%)</th>
+                          <th className="py-3 pr-4 text-right">Đơn giá/SảnF phẩm(VND)</th>
+                          <th className="py-3 pr-4 text-center">Chiết Khấu(%)</th>
                           <th className="py-3 pr-4 text-center">Thuế (%)</th>
                           <th className="py-3 pr-4">Ghi chú</th>
                           <th className="py-3 pr-4 text-right">Thành tiền</th>
@@ -919,6 +927,66 @@ export default function APInvoiceForm() {
           </div>
         </div>
       </div>
+
+      {/* Modal chọn phiếu nhập kho */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Chọn phiếu nhập kho</h3>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {receipts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Không có phiếu nhập kho nào khả dụng
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {receipts.map((receipt) => (
+                    <button
+                      key={receipt.value}
+                      onClick={() => {
+                        if (!receipt.isDisabled) {
+                          loadFromGoodsReceipt(receipt.value);
+                        }
+                      }}
+                      disabled={receipt.isDisabled}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                        receipt.isDisabled
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer'
+                      }`}
+                    >
+                      <div className="font-medium">{receipt.label}</div>
+                      {receipt.isDisabled && (
+                        <div className="text-sm text-gray-400 mt-1">Đã có hóa đơn</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
