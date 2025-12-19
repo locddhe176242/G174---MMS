@@ -24,6 +24,9 @@ public class DashboardStatsDTO {
     // Monthly import/export statistics
     private List<MonthlyImportExport> monthlyImportExport;
     
+    // Weekly import/export statistics (last 4 weeks)
+    private List<WeeklyImportExport> weeklyImportExport;
+    
     // Daily import/export statistics (last 7 days)
     private List<DailyImportExport> dailyImportExport;
     
@@ -38,6 +41,9 @@ public class DashboardStatsDTO {
     private List<PendingAPInvoice> pendingAPInvoices;
     private List<OverdueARInvoice> overdueARInvoices;
     private AccountingSummary accountingSummary;
+    
+    // Approval summary (for MANAGER role)
+    private ApprovalSummary approvalSummary;
     
     @Data
     @NoArgsConstructor
@@ -100,6 +106,16 @@ public class DashboardStatsDTO {
         private BigDecimal importValue;
         private Long exportQuantity;
         private BigDecimal exportValue;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WeeklyImportExport {
+        private String week; // Format: "T1", "T2", "T3", "T4"
+        private String weekLabel; // Format: "dd/MM"
+        private Long importQuantity; // Số phiếu nhập kho
+        private Long exportQuantity; // Số phiếu xuất kho
     }
     
     @Data
@@ -184,5 +200,15 @@ public class DashboardStatsDTO {
         private Integer overdueARInvoicesCount;
         private BigDecimal upcomingPayments7Days;
         private BigDecimal overdueReceivables;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ApprovalSummary {
+        private Long pendingApprovals;
+        private Long pendingPurchaseQuotations;
+        private Long pendingPurchaseOrders;
+        private Long pendingSalesOrders;
     }
 }

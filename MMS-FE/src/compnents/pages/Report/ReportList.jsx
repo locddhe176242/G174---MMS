@@ -3,43 +3,78 @@ import { reportService } from "../../../api/reportService";
 import { toast } from "react-toastify";
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { getProducts } from '../../../api/productService';
 import * as ExcelJS from 'exceljs';
 
 export default function ReportList() {
+    // State for tabs
+    const [activeTab, setActiveTab] = useState('create'); // 'create' hoặc 'list'
+    
+    // State for saved reports
+    const [savedReports, setSavedReports] = useState([]);
+    const [selectedReport, setSelectedReport] = useState(null);
+    
+    // State for report type selection
+    const [reportType, setReportType] = useState('inventory'); // 'inventory' hoặc 'sales'
+    
+    // Existing state
     const [loading, setLoading] = useState(false);
-    const [inventoryData, setInventoryData] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [inventoryFilters, setInventoryFilters] = useState({
+    const [reportData, setReportData] = useState([]); // Đổi tên từ inventoryData để dùng chung
+    const [reportFilters, setReportFilters] = useState({
         startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        endDate: new Date(),
-        productId: null
+        endDate: new Date()
     });
 
     useEffect(() => {
-        fetchProducts();
+        fetchSavedReports(); // Lấy danh sách báo cáo đã lưu
     }, []);
 
-    const fetchProducts = async () => {
+    // Hàm lấy danh sách báo cáo đã lưu
+    const fetchSavedReports = async () => {
         try {
-            const data = await getProducts();
-            setProducts(data || []);
+            const response = await reportService.getAllReports();
+            setSavedReports(response.content || []);
         } catch (error) {
-            console.error('Error fetching products:', error);
+            console.error('Error fetching saved reports:', error);
+            toast.error('Không thể tải danh sách báo cáo');
         }
     };
 
-    const generateInventoryReport = async () => {
+    // Hàm xem chi tiết báo cáo
+    const viewReportDetail = async (reportId) => {
+        try {
+            setLoading(true);
+            const response = await reportService.getReportById(reportId);
+            setSelectedReport(response);
+            
+            // Hiển thị data nếu có
+            if (response.reportData && response.reportData.items) {
+                setReportData(response.reportData.items);
+                setActiveTab('create'); // Chuyển về tab tạo báo cáo để hiển thị data
+            }
+        } catch (error) {
+            console.error('Error fetching report detail:', error);
+            toast.error('Không thể tải chi tiết báo cáo');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateReport = async () => {
         try {
             setLoading(true);
             const requestData = {
-                startDate: inventoryFilters.startDate.toISOString().split('T')[0],
-                endDate: inventoryFilters.endDate.toISOString().split('T')[0],
-                productId: inventoryFilters.productId
+                startDate: reportFilters.startDate.toISOString().split('T')[0],
+                endDate: reportFilters.endDate.toISOString().split('T')[0]
             };
 
-            const response = await reportService.generateInventoryReport(requestData);
-            // Ensure inventoryData is always an array
+            let response;
+            if (reportType === 'inventory') {
+                response = await reportService.generateInventoryReport(requestData);
+            } else {
+                response = await reportService.generateSalesReport(requestData);
+            }
+
+            // Ensure data is always an array
             let data = [];
             if (Array.isArray(response)) {
                 data = response;
@@ -51,24 +86,28 @@ export default function ReportList() {
                 data = response.data;
             }
             
-            setInventoryData(data);
+            setReportData(data);
             
             if (data.length === 0) {
                 toast.warning('Không có dữ liệu trong khoảng thời gian này');
             } else {
-                toast.success(`Tạo báo cáo thành công! (${data.length} sản phẩm)`);
+                const reportTypeName = reportType === 'inventory' ? 'tồn kho' : 'doanh thu';
+                const itemCount = reportType === 'inventory' ? 'sản phẩm' : 'đơn hàng';
+                toast.success(`Tạo báo cáo ${reportTypeName} thành công! (${data.length} ${itemCount})`);
+                // Cập nhật danh sách báo cáo sau khi tạo mới
+                fetchSavedReports();
             }
         } catch (error) {
-            console.error('Error generating inventory report:', error);
+            console.error('Error generating report:', error);
             toast.error(error.response?.data?.message || 'Không thể tạo báo cáo');
-            setInventoryData([]);
+            setReportData([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const exportInventoryToExcel = async () => {
-        if (inventoryData.length === 0) {
+    const exportToExcel = async () => {
+        if (reportData.length === 0) {
             toast.warning('Không có dữ liệu để xuất');
             return;
         }
@@ -89,7 +128,7 @@ export default function ReportList() {
         ];
 
         // Add data rows
-        inventoryData.forEach((item, index) => {
+        reportData.forEach((item, index) => {
             worksheet.addRow({
                 stt: index + 1,
                 productCode: item.productCode || item.product_code || '',
@@ -116,7 +155,7 @@ export default function ReportList() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `BaoCaoTonKho_${inventoryFilters.startDate.toISOString().split('T')[0]}_${inventoryFilters.endDate.toISOString().split('T')[0]}.xlsx`;
+        link.download = `BaoCao${reportType === 'inventory' ? 'TonKho' : 'DoanhThu'}_${reportFilters.startDate.toISOString().split('T')[0]}_${reportFilters.endDate.toISOString().split('T')[0]}.xlsx`;
         link.click();
         window.URL.revokeObjectURL(url);
         
@@ -124,15 +163,15 @@ export default function ReportList() {
     };
 
     const formatNumber = (num) => {
-        return new Intl.NumberFormat('vi-VN').format(num || 0);
+        return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0));
     };
 
     const calculateTotals = () => {
-        if (!inventoryData || inventoryData.length === 0) return {
+        if (!reportData || reportData.length === 0) return {
             totalOpening: 0, totalInbound: 0, totalOutbound: 0, totalClosing: 0
         };
 
-        return inventoryData.reduce((acc, item) => ({
+        return reportData.reduce((acc, item) => ({
             totalOpening: acc.totalOpening + (item.openingQty || item.opening_qty || 0),
             totalInbound: acc.totalInbound + (item.inboundQty || item.inbound_qty || 0),
             totalOutbound: acc.totalOutbound + (item.outboundQty || item.outbound_qty || 0),
@@ -149,28 +188,85 @@ export default function ReportList() {
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Báo cáo tồn kho</h1>
+                            <h1 className="text-2xl font-bold text-gray-900">Báo cáo</h1>
+                            <p className="text-sm text-gray-600 mt-1">Quản lý và tạo các loại báo cáo hệ thống</p>
                         </div>
+                    </div>
+                    
+                    {/* Tab Navigation */}
+                    <div className="mt-6 border-b border-gray-200">
+                        <nav className="-mb-px flex space-x-8">
+                            <button
+                                onClick={() => setActiveTab('create')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                    activeTab === 'create'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                Tạo báo cáo mới
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('list')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                    activeTab === 'list'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                Danh sách báo cáo đã tạo ({savedReports.length})
+                            </button>
+                        </nav>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="container mx-auto px-4 py-6">
-                {/* Inventory Report Section */}
+            {activeTab === 'create' ? (
+                <div className="container mx-auto px-4 py-6">
+                {/* Report Section */}
                 <div className="bg-white rounded-lg shadow-sm mb-6">
                     <div className="px-6 py-4 border-b">
-                        <h2 className="text-lg font-semibold text-gray-900">Tạo báo cáo tồn kho</h2>
+                        <h2 className="text-lg font-semibold text-gray-900">Tạo báo cáo</h2>
+                    </div>
+
+                    {/* Report Type Selection */}
+                    <div className="px-6 py-4 border-b">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Chọn loại báo cáo</label>
+                        <div className="flex gap-6">
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="reportType"
+                                    value="inventory"
+                                    checked={reportType === 'inventory'}
+                                    onChange={(e) => setReportType(e.target.value)}
+                                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Báo cáo tồn kho</span>
+                            </label>
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="reportType"
+                                    value="sales"
+                                    checked={reportType === 'sales'}
+                                    onChange={(e) => setReportType(e.target.value)}
+                                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Báo cáo doanh thu</span>
+                            </label>
+                        </div>
                     </div>
 
                     {/* Filters */}
                     <div className="px-6 py-4">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
                                 <DatePicker
-                                    selected={inventoryFilters.startDate}
-                                    onChange={(date) => setInventoryFilters({ ...inventoryFilters, startDate: date })}
+                                    selected={reportFilters.startDate}
+                                    onChange={(date) => setReportFilters({ ...reportFilters, startDate: date })}
                                     dateFormat="dd/MM/yyyy"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -179,40 +275,26 @@ export default function ReportList() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
                                 <DatePicker
-                                    selected={inventoryFilters.endDate}
-                                    onChange={(date) => setInventoryFilters({ ...inventoryFilters, endDate: date })}
+                                    selected={reportFilters.endDate}
+                                    onChange={(date) => setReportFilters({ ...reportFilters, endDate: date })}
                                     dateFormat="dd/MM/yyyy"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Sản phẩm (Tùy chọn)</label>
-                                <select
-                                    value={inventoryFilters.productId || ''}
-                                    onChange={(e) => setInventoryFilters({ ...inventoryFilters, productId: e.target.value ? parseInt(e.target.value) : null })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="">Tất cả sản phẩm</option>
-                                    {products.map(product => (
-                                        <option key={product.productId || product.product_id} value={product.productId || product.product_id}>
-                                            {product.productName || product.product_name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+
 
                             <div className="flex items-end gap-2">
                                 <button
-                                    onClick={generateInventoryReport}
+                                    onClick={generateReport}
                                     disabled={loading}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
                                 >
-                                    {loading ? 'Đang tạo...' : 'Tạo báo cáo'}
+                                    {loading ? 'Đang tạo...' : `Tạo báo cáo ${reportType === 'inventory' ? 'tồn kho' : 'doanh thu'}`}
                                 </button>
-                                {inventoryData.length > 0 && (
+                                {reportData.length > 0 && (
                                     <button
-                                        onClick={exportInventoryToExcel}
+                                        onClick={exportToExcel}
                                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
                                         title="Xuất Excel"
                                     >
@@ -226,59 +308,109 @@ export default function ReportList() {
                     </div>
 
                     {/* Report Table */}
-                    {inventoryData.length > 0 && (
+                    {reportData.length > 0 && (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">STT</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Đơn vị</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL đầu kỳ</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL nhập</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL xuất</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hàng tồn</th>
+                                        {reportType === 'inventory' ? (
+                                            <>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Đơn vị</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL đầu kỳ</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL nhập</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL xuất</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hàng tồn</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Đơn hàng</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
+                                            </>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {inventoryData.map((item, index) => (
+                                    {reportData.map((item, index) => (
                                         <tr key={index} className="hover:bg-gray-50">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">
-                                                <div className="font-medium">{item.productName || item.product_name}</div>
-                                                <div className="text-xs text-gray-500">{item.productCode || item.product_code}</div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.unit || ''}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(item.openingQty || item.opening_qty)}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-medium">{formatNumber(item.inboundQty || item.inbound_qty)}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{formatNumber(item.outboundQty || item.outbound_qty)}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">{formatNumber(item.closingQty || item.closing_qty)}</td>
+                                            {reportType === 'inventory' ? (
+                                                <>
+                                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                                        <div className="font-medium">{item.productName || item.product_name}</div>
+                                                        <div className="text-xs text-gray-500">{item.productCode || item.product_code}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.unit || ''}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(item.openingQty || item.opening_qty)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-medium">{formatNumber(item.inboundQty || item.inbound_qty)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{formatNumber(item.outboundQty || item.outbound_qty)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">{formatNumber(item.closingQty || item.closing_qty)}</td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                                        <div className="font-medium">{item.orderCode || item.order_code || `SO${String(index + 1).padStart(3, '0')}`}</div>
+                                                        <div className="text-xs text-gray-500">{new Date(item.orderDate || Date.now()).toLocaleDateString('vi-VN')}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-900">{item.customerName || item.customer_name || 'Khách hàng'}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(item.quantity || 1)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(item.unitPrice || item.unit_price || 0)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-semibold">{formatNumber(item.totalAmount || item.total_amount || 0)}</td>
+                                                </>
+                                            )}
                                         </tr>
                                     ))}
-                                    <tr className="bg-gray-100 font-bold">
-                                        <td colSpan="3" className="px-6 py-4 text-sm text-gray-900">TỔNG CỘNG</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalOpening)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">{formatNumber(totals.totalInbound)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">{formatNumber(totals.totalOutbound)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalClosing)}</td>
-                                    </tr>
+                                    {reportType === 'inventory' && (
+                                        <tr className="bg-gray-100 font-bold">
+                                            <td colSpan="3" className="px-6 py-4 text-sm text-gray-900">TỔNG CỘNG</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalOpening)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">{formatNumber(totals.totalInbound)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">{formatNumber(totals.totalOutbound)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(totals.totalClosing)}</td>
+                                        </tr>
+                                    )}
+                                    {reportType === 'sales' && (
+                                        <tr className="bg-gray-100 font-bold">
+                                            <td colSpan="4" className="px-6 py-4 text-sm text-gray-900">TỔNG CỘNG</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-bold">
+                                                {formatNumber(reportData.reduce((sum, item) => sum + (item.totalAmount || item.total_amount || 0), 0))}
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     )}
 
                     {/* Summary Info */}
-                    {inventoryData.length > 0 && (
+                    {reportData.length > 0 && (
                         <div className="px-6 py-4 bg-gray-50 border-t">
                             <div className="text-sm text-gray-600">
-                                <p>Kỳ báo cáo: <span className="font-medium">{inventoryFilters.startDate.toLocaleDateString('vi-VN')}</span> - <span className="font-medium">{inventoryFilters.endDate.toLocaleDateString('vi-VN')}</span></p>
-                                <p className="mt-1">Tổng số mặt hàng: <span className="font-medium">{inventoryData.length}</span></p>
+                                <p>Kỳ báo cáo: <span className="font-medium">{reportFilters.startDate.toLocaleDateString('vi-VN')}</span> - <span className="font-medium">{reportFilters.endDate.toLocaleDateString('vi-VN')}</span></p>
+                                <p className="mt-1">
+                                    {reportType === 'inventory' ? (
+                                        <>Tổng số sản phẩm: <span className="font-medium">{reportData.length}</span></>
+                                    ) : (
+                                        <>Tổng số đơn hàng: <span className="font-medium">{reportData.length}</span></>
+                                    )}
+                                </p>
+                                {reportType === 'sales' && (
+                                    <p className="mt-1">
+                                        Tổng doanh thu: <span className="font-medium text-green-600">
+                                            {formatNumber(reportData.reduce((sum, item) => sum + (item.totalAmount || item.total_amount || 0), 0))} VNĐ
+                                        </span>
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* Empty State */}
-                    {!loading && inventoryData.length === 0 && (
+                    {!loading && reportData.length === 0 && (
                         <div className="px-6 py-12 text-center">
                             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -289,6 +421,88 @@ export default function ReportList() {
                     )}
                 </div>
             </div>
+        ) : (
+            // Tab "Danh sách báo cáo đã tạo"
+            <div className="container mx-auto px-4 py-6">
+                <div className="bg-white rounded-lg shadow-sm">
+                    <div className="px-6 py-4 border-b">
+                        <h2 className="text-lg font-semibold text-gray-900">Danh sách báo cáo đã tạo</h2>
+                    </div>
+
+                    {savedReports.length === 0 ? (
+                        <div className="px-6 py-12 text-center">
+                            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <h3 className="mt-2 text-sm font-medium text-gray-900">Chưa có báo cáo nào</h3>
+                            <p className="mt-1 text-sm text-gray-500">Tạo báo cáo đầu tiên trong tab "Tạo báo cáo mới"</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên báo cáo</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại báo cáo</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thời gian tạo</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tạo bởi</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {savedReports.map((report) => (
+                                        <tr key={report.reportId} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm font-medium text-gray-900">{report.name}</div>
+                                                {report.description && (
+                                                    <div className="text-sm text-gray-500">{report.description}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {report.type === 'Inventory' ? 'Tồn kho' : 
+                                                     report.type === 'Purchase' ? 'Mua hàng' :
+                                                     report.type === 'Sales' ? 'Bán hàng' : 
+                                                     report.type === 'Financial' ? 'Tài chính' : report.type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                    report.status === 'Completed' 
+                                                        ? 'bg-green-100 text-green-800' 
+                                                        : report.status === 'Processing'
+                                                        ? 'bg-yellow-100 text-yellow-800'
+                                                        : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {report.status === 'Completed' ? 'Hoàn thành' :
+                                                     report.status === 'Processing' ? 'Đang xử lý' : 
+                                                     report.status === 'Failed' ? 'Lỗi' : report.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {new Date(report.generatedAt).toLocaleString('vi-VN')}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {report.generatedBy}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button
+                                                    onClick={() => viewReportDetail(report.reportId)}
+                                                    className="text-blue-600 hover:text-blue-900 mr-3"
+                                                >
+                                                    Xem chi tiết
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
         </div>
     );
 }

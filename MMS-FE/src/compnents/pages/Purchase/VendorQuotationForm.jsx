@@ -593,21 +593,14 @@ const VendorQuotationForm = () => {
                         Tạo báo giá từ nhà cung cấp
                     </h1>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-blue-800">
-                        <span className="font-semibold">RFQ tham chiếu:</span> {rfqData.rfqNo || rfqData.rfq_no}
-                    </p>
-                    <p className="text-sm text-blue-800">
-                        <span className="font-semibold">Nhà cung cấp:</span> {vendorData?.name || 'Đang tải...'}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-2">
-                        <strong>Lưu ý:</strong> Chỉ có thể tạo 1 báo giá duy nhất từ RFQ này. 
-                        Danh mục sản phẩm và số lượng được tham chiếu từ RFQ và không thể thay đổi.
+                <div className="mb-4">
+                    <p className="text-base text-gray-700">
+                        <span className="text-lg font-bold text-gray-800">Nhà cung cấp:</span> {vendorData?.name || 'Đang tải...'}
                     </p>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6">
                 {/* Quotation Information */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                     <h2 className="text-lg font-semibold text-gray-800 mb-4">Thông tin báo giá</h2>
@@ -632,7 +625,7 @@ const VendorQuotationForm = () => {
                             )}
                         </div>
 
-                        {/* Quotation Date - Ngày tạo (không cho sửa) */}
+                        {/* Quotation Date - Ngày tạo */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Ngày tạo
@@ -704,11 +697,25 @@ const VendorQuotationForm = () => {
                             <input
                                 type="number"
                                 value={formData.warrantyMonths || ''}
-                                onChange={(e) => handleInputChange('warrantyMonths', e.target.value ? parseInt(e.target.value) : null)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                min="0"
+                                onChange={(e) => {
+                                    const value = e.target.value ? parseInt(e.target.value) : null;
+                                    if (value !== null && value < 0) {
+                                        setValidationErrors(prev => ({
+                                            ...prev,
+                                            warrantyMonths: 'Thời hạn bảo hành không được âm'
+                                        }));
+                                        return;
+                                    }
+                                    handleInputChange('warrantyMonths', value);
+                                }}
+                                className={`w-full px-3 py-2 border rounded-md ${
+                                    validationErrors.warrantyMonths ? 'border-red-500' : 'border-gray-300'
+                                }`}
                                 placeholder="Số tháng"
                             />
+                            {validationErrors.warrantyMonths && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.warrantyMonths}</p>
+                            )}
                         </div>
 
                         {/* Delivery Terms */}
@@ -761,13 +768,27 @@ const VendorQuotationForm = () => {
                             <input
                                 type="number"
                                 value={formData.headerDiscount}
-                                onChange={(e) => handleInputChange('headerDiscount', parseFloat(e.target.value) || 0)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                min="0"
+                                onChange={(e) => {
+                                    const value = parseFloat(e.target.value) || 0;
+                                    if (value < 0) {
+                                        setValidationErrors(prev => ({
+                                            ...prev,
+                                            headerDiscount: 'Chiết khấu không được âm'
+                                        }));
+                                        return;
+                                    }
+                                    handleInputChange('headerDiscount', value);
+                                }}
+                                className={`w-full px-3 py-2 border rounded-md ${
+                                    validationErrors.headerDiscount ? 'border-red-500' : 'border-gray-300'
+                                }`}
                                 max="100"
                                 step="0.01"
                                 placeholder="VD: 2 (giảm 2%)"
                             />
+                            {validationErrors.headerDiscount && (
+                                <p className="text-red-500 text-sm mt-1">{validationErrors.headerDiscount}</p>
+                            )}
                         </div>
 
                         {/* Shipping Cost */}
@@ -872,24 +893,62 @@ const VendorQuotationForm = () => {
                                             <input
                                                 type="number"
                                                 value={item.discountPercent || 0}
-                                                onChange={(e) => handleItemChange(index, 'discountPercent', parseFloat(e.target.value) || 0)}
-                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                min="0"
+                                                onChange={(e) => {
+                                                    const value = parseFloat(e.target.value) || 0;
+                                                    if (value < 0) {
+                                                        setValidationErrors(prev => ({
+                                                            ...prev,
+                                                            [`item_${index}_discountPercent`]: 'Chiết khấu không được âm'
+                                                        }));
+                                                        return;
+                                                    }
+                                                    setValidationErrors(prev => {
+                                                        const newErrors = {...prev};
+                                                        delete newErrors[`item_${index}_discountPercent`];
+                                                        return newErrors;
+                                                    });
+                                                    handleItemChange(index, 'discountPercent', value);
+                                                }}
+                                                className={`w-24 px-2 py-1 border rounded text-sm ${
+                                                    validationErrors[`item_${index}_discountPercent`] ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                                 max="100"
                                                 step="0.01"
                                             />
+                                            {validationErrors[`item_${index}_discountPercent`] && (
+                                                <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_discountPercent`]}</p>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <input
                                                 type="number"
                                                 value={item.taxRate || 0}
-                                                onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
-                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                min="0"
+                                                onChange={(e) => {
+                                                    const value = parseFloat(e.target.value) || 0;
+                                                    if (value < 0) {
+                                                        setValidationErrors(prev => ({
+                                                            ...prev,
+                                                            [`item_${index}_taxRate`]: 'Thuế không được âm'
+                                                        }));
+                                                        return;
+                                                    }
+                                                    setValidationErrors(prev => {
+                                                        const newErrors = {...prev};
+                                                        delete newErrors[`item_${index}_taxRate`];
+                                                        return newErrors;
+                                                    });
+                                                    handleItemChange(index, 'taxRate', value);
+                                                }}
+                                                className={`w-24 px-2 py-1 border rounded text-sm ${
+                                                    validationErrors[`item_${index}_taxRate`] ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                                 max="100"
                                                 step="0.01"
                                                 disabled={formData.isTaxIncluded}
                                             />
+                                            {validationErrors[`item_${index}_taxRate`] && (
+                                                <p className="text-red-500 text-xs mt-1">{validationErrors[`item_${index}_taxRate`]}</p>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <input

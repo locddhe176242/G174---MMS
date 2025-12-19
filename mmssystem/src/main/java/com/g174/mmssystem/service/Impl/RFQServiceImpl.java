@@ -46,8 +46,8 @@ public class RFQServiceImpl implements IRFQService {
 
     @Override
     @Transactional
-    public RFQResponseDTO createRFQ(RFQRequestDTO dto, Integer createdById) {
-        log.info("Creating RFQ for Requisition ID: {}", dto.getRequisitionId());
+    public RFQResponseDTO createRFQ(RFQRequestDTO dto, Integer createdById, boolean sendEmail) {
+        log.info("Creating RFQ for Requisition ID: {}, sendEmail: {}", dto.getRequisitionId(), sendEmail);
 
         // Validate and load entities
         PurchaseRequisition requisition = null;
@@ -178,8 +178,8 @@ public class RFQServiceImpl implements IRFQService {
         RFQ savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
                 .orElse(saved);
 
-        // Send email notifications to vendors
-        if (!vendorsToNotify.isEmpty()) {
+        // Send email notifications to vendors only if sendEmail is true
+        if (sendEmail && !vendorsToNotify.isEmpty()) {
             try {
                 emailService.sendRFQInvitationsToVendors(savedWithRelations, vendorsToNotify);
                 log.info("Email notifications sent to {} vendors for RFQ {}", vendorsToNotify.size(), saved.getRfqNo());
@@ -196,6 +196,8 @@ public class RFQServiceImpl implements IRFQService {
                 // Don't fail the RFQ creation if email sending fails
                 // RFQ will remain in Draft status if email fails
             }
+        } else {
+            log.info("Email sending skipped for RFQ {} (sendEmail={})", saved.getRfqNo(), sendEmail);
         }
 
         log.info("RFQ created successfully with ID: {} and number: {}", saved.getRfqId(), saved.getRfqNo());
@@ -254,8 +256,8 @@ public class RFQServiceImpl implements IRFQService {
 
     @Override
     @Transactional
-    public RFQResponseDTO updateRFQ(Integer rfqId, RFQRequestDTO dto, Integer updatedById) {
-        log.info("Updating RFQ ID: {}", rfqId);
+    public RFQResponseDTO updateRFQ(Integer rfqId, RFQRequestDTO dto, Integer updatedById, boolean sendEmail) {
+        log.info("Updating RFQ ID: {}, sendEmail: {}", rfqId, sendEmail);
 
         RFQ rfq = rfqRepository.findById(rfqId)
                 .filter(r -> r.getDeletedAt() == null)
@@ -365,8 +367,8 @@ public class RFQServiceImpl implements IRFQService {
         RFQ savedWithRelations = rfqRepository.findByIdWithRelations(saved.getRfqId())
                 .orElse(saved);
 
-        // Send email notifications to newly added vendors only
-        if (!newVendorsToNotify.isEmpty()) {
+        // Send email notifications to newly added vendors only if sendEmail is true
+        if (sendEmail && !newVendorsToNotify.isEmpty()) {
             try {
                 emailService.sendRFQInvitationsToVendors(savedWithRelations, newVendorsToNotify);
                 log.info("Email notifications sent to {} new vendors for updated RFQ {}", 
@@ -385,6 +387,9 @@ public class RFQServiceImpl implements IRFQService {
                 log.error("Failed to send email notifications for updated RFQ {}: {}", 
                         saved.getRfqNo(), e.getMessage(), e);
             }
+        } else {
+            log.info("Email sending skipped for RFQ {} (sendEmail={}, newVendors={})", 
+                    saved.getRfqNo(), sendEmail, newVendorsToNotify.size());
         }
 
         log.info("RFQ updated successfully");

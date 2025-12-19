@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { getCustomerDetail } from "../../api/customerService";
+import PermissionGuard from "../PermissionGuard";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">

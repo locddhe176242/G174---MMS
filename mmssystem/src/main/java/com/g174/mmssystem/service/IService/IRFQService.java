@@ -8,7 +8,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface IRFQService {
-    RFQResponseDTO createRFQ(RFQRequestDTO dto, Integer createdById);
+    RFQResponseDTO createRFQ(RFQRequestDTO dto, Integer createdById, boolean sendEmail);
     
     RFQResponseDTO getRFQById(Integer rfqId);
     
@@ -22,7 +22,7 @@ public interface IRFQService {
     
     List<RFQResponseDTO> getRFQsByRequisitionId(Long requisitionId);
     
-    RFQResponseDTO updateRFQ(Integer rfqId, RFQRequestDTO dto, Integer updatedById);
+    RFQResponseDTO updateRFQ(Integer rfqId, RFQRequestDTO dto, Integer updatedById, boolean sendEmail);
     
     RFQResponseDTO updateRFQStatus(Integer rfqId, com.g174.mmssystem.entity.RFQ.RFQStatus status);
     

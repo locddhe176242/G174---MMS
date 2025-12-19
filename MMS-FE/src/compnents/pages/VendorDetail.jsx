@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { vendorService } from "../../api/vendorService";
 import { translatePOStatus, translateApprovalStatus, getStatusColor } from "../../utils/translations";
+import PermissionGuard from "../PermissionGuard";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">

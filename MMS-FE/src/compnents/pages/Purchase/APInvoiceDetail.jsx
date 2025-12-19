@@ -56,6 +56,7 @@ export default function APInvoiceDetail() {
     const map = {
       Unpaid: { label: "Chưa thanh toán", color: "bg-red-100 text-red-800" },
       "Partially Paid": { label: "Thanh toán một phần", color: "bg-yellow-100 text-yellow-800" },
+      "Partially_Paid": { label: "Thanh toán một phần", color: "bg-yellow-100 text-yellow-800" },
       Paid: { label: "Đã thanh toán", color: "bg-green-100 text-green-800" },
       Cancelled: { label: "Đã hủy", color: "bg-gray-100 text-gray-800" },
     };
@@ -179,22 +180,7 @@ export default function APInvoiceDetail() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              {(data.status === "Unpaid" || data.status === "Chưa thanh toán") && balanceAmount === totalAmount && id ? (
-                <button
-                  onClick={() => navigate(`/purchase/ap-invoices/${id}/edit`)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Chỉnh sửa
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
-                  title={!id ? "ID không hợp lệ" : "Không thể chỉnh sửa hóa đơn đã thanh toán hoặc đã có payment"}
-                >
-                  Chỉnh sửa
-                </button>
-              )}
+              {/* Nút chỉnh sửa đã bị ẩn - không cho sửa hóa đơn sau khi tạo */}
             </div>
           </div>
         </div>
@@ -472,19 +458,31 @@ export default function APInvoiceDetail() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {data.payments.map((payment, idx) => (
+                    {data.payments.map((payment, idx) => {
+                      // Translate payment method to Vietnamese
+                      const translateMethod = (method) => {
+                        const methodMap = {
+                          'Cash': 'Tiền mặt',
+                          'Bank_Transfer': 'Chuyển khoản',
+                          'Credit_Card': 'Thẻ tín dụng',
+                          'Check': 'Séc'
+                        };
+                        return methodMap[method] || method || 'Chuyển khoản';
+                      };
+
+                      return (
                       <div key={payment.apPaymentId || idx} className="flex justify-between items-start p-3 bg-gray-50 rounded border text-sm">
                         <div>
                           <div className="font-medium">{formatCurrency(payment.amount)}</div>
                           <div className="text-gray-500 text-xs mt-1">
-                            {payment.method || "Chuyển khoản"} - {formatDate(payment.paymentDate)}
+                            {translateMethod(payment.method)} - {formatDate(payment.paymentDate)}
                           </div>
-                          {payment.referenceNo && (
+                          {payment.method !== 'Cash' && payment.referenceNo && (
                             <div className="text-gray-500 text-xs">Ref: {payment.referenceNo}</div>
                           )}
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>

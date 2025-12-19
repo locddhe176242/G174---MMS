@@ -45,7 +45,24 @@ public class GoodsReceiptMapper {
             // New flow: Direct PO → GR
             if (receipt.getPurchaseOrder() != null) {
                 builder.orderId(receipt.getPurchaseOrder().getOrderId())
-                       .poNo(receipt.getPurchaseOrder().getPoNo());
+                       .poNo(receipt.getPurchaseOrder().getPoNo())
+                       .poStatus(receipt.getPurchaseOrder().getApprovalStatus() != null 
+                           ? receipt.getPurchaseOrder().getApprovalStatus().name() 
+                           : null);
+                
+                // Calculate progress for partial delivery tracking
+                if (receipt.getPurchaseOrder().getItems() != null && !receipt.getPurchaseOrder().getItems().isEmpty()) {
+                    int totalExpected = receipt.getPurchaseOrder().getItems().stream()
+                            .mapToInt(poi -> poi.getQuantity() != null ? poi.getQuantity().intValue() : 0)
+                            .sum();
+                    
+                    int totalReceived = receipt.getPurchaseOrder().getItems().stream()
+                            .mapToInt(poi -> poi.getReceivedQty() != null ? poi.getReceivedQty().intValue() : 0)
+                            .sum();
+                    
+                    builder.totalExpectedQty(totalExpected)
+                           .totalReceivedQty(totalReceived);
+                }
             }
         }
 
