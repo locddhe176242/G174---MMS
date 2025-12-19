@@ -108,14 +108,9 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã có hóa đơn");
         }
 
-        // Nếu đã gửi khách (Approved) và không phải Manager -> chặn
+        // Nếu đã gửi khách (Approved) -> không cho sửa (kể cả Manager)
         if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
-            boolean isManager = isManager();
-            if (!isManager) {
-                throw new IllegalStateException("Đơn hàng đã gửi khách, chỉ Manager mới được sửa.");
-            }
-            log.warn("Manager {} đang chỉnh sửa đơn hàng đã gửi khách: {}",
-                    getCurrentUser().getEmail(), order.getSoNo());
+            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã gửi khách.");
         }
 
         Customer customer = getCustomer(request.getCustomerId());
@@ -250,13 +245,9 @@ public class SalesOrderServiceImpl implements ISalesOrderService {
             throw new IllegalStateException("Không thể xóa đơn hàng đã có hóa đơn");
         }
 
-        // Nếu đã gửi khách (Approved) và không phải Manager -> chặn
+        // Nếu đã gửi khách (Approved) -> không cho xóa (kể cả Manager)
         if (order.getApprovalStatus() == SalesOrder.ApprovalStatus.Approved) {
-            if (!isManager) {
-                throw new IllegalStateException("Đơn hàng đã gửi khách, chỉ Manager mới được xóa.");
-            }
-            log.warn("Manager {} đang xóa đơn hàng đã gửi khách: {}",
-                    getCurrentUser().getEmail(), order.getSoNo());
+            throw new IllegalStateException("Không thể xóa đơn hàng đã gửi khách.");
         }
 
         order.setDeletedAt(Instant.now());

@@ -128,11 +128,8 @@ public class DeliveryServiceImpl implements IDeliveryService {
                 throw new IllegalStateException("Không thể sửa kho khi phiếu giao hàng đã xuất kho.");
             }
         } else if (delivery.getStatus() == Delivery.DeliveryStatus.Picked) {
-            // Picked: chỉ cho phép sửa notes, không sửa items
-            if (request.getItems() != null && !request.getItems().isEmpty()) {
-                throw new IllegalStateException(
-                        "Không thể sửa sản phẩm khi phiếu giao hàng đã được submit cho kho. Chỉ có thể cập nhật ghi chú.");
-            }
+            // Picked: không cho sửa nữa
+            throw new IllegalStateException("Không thể chỉnh sửa phiếu giao hàng đang chuẩn bị hàng.");
         }
 
         Warehouse warehouse = getWarehouse(request.getWarehouseId());
@@ -205,8 +202,12 @@ public class DeliveryServiceImpl implements IDeliveryService {
     public void deleteDelivery(Integer id) {
         Delivery delivery = getDeliveryEntity(id);
 
-        // Check: Không cho xóa khi Delivered, hoặc Manager có thể xóa khi
-        // Shipped/Delivered
+        // Không cho xóa khi đang chuẩn bị hàng
+        if (delivery.getStatus() == Delivery.DeliveryStatus.Picked) {
+            throw new IllegalStateException("Không thể xóa phiếu giao hàng đang chuẩn bị hàng.");
+        }
+
+        // Check: Không cho xóa khi Delivered, hoặc Manager có thể xóa khi Shipped/Delivered
         if (delivery.getStatus() == Delivery.DeliveryStatus.Delivered) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             boolean isManager = authentication != null &&

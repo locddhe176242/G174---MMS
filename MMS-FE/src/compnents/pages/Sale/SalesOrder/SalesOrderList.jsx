@@ -99,11 +99,7 @@ export default function SalesOrderList() {
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter((order) => {
-      // Ẩn các đơn đã giao hết hàng và đã có hóa đơn tương ứng
-      if (order.isFullyDelivered && order.hasInvoice) {
-        return false;
-      }
-
+      // Không ẩn đơn đã giao hết / đã có hóa đơn nữa, chỉ lọc theo từ khóa + trạng thái
       const matchesKeyword =
         !term ||
         (order.orderNo || "").toLowerCase().includes(term) ||
@@ -333,12 +329,10 @@ export default function SalesOrderList() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          {/* Không cho sửa/xóa khi đơn đã có Delivery hoặc AR Invoice */}
+                          {/* Chỉ cho sửa/xóa khi đơn còn Draft, chưa có Delivery và chưa có AR Invoice */}
                           {!order.hasDelivery &&
                             !order.hasInvoice &&
-                            (order.approvalStatus === "Draft" ||
-                              (order.approvalStatus === "Approved" &&
-                                (hasRole("MANAGER") || hasRole("ROLE_MANAGER")))) && (
+                            order.approvalStatus === "Draft" && (
                               <>
                                 <button
                                   onClick={() =>

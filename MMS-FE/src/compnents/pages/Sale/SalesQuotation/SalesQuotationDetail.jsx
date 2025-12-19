@@ -19,6 +19,7 @@ const formatDateTime = (value) =>
 const STATUS_LABELS = {
   Draft: "Nháp",
   Active: "Đang mở",
+  Converted: "Đã chuyển đơn",
   Cancelled: "Đã hủy",
   Expired: "Hết hạn",
 };
@@ -158,12 +159,15 @@ export default function SalesQuotationDetail() {
             </div>
             <div className="flex-1"></div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate(`/sales/quotations/${id}/edit`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Chỉnh sửa
-              </button>
+              {/* Chỉ cho chỉnh sửa khi báo giá chưa Converted (ví dụ Draft/Active) */}
+              {data.status !== "Converted" && (
+                <button
+                  onClick={() => navigate(`/sales/quotations/${id}/edit`)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Chỉnh sửa
+                </button>
+              )}
               {data.status === "Draft" && (
                 <button
                   onClick={handleSendToCustomer}

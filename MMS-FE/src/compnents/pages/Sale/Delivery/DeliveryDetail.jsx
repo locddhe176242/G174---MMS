@@ -103,6 +103,7 @@ export default function DeliveryDetail() {
 
   const nextStatus = getNextStatus(data.status);
   const canChangeStatus = data.status !== "Delivered" && data.status !== "Cancelled";
+  const canEdit = data.status === "Draft";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -125,7 +126,7 @@ export default function DeliveryDetail() {
               </p>
             </div>
             <div className="flex-1"></div>
-            {canChangeStatus && (
+            {canEdit && (
               <button
                 onClick={() => navigate(`/sales/deliveries/${id}/edit`)}
                 className="px-4 py-2 border rounded-lg hover:bg-gray-100"

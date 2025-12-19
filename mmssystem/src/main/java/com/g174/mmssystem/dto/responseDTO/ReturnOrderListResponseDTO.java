@@ -13,6 +13,7 @@ public class ReturnOrderListResponseDTO {
     private Integer roId;
     private String returnNo;
     private ReturnOrder.ReturnStatus status;
+    private ReturnOrder.GoodsReceiptStatus goodsReceiptStatus;
 
     private Integer deliveryId;
     private String deliveryNo;

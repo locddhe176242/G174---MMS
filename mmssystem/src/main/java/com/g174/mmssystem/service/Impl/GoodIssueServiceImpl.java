@@ -254,23 +254,11 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                 .filter(i -> i.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Good Issue not found with ID: " + issueId));
 
-        // Check: Chỉ cho phép sửa khi Draft, hoặc Manager có thể sửa khi Approved
+        // Không cho phép sửa khi phiếu đã được phê duyệt
         if (issue.getStatus() == GoodIssue.GoodIssueStatus.Approved) {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null &&
-                    authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-
-            if (!isManager) {
-                throw new IllegalStateException("Không thể chỉnh sửa phiếu xuất kho đã được phê duyệt. Chỉ Manager mới có quyền sửa.");
-            }
-
-            User currentUser = userRepository.findById(updatedById)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + updatedById));
-            log.warn("Manager {} đang chỉnh sửa phiếu xuất kho đã được phê duyệt: {}",
-                    currentUser.getEmail(), issue.getIssueNo());
-        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft && issue.getStatus() != GoodIssue.GoodIssueStatus.Approved) {
-            throw new IllegalStateException("Chỉ có thể chỉnh sửa phiếu xuất kho ở trạng thái Nháp hoặc Đã duyệt (Manager)");
+            throw new IllegalStateException("Không thể chỉnh sửa phiếu xuất kho đã được phê duyệt.");
+        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft) {
+            throw new IllegalStateException("Chỉ có thể chỉnh sửa phiếu xuất kho ở trạng thái Nháp.");
         }
 
         // Update basic fields
@@ -473,24 +461,12 @@ public class GoodIssueServiceImpl implements IGoodIssueService {
                 .filter(i -> i.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Good Issue not found with ID: " + issueId));
 
-        // Validate: Chỉ cho phép xóa khi Draft, hoặc Manager có thể xóa khi Approved
+        // Validate: Chỉ cho phép xóa khi còn trạng thái Nháp
         if (issue.getStatus() == GoodIssue.GoodIssueStatus.Approved) {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean isManager = authentication != null &&
-                    authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
-
-            if (!isManager) {
-                throw new IllegalStateException("Không thể xóa phiếu xuất kho đã được phê duyệt. Chỉ Manager mới có quyền xóa.");
-            }
-
-            User currentUser = userRepository.findByEmail(
-                            SecurityContextHolder.getContext().getAuthentication().getName())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            log.warn("Manager {} đang xóa phiếu xuất kho đã được phê duyệt: {}",
-                    currentUser.getEmail(), issue.getIssueNo());
-        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft && issue.getStatus() != GoodIssue.GoodIssueStatus.Approved) {
-            throw new IllegalStateException("Chỉ có thể xóa phiếu xuất kho ở trạng thái Nháp hoặc Đã duyệt (Manager)");
+            log.warn("Attempt to delete approved good issue with ID: {}", issueId);
+            throw new IllegalStateException("Không thể xóa phiếu xuất kho đã được phê duyệt.");
+        } else if (issue.getStatus() != GoodIssue.GoodIssueStatus.Draft) {
+            throw new IllegalStateException("Chỉ có thể xóa phiếu xuất kho ở trạng thái Nháp.");
         }
 
         issue.setDeletedAt(LocalDateTime.now());
