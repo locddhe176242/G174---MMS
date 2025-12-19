@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faImage, faFloppyDisk, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faImage, faFloppyDisk, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { getCategories } from '../../../api/categoryService';
-import { updateProduct, uploadProductImage } from '../../../api/productService';
+import { getProductById, updateProduct, uploadProductImage } from '../../../api/productService';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -30,51 +31,69 @@ const getImageUrl = (imageUrl) => {
     return `http://localhost:8080${imageUrl}`;
 };
 
-const ProductEdit = ({ product, onClose, onSave }) => {
+const ProductEdit = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [product, setProduct] = useState(null);
     const [formData, setFormData] = useState({
-        name: product?.name || '',
-
-        description: product?.description || '',
-        purchasePrice: product?.purchasePrice || '',
-        sellingPrice: product?.sellingPrice || '',
-        categoryId: product?.categoryId ? String(product.categoryId) : '',
-        uom: product?.uom || '',
-        size: product?.size || '',
-        status: product?.status || 'IN_STOCK',
-        imageUrl: product?.imageUrl || product?.image_url || null,
+        name: '',
+        description: '',
+        purchasePrice: '',
+        sellingPrice: '',
+        categoryId: '',
+        uom: '',
+        size: '',
+        status: 'IN_STOCK',
+        imageUrl: null,
         imageFile: null, // Lưu file object để upload
-        sku: product?.sku || ''
+        sku: ''
     });
 
     // ============ State ============
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
 
     // ============ Effects ============
     useEffect(() => {
-        const fetchCategories = async () => {
+        const fetchProductAndCategories = async () => {
             try {
-                const data = await getCategories();
-                setCategories(data || []);
+                setFetching(true);
+                // Fetch product data
+                const productData = await getProductById(id);
+                setProduct(productData);
+                
+                // Set form data from product
+                setFormData({
+                    name: productData?.name || '',
+                    description: productData?.description || '',
+                    purchasePrice: productData?.purchasePrice || '',
+                    sellingPrice: productData?.sellingPrice || '',
+                    categoryId: productData?.categoryId ? String(productData.categoryId) : '',
+                    uom: productData?.uom || '',
+                    size: productData?.size || '',
+                    status: productData?.status || 'IN_STOCK',
+                    imageUrl: productData?.imageUrl || productData?.image_url || null,
+                    imageFile: null,
+                    sku: productData?.sku || ''
+                });
 
-                if (product?.categoryId) {
-                    const catExists = data.find(
-                        (c) => c.categoryId === Number(product.categoryId)
-                    );
-                    if (catExists) {
-                        setFormData((prev) => ({
-                            ...prev,
-                            categoryId: String(product.categoryId),
-                        }));
-                    }
-                }
+                // Fetch categories
+                const categoriesData = await getCategories();
+                setCategories(categoriesData || []);
             } catch (error) {
-                console.error(' Lỗi khi tải danh mục:', error);
-                toast.error('Không thể tải danh mục sản phẩm!');
+                console.error('Lỗi khi tải sản phẩm:', error);
+                toast.error('Không thể tải thông tin sản phẩm!');
+                navigate('/products');
+            } finally {
+                setFetching(false);
             }
         };
-        fetchCategories();
-    }, [product]);
+
+        if (id) {
+            fetchProductAndCategories();
+        }
+    }, [id, navigate]);
 
     // ============ Event Handlers ============
     /**
@@ -136,15 +155,6 @@ const ProductEdit = ({ product, onClose, onSave }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            // Kiểm tra productId trước khi gọi API
-            const productId = product?.productId || product?.id || product?.product_id;
-            if (!productId) {
-                console.error('ID sản phẩm không tồn tại:', product);
-                toast.error('Không tìm thấy ID sản phẩm!');
-                setLoading(false);
-                return;
-            }
-            
             // Chuẩn hóa dữ liệu trước khi gửi - chỉ gửi field có giá trị (UPDATE chỉ cần field cần update)
             const payload = {};
             
@@ -200,13 +210,13 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                 // Nếu là base64, bỏ qua (không gửi)
             }
             
-            if (formData.status) payload.status = formData.status;
+            // Không cho cập nhật trạng thái
+            // if (formData.status) payload.status = formData.status;
             
             console.log('Dữ liệu gửi đi:', payload);
-            const response = await updateProduct(productId, payload);
+            const response = await updateProduct(id, payload);
             toast.success('Cập nhật sản phẩm thành công!');
-            onSave(response);
-            onClose();
+            navigate('/products');
         } catch (error) {
             console.error('Lỗi khi cập nhật sản phẩm:', error);
             console.error('Phản hồi lỗi:', error?.response?.data);
@@ -257,15 +267,33 @@ const ProductEdit = ({ product, onClose, onSave }) => {
     };
 
     // ============ Render ============
+    if (fetching) {
+        return (
+            <div className="p-6 flex items-center justify-center min-h-screen">
+                <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-blue-500" />
+            </div>
+        );
+    }
+
+    if (!product) {
+        return null;
+    }
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-            <div className="bg-white rounded-lg p-6 w-full max-w-5xl my-8 mx-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-slate-800">Chỉnh sửa sản phẩm</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                        <FontAwesomeIcon icon={faXmark} className="w-6 h-6" />
+        <div className="p-6">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/products')}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                    >
+                        ← Quay lại
                     </button>
+                    <h1 className="text-2xl font-semibold">Chỉnh sửa sản phẩm</h1>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
 
             <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
@@ -337,16 +365,13 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                            <select
+                            <input
+                                type="text"
                                 name="status"
-                                value={formData.status}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
-                            >
-                                <option value="IN_STOCK">Còn hàng</option>
-                                <option value="OUT_OF_STOCK">Hết hàng</option>
-                                <option value="DISCONTINUED">Ngừng kinh doanh</option>
-                            </select>
+                                value={formData.status === 'IN_STOCK' ? 'Còn hàng' : formData.status === 'OUT_OF_STOCK' ? 'Hết hàng' : 'Ngừng kinh doanh'}
+                                disabled
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-gray-100 cursor-not-allowed"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Giá bán</label>
@@ -446,7 +471,7 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => navigate('/products')}
                         disabled={loading}
                         className="group px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 transition-all duration-200 hover:scale-105 hover:shadow-sm disabled:hover:scale-100"
                     >
@@ -454,8 +479,8 @@ const ProductEdit = ({ product, onClose, onSave }) => {
                     </button>
                 </div>
             </form>
+            </div>
         </div>
-    </div>
     );
 };
 

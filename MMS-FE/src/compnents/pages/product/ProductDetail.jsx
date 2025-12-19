@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faFileText } from '@fortawesome/free-solid-svg-icons';
+import { faFileText, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { getProductById } from '../../../api/productService';
+import { toast } from 'react-toastify';
 
 /**
  * Helper function để xử lý image URL (giống UserProfile)
@@ -26,18 +29,59 @@ const getImageUrl = (imageUrl) => {
     return `http://localhost:8080${imageUrl}`;
 };
 
-const ProductDetail = ({ product, onClose }) => {
-    if (!product) return null;
+const ProductDetail = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchProduct = async () => {
+            try {
+                setLoading(true);
+                const data = await getProductById(id);
+                setProduct(data);
+            } catch (error) {
+                console.error('Lỗi khi tải sản phẩm:', error);
+                toast.error('Không thể tải thông tin sản phẩm!');
+                navigate('/products');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) {
+            fetchProduct();
+        }
+    }, [id, navigate]);
+
+    if (loading) {
+        return (
+            <div className="p-6 flex items-center justify-center min-h-screen">
+                <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-blue-500" />
+            </div>
+        );
+    }
+
+    if (!product) {
+        return null;
+    }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-            <div className="bg-white rounded-lg p-6 w-full max-w-5xl my-8 mx-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-slate-800">Chi tiết sản phẩm</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                        <FontAwesomeIcon icon={faXmark} className="w-6 h-6" />
+        <div className="p-6">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/products')}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                    >
+                        ← Quay lại
                     </button>
+                    <h1 className="text-2xl font-semibold">Chi tiết sản phẩm</h1>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
 
                 <div className="bg-slate-50 rounded-lg p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -104,14 +148,6 @@ const ProductDetail = ({ product, onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 mt-6 pt-4 border-t">
-                    <button
-                        onClick={onClose}
-                        className="group px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all duration-200 hover:scale-105 hover:shadow-sm"
-                    >
-                        <span className="group-hover:font-medium transition-all duration-200">Đóng</span>
-                    </button>
-                </div>
             </div>
         </div>
     );

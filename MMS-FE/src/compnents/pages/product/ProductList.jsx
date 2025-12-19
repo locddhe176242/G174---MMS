@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBox, faList, faPlus, faSearch, faSpinner, faEdit, faEye, faTrash, faXmark, faFloppyDisk, faFilter, faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import ProductDetail from './ProductDetail';
-import ProductEdit from './ProductEdit';
-import ProductAdd from './ProductAdd';
 import Pagination from '../../common/Pagination';
 import { getProducts, updateProduct, deleteProduct } from '../../../api/productService'
 import { getCategories } from '../../../api/categoryService'; 
@@ -11,6 +9,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const ProductList = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(null);
@@ -139,46 +138,28 @@ const ProductList = () => {
   };
 
   /**
-   * Mở modal xem chi tiết sản phẩm
+   * Điều hướng đến trang chi tiết sản phẩm
    */
   const handleViewDetail = (product) => {
-    setSelectedProduct(product);
-    setCurrentScreen("detail");
+    const productId = product.productId || product.id || product.product_id;
+    navigate(`/products/${productId}`);
   };
 
   // ============ Add Functions (Thêm) ============
   /**
-   * Mở modal thêm sản phẩm mới
+   * Điều hướng đến trang thêm sản phẩm mới
    */
   const handleAdd = () => {
-    setCurrentScreen("add");
-  };
-
-  /**
-   * Xử lý sau khi thêm sản phẩm mới thành công
-   * Đóng modal và tải lại danh sách sản phẩm
-   */
-  const handleSaveAdd = async (newProduct) => {
-    handleClose();
-    await fetchProducts();
+    navigate('/products/new');
   };
 
   // ============ Update Functions (Cập nhật) ============
   /**
-   * Mở modal chỉnh sửa sản phẩm
+   * Điều hướng đến trang chỉnh sửa sản phẩm
    */
   const handleEdit = (product) => {
-    setSelectedProduct(product);
-    setCurrentScreen("edit");
-  };
-
-  /**
-   * Xử lý sau khi cập nhật sản phẩm thành công
-   * Đóng modal và tải lại danh sách sản phẩm
-   */
-  const handleSaveEdit = async (updatedProduct) => {
-    handleClose();
-    await fetchProducts();
+    const productId = product.productId || product.id || product.product_id;
+    navigate(`/products/${productId}/edit`);
   };
 
   // ============ Delete Functions (Xóa) ============
@@ -410,23 +391,7 @@ const ProductList = () => {
       )}
 
       {/* Modals */}
-      {currentScreen === 'detail' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <ProductDetail product={selectedProduct} onClose={handleClose} />
-        </div>
-      )}
 
-      {currentScreen === 'edit' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <ProductEdit product={selectedProduct} onClose={handleClose} onSave={handleSaveEdit} />
-        </div>
-      )}
-
-      {currentScreen === 'add' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <ProductAdd onClose={handleClose} onSave={handleSaveAdd} />
-        </div>
-      )}
     </div>
   );
 };

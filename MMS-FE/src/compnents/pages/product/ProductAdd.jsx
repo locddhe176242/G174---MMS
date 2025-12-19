@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faUpload, faImage, faPlus, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
+import { faImage, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
 import { getCategories } from '../../../api/categoryService';
 import { createProduct, uploadProductImage } from '../../../api/productService';
 import { toast } from 'react-toastify';
@@ -29,7 +30,8 @@ const getImageUrl = (imageUrl) => {
     return `http://localhost:8080${imageUrl}`;
 };
 
-const ProductAdd = ({ onClose, onSave }) => {
+const ProductAdd = () => {
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -38,7 +40,7 @@ const ProductAdd = ({ onClose, onSave }) => {
         categoryId: '',
         uom: '',
         size: '',
-        status: 'IN_STOCK',
+        status: 'OUT_OF_STOCK',
         image_url: null,
         imageFile: null, // Lưu file object để upload
         sku: ''
@@ -48,7 +50,6 @@ const ProductAdd = ({ onClose, onSave }) => {
 
     // ============ Effects ============
     useEffect(() => {
-        document.body.style.overflow = 'hidden';
         const fetchCategories = async () => {
             try {
                 const data = await getCategories();
@@ -218,8 +219,7 @@ const ProductAdd = ({ onClose, onSave }) => {
       
       const response = await createProduct(newProduct);
       toast.success('Thêm sản phẩm thành công!');
-      onSave(response);
-      onClose();
+      navigate('/products');
     } catch (error) {
       console.error('Lỗi khi tạo sản phẩm:', error);
       console.error('Phản hồi lỗi:', error?.response?.data);
@@ -269,14 +269,20 @@ const ProductAdd = ({ onClose, onSave }) => {
 
     // ============ Render ============
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-            <div className="bg-white rounded-lg p-6 w-full max-w-5xl my-8 mx-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-slate-800">Thêm sản phẩm mới</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-                        <FontAwesomeIcon icon={faXmark} className="w-6 h-6" />
+        <div className="p-6">
+            <div className="mb-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/products')}
+                        className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                    >
+                        ← Quay lại
                     </button>
+                    <h1 className="text-2xl font-semibold">Thêm sản phẩm mới</h1>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
 
             <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
@@ -361,16 +367,13 @@ const ProductAdd = ({ onClose, onSave }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                            <select
+                            <input
+                                type="text"
                                 name="status"
-                                value={formData.status}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue"
-                            >
-                                <option value="IN_STOCK">Còn hàng</option>
-                                <option value="OUT_OF_STOCK">Hết hàng</option>
-                                <option value="DISCONTINUED">Ngừng kinh doanh</option>
-                            </select>
+                                value={formData.status === 'IN_STOCK' ? 'Còn hàng' : formData.status === 'OUT_OF_STOCK' ? 'Hết hàng' : 'Ngừng kinh doanh'}
+                                disabled
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-gray-100 cursor-not-allowed"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Giá bán</label>
@@ -469,15 +472,15 @@ const ProductAdd = ({ onClose, onSave }) => {
                     </button>
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => navigate('/products')}
                         className="group px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all duration-200 hover:scale-105 hover:shadow-sm"
                     >
                         <span className="group-hover:font-medium transition-all duration-200">Hủy</span>
                     </button>
                 </div>
             </form>
+            </div>
         </div>
-    </div>
     );
 };
 
