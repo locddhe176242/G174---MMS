@@ -1,23 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faSearch, faPlus, faEye, faEdit, faTrash, faSpinner, faTag, faFileDownload, faUndo
+    faSearch, faSpinner, faUndo
 } from '@fortawesome/free-solid-svg-icons';
-import CategoryDetail from './CategoryDetail';
-import CategoryEdit from './CategoryEdit';
-import CategoryAdd from './CategoryAdd';
 import { getCategories, getDeletedCategories, deleteCategory, restoreCategory } from '../../../api/categoryService';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const CategoryList = () => {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeFilter, setActiveFilter] = useState('active'); 
 
@@ -56,34 +54,16 @@ const CategoryList = () => {
     return matchFilter && matchSearch;
   });
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedCategories(filteredCategories.map((c) => c.categoryId));
-    } else {
-      setSelectedCategories([]);
-    }
-  };
-
-  const handleSelectCategory = (categoryId) => {
-    setSelectedCategories((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
-
   const handleViewDetail = (category) => {
-    setSelectedCategory(category);
-    setCurrentScreen("detail");
+    navigate(`/categories/${category.categoryId}`);
   };
 
   const handleEdit = (category) => {
-    setSelectedCategory(category);
-    setCurrentScreen("edit");
+    navigate(`/categories/${category.categoryId}/edit`);
   };
 
   const handleAdd = () => {
-    setCurrentScreen("add");
+    navigate('/categories/new');
   };
 
   const handleDelete = async (categoryId) => {
@@ -145,15 +125,6 @@ const CategoryList = () => {
     setSelectedCategory(null);
   };
 
-  const handleSaveEdit = async (updatedCategory) => {
-    handleClose();
-    await fetchCategories();
-  };
-
-  const handleSaveAdd = async (newCategory) => {
-    handleClose();
-    await fetchCategories();
-  };
 
   return (
     <div className="p-6">
@@ -175,10 +146,6 @@ const CategoryList = () => {
               onClick={handleAdd}
               className="group flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-blue-600 hover:border-blue-700"
             >
-                          <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
               <span className="group-hover:font-medium transition-all duration-200">Thêm danh mục</span>
             </button>
           </div>
@@ -321,23 +288,6 @@ const CategoryList = () => {
         </div>
       </div>
                 
-      {currentScreen === 'detail' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <CategoryDetail category={selectedCategory} onClose={handleClose} />
-        </div>
-      )}
-
-      {currentScreen === 'edit' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <CategoryEdit category={selectedCategory} onClose={handleClose} onSave={handleSaveEdit} />
-        </div>
-      )}
-
-      {currentScreen === 'add' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <CategoryAdd onClose={handleClose} onSave={handleSaveAdd} />
-        </div>
-      )}
     </div>
   );
 };
