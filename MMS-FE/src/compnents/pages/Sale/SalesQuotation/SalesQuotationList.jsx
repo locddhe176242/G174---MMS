@@ -291,20 +291,10 @@ export default function SalesQuotationList() {
                         {formatDate(quotation.quotationDate)}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {quotation.createdByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.createdAt)}
-                        </div>
+                        {quotation.createdByDisplay || "—"}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {quotation.updatedByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(quotation.updatedAt)}
-                        </div>
+                        {quotation.updatedByDisplay || "—"}
                       </td>
                       <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">
                         {formatCurrency(quotation.totalAmount)}

@@ -157,7 +157,7 @@ export default function PurchaseOrderDetail() {
             setErr(
                 e?.response?.data?.message ||
                 e.message ||
-                "Không thể tải dữ liệu Đơn hàng mua"
+                "Không thể tải dữ liệu Đơn mua hàng"
             );
         } finally {
             setLoading(false);
@@ -277,7 +277,7 @@ export default function PurchaseOrderDetail() {
                                 <FontAwesomeIcon icon={faArrowLeft} />
                             </button>
                             <h1 className="text-2xl font-semibold">
-                                Đơn hàng mua: {data.po_no || data.poNo || `#${id}`}
+                                Đơn mua hàng: {data.po_no || data.poNo || `#${id}`}
                             </h1>
                         </div>
                         <div className="flex items-center gap-2">

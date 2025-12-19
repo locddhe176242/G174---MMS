@@ -512,7 +512,7 @@ export default function PurchaseOrderForm() {
             });
         } catch (err) {
             console.error("Error loading Purchase Order:", err);
-            setError("Không thể tải thông tin Đơn hàng mua");
+            setError("Không thể tải thông tin Đơn mua hàng");
         } finally {
             setLoading(false);
         }
@@ -975,11 +975,11 @@ export default function PurchaseOrderForm() {
 
             if (isEdit) {
                 await purchaseOrderService.updatePurchaseOrder(id, payload, currentUserId);
-                toast.success("Cập nhật Đơn hàng mua thành công!");
+                toast.success("Cập nhật Đơn mua hàng thành công!");
             } else {
                 const response = await purchaseOrderService.createPurchaseOrder(payload, currentUserId);
                 console.log("Create response:", response);
-                toast.success("Tạo Đơn hàng mua thành công!");
+                toast.success("Tạo Đơn mua hàng thành công!");
                 
                 // Close PR after creating PO
                 if (prIdFromQuery) {
@@ -997,7 +997,7 @@ export default function PurchaseOrderForm() {
             console.error("Error object:", err);
             console.error("Response data:", err?.response?.data);
             console.error("Response status:", err?.response?.status);
-            const msg = err?.response?.data?.message || err?.message || (isEdit ? "Không thể cập nhật Đơn hàng mua" : "Không thể tạo Đơn hàng mua");
+            const msg = err?.response?.data?.message || err?.message || (isEdit ? "Không thể cập nhật Đơn mua hàng" : "Không thể tạo Đơn mua hàng");
             setError(msg);
             toast.error(msg);
         } finally {
@@ -1030,7 +1030,7 @@ export default function PurchaseOrderForm() {
                             <FontAwesomeIcon icon={faArrowLeft} />
                         </button>
                         <h1 className="text-2xl font-semibold">
-                            {isEdit ? "Cập nhật Đơn hàng mua" : "Thêm Đơn hàng mua"}
+                            {isEdit ? "Cập nhật Đơn mua hàng" : "Thêm Đơn mua hàng"}
                         </h1>
                         <div className="flex-1"></div>
                         <button

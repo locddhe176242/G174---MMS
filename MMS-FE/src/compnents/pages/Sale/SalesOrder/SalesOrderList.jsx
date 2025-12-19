@@ -311,20 +311,10 @@ export default function SalesOrderList() {
                         {formatDate(order.orderDate)}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {order.createdByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(order.createdAt)}
-                        </div>
+                        {order.createdByDisplay || "—"}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {order.updatedByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(order.updatedAt)}
-                        </div>
+                        {order.updatedByDisplay || "—"}
                       </td>
                       <td className="px-6 py-3 text-sm font-semibold text-right text-gray-900">
                         {formatCurrency(order.totalAmount)}

@@ -274,8 +274,7 @@ export default function ReturnOrderList() {
                           {formatDate(ro.returnDate)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <div>{ro.createdByDisplay || "—"}</div>
-                          <div className="text-xs text-gray-500">{formatDateTime(ro.createdAt)}</div>
+                          {ro.createdByDisplay || "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
                           <div className="flex items-center gap-1">

@@ -304,12 +304,7 @@ export default function SalesReturnInboundOrderList() {
                         {formatDate(row.expectedReceiptDate)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {row.createdByName || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(row.createdAt)}
-                        </div>
+                        {row.createdByName || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <button

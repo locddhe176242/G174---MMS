@@ -308,8 +308,7 @@ export default function InvoiceList() {
                           {formatCurrency(inv.balanceAmount)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <div>{inv.createdByDisplay || "—"}</div>
-                          <div className="text-xs text-gray-500">{formatDateTime(inv.createdAt)}</div>
+                          {inv.createdByDisplay || "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
                           <div className="flex items-center gap-1">

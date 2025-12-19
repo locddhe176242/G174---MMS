@@ -136,7 +136,7 @@ export default function PurchaseOrderList() {
             setTotalElements(response.totalElements || 0);
             setCurrentPage(page);
         } catch (err) {
-            setError("Không thể tải danh sách Đơn hàng mua");
+            setError("Không thể tải danh sách Đơn mua hàng");
             console.error("Error fetching Purchase Orders:", err);
         } finally {
             setLoading(false);
@@ -180,12 +180,12 @@ export default function PurchaseOrderList() {
             await purchaseOrderService.deletePurchaseOrder(
                 orderToDelete.order_id || orderToDelete.orderId || orderToDelete.id
             );
-            toast.success("Xóa Đơn hàng mua thành công!");
+            toast.success("Xóa Đơn mua hàng thành công!");
             setShowDeleteModal(false);
             setOrderToDelete(null);
             fetchOrders(currentPage, searchKeyword, sortField, sortDirection, statusFilter);
         } catch (err) {
-            toast.error(err?.response?.data?.message || "Không thể xóa Đơn hàng mua");
+            toast.error(err?.response?.data?.message || "Không thể xóa Đơn mua hàng");
             console.error("Error deleting Purchase Order:", err);
         } finally {
             setIsDeleting(false);
@@ -217,13 +217,13 @@ export default function PurchaseOrderList() {
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Quản lý Đơn hàng mua</h1>
+                            <h1 className="text-2xl font-bold text-gray-900">Quản lý Đơn mua hàng</h1>
                         </div>
                         <button
                             onClick={() => navigate("/purchase/purchase-orders/new")}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
-                            + Tạo Đơn hàng mua
+                            + Tạo Đơn mua hàng
                         </button>
                     </div>
                 </div>
@@ -237,7 +237,7 @@ export default function PurchaseOrderList() {
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        placeholder="Tìm kiếm Đơn hàng mua..."
+                                        placeholder="Tìm kiếm Đơn mua hàng..."
                                         value={searchKeyword}
                                         onChange={(e) => setSearchKeyword(e.target.value)}
                                         className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -405,10 +405,10 @@ export default function PurchaseOrderList() {
 
                         <div className="text-center">
                             <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Xác nhận xóa Đơn hàng mua
+                                Xác nhận xóa Đơn mua hàng
                             </h3>
                             <p className="text-sm text-gray-500 mb-6">
-                                Bạn có chắc chắn muốn xóa Đơn hàng mua <strong>"{orderToDelete?.po_no || orderToDelete?.poNo}"</strong> không? Hành động này không thể hoàn tác.
+                                Bạn có chắc chắn muốn xóa Đơn mua hàng <strong>"{orderToDelete?.po_no || orderToDelete?.poNo}"</strong> không? Hành động này không thể hoàn tác.
                             </p>
 
                             <div className="flex items-center justify-center gap-3">

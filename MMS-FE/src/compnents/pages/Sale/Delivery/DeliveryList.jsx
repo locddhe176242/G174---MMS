@@ -281,12 +281,7 @@ export default function DeliveryList() {
                         {formatDate(delivery.plannedDate)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        <div className="font-semibold">
-                          {delivery.createdByDisplay || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(delivery.createdAt)}
-                        </div>
+                        {delivery.createdByDisplay || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{delivery.trackingCode || "—"}</td>
                       <td className="px-4 py-3 text-sm text-center">
