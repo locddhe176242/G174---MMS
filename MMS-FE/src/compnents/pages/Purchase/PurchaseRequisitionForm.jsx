@@ -5,6 +5,7 @@ import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+
 import { getCurrentUser } from '../../../api/authService';
 import { getProducts } from '../../../api/productService';
 import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
@@ -205,7 +206,6 @@ const PurchaseRequisitionForm = () => {
                             product_name: item.product_name || item.productName || '',
                             requested_qty: item.requested_qty || item.requestedQty || 1,
                             unit: item.unit || item.uom || '',
-                            delivery_date: item.delivery_date ? new Date(item.delivery_date) : (item.deliveryDate ? new Date(item.deliveryDate) : new Date()),
                             note: item.note || ''
                         }))
                     });
@@ -269,7 +269,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -367,7 +366,29 @@ const PurchaseRequisitionForm = () => {
                     items: newItems
                 };
             });
+            // Clear any quantity validation errors when field is emptied
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[`item_${index}_qty`];
+                return newErrors;
+            });
             return;
+        }
+
+        // Check for negative values immediately
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue < 0) {
+            setValidationErrors(prev => ({
+                ...prev,
+                [`item_${index}_qty`]: 'Số lượng không được là số âm'
+            }));
+        } else if (!isNaN(numValue) && numValue > 0) {
+            // Clear error if value becomes valid
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[`item_${index}_qty`];
+                return newErrors;
+            });
         }
 
         // Allow any value during typing (validation happens on blur)
@@ -406,7 +427,6 @@ const PurchaseRequisitionForm = () => {
             product_name: '',
             requested_qty: 1,
             unit: '',
-            delivery_date: new Date(),
             note: ''
         };
 
@@ -449,7 +469,7 @@ const PurchaseRequisitionForm = () => {
                 return;
             }
 
-            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ngày giao hàng, Ghi chú
+            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ghi chú
             // Skip header row (row 1), start from row 2
             const importedItems = [];
 
@@ -507,12 +527,11 @@ const PurchaseRequisitionForm = () => {
                     return cell.value?.toString() || '';
                 };
 
-                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ngày giao hàng, E=Ghi chú
+                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ghi chú
                 const productNameValue = getCellValue(1);
                 const qtyValue = getCellValue(2);
                 const unitValue = getCellValue(3);
-                const deliveryDateValue = getCellValue(4, true); // isDateColumn = true
-                const noteValue = getCellValue(5);
+                const noteValue = getCellValue(4);
 
                 const productName = productNameValue ? productNameValue.toString().trim() : '';
                 const qty = qtyValue ? (typeof qtyValue === 'number' ? qtyValue : parseFloat(qtyValue)) : 1;
@@ -532,68 +551,11 @@ const PurchaseRequisitionForm = () => {
                     productId = foundProduct.value;
                 }
 
-                // Parse delivery date
-                let deliveryDate = new Date();
-                if (deliveryDateValue) {
-                    // Check if it's an Excel date serial number object
-                    if (deliveryDateValue && typeof deliveryDateValue === 'object' && deliveryDateValue.isExcelDateSerial) {
-                        // Excel date serial number (days since 1900-01-01)
-                        // Excel epoch is 1899-12-30 (not 1900-01-01)
-                        const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
-                        const serialNumber = deliveryDateValue.value;
-                        const jsDate = new Date(excelEpoch.getTime() + (serialNumber - 1) * 24 * 60 * 60 * 1000);
-                        // Extract date parts to avoid timezone issues
-                        deliveryDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
-                    } else if (deliveryDateValue instanceof Date) {
-                        // ExcelJS returns Date object - extract date parts to avoid timezone issues
-                        deliveryDate = new Date(
-                            deliveryDateValue.getFullYear(),
-                            deliveryDateValue.getMonth(),
-                            deliveryDateValue.getDate()
-                        );
-                    } else if (typeof deliveryDateValue === 'number') {
-                        // Could be Excel date serial number or just a number
-                        // If it's a small number (< 100000), likely a date serial
-                        if (deliveryDateValue > 0 && deliveryDateValue < 100000) {
-                            // Excel date serial number
-                            const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
-                            const jsDate = new Date(excelEpoch.getTime() + (deliveryDateValue - 1) * 24 * 60 * 60 * 1000);
-                            deliveryDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
-                        } else {
-                            // Not a date, use current date
-                            deliveryDate = new Date();
-                        }
-                    } else {
-                        // Try to parse as date string (format: DD/MM/YYYY or YYYY-MM-DD)
-                        const dateStr = deliveryDateValue.toString().trim();
-                        let parsedDate = null;
-
-                        // Try DD/MM/YYYY format
-                        if (dateStr.includes('/')) {
-                            const parts = dateStr.split('/');
-                            if (parts.length === 3) {
-                                const day = parseInt(parts[0], 10);
-                                const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-                                const year = parseInt(parts[2], 10);
-                                parsedDate = new Date(year, month, day);
-                            }
-                        } else {
-                            // Try standard date parsing
-                            parsedDate = new Date(dateStr);
-                        }
-
-                        if (parsedDate && !isNaN(parsedDate.getTime())) {
-                            deliveryDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
-                        }
-                    }
-                }
-
                 importedItems.push({
                     product_id: productId,
                     product_name: productId ? '' : productName,
                     requested_qty: isNaN(qty) || qty <= 0 ? 1 : qty,
                     unit: unit,
-                    delivery_date: deliveryDate,
                     note: note
                 });
             });
@@ -639,7 +601,6 @@ const PurchaseRequisitionForm = () => {
                 { header: 'Sản phẩm', key: 'product', width: 30 },
                 { header: 'Số lượng', key: 'quantity', width: 12 },
                 { header: 'Đơn vị', key: 'unit', width: 12 },
-                { header: 'Ngày giao hàng', key: 'delivery_date', width: 18 },
                 { header: 'Ghi chú', key: 'note', width: 30 }
             ];
 
@@ -657,7 +618,6 @@ const PurchaseRequisitionForm = () => {
                 product: 'Ví dụ: Máy tính Dell XPS 13',
                 quantity: 5,
                 unit: 'Cái',
-                delivery_date: new Date(),
                 note: 'Ghi chú mẫu'
             });
 
@@ -669,7 +629,7 @@ const PurchaseRequisitionForm = () => {
             };
 
             // Format date column
-            worksheet.getColumn('delivery_date').numFmt = 'dd/mm/yyyy';
+
 
             // Freeze header row
             worksheet.views = [
@@ -755,12 +715,20 @@ const PurchaseRequisitionForm = () => {
             if (!item.product_id && (!item.product_name || !item.product_name.trim())) {
                 errors[`item_${index}_product`] = 'Sản phẩm là bắt buộc';
             }
-            if (!item.requested_qty || parseFloat(item.requested_qty) <= 0) {
+            
+            // Validate quantity more specifically
+            const qty = parseFloat(item.requested_qty);
+            if (!item.requested_qty) {
+                errors[`item_${index}_qty`] = 'Số lượng là bắt buộc';
+            } else if (isNaN(qty)) {
+                errors[`item_${index}_qty`] = 'Số lượng phải là một số';
+            } else if (qty < 0) {
+                errors[`item_${index}_qty`] = 'Số lượng không được là số âm';
+            } else if (qty <= 0) {
                 errors[`item_${index}_qty`] = 'Số lượng phải lớn hơn 0';
             }
-            if (!item.delivery_date) {
-                errors[`item_${index}_delivery_date`] = 'Ngày giao hàng là bắt buộc';
-            }
+            
+
         });
 
         return errors;
@@ -796,7 +764,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -837,7 +804,6 @@ const PurchaseRequisitionForm = () => {
                     productName: item.product_name || '',
                     requestedQty: parseFloat(item.requested_qty) || 1,
                     unit: item.unit || '',
-                    deliveryDate: item.delivery_date ? item.delivery_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                     note: item.note || ''
                 }))
             };
@@ -1048,7 +1014,6 @@ const PurchaseRequisitionForm = () => {
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Sản phẩm</th>
                                         <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Số lượng</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Đơn vị</th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ngày giao hàng</th>
                                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ghi chú</th>
                                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Thao tác</th>
                                     </tr>
@@ -1095,6 +1060,25 @@ const PurchaseRequisitionForm = () => {
                                                     onBlur={(e) => {
                                                         const value = e.target.value;
                                                         const numValue = parseFloat(value);
+                                                        
+                                                        // Check for negative values first
+                                                        if (numValue < 0) {
+                                                            setValidationErrors(prev => ({
+                                                                ...prev,
+                                                                [`item_${index}_qty`]: 'Số lượng không được là số âm'
+                                                            }));
+                                                            return;
+                                                        }
+                                                        
+                                                        // Clear error if value is valid
+                                                        if (numValue > 0) {
+                                                            setValidationErrors(prev => {
+                                                                const newErrors = { ...prev };
+                                                                delete newErrors[`item_${index}_qty`];
+                                                                return newErrors;
+                                                            });
+                                                        }
+                                                        
                                                         // Auto-set to 1 if empty or < 1 (số lượng phải là số nguyên dương)
                                                         if (value === '' || value === null || isNaN(numValue) || numValue < 1) {
                                                             setFormData(prev => {
@@ -1112,7 +1096,7 @@ const PurchaseRequisitionForm = () => {
                                                     }}
                                                     className={`w-20 px-2 py-1 border rounded text-sm text-right ${validationErrors[`item_${index}_qty`] ? 'border-red-500' : 'border-gray-300'}`}
                                                     step="1"
-                                                    min="1"
+                                                    onInvalid={(e) => e.preventDefault()}
                                                 />
                                                 {validationErrors[`item_${index}_qty`] && (
                                                     <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_qty`]}</p>
@@ -1129,18 +1113,6 @@ const PurchaseRequisitionForm = () => {
                                                 />
                                                 {validationErrors[`item_${index}_unit`] && (
                                                     <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_unit`]}</p>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <DatePicker
-                                                    selected={item.delivery_date}
-                                                    onChange={(date) => handleItemChange(index, 'delivery_date', date)}
-                                                    dateFormat="dd/MM/yyyy"
-                                                    className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    placeholderText="Chọn ngày"
-                                                />
-                                                {validationErrors[`item_${index}_delivery_date`] && (
-                                                    <p className="text-xs text-red-600 mt-1">{validationErrors[`item_${index}_delivery_date`]}</p>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">

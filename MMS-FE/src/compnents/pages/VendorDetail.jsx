@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { vendorService } from "../../api/vendorService";
 import { translatePOStatus, translateApprovalStatus, getStatusColor } from "../../utils/translations";
+import PermissionGuard from "../PermissionGuard";
 
 const Stat = ({ label, value }) => (
   <div className="flex-1 text-center">
@@ -83,6 +84,16 @@ export default function VendorDetail() {
   };
 
   return (
+    <PermissionGuard 
+      anyOf={['vendor.view']} 
+      fallback={
+        <div className="p-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-yellow-800">Bạn không có quyền xem chi tiết nhà cung cấp.</p>
+          </div>
+        </div>
+      }
+    >
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -283,5 +294,6 @@ export default function VendorDetail() {
         </aside>
       </div>
     </div>
+    </PermissionGuard>
   );
 }

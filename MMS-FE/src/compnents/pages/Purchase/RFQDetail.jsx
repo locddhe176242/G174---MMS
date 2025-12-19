@@ -263,9 +263,19 @@ export default function RFQDetail() {
   
   const selectedVendors = data.selectedVendors || [];
    
-  // Số NCC được mời = selectedVendorIds, nếu không có thì dùng số quotation
+  // Tính số nhà cung cấp được mời một cách chính xác
+  let invitedVendorCount = 0;
+  if (selectedVendorIds.length > 0) {
+    invitedVendorCount = selectedVendorIds.length;
+  } else if (selectedVendors.length > 0) {
+    invitedVendorCount = selectedVendors.length;
+  } else {
+    // Nếu không có thông tin về NCC được mời, dùng unique vendor IDs từ quotations
+    const uniqueVendorIds = new Set(quotations.map(q => q.vendorId || q.vendor_id));
+    invitedVendorCount = Math.max(uniqueVendorIds.size, quotations.length);
+  }
+  
   // Số báo giá nhận được = số quotation
-  const invitedVendorCount = selectedVendorIds.length > 0 ? selectedVendorIds.length : quotations.length;
   const receivedQuotationCount = quotations.length;
 
   return (
@@ -492,15 +502,17 @@ export default function RFQDetail() {
                               </div>
                               {vendorQuotation && (
                                 <div className="text-xs text-gray-600 space-y-1">
-                                  <div>
-                                    <span className="font-medium">Số BG: </span>
-                                    <button
-                                      onClick={() => handleViewQuotation(vendorQuotation)}
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
-                                    </button>
-                                  </div>
+                                  {(vendorQuotation.quotationNo || vendorQuotation.quotation_no) && (
+                                    <div>
+                                      <span className="font-medium">Số BG: </span>
+                                      <button
+                                        onClick={() => handleViewQuotation(vendorQuotation)}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
+                                      </button>
+                                    </div>
+                                  )}
                                   <div>
                                     <span className="font-medium">Giá trị: </span>
                                     <span className="text-green-600 font-semibold">
@@ -544,15 +556,17 @@ export default function RFQDetail() {
                               </div>
                               {vendorQuotation && (
                                 <div className="text-xs text-gray-600 space-y-1">
-                                  <div>
-                                    <span className="font-medium">Số BG: </span>
-                                    <button
-                                      onClick={() => handleViewQuotation(vendorQuotation)}
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
-                                    </button>
-                                  </div>
+                                  {(vendorQuotation.quotationNo || vendorQuotation.quotation_no) && (
+                                    <div>
+                                      <span className="font-medium">Số BG: </span>
+                                      <button
+                                        onClick={() => handleViewQuotation(vendorQuotation)}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {vendorQuotation.quotationNo || vendorQuotation.quotation_no || "-"}
+                                      </button>
+                                    </div>
+                                  )}
                                   <div>
                                     <span className="font-medium">Giá trị: </span>
                                     <span className="text-green-600 font-semibold">
