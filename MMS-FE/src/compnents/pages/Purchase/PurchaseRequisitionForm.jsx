@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
-import CreatableSelect from 'react-select/creatable';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { getCurrentUser } from '../../../api/authService';
 import { getProducts } from '../../../api/productService';
 import purchaseRequisitionService from '../../../api/purchaseRequisitionService';
 import { getCurrentUserProfile } from '../../../api/userProfileService';
-import * as ExcelJS from 'exceljs';
 
 const PurchaseRequisitionForm = () => {
     const navigate = useNavigate();
@@ -35,7 +33,6 @@ const PurchaseRequisitionForm = () => {
     const [validationErrors, setValidationErrors] = useState({});
     const [products, setProducts] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
-    const fileInputRef = useRef(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState(null);
@@ -427,279 +424,6 @@ const PurchaseRequisitionForm = () => {
         }));
     };
 
-    // Handle Excel import
-    const handleExcelImport = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Check file extension
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-        if (!['xlsx', 'xls'].includes(fileExtension)) {
-            toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
-            return;
-        }
-
-        try {
-            const workbook = new ExcelJS.Workbook();
-            const arrayBuffer = await file.arrayBuffer();
-            await workbook.xlsx.load(arrayBuffer);
-
-            // Get first worksheet
-            const worksheet = workbook.worksheets[0];
-            if (!worksheet) {
-                toast.error('File Excel không có dữ liệu');
-                return;
-            }
-
-            // Expected columns: Sản phẩm, Số lượng, Đơn vị, Ngày giao hàng, Ghi chú
-            // Skip header row (row 1), start from row 2
-            const importedItems = [];
-
-            worksheet.eachRow((row, rowNum) => {
-                if (rowNum === 1) return; // Skip header
-
-                // Get cell values - ExcelJS uses 1-based indexing
-                const getCellValue = (colIndex, isDateColumn = false) => {
-                    const cell = row.getCell(colIndex);
-                    if (!cell || cell.value === null || cell.value === undefined) return null;
-
-                    // For date column, check if cell is formatted as date
-                    if (isDateColumn) {
-                        // Check if cell has date format
-                        if (cell.type === ExcelJS.ValueType.Date || cell.value instanceof Date) {
-                            if (cell.value instanceof Date) {
-                                // Create new date to avoid timezone issues
-                                return new Date(cell.value.getFullYear(), cell.value.getMonth(), cell.value.getDate());
-                            }
-                            return new Date(cell.value);
-                        }
-
-                        // If number and cell format suggests date, treat as Excel date serial
-                        if (cell.type === ExcelJS.ValueType.Number && cell.numFmt) {
-                            // Check if format contains date indicators (d, m, y)
-                            const dateFormats = ['d', 'm', 'y', 'dd', 'mm', 'yy', 'yyyy', 'mmm', 'mmmm'];
-                            const hasDateFormat = dateFormats.some(fmt => cell.numFmt.toLowerCase().includes(fmt));
-                            if (hasDateFormat) {
-                                // This is an Excel date serial number
-                                return { isExcelDateSerial: true, value: cell.value };
-                            }
-                        }
-                    }
-
-                    // Handle date cells - ExcelJS may return Date object or number
-                    if (cell.type === ExcelJS.ValueType.Date || cell.value instanceof Date) {
-                        if (cell.value instanceof Date) {
-                            // Create new date to avoid timezone issues
-                            return new Date(cell.value.getFullYear(), cell.value.getMonth(), cell.value.getDate());
-                        }
-                        return new Date(cell.value);
-                    }
-
-                    // Handle number cells
-                    if (cell.type === ExcelJS.ValueType.Number) {
-                        return cell.value;
-                    }
-
-                    // Handle formula cells
-                    if (cell.type === ExcelJS.ValueType.Formula) {
-                        return cell.result;
-                    }
-
-                    // Default: convert to string
-                    return cell.value?.toString() || '';
-                };
-
-                // Map columns: A=Sản phẩm, B=Số lượng, C=Đơn vị, D=Ngày giao hàng, E=Ghi chú
-                const productNameValue = getCellValue(1);
-                const qtyValue = getCellValue(2);
-                const unitValue = getCellValue(3);
-                const deliveryDateValue = getCellValue(4, true); // isDateColumn = true
-                const noteValue = getCellValue(5);
-
-                const productName = productNameValue ? productNameValue.toString().trim() : '';
-                const qty = qtyValue ? (typeof qtyValue === 'number' ? qtyValue : parseFloat(qtyValue)) : 1;
-                const unit = unitValue ? unitValue.toString().trim() : '';
-                const note = noteValue ? noteValue.toString().trim() : '';
-
-                // Skip empty rows
-                if (!productName) return;
-
-                // Try to find product by name in products list
-                let productId = null;
-                const foundProduct = products.find(p => {
-                    const label = p.label || '';
-                    return label.includes(productName) || label.toLowerCase().includes(productName.toLowerCase());
-                });
-                if (foundProduct) {
-                    productId = foundProduct.value;
-                }
-
-                // Parse delivery date
-                let deliveryDate = new Date();
-                if (deliveryDateValue) {
-                    // Check if it's an Excel date serial number object
-                    if (deliveryDateValue && typeof deliveryDateValue === 'object' && deliveryDateValue.isExcelDateSerial) {
-                        // Excel date serial number (days since 1900-01-01)
-                        // Excel epoch is 1899-12-30 (not 1900-01-01)
-                        const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
-                        const serialNumber = deliveryDateValue.value;
-                        const jsDate = new Date(excelEpoch.getTime() + (serialNumber - 1) * 24 * 60 * 60 * 1000);
-                        // Extract date parts to avoid timezone issues
-                        deliveryDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
-                    } else if (deliveryDateValue instanceof Date) {
-                        // ExcelJS returns Date object - extract date parts to avoid timezone issues
-                        deliveryDate = new Date(
-                            deliveryDateValue.getFullYear(),
-                            deliveryDateValue.getMonth(),
-                            deliveryDateValue.getDate()
-                        );
-                    } else if (typeof deliveryDateValue === 'number') {
-                        // Could be Excel date serial number or just a number
-                        // If it's a small number (< 100000), likely a date serial
-                        if (deliveryDateValue > 0 && deliveryDateValue < 100000) {
-                            // Excel date serial number
-                            const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
-                            const jsDate = new Date(excelEpoch.getTime() + (deliveryDateValue - 1) * 24 * 60 * 60 * 1000);
-                            deliveryDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
-                        } else {
-                            // Not a date, use current date
-                            deliveryDate = new Date();
-                        }
-                    } else {
-                        // Try to parse as date string (format: DD/MM/YYYY or YYYY-MM-DD)
-                        const dateStr = deliveryDateValue.toString().trim();
-                        let parsedDate = null;
-
-                        // Try DD/MM/YYYY format
-                        if (dateStr.includes('/')) {
-                            const parts = dateStr.split('/');
-                            if (parts.length === 3) {
-                                const day = parseInt(parts[0], 10);
-                                const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-                                const year = parseInt(parts[2], 10);
-                                parsedDate = new Date(year, month, day);
-                            }
-                        } else {
-                            // Try standard date parsing
-                            parsedDate = new Date(dateStr);
-                        }
-
-                        if (parsedDate && !isNaN(parsedDate.getTime())) {
-                            deliveryDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
-                        }
-                    }
-                }
-
-                importedItems.push({
-                    product_id: productId,
-                    product_name: productId ? '' : productName,
-                    requested_qty: isNaN(qty) || qty <= 0 ? 1 : qty,
-                    unit: unit,
-                    delivery_date: deliveryDate,
-                    note: note
-                });
-            });
-
-            if (importedItems.length === 0) {
-                toast.error('Không tìm thấy dữ liệu hợp lệ trong file Excel');
-                return;
-            }
-
-            // Add imported items to form
-            setFormData(prev => ({
-                ...prev,
-                items: [...prev.items, ...importedItems]
-            }));
-
-            toast.success(`Đã import ${importedItems.length} sản phẩm từ Excel`);
-
-            // Reset file input
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        } catch (error) {
-            console.error('Error importing Excel:', error);
-            toast.error('Lỗi khi đọc file Excel: ' + error.message);
-        }
-    };
-
-    // Trigger file input
-    const triggerFileInput = () => {
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
-    };
-
-    // Download Excel template
-    const downloadExcelTemplate = async () => {
-        try {
-            const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Template');
-
-            // Set column headers
-            worksheet.columns = [
-                { header: 'Sản phẩm', key: 'product', width: 30 },
-                { header: 'Số lượng', key: 'quantity', width: 12 },
-                { header: 'Đơn vị', key: 'unit', width: 12 },
-                { header: 'Ngày giao hàng', key: 'delivery_date', width: 18 },
-                { header: 'Ghi chú', key: 'note', width: 30 }
-            ];
-
-            // Style header row
-            worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-            worksheet.getRow(1).fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FF4472C4' }
-            };
-            worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-
-            // Add example row
-            const exampleRow = worksheet.addRow({
-                product: 'Ví dụ: Máy tính Dell XPS 13',
-                quantity: 5,
-                unit: 'Cái',
-                delivery_date: new Date(),
-                note: 'Ghi chú mẫu'
-            });
-
-            // Style example row (light gray background)
-            exampleRow.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFF2F2F2' }
-            };
-
-            // Format date column
-            worksheet.getColumn('delivery_date').numFmt = 'dd/mm/yyyy';
-
-            // Freeze header row
-            worksheet.views = [
-                { state: 'frozen', ySplit: 1 }
-            ];
-
-            // Generate buffer and download
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Template_Phieu_Yeu_Cau_Mua_Hang_${new Date().toISOString().split('T')[0]}.xlsx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            toast.success('Đã tải template Excel thành công!');
-        } catch (error) {
-            console.error('Error downloading Excel template:', error);
-            toast.error('Lỗi khi tải template Excel: ' + error.message);
-        }
-    };
-
-
     const handleProductSelect = (index, selectedOption) => {
         if (selectedOption && selectedOption.product) {
             const product = selectedOption.product;
@@ -928,12 +652,11 @@ const PurchaseRequisitionForm = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Ngày yêu cầu
                             </label>
-                            <DatePicker
-                                selected={formData.requisition_date}
-                                onChange={(date) => handleInputChange('requisition_date', date)}
-                                dateFormat="dd/MM/yyyy"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholderText="Chọn ngày"
+                            <input
+                                type="text"
+                                value={formData.requisition_date ? new Date(formData.requisition_date).toLocaleDateString('vi-VN') : ''}
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                             />
                         </div>
 
@@ -997,33 +720,6 @@ const PurchaseRequisitionForm = () => {
                     <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                         <h2 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm</h2>
                         <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={downloadExcelTemplate}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition flex items-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                Tải Template Excel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={triggerFileInput}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                                Import từ Excel
-                            </button>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls"
-                                onChange={handleExcelImport}
-                                className="hidden"
-                            />
                             <button
                                 type="button"
                                 onClick={addItem}
