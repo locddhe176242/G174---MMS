@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileText, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faFileText, faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { getProductById } from '../../../api/productService';
 import { toast } from 'react-toastify';
 
@@ -74,8 +74,9 @@ const ProductDetail = () => {
                     <button
                         onClick={() => navigate('/products')}
                         className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        ← Quay lại
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                     <h1 className="text-2xl font-semibold">Chi tiết sản phẩm</h1>
                 </div>

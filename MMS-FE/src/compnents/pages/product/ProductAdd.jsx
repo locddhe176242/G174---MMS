@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faImage, faSpinner, faFloppyDisk } from '@fortawesome/free-solid-svg-icons';
+import { faImage, faSpinner, faFloppyDisk, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { getCategories } from '../../../api/categoryService';
 import { createProduct, uploadProductImage } from '../../../api/productService';
 import { toast } from 'react-toastify';
@@ -275,8 +275,9 @@ const ProductAdd = () => {
                     <button
                         onClick={() => navigate('/products')}
                         className="px-3 py-1.5 rounded border hover:bg-gray-50"
+                        title="Quay lại trang trước"
                     >
-                        ← Quay lại
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </button>
                     <h1 className="text-2xl font-semibold">Thêm sản phẩm mới</h1>
                 </div>
