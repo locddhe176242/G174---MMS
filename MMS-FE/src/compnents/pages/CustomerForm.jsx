@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
 import { customerService } from "../../api/customerService";
 import { toast } from "react-toastify";
@@ -318,16 +320,17 @@ export default function CustomerForm() {
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Cập nhật khách hàng" : "Thêm khách hàng mới"}
-            </h1>
+          <div className="flex items-center gap-3">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 rounded border hover:bg-gray-50"
+              title="Quay lại trang trước"
             >
-              Quay lại
+              <FontAwesomeIcon icon={faArrowLeft} />
             </button>
+            <h1 className="text-2xl font-semibold">
+              {isEdit ? "Cập nhật khách hàng" : "Thêm khách hàng mới"}
+            </h1>
           </div>
         </div>
       </div>

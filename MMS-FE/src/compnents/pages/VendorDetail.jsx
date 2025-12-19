@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { vendorService } from "../../api/vendorService";
 import { translatePOStatus, translateApprovalStatus, getStatusColor } from "../../utils/translations";
 
@@ -87,10 +89,11 @@ export default function VendorDetail() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/vendors")}
           className="px-3 py-1.5 rounded border hover:bg-gray-50"
+          title="Quay lại trang trước"
         >
-          ←
+          <FontAwesomeIcon icon={faArrowLeft} />
         </button>
         <h1 className="text-2xl font-semibold">
           {vendorName || `Nhà cung cấp #${data.vendorId}`}

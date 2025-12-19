@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { getCustomerDetail } from "../../api/customerService";
 
 const Stat = ({ label, value }) => (
@@ -54,10 +56,11 @@ export default function CustomerDetail() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/customers")}
           className="px-3 py-1.5 rounded border hover:bg-gray-50"
+          title="Quay lại trang trước"
         >
-          ←
+          <FontAwesomeIcon icon={faArrowLeft} />
         </button>
         <h1 className="text-2xl font-semibold">
           {fullName || `Khách hàng #${data.customerId}`}
